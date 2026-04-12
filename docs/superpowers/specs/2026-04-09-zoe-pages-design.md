@@ -333,7 +333,7 @@ Each card:
 **Empty state:** illustration + "Nenhuma marca configurada" + CTA button
 
 **Mock data:** 3 brands (Nubank active, iFood active, XP pausada)
-
+prefir
 ---
 
 ### 5.8 Alertas (`/alerts`)

@@ -1,0 +1,195 @@
+<style>
+  .preview {
+    background: #F9FAFB;
+    border-radius: 10px;
+    overflow: hidden;
+    font-family: 'Segoe UI', sans-serif;
+    font-size: 11px;
+    color: #07091A;
+    display: flex;
+    min-height: 280px;
+    border: 1px solid #E5E7EB;
+  }
+  .sidebar {
+    width: 160px;
+    background: white;
+    border-right: 1px solid #E5E7EB;
+    padding: 12px 8px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .sidebar-logo {
+    font-size: 14px;
+    font-weight: 800;
+    color: #00A799;
+    padding: 4px 8px 12px;
+    letter-spacing: -0.5px;
+  }
+  .sidebar-section-label {
+    font-size: 9px;
+    font-weight: 600;
+    color: #9CA3AF;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    padding: 8px 8px 4px;
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    cursor: pointer;
+    color: #4B5563;
+  }
+  .nav-item.active {
+    background: #F0FDFA;
+    color: #00A799;
+    font-weight: 600;
+  }
+  .nav-item .icon { width: 14px; height: 14px; border-radius: 2px; background: currentColor; opacity: 0.5; flex-shrink: 0; }
+  .nav-item.active .icon { opacity: 1; }
+  .nav-sub {
+    padding-left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .nav-sub-item {
+    padding: 4px 8px;
+    border-radius: 6px;
+    color: #6B7280;
+    font-size: 10px;
+  }
+  .nav-sub-item.active { color: #00A799; font-weight: 600; }
+  .chevron { margin-left: auto; font-size: 9px; color: #9CA3AF; }
+  .content-area { flex: 1; padding: 12px; }
+  .content-topbar { font-weight: 700; font-size: 13px; margin-bottom: 10px; }
+  .mini-cards { display: flex; gap: 6px; }
+  .mini-card { background: white; border-radius: 6px; padding: 8px; border: 1px solid #E5E7EB; flex: 1; }
+  .mini-card .lbl { font-size: 9px; color: #6B7280; }
+  .mini-card .val { font-size: 14px; font-weight: 700; color: #07091A; }
+  .progress { height: 3px; background: #E5E7EB; border-radius: 2px; margin-top: 4px; }
+  .progress-fill { height: 3px; background: #00A799; border-radius: 2px; }
+  .badge-pill { background: #FF5B35; color: white; font-size: 8px; border-radius: 20px; padding: 0 5px; margin-left: auto; }
+  .user-row { display: flex; align-items: center; gap: 6px; padding: 8px; border-top: 1px solid #E5E7EB; margin-top: auto; }
+  .avatar { width: 24px; height: 24px; border-radius: 50%; background: #00A799; display: flex; align-items: center; justify-content: center; color: white; font-size: 9px; font-weight: 700; flex-shrink: 0; }
+</style>
+
+<h2>Como deve ser a navegação lateral?</h2>
+<p class="subtitle">A sidebar define a arquitetura de informação de todo o produto.</p>
+
+<div class="cards">
+
+  <!-- OPÇÃO A: Flat simples -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="preview">
+        <div class="sidebar">
+          <div class="sidebar-logo">Zoe</div>
+          <div class="nav-item active"><span class="icon"></span> Dashboard</div>
+          <div class="nav-item"><span class="icon"></span> Menções</div>
+          <div class="nav-item"><span class="icon"></span> Marcas</div>
+          <div class="nav-item"><span class="icon"></span> Alertas</div>
+          <div class="nav-item"><span class="icon"></span> Relatórios</div>
+          <div class="user-row">
+            <div class="avatar">DC</div>
+            <div style="font-size:9px;line-height:1.3"><div style="font-weight:600">Douglas Castro</div><div style="color:#6B7280">Admin</div></div>
+          </div>
+        </div>
+        <div class="content-area">
+          <div class="content-topbar">Dashboard</div>
+          <div class="mini-cards">
+            <div class="mini-card"><div class="lbl">Menções</div><div class="val">847</div><div class="progress"><div class="progress-fill" style="width:70%"></div></div></div>
+            <div class="mini-card"><div class="lbl">Sentimento +</div><div class="val" style="color:#00A799">67%</div><div class="progress"><div class="progress-fill" style="width:67%"></div></div></div>
+            <div class="mini-card"><div class="lbl">Campanhas</div><div class="val">8</div><div class="progress"><div class="progress-fill" style="width:40%"></div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Flat simples</h3>
+      <p>5 itens diretos, sem seções. Limpo, fácil de navegar. Ideal para escopo inicial menor.</p>
+    </div>
+  </div>
+
+  <!-- OPÇÃO B: Seções agrupadas com sub-itens colapsáveis -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="preview">
+        <div class="sidebar">
+          <div class="sidebar-logo">Zoe</div>
+          <div class="sidebar-section-label">Principal</div>
+          <div class="nav-item active"><span class="icon"></span> Dashboard</div>
+          <div class="sidebar-section-label">Intelligence</div>
+          <div class="nav-item"><span class="icon"></span> Monitoramento</div>
+          <div class="nav-item"><span class="icon"></span> Sentimento</div>
+          <div class="nav-item"><span class="icon"></span> Influenciadores</div>
+          <div class="sidebar-section-label">Gestão</div>
+          <div class="nav-item"><span class="icon"></span> Marcas <span class="badge-pill">3</span></div>
+          <div class="nav-item"><span class="icon"></span> Alertas <span class="badge-pill">2</span></div>
+          <div class="nav-item"><span class="icon"></span> Relatórios</div>
+          <div class="user-row">
+            <div class="avatar">DC</div>
+            <div style="font-size:9px;line-height:1.3"><div style="font-weight:600">Douglas</div><div style="color:#6B7280">Nubank · Admin</div></div>
+          </div>
+        </div>
+        <div class="content-area">
+          <div class="content-topbar">Dashboard</div>
+          <div class="mini-cards">
+            <div class="mini-card"><div class="lbl">Menções</div><div class="val">847</div><div class="progress"><div class="progress-fill" style="width:70%"></div></div></div>
+            <div class="mini-card"><div class="lbl">Sentimento +</div><div class="val" style="color:#00A799">67%</div><div class="progress"><div class="progress-fill" style="width:67%"></div></div></div>
+            <div class="mini-card"><div class="lbl">Campanhas</div><div class="val">8</div><div class="progress"><div class="progress-fill" style="width:40%"></div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Seções com labels (como Atvera)</h3>
+      <p>Grupos separados por label: Principal / Intelligence / Gestão. Badges de contagem em Alertas e Marcas. Mais próximo do wireframe e da referência Atvera.</p>
+    </div>
+  </div>
+
+  <!-- OPÇÃO C: Item pai colapsável -->
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="preview">
+        <div class="sidebar">
+          <div class="sidebar-logo">Zoe</div>
+          <div class="nav-item active"><span class="icon"></span> Dashboard</div>
+          <div>
+            <div class="nav-item"><span class="icon"></span> Intelligence <span class="chevron">▾</span></div>
+            <div class="nav-sub">
+              <div class="nav-sub-item active">Monitoramento</div>
+              <div class="nav-sub-item">Sentimento</div>
+              <div class="nav-sub-item">Influenciadores</div>
+            </div>
+          </div>
+          <div class="nav-item"><span class="icon"></span> Marcas</div>
+          <div class="nav-item"><span class="icon"></span> Alertas <span class="badge-pill">2</span></div>
+          <div class="nav-item"><span class="icon"></span> Relatórios</div>
+          <div class="user-row">
+            <div class="avatar">DC</div>
+            <div style="font-size:9px;line-height:1.3"><div style="font-weight:600">Douglas</div><div style="color:#6B7280">Nubank · Admin</div></div>
+          </div>
+        </div>
+        <div class="content-area">
+          <div class="content-topbar">Dashboard</div>
+          <div class="mini-cards">
+            <div class="mini-card"><div class="lbl">Menções</div><div class="val">847</div><div class="progress"><div class="progress-fill" style="width:70%"></div></div></div>
+            <div class="mini-card"><div class="lbl">Sentimento +</div><div class="val" style="color:#00A799">67%</div><div class="progress"><div class="progress-fill" style="width:67%"></div></div></div>
+            <div class="mini-card"><div class="lbl">Campanhas</div><div class="val">8</div><div class="progress"><div class="progress-fill" style="width:40%"></div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Accordion colapsável</h3>
+      <p>"Intelligence" é um item pai que abre/fecha para revelar sub-páginas. Mais compacto quando fechado, mantém hierarquia quando aberto.</p>
+    </div>
+  </div>
+
+</div>

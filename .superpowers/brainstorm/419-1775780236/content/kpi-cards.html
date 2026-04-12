@@ -1,0 +1,198 @@
+<style>
+  .preview-wrap {
+    background: #F9FAFB;
+    border-radius: 10px;
+    padding: 14px;
+    font-family: 'Segoe UI', sans-serif;
+    font-size: 11px;
+    color: #07091A;
+    border: 1px solid #E5E7EB;
+  }
+  .cards-row { display: flex; gap: 8px; }
+  /* Style A – Clean minimal */
+  .kpi-a {
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #E5E7EB;
+    padding: 14px;
+    flex: 1;
+  }
+  .kpi-a .lbl { font-size: 10px; color: #6B7280; margin-bottom: 4px; }
+  .kpi-a .val { font-size: 22px; font-weight: 700; }
+  .kpi-a .trend { font-size: 9px; color: #16A34A; margin-top: 3px; }
+  .kpi-a .trend.neg { color: #DC2626; }
+
+  /* Style B – Atvera-style with progress */
+  .kpi-b {
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #E5E7EB;
+    padding: 14px;
+    flex: 1;
+  }
+  .kpi-b .lbl { font-size: 10px; color: #6B7280; margin-bottom: 4px; }
+  .kpi-b .val { font-size: 20px; font-weight: 700; }
+  .kpi-b .target { font-size: 9px; color: #9CA3AF; margin-top: 2px; }
+  .kpi-b .prog-wrap { margin-top: 8px; }
+  .kpi-b .prog-bar { height: 4px; background: #E5E7EB; border-radius: 2px; }
+  .kpi-b .prog-fill { height: 4px; border-radius: 2px; }
+  .kpi-b .prog-label { display: flex; justify-content: space-between; font-size: 9px; color: #9CA3AF; margin-top: 3px; }
+
+  /* Style C – Bordered accent + icon */
+  .kpi-c {
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #E5E7EB;
+    border-top: 3px solid #00A799;
+    padding: 14px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .kpi-c.ember { border-top-color: #FF5B35; }
+  .kpi-c .header { display: flex; justify-content: space-between; align-items: flex-start; }
+  .kpi-c .icon-box { width: 28px; height: 28px; border-radius: 6px; background: #F0FDFA; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+  .kpi-c.ember .icon-box { background: #FFF7F5; }
+  .kpi-c .lbl { font-size: 10px; color: #6B7280; }
+  .kpi-c .val { font-size: 20px; font-weight: 700; }
+  .kpi-c .footer { font-size: 9px; color: #9CA3AF; margin-top: 2px; border-top: 1px solid #F3F4F6; padding-top: 6px; }
+  .kpi-c .footer span { color: #16A34A; font-weight: 600; }
+</style>
+
+<h2>Qual estilo de card de KPI combina com a Zoe?</h2>
+<p class="subtitle">Esses cards aparecem no Dashboard e em outras páginas com métricas.</p>
+
+<div class="cards">
+
+  <!-- A: Clean minimal -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="preview-wrap">
+        <div class="cards-row">
+          <div class="kpi-a">
+            <div class="lbl">Menções esta semana</div>
+            <div class="val">847</div>
+            <div class="trend">↑ 12% vs semana anterior</div>
+          </div>
+          <div class="kpi-a">
+            <div class="lbl">Sentimento positivo</div>
+            <div class="val" style="color:#00A799">67%</div>
+            <div class="trend">↑ 3pp este mês</div>
+          </div>
+          <div class="kpi-a">
+            <div class="lbl">Campanhas ativas</div>
+            <div class="val">8</div>
+            <div class="trend neg">↓ 2 finalizadas hoje</div>
+          </div>
+          <div class="kpi-a">
+            <div class="lbl">Escrow em custódia</div>
+            <div class="val" style="font-size:17px">R$ 124.500</div>
+            <div class="trend">4 pagamentos pendentes</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Minimalista com tendência</h3>
+      <p>Valor grande, label pequena, seta de tendência (↑↓). Limpo e direto. Sem barra de progresso.</p>
+    </div>
+  </div>
+
+  <!-- B: Atvera-style progress -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="preview-wrap">
+        <div class="cards-row">
+          <div class="kpi-b">
+            <div class="lbl">Menções esta semana</div>
+            <div class="val">847</div>
+            <div class="target">Meta: 1.000</div>
+            <div class="prog-wrap">
+              <div class="prog-bar"><div class="prog-fill" style="width:84%;background:#00A799"></div></div>
+              <div class="prog-label"><span>84% da meta</span><span>1.000</span></div>
+            </div>
+          </div>
+          <div class="kpi-b">
+            <div class="lbl">Sentimento positivo</div>
+            <div class="val" style="color:#00A799">67%</div>
+            <div class="target">Meta: 70%</div>
+            <div class="prog-wrap">
+              <div class="prog-bar"><div class="prog-fill" style="width:95%;background:#00A799"></div></div>
+              <div class="prog-label"><span>95% da meta</span><span>70%</span></div>
+            </div>
+          </div>
+          <div class="kpi-b">
+            <div class="lbl">Campanhas ativas</div>
+            <div class="val">8</div>
+            <div class="target">de 10 planejadas</div>
+            <div class="prog-wrap">
+              <div class="prog-bar"><div class="prog-fill" style="width:80%;background:#D97706"></div></div>
+              <div class="prog-label"><span>80% planejadas</span><span>10</span></div>
+            </div>
+          </div>
+          <div class="kpi-b">
+            <div class="lbl">Escrow em custódia</div>
+            <div class="val" style="font-size:15px">R$ 124.500</div>
+            <div class="target">Limite: R$ 150k</div>
+            <div class="prog-wrap">
+              <div class="prog-bar"><div class="prog-fill" style="width:83%;background:#07091A"></div></div>
+              <div class="prog-label"><span>83% do limite</span><span>R$ 150k</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Com meta e progresso (estilo Atvera)</h3>
+      <p>Progress bar mostrando % atingido da meta. Mais contextual — o usuário vê não só o valor mas onde está em relação ao objetivo.</p>
+    </div>
+  </div>
+
+  <!-- C: Accent border + icon -->
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="preview-wrap">
+        <div class="cards-row">
+          <div class="kpi-c">
+            <div class="header">
+              <div class="lbl">Menções esta semana</div>
+              <div class="icon-box">📣</div>
+            </div>
+            <div class="val">847</div>
+            <div class="footer"><span>↑ 12%</span> vs semana anterior</div>
+          </div>
+          <div class="kpi-c">
+            <div class="header">
+              <div class="lbl">Sentimento positivo</div>
+              <div class="icon-box">😊</div>
+            </div>
+            <div class="val" style="color:#00A799">67%</div>
+            <div class="footer"><span>↑ 3pp</span> este mês</div>
+          </div>
+          <div class="kpi-c ember">
+            <div class="header">
+              <div class="lbl">Campanhas ativas</div>
+              <div class="icon-box">🚀</div>
+            </div>
+            <div class="val">8</div>
+            <div class="footer">2 finalizando <span style="color:#D97706">hoje</span></div>
+          </div>
+          <div class="kpi-c" style="border-top-color:#07091A">
+            <div class="header">
+              <div class="lbl">Escrow em custódia</div>
+              <div class="icon-box" style="background:#F3F4F6">💰</div>
+            </div>
+            <div class="val" style="font-size:16px">R$ 124.500</div>
+            <div class="footer">4 pagamentos pendentes</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Borda colorida + ícone</h3>
+      <p>Borda superior colorida por tipo de métrica, ícone no canto. Visual mais marcante, diferencia cada card pelo tipo.</p>
+    </div>
+  </div>
+
+</div>
