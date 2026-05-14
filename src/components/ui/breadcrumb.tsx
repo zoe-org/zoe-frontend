@@ -1,9 +1,7 @@
 import { useLocation } from "react-router-dom"
-import { ChevronRight } from "lucide-react"
 
 const routeLabels: Record<string, string> = {
   "/dashboard": "Dashboard",
-  "/intelligence": "Intelligence",
   "/intelligence/monitoring": "Monitoramento",
   "/intelligence/sentiment": "Sentimento",
   "/intelligence/influencers": "Influenciadores",
@@ -12,33 +10,32 @@ const routeLabels: Record<string, string> = {
   "/reports": "Relatórios",
 }
 
-const parentGroups: Record<string, { label: string; path?: string }> = {
-  "/intelligence/monitoring": { label: "Intelligence" },
-  "/intelligence/sentiment": { label: "Intelligence" },
-  "/intelligence/influencers": { label: "Intelligence" },
-  "/alerts": { label: "Intelligence" },
-  "/brands": { label: "Gestão" },
-  "/reports": { label: "Gestão" },
+const parentGroups: Record<string, string> = {
+  "/intelligence/monitoring": "Intelligence",
+  "/intelligence/sentiment": "Intelligence",
+  "/intelligence/influencers": "Intelligence",
+  "/alerts": "Intelligence",
+  "/brands": "Gestão",
+  "/reports": "Gestão",
 }
 
 export function Breadcrumb() {
   const { pathname } = useLocation()
 
-  if (pathname === "/dashboard") return null
-
-  const parent = parentGroups[pathname]
   const currentLabel = routeLabels[pathname]
   if (!currentLabel) return null
 
+  const parent = parentGroups[pathname]
+
   return (
-    <nav className="flex items-center gap-1 text-xs text-[#6B7280] mb-4">
+    <nav className="flex items-center gap-1.5 font-mono-zoe text-xs">
       {parent && (
         <>
-          <span>{parent.label}</span>
-          <ChevronRight className="w-3 h-3" />
+          <span style={{ color: "var(--ink-muted)" }}>{parent}</span>
+          <span style={{ color: "var(--ink-muted)" }} className="select-none mx-2">/</span>
         </>
       )}
-      <span className="text-[--color-midnight] font-medium">{currentLabel}</span>
+      <span style={{ color: "var(--ink)" }} className="">{currentLabel}</span>
     </nav>
   )
 }
