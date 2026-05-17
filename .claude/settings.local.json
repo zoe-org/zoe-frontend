@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(C:/Users/julia/.claude/plugins/cache/superpowers-marketplace/superpowers/5.0.7/skills/brainstorming/scripts/start-server.sh --project-dir \"d:/Projects/Zoe - Startup/zoe-frontend\")"
-    ]
-  }
-}
