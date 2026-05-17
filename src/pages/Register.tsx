@@ -181,8 +181,6 @@ const accountSchema = z.object({
   password: z.string().min(8, "Mínimo 8 caracteres"),
   confirmPassword: z.string().min(1, "Confirme sua senha"),
   company: z.string().min(1, "Empresa obrigatória"),
-  gender: z.string().min(1, "Gênero obrigatório"),
-  birthDate: z.string().min(1, "Data de nascimento obrigatória"),
   terms: z.literal(true, { error: () => ({ message: "Aceite os termos" }) }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "As senhas não coincidem",
@@ -192,7 +190,7 @@ const accountSchema = z.object({
 type AccountData = z.infer<typeof accountSchema>
 
 function StepAccount({ onNext, defaultEmail = "" }: { onNext: (data: AccountData) => void; defaultEmail?: string }) {
-  const form = useForm<AccountData>({ resolver: zodResolver(accountSchema), defaultValues: { email: defaultEmail, gender: "", birthDate: "" } })
+  const form = useForm<AccountData>({ resolver: zodResolver(accountSchema), defaultValues: { email: defaultEmail } })
   const [error, setError] = useState("")
   const [showPw, setShowPw] = useState(false)
   const password = form.watch("password") ?? ""
@@ -245,72 +243,6 @@ function StepAccount({ onNext, defaultEmail = "" }: { onNext: (data: AccountData
             <Label htmlFor="company">Empresa ou agência</Label>
             <Input id="company" {...form.register("company")} placeholder="Minha Empresa" aria-invalid={!!form.formState.errors.company} />
             {form.formState.errors.company && <p className="text-xs text-destructive">{form.formState.errors.company.message}</p>}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="gender">Gênero</Label>
-              <Controller
-                control={form.control}
-                name="gender"
-                render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value ?? ""}>
-                    <SelectTrigger
-                      id="gender"
-                      className="w-full"
-                      aria-invalid={!!form.formState.errors.gender}
-                    >
-                      <SelectValue placeholder="Selecione..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="male">Masculino</SelectItem>
-                      <SelectItem value="female">Feminino</SelectItem>
-                      <SelectItem value="other">Outro</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              {form.formState.errors.gender && <p className="text-xs text-destructive">{form.formState.errors.gender.message}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <Label>Data de nascimento</Label>
-              <Controller
-                control={form.control}
-                name="birthDate"
-                render={({ field }) => {
-                  const selected = field.value ? new Date(field.value) : undefined
-                  return (
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          aria-invalid={!!form.formState.errors.birthDate}
-                          className="w-full justify-start gap-2 bg-transparent font-normal aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20"
-                        >
-                          <CalendarIcon className="size-4 text-muted-foreground" />
-                          {selected
-                            ? format(selected, "dd/MM/yyyy", { locale: ptBR })
-                            : <span className="text-muted-foreground">dd/mm/aaaa</span>}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={selected}
-                          onSelect={(date) => field.onChange(date ? date.toISOString() : "")}
-                          captionLayout="dropdown"
-                          defaultMonth={selected ?? new Date(2000, 0)}
-                          startMonth={new Date(1920, 0)}
-                          endMonth={new Date()}
-                          locale={ptBR}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  )
-                }}
-              />
-              {form.formState.errors.birthDate && <p className="text-xs text-destructive">{form.formState.errors.birthDate.message}</p>}
-            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
