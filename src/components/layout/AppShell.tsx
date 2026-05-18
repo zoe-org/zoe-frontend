@@ -1,14 +1,19 @@
 import { useState, useEffect } from "react"
-import { NavLink, Outlet, useLocation } from "react-router-dom"
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom"
 import {
   House, Brain, Settings, Bell,
   ChevronDown, ChevronUp, Search, PanelLeftClose, PanelLeftOpen, ChevronsUpDown,
-  Sun, Moon,
+  Sun, Moon, LogOut,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useAuth } from "@/features/auth/AuthContext"
+import { useFeature } from "@/features/auth/useFeature"
 import { Breadcrumb } from "@/components/ui/breadcrumb"
+import { TenantSwitcher } from "@/components/layout/TenantSwitcher"
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import ZoeLogo from "@/assets/zoe-logo.svg?react"
 
 const STORAGE_INTEL_KEY = "zoe_sidebar_intel_open"
@@ -48,8 +53,11 @@ const SubNavItem = ({ to, children, badge }: { to: string, children: React.React
 )
 
 export function AppShell() {
-  const { user } = useAuth()
+  const { user, role, signOut } = useAuth()
+  const hasIntelligence = useFeature("intelligence")
+  const hasOperations = useFeature("operations")
   const location = useLocation()
+  const navigate = useNavigate()
   const { resolvedTheme, setTheme } = useTheme()
   const isDark = resolvedTheme === "dark"
 
@@ -115,64 +123,92 @@ export function AppShell() {
             {sidebarOpen && <span>Dashboard</span>}
           </NavLink>
 
-          <button
-            onClick={() => sidebarOpen ? setIntelOpen(!intelOpen) : setSidebarOpen(true)}
-            className={`w-full flex items-center py-2 rounded-md text-[14px] font-medium transition-colors text-[#697788] dark:text-[#8A91A3] ${sidebarOpen ? "pl-3 justify-between" : "justify-center px-2"}`}
-          >
-            <span className={`flex items-center ${sidebarOpen ? "gap-2" : ""}`}>
-              <Brain className="w-[18px] h-[18px] shrink-0" strokeWidth={2.5} />
-              {sidebarOpen && <span>Intelligence</span>}
-            </span>
-            {sidebarOpen && (intelOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
-          </button>
+          {hasIntelligence && (
+            <>
+              <button
+                onClick={() => sidebarOpen ? setIntelOpen(!intelOpen) : setSidebarOpen(true)}
+                className={`w-full flex items-center py-2 rounded-md text-[14px] font-medium transition-colors text-[#697788] dark:text-[#8A91A3] ${sidebarOpen ? "pl-3 justify-between" : "justify-center px-2"}`}
+              >
+                <span className={`flex items-center ${sidebarOpen ? "gap-2" : ""}`}>
+                  <Brain className="w-[18px] h-[18px] shrink-0" strokeWidth={2.5} />
+                  {sidebarOpen && <span>Intelligence</span>}
+                </span>
+                {sidebarOpen && (intelOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
+              </button>
 
-          {sidebarOpen && intelOpen && (
-            <div className="ml-[21px] border-l-2 border-[#E5E7EB] dark:border-[#1C1F2E] flex flex-col mt-0 mb-2">
-              <SubNavItem to="/intelligence/monitoring">Monitoramento</SubNavItem>
-              <SubNavItem to="/intelligence/sentiment">Sentimento</SubNavItem>
-              <SubNavItem to="/intelligence/influencers">Influenciadores</SubNavItem>
-              <SubNavItem to="/alerts" badge={<span className="bg-ember text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">3</span>}>Alertas</SubNavItem>
-            </div>
+              {sidebarOpen && intelOpen && (
+                <div className="ml-[21px] border-l-2 border-[#E5E7EB] dark:border-[#1C1F2E] flex flex-col mt-0 mb-2">
+                  <SubNavItem to="/intelligence/monitoring">Monitoramento</SubNavItem>
+                  <SubNavItem to="/intelligence/sentiment">Sentimento</SubNavItem>
+                  <SubNavItem to="/intelligence/influencers">Influenciadores</SubNavItem>
+                  <SubNavItem to="/alerts" badge={<span className="bg-ember text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">3</span>}>Alertas</SubNavItem>
+                </div>
+              )}
+            </>
           )}
 
-          <button
-            onClick={() => sidebarOpen ? setGestaoOpen(!gestaoOpen) : setSidebarOpen(true)}
-            className={`w-full flex items-center py-2 rounded-md text-[14px] font-medium transition-colors text-[#697788] dark:text-[#8A91A3] ${sidebarOpen ? "pl-3 justify-between" : "justify-center px-2"}`}
-          >
-            <span className={`flex items-center ${sidebarOpen ? "gap-2" : ""}`}>
-              <Settings className="w-[18px] h-[18px] shrink-0" strokeWidth={2.5} />
-              {sidebarOpen && <span>Gestão</span>}
-            </span>
-            {sidebarOpen && (gestaoOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
-          </button>
+          {(hasOperations || hasIntelligence) && (
+            <>
+              <button
+                onClick={() => sidebarOpen ? setGestaoOpen(!gestaoOpen) : setSidebarOpen(true)}
+                className={`w-full flex items-center py-2 rounded-md text-[14px] font-medium transition-colors text-[#697788] dark:text-[#8A91A3] ${sidebarOpen ? "pl-3 justify-between" : "justify-center px-2"}`}
+              >
+                <span className={`flex items-center ${sidebarOpen ? "gap-2" : ""}`}>
+                  <Settings className="w-[18px] h-[18px] shrink-0" strokeWidth={2.5} />
+                  {sidebarOpen && <span>Gestão</span>}
+                </span>
+                {sidebarOpen && (gestaoOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
+              </button>
 
-          {sidebarOpen && gestaoOpen && (
-            <div className="ml-[21px] border-l-2 border-[#E5E7EB] dark:border-[#1C1F2E] flex flex-col mt-0 mb-2">
-              <SubNavItem to="/brands">Marcas</SubNavItem>
-              <SubNavItem to="/reports">Relatórios</SubNavItem>
-              <SubNavItem to="/users">Usuários</SubNavItem>
-            </div>
+              {sidebarOpen && gestaoOpen && (
+                <div className="ml-[21px] border-l-2 border-[#E5E7EB] dark:border-[#1C1F2E] flex flex-col mt-0 mb-2">
+                  {hasIntelligence && <SubNavItem to="/brands">Marcas</SubNavItem>}
+                  <SubNavItem to="/reports">Relatórios</SubNavItem>
+                  <SubNavItem to="/users">Usuários</SubNavItem>
+                </div>
+              )}
+            </>
           )}
         </nav>
 
         {/* Footer */}
         <div className="border-t border-[#E5E7EB] dark:border-[#1C1F2E]">
-          <div className={`p-2 m-2 flex items-center rounded-lg hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D] cursor-pointer transition-colors text-[#697788] dark:text-[#8A91A3] ${sidebarOpen ? "gap-3" : "justify-center"}`}>
-            <Avatar className="w-9 h-9 shrink-0">
-              <AvatarFallback className="bg-teal-500 text-white text-sm font-semibold">
-                {user?.name?.[0]?.toUpperCase() ?? user?.email?.[0]?.toUpperCase() ?? "U"}
-              </AvatarFallback>
-            </Avatar>
-            {sidebarOpen && (
-              <>
-                <div className="flex-1 min-w-0 text-[13px]">
-                  <div className="font-semibold text-[#111827] dark:text-[#E6E8EF] truncate">{user?.name ?? "User"}</div>
-                  <div className="text-[#6B7280] dark:text-[#8A91A3] text-xs truncate">Intelligence • Admin</div>
-                </div>
-                <ChevronsUpDown className="w-4 h-4 text-[#6B7280] dark:text-[#8A91A3]" />
-              </>
-            )}
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                aria-label="Menu do usuário"
+                className={`w-[calc(100%-1rem)] p-2 m-2 flex items-center rounded-lg hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D] cursor-pointer transition-colors text-[#697788] dark:text-[#8A91A3] ${sidebarOpen ? "gap-3" : "justify-center"}`}
+              >
+                <Avatar className="w-9 h-9 shrink-0">
+                  <AvatarFallback className="bg-teal-500 text-white text-sm font-semibold">
+                    {user?.name?.[0]?.toUpperCase() ?? user?.email?.[0]?.toUpperCase() ?? "U"}
+                  </AvatarFallback>
+                </Avatar>
+                {sidebarOpen && (
+                  <>
+                    <div className="flex-1 min-w-0 text-[13px] text-left">
+                      <div className="font-semibold text-[#111827] dark:text-[#E6E8EF] truncate">{user?.name ?? "User"}</div>
+                      <div className="text-[#6B7280] dark:text-[#8A91A3] text-xs truncate">{role ?? "—"}</div>
+                    </div>
+                    <ChevronsUpDown className="w-4 h-4 text-[#6B7280] dark:text-[#8A91A3]" />
+                  </>
+                )}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="top" align="start" className="w-56">
+              <DropdownMenuLabel className="text-xs">
+                <div className="font-semibold truncate">{user?.name ?? "User"}</div>
+                <div className="text-[#6B7280] font-normal truncate">{user?.email}</div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="cursor-pointer text-neg focus:text-neg"
+                onSelect={async () => { await signOut(); navigate("/login", { replace: true }) }}
+              >
+                <LogOut className="w-4 h-4 mr-2" /> Sair
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
       </aside>
@@ -191,11 +227,7 @@ export function AppShell() {
               className="w-75 h-8 pl-8 pr-3 text-xs  border border-[#E5E7EB] dark:border-[#262A3A] dark:text-[#E6E8EF] rounded-md outline-none focus:ring-1 focus:ring-teal-500"
             />
           </div>
-          <button className="border flex items-center gap-1.5 text-xs text-[--color-midnight] dark:text-[#E6E8EF] hover:bg-[#F9FAFB] dark:hover:bg-[#1A1D2D] px-3 py-2 rounded-md transition-colors cursor-pointer">
-            <span className="w-2 h-2 rounded-full bg-[#820AD1]" />
-            <span>Nubank</span>
-            <ChevronDown className="w-3 h-3 text-[#6B7280]" />
-          </button>
+          <TenantSwitcher />
           <button
             type="button"
             aria-label={isDark ? "Ativar modo claro" : "Ativar modo escuro"}

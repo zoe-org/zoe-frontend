@@ -1,18 +1,17 @@
 import { useState, useEffect } from "react"
-import { useForm, Controller } from "react-hook-form"
+import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { format } from "date-fns"
-import { ptBR } from "date-fns/locale"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Calendar } from "@/components/ui/calendar"
 import { auth } from "@/features/auth/useAuth"
-import { useNavigate, Link } from "react-router-dom"
-import { Check, ArrowLeft, Eye, EyeOff, BriefcaseBusiness, Blocks, CalendarIcon } from "lucide-react"
+import { useAuth } from "@/features/auth/AuthContext"
+import { translateCognitoError } from "@/features/auth/errors"
+import { setOnboardingIntent, type OnboardingIntent } from "@/features/auth/onboardingIntent"
+import { ApiError } from "@/lib/api"
+import { useNavigate, useLocation, Link } from "react-router-dom"
+import { Check, ArrowLeft, Eye, EyeOff, BriefcaseBusiness, Blocks } from "lucide-react"
 import ZoeLogo from "@/assets/zoe-logo.svg?react"
 import Google from "@/assets/google-icon.svg?react"
 import Microsoft from "@/assets/microsoft-icon.svg?react"
@@ -178,9 +177,8 @@ const accountSchema = z.object({
   name: z.string().min(2, "Nome obrigatório"),
   surname: z.string().min(2, "Sobrenome obrigatório"),
   email: z.email("E-mail inválido"),
-  password: z.string().min(8, "Mínimo 8 caracteres"),
+  password: z.string().min(8, "Mínimo 8 caracteres").regex(/[A-Z]/, "Inclua uma maiúscula").regex(/\d/, "Inclua um número").regex(/[^A-Za-z0-9]/, "Inclua um símbolo"),
   confirmPassword: z.string().min(1, "Confirme sua senha"),
-  company: z.string().min(1, "Empresa obrigatória"),
   terms: z.literal(true, { error: () => ({ message: "Aceite os termos" }) }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "As senhas não coincidem",
@@ -212,10 +210,28 @@ function StepAccount({ onNext, defaultEmail = "" }: { onNext: (data: AccountData
           onSubmit={form.handleSubmit(async (data) => {
             try {
               setError("")
-              await auth.register(data.email, data.password)
+              const fullName = `${data.name} ${data.surname}`.trim()
+              await auth.register(data.email, data.password, fullName)
               onNext(data)
             } catch (e: unknown) {
-              setError(e instanceof Error ? e.message : "Erro ao criar conta.")
+              const { code, message } = translateCognitoError(e)
+              if (code === "UsernameExistsException") {
+                // Conta já existe. Se ainda não foi confirmada, reenviar código resolve.
+                // Se já está confirmada, resendCode lança "InvalidParameterException".
+                try {
+                  await auth.resendCode(data.email)
+                  onNext(data)
+                } catch (resendErr) {
+                  const resendCode = (resendErr as { name?: string })?.name
+                  if (resendCode === "InvalidParameterException" || resendCode === "NotAuthorizedException") {
+                    setError("Esse e-mail já tem conta confirmada. Faça login.")
+                  } else {
+                    setError(translateCognitoError(resendErr).message)
+                  }
+                }
+                return
+              }
+              setError(message)
             }
           })}
           className="space-y-4"
@@ -237,12 +253,6 @@ function StepAccount({ onNext, defaultEmail = "" }: { onNext: (data: AccountData
             <Label htmlFor="email">E-mail corporativo</Label>
             <Input id="email" type="email" {...form.register("email")} placeholder="joao@empresa.com" aria-invalid={!!form.formState.errors.email} />
             {form.formState.errors.email && <p className="text-xs text-destructive">{form.formState.errors.email.message}</p>}
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="company">Empresa ou agência</Label>
-            <Input id="company" {...form.register("company")} placeholder="Minha Empresa" aria-invalid={!!form.formState.errors.company} />
-            {form.formState.errors.company && <p className="text-xs text-destructive">{form.formState.errors.company.message}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -327,8 +337,15 @@ function StepAccount({ onNext, defaultEmail = "" }: { onNext: (data: AccountData
   )
 }
 
-function StepVerification({ email, onBack }: { email: string; onBack: () => void }) {
+function StepVerification({
+  email, password, onBack,
+}: {
+  email: string
+  password: string | null
+  onBack: () => void
+}) {
   const nav = useNavigate()
+  const { refresh } = useAuth()
   const [code, setCode] = useState(Array(6).fill(""))
   const [error, setError] = useState("")
   const [resendTimer, setResendTimer] = useState(30)
@@ -387,17 +404,29 @@ function StepVerification({ email, onBack }: { email: string; onBack: () => void
       setSubmitting(true)
       setError("")
       await auth.confirm(email, fullCode)
-      nav("/dashboard")
-    } catch {
-      setError("Código inválido. Tente novamente.")
+
+      // Sem senha (veio do fluxo "UserNotConfirmed" no login): manda pro login.
+      if (!password) {
+        nav("/login", { replace: true, state: { email } })
+        return
+      }
+
+      // signIn programático e hidrata o contexto. O ProtectedRoute leva pro onboarding
+      // automaticamente quando o user não tem memberships ainda.
+      await auth.login(email, password)
+      await refresh()
+      nav("/dashboard", { replace: true })
+    } catch (err) {
+      const { message } = translateCognitoError(err)
+      setError(err instanceof ApiError ? err.message : message)
       setSubmitting(false)
     }
   }
 
   const handleResend = async () => {
     try {
-      await auth.register(email, "")
-    } catch { /* resend best-effort */ }
+      await auth.resendCode(email)
+    } catch { /* best-effort */ }
     setResendTimer(30)
   }
 
@@ -455,9 +484,13 @@ function StepVerification({ email, onBack }: { email: string; onBack: () => void
 }
 
 export default function RegisterPage() {
-  const [step, setStep] = useState(1)
+  const location = useLocation()
+  const initial = (location.state ?? null) as { email?: string; step?: number } | null
+
+  const [step, setStep] = useState(initial?.step ?? 1)
   const [intent, setIntent] = useState("")
-  const [email, setEmail] = useState("")
+  const [email, setEmail] = useState(initial?.email ?? "")
+  const [password, setPassword] = useState<string | null>(null)
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] flex flex-col lg:flex-row">
@@ -564,6 +597,7 @@ export default function RegisterPage() {
                 initialValue={intent}
                 onNext={(val) => {
                   setIntent(val)
+                  setOnboardingIntent(val as OnboardingIntent)
                   setStep(2)
                 }}
               />
@@ -575,6 +609,7 @@ export default function RegisterPage() {
                   defaultEmail={email}
                   onNext={(data) => {
                     setEmail(data.email)
+                    setPassword(data.password)
                     setStep(3)
                   }}
                 />
@@ -583,7 +618,11 @@ export default function RegisterPage() {
 
             {step === 3 && (
               <div className="w-full max-w-md">
-                <StepVerification email={email} onBack={() => setStep(2)} />
+                <StepVerification
+                  email={email}
+                  password={password}
+                  onBack={() => setStep(2)}
+                />
               </div>
             )}
           </div>

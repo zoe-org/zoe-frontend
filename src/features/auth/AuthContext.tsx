@@ -1,14 +1,7 @@
-import { createContext, useContext, useEffect, useState } from "react"
-import { fetchAuthSession } from "aws-amplify/auth"
-
-type Tenant = { id: string; modules: ("intelligence" | "operations")[] }
-type User = { email: string; name?: string; tenant: Tenant } | null
-
-const DEV_MOCK_USER: User = {
-  email: "julia@zoe.ai",
-  name: "Júlia",
-  tenant: { id: "zoe-dev", modules: ["intelligence", "operations"] },
-}
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
+import { fetchAuthSession, signOut as amplifySignOut } from "aws-amplify/auth"
+import { meApi, type Me, type Membership, type MeTenant } from "@/lib/api/me"
+import { ApiError, getActiveTenantId, setActiveTenantId } from "@/lib/api"
 
 export const useCognitoAuth = Boolean(
   import.meta.env.VITE_COGNITO_USER_POOL_ID && import.meta.env.VITE_COGNITO_CLIENT_ID
@@ -16,39 +9,207 @@ export const useCognitoAuth = Boolean(
 
 export const DEV_CREDENTIALS = { email: "julia@zoe.ai", password: "zoe12345" }
 
-const Ctx = createContext<{ user: User; loading: boolean; refresh: () => Promise<void>; devLogin: () => void }>(null!)
-
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User>(null)
-  const [loading, setLoading] = useState(true)
-
-  const refresh = async () => {
-    if (!useCognitoAuth) {
-      setUser(DEV_MOCK_USER)
-      setLoading(false)
-      return
-    }
-    try {
-      const session = await fetchAuthSession()
-      const claims = session.tokens?.idToken?.payload
-      if (!claims) { setUser(null); return }
-      setUser({
-        email: claims.email as string,
-        tenant: {
-          id: claims["custom:tenant_id"] as string,
-          modules: JSON.parse((claims["custom:module_config"] as string) ?? "[]"),
-        },
-      })
-    } finally { setLoading(false) }
-  }
-
-  const devLogin = () => {
-    setUser(DEV_MOCK_USER)
-    setLoading(false)
-  }
-
-  useEffect(() => { refresh() }, [])
-  return <Ctx.Provider value={{ user, loading, refresh, devLogin }}>{children}</Ctx.Provider>
+const DEV_MOCK: { me: Me; tenant: MeTenant } = {
+  me: {
+    id: "00000000-0000-0000-0000-000000000001",
+    email: "julia@zoe.ai",
+    name: "Júlia",
+    memberships: [{
+      tenantId: "00000000-0000-0000-0000-0000000000aa",
+      tenantName: "Zoe Dev",
+      tenantSlug: "zoe-dev",
+      role: "Owner",
+    }],
+  },
+  tenant: {
+    tenant: {
+      id: "00000000-0000-0000-0000-0000000000aa",
+      name: "Zoe Dev",
+      slug: "zoe-dev",
+      status: "Active",
+    },
+    role: "Owner",
+    features: ["intelligence", "operations"],
+  },
 }
 
-export const useAuth = () => useContext(Ctx)
+type AuthState = {
+  isLoading: boolean
+  isAuthenticated: boolean
+  user: Me | null
+  memberships: Membership[]
+  activeTenantId: string | null
+  activeTenant: MeTenant | null
+  role: string | null
+  features: string[]
+  /** True quando o user logou mas ainda não tem nenhum tenant — onboarding pendente. */
+  needsOnboarding: boolean
+  error: string | null
+}
+
+type AuthActions = {
+  /** Re-hidrata a partir do Cognito + /api/me. Chamar após signIn/confirmSignUp. */
+  refresh: () => Promise<void>
+  /** Troca o tenant ativo (persiste em localStorage e recarrega /api/me/tenant). */
+  switchTenant: (tenantId: string) => Promise<void>
+  signOut: () => Promise<void>
+  /** Atalho para login mockado em ambiente sem Cognito. */
+  devLogin: () => void
+  hasFeature: (code: string) => boolean
+}
+
+const initialState: AuthState = {
+  isLoading: true,
+  isAuthenticated: false,
+  user: null,
+  memberships: [],
+  activeTenantId: null,
+  activeTenant: null,
+  role: null,
+  features: [],
+  needsOnboarding: false,
+  error: null,
+}
+
+const AuthContext = createContext<(AuthState & AuthActions) | null>(null)
+
+async function hasCognitoSession(): Promise<boolean> {
+  try {
+    const session = await fetchAuthSession()
+    return Boolean(session.tokens?.idToken)
+  } catch {
+    return false
+  }
+}
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [state, setState] = useState<AuthState>(initialState)
+  /** Travessas concorrentes: protege contra um refresh tardio sobrescrever um signOut recente. */
+  const generationRef = useRef(0)
+
+  const applyTenant = useCallback((memberships: Membership[]): string | null => {
+    const stored = getActiveTenantId()
+    const valid = stored && memberships.some(m => m.tenantId === stored) ? stored : memberships[0]?.tenantId ?? null
+    if (valid !== stored) setActiveTenantId(valid)
+    return valid
+  }, [])
+
+  const loadTenantContext = useCallback(async (tenantId: string | null): Promise<MeTenant | null> => {
+    if (!tenantId) return null
+    try {
+      return await meApi.getTenant(tenantId)
+    } catch (err) {
+      // Membership pode ter sido revogada entre /api/me e /api/me/tenant — limpa e segue.
+      if (err instanceof ApiError && (err.status === 403 || err.status === 404)) {
+        setActiveTenantId(null)
+        return null
+      }
+      throw err
+    }
+  }, [])
+
+  const refresh = useCallback(async () => {
+    const gen = ++generationRef.current
+    setState(s => ({ ...s, isLoading: true, error: null }))
+
+    if (!useCognitoAuth) {
+      // Modo dev sem Cognito: já fica autenticado com mock. devLogin() é o gatilho real.
+      if (gen !== generationRef.current) return
+      setState({ ...initialState, isLoading: false, isAuthenticated: false })
+      return
+    }
+
+    const signedIn = await hasCognitoSession()
+    if (!signedIn) {
+      if (gen !== generationRef.current) return
+      setActiveTenantId(null)
+      setState({ ...initialState, isLoading: false })
+      return
+    }
+
+    try {
+      const me = await meApi.get()
+      const activeTenantId = applyTenant(me.memberships)
+      const tenantCtx = await loadTenantContext(activeTenantId)
+      if (gen !== generationRef.current) return
+      setState({
+        isLoading: false,
+        isAuthenticated: true,
+        user: me,
+        memberships: me.memberships,
+        activeTenantId,
+        activeTenant: tenantCtx,
+        role: tenantCtx?.role ?? null,
+        features: tenantCtx?.features ?? [],
+        needsOnboarding: me.memberships.length === 0,
+        error: null,
+      })
+    } catch (err) {
+      if (gen !== generationRef.current) return
+      const message = err instanceof Error ? err.message : "Falha ao carregar sessão."
+      setState(s => ({ ...s, isLoading: false, error: message }))
+    }
+  }, [applyTenant, loadTenantContext])
+
+  const switchTenant = useCallback(async (tenantId: string) => {
+    if (!state.memberships.some(m => m.tenantId === tenantId)) return
+    setActiveTenantId(tenantId)
+    setState(s => ({ ...s, isLoading: true }))
+    const tenantCtx = await loadTenantContext(tenantId)
+    setState(s => ({
+      ...s,
+      isLoading: false,
+      activeTenantId: tenantId,
+      activeTenant: tenantCtx,
+      role: tenantCtx?.role ?? null,
+      features: tenantCtx?.features ?? [],
+    }))
+  }, [state.memberships, loadTenantContext])
+
+  const signOut = useCallback(async () => {
+    generationRef.current++
+    if (useCognitoAuth) {
+      await amplifySignOut().catch(() => { /* já deslogado */ })
+    }
+    setActiveTenantId(null)
+    setState({ ...initialState, isLoading: false })
+  }, [])
+
+  const devLogin = useCallback(() => {
+    generationRef.current++
+    setActiveTenantId(DEV_MOCK.tenant.tenant.id)
+    setState({
+      isLoading: false,
+      isAuthenticated: true,
+      user: DEV_MOCK.me,
+      memberships: DEV_MOCK.me.memberships,
+      activeTenantId: DEV_MOCK.tenant.tenant.id,
+      activeTenant: DEV_MOCK.tenant,
+      role: DEV_MOCK.tenant.role,
+      features: DEV_MOCK.tenant.features,
+      needsOnboarding: false,
+      error: null,
+    })
+  }, [])
+
+  const hasFeature = useCallback((code: string) => state.features.includes(code), [state.features])
+
+  useEffect(() => { refresh() }, [refresh])
+
+  const value = useMemo<AuthState & AuthActions>(() => ({
+    ...state,
+    refresh,
+    switchTenant,
+    signOut,
+    devLogin,
+    hasFeature,
+  }), [state, refresh, switchTenant, signOut, devLogin, hasFeature])
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+}
+
+export function useAuth() {
+  const ctx = useContext(AuthContext)
+  if (!ctx) throw new Error("useAuth must be used within an AuthProvider")
+  return ctx
+}
