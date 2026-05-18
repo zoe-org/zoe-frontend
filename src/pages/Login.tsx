@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { auth } from "@/features/auth/useAuth"
-import { useAuth, DEV_CREDENTIALS } from "@/features/auth/AuthContext"
-import { useNavigate, Link } from "react-router-dom"
+import { useAuth, DEV_CREDENTIALS, useCognitoAuth } from "@/features/auth/AuthContext"
+import { translateCognitoError } from "@/features/auth/errors"
+import { useNavigate, useLocation, Link } from "react-router-dom"
 import { Eye, EyeOff} from "lucide-react"
 import ZoeLogo from "@/assets/zoe-logo.svg?react"
 import Google from "@/assets/google-icon.svg?react"
@@ -27,15 +28,19 @@ const slides = [
 
 export default function LoginPage() {
   const nav = useNavigate()
-  const { user, devLogin } = useAuth()
+  const location = useLocation()
+  const { isAuthenticated, devLogin, refresh } = useAuth()
   const form = useForm({ resolver: zodResolver(schema) })
   const [showPw, setShowPw] = useState(false)
   const [slide, setSlide] = useState(0)
   const [error, setError] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+
+  const returnTo = (location.state as { from?: string } | null)?.from ?? "/dashboard"
 
   useEffect(() => {
-    if (user) nav("/dashboard", { replace: true })
-  }, [user, nav])
+    if (isAuthenticated) nav(returnTo, { replace: true })
+  }, [isAuthenticated, nav, returnTo])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -46,18 +51,36 @@ export default function LoginPage() {
 
   const onSubmit = form.handleSubmit(async ({ email, password }) => {
     setError("")
-    // Mock credentials always work, even without Cognito
-    if (email === DEV_CREDENTIALS.email && password === DEV_CREDENTIALS.password) {
+    setSubmitting(true)
+
+    // Atalho de dev: credenciais mock funcionam mesmo com Cognito configurado, contanto que ele
+    // recuse antes (UserNotFoundException). Se Cognito não estiver configurado, vai direto.
+    const tryDevLogin = email === DEV_CREDENTIALS.email && password === DEV_CREDENTIALS.password
+
+    if (tryDevLogin && !useCognitoAuth) {
       devLogin()
-      nav("/dashboard")
+      nav(returnTo, { replace: true })
       return
     }
-    // Otherwise try real Cognito
+
     try {
       await auth.login(email, password)
-      nav("/dashboard")
-    } catch {
-      setError("E-mail ou senha incorretos.")
+      await refresh()
+      nav(returnTo, { replace: true })
+    } catch (err) {
+      const { code, message } = translateCognitoError(err)
+      if (code === "UserNotConfirmedException") {
+        nav("/register", { state: { email, step: 3 }, replace: true })
+        return
+      }
+      if (tryDevLogin) {
+        devLogin()
+        nav(returnTo, { replace: true })
+        return
+      }
+      setError(message)
+    } finally {
+      setSubmitting(false)
     }
   })
 
@@ -197,8 +220,8 @@ export default function LoginPage() {
 
             {error && <p className="text-xs text-[#DC2626]">{error}</p>}
 
-            <Button type="submit" className="w-full bg-teal-500 hover:bg-teal-500/90 text-white">
-              Entrar
+            <Button type="submit" disabled={submitting} className="w-full bg-teal-500 hover:bg-teal-500/90 text-white">
+              {submitting ? "Entrando..." : "Entrar"}
             </Button>
           </form>
 

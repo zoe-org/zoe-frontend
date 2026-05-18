@@ -3,6 +3,8 @@ import { AppShell } from "@/components/layout/AppShell"
 import { ProtectedRoute } from "@/features/auth/ProtectedRoute"
 import LoginPage from "@/pages/Login"
 import RegisterPage from "@/pages/Register"
+import AcceptInvitePage from "@/pages/AcceptInvite"
+import OnboardingTenantPage from "@/pages/OnboardingTenant"
 import DashboardPage from "@/pages/Dashboard"
 import MonitoringPage from "@/pages/intelligence/Monitoring"
 import SentimentPage from "@/pages/intelligence/Sentiment"
@@ -14,6 +16,11 @@ import ReportsPage from "@/pages/Reports"
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
   { path: "/register", element: <RegisterPage /> },
+  { path: "/invite/:token", element: <AcceptInvitePage /> },
+  {
+    path: "/onboarding/tenant",
+    element: <ProtectedRoute><OnboardingTenantPage /></ProtectedRoute>,
+  },
   {
     element: <ProtectedRoute><AppShell /></ProtectedRoute>,
     children: [
