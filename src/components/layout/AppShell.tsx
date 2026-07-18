@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom"
 import {
   House, Brain, Settings, Bell,
@@ -53,7 +54,8 @@ const SubNavItem = ({ to, children, badge }: { to: string, children: React.React
 )
 
 export function AppShell() {
-  const { user, role, signOut } = useAuth()
+  const { user, role, signOut, activeTenantId } = useAuth()
+  const queryClient = useQueryClient()
   const hasIntelligence = useFeature("intelligence")
   const hasOperations = useFeature("operations")
   const location = useLocation()
@@ -64,6 +66,13 @@ export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(() => getInitialOpenState(STORAGE_SIDEBAR_KEY))
   const [intelOpen, setIntelOpen] = useState(() => getInitialOpenState(STORAGE_INTEL_KEY))
   const [gestaoOpen, setGestaoOpen] = useState(() => getInitialOpenState(STORAGE_GESTAO_KEY))
+
+  // Troca de tenant: descarta o cache do tenant anterior. O tenantId nas query
+  // keys já impede servir dado de outro tenant; isto libera memória e força um
+  // refetch limpo. Isolamento é preocupação de frontend também.
+  useEffect(() => {
+    queryClient.clear()
+  }, [activeTenantId, queryClient])
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_SIDEBAR_KEY, String(sidebarOpen)) } catch { }

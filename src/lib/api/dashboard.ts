@@ -1,0 +1,128 @@
+import { useQuery } from "@tanstack/react-query"
+import { useAuth } from "@/features/auth/AuthContext"
+
+// Endpoints /api/dashboard/* ainda NÃO existem (Júlia está batched na 3.A). Os
+// tipos abaixo são o shape combinado esperado; cada método do dashboardApi
+// devolve MOCK atrás da mesma assinatura da versão real — trocar mock→real vira
+// 1 linha (o `apiClient.get(...)` comentado). Shapes provisórios: alinhar com o
+// zoe-api quando os endpoints saírem.
+
+export type DashboardSummary = {
+  totalMentions: number
+  avgScore: number
+  deltaPct30d: number
+}
+
+export type SentimentPoint = {
+  date: string
+  positive: number
+  neutral: number
+  negative: number
+  avgScore: number
+}
+export type SentimentEvolution = { brandId: string; points: SentimentPoint[] }
+
+export type SovBrand = { brandId: string; brandName: string; mentions: number; sharePct: number }
+export type ShareOfVoice = { brands: SovBrand[] }
+
+export type TopVideo = {
+  analysisId: string
+  youtubeVideoId: string
+  title: string
+  channelName: string
+  score: number | null
+  classificacao: string | null
+  confidence: number | null
+  pipelinePath: string
+}
+export type TopVideos = { items: TopVideo[] }
+
+// ── mock determinístico (só até os endpoints existirem) ────────────────────
+
+function seeded(seed: string): () => number {
+  let h = 2166136261
+  for (let i = 0; i < seed.length; i++) { h ^= seed.charCodeAt(i); h = Math.imul(h, 16777619) }
+  return () => { h += 0x6d2b79f5; let t = Math.imul(h ^ (h >>> 15), 1 | h); t ^= t + Math.imul(t ^ (t >>> 7), 61 | t); return ((t ^ (t >>> 14)) >>> 0) / 4294967296 }
+}
+
+function mockSummary(brandId: string): DashboardSummary {
+  const r = seeded(brandId + "summary")
+  return { totalMentions: Math.floor(80 + r() * 120), avgScore: 0.45 + r() * 0.35, deltaPct30d: Math.round((r() * 30 - 10) * 10) / 10 }
+}
+
+function mockSentiment(brandId: string): SentimentEvolution {
+  const r = seeded(brandId + "sent")
+  const points: SentimentPoint[] = Array.from({ length: 30 }, (_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (29 - i))
+    const pos = Math.floor(2 + r() * 8), neu = Math.floor(1 + r() * 5), neg = Math.floor(r() * 4)
+    const total = pos + neu + neg || 1
+    return { date: d.toISOString().slice(0, 10), positive: pos, neutral: neu, negative: neg, avgScore: (pos - neg) / total / 2 + 0.5 }
+  })
+  return { brandId, points }
+}
+
+function mockTopVideos(brandId: string): TopVideos {
+  const r = seeded(brandId + "top")
+  const paths = ["Full", "CommentsOnly", "CaptionFallback", "Full"]
+  const cls = ["Positive", "Neutral", "Negative", "Positive"]
+  return {
+    items: Array.from({ length: 5 }, (_, i) => ({
+      analysisId: `mock-${brandId}-${i}`,
+      youtubeVideoId: `vid${i}`,
+      title: `Vídeo em alta #${i + 1}`,
+      channelName: "Canal exemplo",
+      score: Math.round((0.4 + r() * 0.5) * 100) / 100,
+      classificacao: cls[i % cls.length],
+      confidence: Math.round((0.6 + r() * 0.35) * 100) / 100,
+      pipelinePath: paths[i % paths.length],
+    })),
+  }
+}
+
+export const dashboardApi = {
+  summary: (brandId: string, _opts?: { signal?: AbortSignal }): Promise<DashboardSummary> =>
+    // TODO(3.A): apiClient.get(`/api/dashboard/summary?brandId=${brandId}`, { signal: _opts?.signal })
+    Promise.resolve(mockSummary(brandId)),
+  sentiment: (brandId: string, _opts?: { signal?: AbortSignal }): Promise<SentimentEvolution> =>
+    // TODO(3.A): apiClient.get(`/api/dashboard/sentiment?brandId=${brandId}`, { signal: _opts?.signal })
+    Promise.resolve(mockSentiment(brandId)),
+  topVideos: (brandId: string, _opts?: { signal?: AbortSignal }): Promise<TopVideos> =>
+    // TODO(3.A): apiClient.get(`/api/dashboard/top-videos?brandId=${brandId}`, { signal: _opts?.signal })
+    Promise.resolve(mockTopVideos(brandId)),
+  // SoV é gated por feature `sov`; o backend também retorna 403 sem a feature.
+  sov: (_opts?: { signal?: AbortSignal }): Promise<ShareOfVoice> =>
+    // TODO(3.A): apiClient.get(`/api/dashboard/sov`, { signal: _opts?.signal })
+    Promise.resolve({ brands: [] }),
+}
+
+// ── hooks (tenantId na key = isolamento por tenant) ────────────────────────
+
+export function useDashboardSummary(brandId: string | null) {
+  const { activeTenantId } = useAuth()
+  return useQuery({
+    queryKey: ["dashboard-summary", activeTenantId, brandId],
+    queryFn: ({ signal }) => dashboardApi.summary(brandId!, { signal }),
+    enabled: Boolean(activeTenantId && brandId),
+    staleTime: 60_000,
+  })
+}
+
+export function useSentimentEvolution(brandId: string | null) {
+  const { activeTenantId } = useAuth()
+  return useQuery({
+    queryKey: ["dashboard-sentiment", activeTenantId, brandId],
+    queryFn: ({ signal }) => dashboardApi.sentiment(brandId!, { signal }),
+    enabled: Boolean(activeTenantId && brandId),
+    staleTime: 60_000,
+  })
+}
+
+export function useTopVideos(brandId: string | null) {
+  const { activeTenantId } = useAuth()
+  return useQuery({
+    queryKey: ["dashboard-top-videos", activeTenantId, brandId],
+    queryFn: ({ signal }) => dashboardApi.topVideos(brandId!, { signal }),
+    enabled: Boolean(activeTenantId && brandId),
+    staleTime: 60_000,
+  })
+}

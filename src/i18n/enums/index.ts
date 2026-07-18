@@ -1,0 +1,53 @@
+// i18n dos enums do domínio (ADR-023): o domínio fala inglês (Positive, Full,
+// comments_only), a UI localiza. Estrutura por LOCALE (pronta pra `es` no Ano 2),
+// nunca hard-coded na tela. Fallback SEMPRE pro valor cru — um enum novo ainda
+// não traduzido não pode crashar a UI.
+
+export type EnumKind = "classification" | "sentiment" | "nerMode" | "pipelinePath"
+
+type LocaleDictionaries = Record<EnumKind, Record<string, string>>
+
+const dictionaries: Record<string, LocaleDictionaries> = {
+  "pt-BR": {
+    classification: {
+      Positive: "Positivo",
+      Negative: "Negativo",
+      Neutral: "Neutro",
+      Inconclusive: "Indeterminado",
+    },
+    sentiment: {
+      Positive: "Positivo",
+      Negative: "Negativo",
+      Neutral: "Neutro",
+      Mixed: "Misto",
+    },
+    nerMode: {
+      Full: "Completo",
+      Conservative: "Conservador",
+    },
+    // O read-API serializa os enums pelo nome C# (PascalCase), inclusive
+    // pipeline_path ("CommentsOnly", não o "comments_only" do contrato de pipeline).
+    // Casamos com o que a API devolve; o fallback cobre qualquer valor cru.
+    pipelinePath: {
+      Full: "Análise completa",
+      VideoCaption: "Análise completa",
+      CaptionFallback: "Legenda + comentários",
+      CommentsOnly: "Apenas comentários",
+    },
+  },
+}
+
+export const DEFAULT_LOCALE = "pt-BR"
+
+/**
+ * Traduz um valor de enum do domínio para o locale. Fallback: o próprio valor
+ * cru (nunca lança, nunca some da tela) — cobre enums novos ainda sem tradução.
+ */
+export function tEnum(
+  kind: EnumKind,
+  value: string | null | undefined,
+  locale: string = DEFAULT_LOCALE,
+): string {
+  if (value == null || value === "") return ""
+  return dictionaries[locale]?.[kind]?.[value] ?? value
+}
