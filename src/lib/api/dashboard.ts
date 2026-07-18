@@ -79,20 +79,29 @@ function mockTopVideos(brandId: string): TopVideos {
   }
 }
 
+type Opts = { signal?: AbortSignal }
+
+// Resolve respeitando abort (espelha o comportamento cancelável da versão real).
+function mockResolve<T>(value: T, opts?: Opts): Promise<T> {
+  return opts?.signal?.aborted
+    ? Promise.reject(new DOMException("Aborted", "AbortError"))
+    : Promise.resolve(value)
+}
+
 export const dashboardApi = {
-  summary: (brandId: string, _opts?: { signal?: AbortSignal }): Promise<DashboardSummary> =>
-    // TODO(3.A): apiClient.get(`/api/dashboard/summary?brandId=${brandId}`, { signal: _opts?.signal })
-    Promise.resolve(mockSummary(brandId)),
-  sentiment: (brandId: string, _opts?: { signal?: AbortSignal }): Promise<SentimentEvolution> =>
-    // TODO(3.A): apiClient.get(`/api/dashboard/sentiment?brandId=${brandId}`, { signal: _opts?.signal })
-    Promise.resolve(mockSentiment(brandId)),
-  topVideos: (brandId: string, _opts?: { signal?: AbortSignal }): Promise<TopVideos> =>
-    // TODO(3.A): apiClient.get(`/api/dashboard/top-videos?brandId=${brandId}`, { signal: _opts?.signal })
-    Promise.resolve(mockTopVideos(brandId)),
+  summary: (brandId: string, opts?: Opts): Promise<DashboardSummary> =>
+    // TODO(3.A): apiClient.get(`/api/dashboard/summary?brandId=${brandId}`, { signal: opts?.signal })
+    mockResolve(mockSummary(brandId), opts),
+  sentiment: (brandId: string, opts?: Opts): Promise<SentimentEvolution> =>
+    // TODO(3.A): apiClient.get(`/api/dashboard/sentiment?brandId=${brandId}`, { signal: opts?.signal })
+    mockResolve(mockSentiment(brandId), opts),
+  topVideos: (brandId: string, opts?: Opts): Promise<TopVideos> =>
+    // TODO(3.A): apiClient.get(`/api/dashboard/top-videos?brandId=${brandId}`, { signal: opts?.signal })
+    mockResolve(mockTopVideos(brandId), opts),
   // SoV é gated por feature `sov`; o backend também retorna 403 sem a feature.
-  sov: (_opts?: { signal?: AbortSignal }): Promise<ShareOfVoice> =>
-    // TODO(3.A): apiClient.get(`/api/dashboard/sov`, { signal: _opts?.signal })
-    Promise.resolve({ brands: [] }),
+  sov: (opts?: Opts): Promise<ShareOfVoice> =>
+    // TODO(3.A): apiClient.get(`/api/dashboard/sov`, { signal: opts?.signal })
+    mockResolve({ brands: [] } as ShareOfVoice, opts),
 }
 
 // ── hooks (tenantId na key = isolamento por tenant) ────────────────────────
