@@ -37,6 +37,9 @@ export type TopVideo = {
 }
 export type TopVideos = { items: TopVideo[] }
 
+export type TopKeyword = { keyword: string; volume: number; sentiment: string }
+export type TopKeywords = { items: TopKeyword[] }
+
 // ── mock determinístico (só até os endpoints existirem) ────────────────────
 
 function seeded(seed: string): () => number {
@@ -59,6 +62,19 @@ function mockSentiment(brandId: string): SentimentEvolution {
     return { date: d.toISOString().slice(0, 10), positive: pos, neutral: neu, negative: neg, avgScore: (pos - neg) / total / 2 + 0.5 }
   })
   return { brandId, points }
+}
+
+function mockTopKeywords(brandId: string): TopKeywords {
+  const r = seeded(brandId + "kw")
+  const words = ["atendimento", "app", "pix", "cashback", "limite", "taxas", "investimentos", "cartão", "seguro", "conta"]
+  const sents = ["Positive", "Neutral", "Negative"]
+  return {
+    items: words.map((w) => ({
+      keyword: w,
+      volume: Math.floor(5 + r() * 45),
+      sentiment: sents[Math.floor(r() * sents.length)],
+    })).sort((a, b) => b.volume - a.volume),
+  }
 }
 
 function mockTopVideos(brandId: string): TopVideos {
@@ -98,6 +114,9 @@ export const dashboardApi = {
   topVideos: (brandId: string, opts?: Opts): Promise<TopVideos> =>
     // TODO(3.A): apiClient.get(`/api/dashboard/top-videos?brandId=${brandId}`, { signal: opts?.signal })
     mockResolve(mockTopVideos(brandId), opts),
+  topKeywords: (brandId: string, opts?: Opts): Promise<TopKeywords> =>
+    // TODO(3.A): apiClient.get(`/api/dashboard/keywords?brandId=${brandId}`, { signal: opts?.signal })
+    mockResolve(mockTopKeywords(brandId), opts),
   // SoV é gated por feature `sov`; o backend também retorna 403 sem a feature.
   sov: (opts?: Opts): Promise<ShareOfVoice> =>
     // TODO(3.A): apiClient.get(`/api/dashboard/sov`, { signal: opts?.signal })
@@ -131,6 +150,16 @@ export function useTopVideos(brandId: string | null) {
   return useQuery({
     queryKey: ["dashboard-top-videos", activeTenantId, brandId],
     queryFn: ({ signal }) => dashboardApi.topVideos(brandId!, { signal }),
+    enabled: Boolean(activeTenantId && brandId),
+    staleTime: 60_000,
+  })
+}
+
+export function useTopKeywords(brandId: string | null) {
+  const { activeTenantId } = useAuth()
+  return useQuery({
+    queryKey: ["dashboard-top-keywords", activeTenantId, brandId],
+    queryFn: ({ signal }) => dashboardApi.topKeywords(brandId!, { signal }),
     enabled: Boolean(activeTenantId && brandId),
     staleTime: 60_000,
   })
