@@ -107,7 +107,7 @@ function StepRequest({ onSent }: { onSent: (email: string) => void }) {
 
   return (
     <>
-      <h1 className="text-3xl font-bold text-[--color-midnight] mb-1">Esqueceu sua senha?</h1>
+      <h1 className="text-3xl font-bold text-midnight dark:text-[#E6E8EF] mb-1">Esqueceu sua senha?</h1>
       <p className="text-sm text-[#6B7280] mb-8">
         Informe seu e-mail e enviaremos um código para redefinir sua senha.
       </p>
@@ -201,9 +201,9 @@ function StepConfirm({ email, onDone, onBack }: { email: string; onDone: () => v
 
   return (
     <>
-      <h1 className="text-3xl font-bold text-[--color-midnight] mb-1">Redefinir senha</h1>
+      <h1 className="text-3xl font-bold text-midnight dark:text-[#E6E8EF] mb-1">Redefinir senha</h1>
       <p className="text-sm text-[#6B7280] mb-6">
-        Mandamos um código de 6 dígitos para <strong className="text-[--color-midnight]">{email}</strong>
+        Mandamos um código de 6 dígitos para <strong className="text-midnight dark:text-[#E6E8EF]">{email}</strong>
       </p>
 
       <form onSubmit={onSubmit} className="space-y-4">
@@ -237,7 +237,7 @@ function StepConfirm({ email, onDone, onBack }: { email: string; onDone: () => v
             <button
               type="button"
               onClick={() => setShowPw(!showPw)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-[--color-midnight]"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-midnight dark:hover:text-[#E6E8EF]"
             >
               {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
@@ -269,7 +269,7 @@ function StepConfirm({ email, onDone, onBack }: { email: string; onDone: () => v
       </form>
 
       <div className="flex items-center justify-between mt-4 text-sm">
-        <button onClick={onBack} className="flex items-center gap-1 text-[#6B7280] hover:text-[--color-midnight]">
+        <button onClick={onBack} className="flex items-center gap-1 text-[#6B7280] hover:text-midnight dark:hover:text-[#E6E8EF]">
           <ArrowLeft className="w-3.5 h-3.5" /> Voltar
         </button>
         <p className="text-[#6B7280]">
@@ -294,7 +294,7 @@ function StepDone({ email }: { email: string }) {
           <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
         </svg>
       </div>
-      <h1 className="text-3xl font-bold text-[--color-midnight] mb-1">Senha redefinida</h1>
+      <h1 className="text-3xl font-bold text-midnight dark:text-[#E6E8EF] mb-1">Senha redefinida</h1>
       <p className="text-sm text-[#6B7280] mb-8">Sua senha foi alterada com sucesso. Entre com sua nova senha.</p>
       <Link to="/login" state={{ email }}>
         <Button className="w-full bg-teal-500 hover:bg-teal-500/90 text-white">Ir para o login</Button>

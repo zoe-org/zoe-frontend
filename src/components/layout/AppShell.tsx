@@ -37,7 +37,7 @@ const SubNavItem = ({ to, children, badge }: { to: string, children: React.React
     className={({ isActive }) =>
       `relative flex items-center font-medium justify-between py-1.5 pl-4 text-[13.5px] transition-colors ${isActive
         ? "text-teal-500 dark:text-teal-300"
-        : "text-[#697788] dark:text-[#8A91A3] hover:text-[--color-midnight] dark:hover:text-[#E6E8EF]"
+        : "text-[#697788] dark:text-[#8A91A3] hover:text-midnight dark:hover:text-[#E6E8EF]"
       }`
     }
   >
@@ -125,7 +125,7 @@ export function AppShell() {
             className={({ isActive }) =>
               `flex items-center gap-2 py-2 font-medium text-[14px] transition-colors rounded-md ${sidebarOpen ? "px-3" : "justify-center px-2"} ${isActive
                 ? "text-[#00A799] dark:text-teal-300"
-                : "text-[#697788] dark:text-[#8A91A3] hover:text-[--color-midnight] dark:hover:text-[#E6E8EF]"
+                : "text-[#697788] dark:text-[#8A91A3] hover:text-midnight dark:hover:text-[#E6E8EF]"
               }`
             }
           >

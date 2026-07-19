@@ -122,7 +122,7 @@ export default function DashboardPage() {
           {evolution.isLoading ? (
             <div className="h-40 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D] animate-pulse" />
           ) : trend.length === 0 ? (
-            <div className="py-12 text-center text-sm text-muted">Sem dados no período.</div>
+            <div className="py-12 text-center text-sm text-ink-muted">Sem dados no período.</div>
           ) : (
             <AreaLine data={trend} height={160} color="#00A799" fillOpacity={0.12} />
           )}
@@ -142,7 +142,7 @@ export default function DashboardPage() {
                   <div className="flex items-baseline justify-between mb-1">
                     <span className="text-[12.5px] text-ink-2">{d.label}</span>
                     <div className="flex items-baseline gap-1.5">
-                      <span className="font-mono-zoe text-[11.5px] text-muted">{d.count}</span>
+                      <span className="font-mono-zoe text-[11.5px] text-ink-muted">{d.count}</span>
                       <span className="font-display" style={{ fontSize: 18, color: d.color }}>{d.pct}%</span>
                     </div>
                   </div>
@@ -172,7 +172,7 @@ export default function DashboardPage() {
         ) : feed.isError ? (
           <ErrorState onRetry={() => feed.refetch()} />
         ) : recent.length === 0 ? (
-          <div className="px-8 py-12 text-center text-sm text-muted">
+          <div className="px-8 py-12 text-center text-sm text-ink-muted">
             Ainda não há vídeos analisados para esta marca.
           </div>
         ) : (
@@ -285,7 +285,7 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <AlertCircle className="w-10 h-10 text-[#DC2626] mb-3" />
-      <h3 className="text-lg font-semibold text-[--color-midnight] dark:text-[#E6E8EF] mb-1">Não foi possível carregar</h3>
+      <h3 className="text-lg font-semibold text-midnight dark:text-[#E6E8EF] mb-1">Não foi possível carregar</h3>
       <p className="text-sm text-[#6B7280] mb-4">Tente novamente em instantes.</p>
       <button onClick={onRetry} className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors">Tentar de novo</button>
     </div>

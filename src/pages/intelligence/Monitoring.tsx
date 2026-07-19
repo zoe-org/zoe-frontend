@@ -135,7 +135,7 @@ export default function MonitoringPage() {
               </Select>
             )}
             <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted" />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-ink-muted" />
               <input
                 type="text"
                 value={searchInput}
@@ -178,7 +178,7 @@ export default function MonitoringPage() {
               onClick={() => setParam("sent", tab.key)}
               aria-pressed={active}
               className={`px-3 py-3 text-[13px] font-medium border-b-2 transition-colors -mb-[1px] ${
-                active ? "border-teal-500 text-[--color-teal-600] dark:text-teal-300" : "border-transparent text-muted hover:text-ink"
+                active ? "border-teal-500 text-teal-600 dark:text-teal-300" : "border-transparent text-ink-muted hover:text-ink"
               }`}
             >
               {tab.label}
@@ -212,7 +212,7 @@ export default function MonitoringPage() {
                 <div className="text-[14px] font-medium truncate mb-0.5" style={{ color: "var(--ink)" }}>
                   {m.title}
                 </div>
-                <div className="flex items-center gap-2 text-[11.5px] text-muted flex-wrap">
+                <div className="flex items-center gap-2 text-[11.5px] text-ink-muted flex-wrap">
                   <span className="truncate">{m.channelName}</span>
                   <span>·</span>
                   <span>{formatDistanceToNow(new Date(m.publishedAt), { addSuffix: true, locale: ptBR })}</span>
@@ -230,7 +230,7 @@ export default function MonitoringPage() {
                 <div className="font-mono-zoe text-[13px]" style={{ color: "var(--ink)" }}>
                   {m.score != null ? m.score.toFixed(2) : "—"}
                 </div>
-                <div className="text-[10px] text-muted-2">score</div>
+                <div className="text-[10px] text-ink-muted-2">score</div>
               </div>
             </button>
           ))}
@@ -288,7 +288,7 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <AlertCircle className="w-10 h-10 text-[#DC2626] mb-3" />
-      <h3 className="text-lg font-semibold text-[--color-midnight] dark:text-[#E6E8EF] mb-1">Não foi possível carregar</h3>
+      <h3 className="text-lg font-semibold text-midnight dark:text-[#E6E8EF] mb-1">Não foi possível carregar</h3>
       <p className="text-sm text-[#6B7280] mb-4">Tente novamente em instantes.</p>
       <button onClick={onRetry} className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors">
         Tentar de novo

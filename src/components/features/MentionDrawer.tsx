@@ -48,7 +48,7 @@ export function MentionDrawer({
         <div className="space-y-6 mt-4">
           {/* Título + meta */}
           <div>
-            <h3 className="font-semibold text-[--color-midnight] dark:text-[#E6E8EF]">{item.title}</h3>
+            <h3 className="font-semibold text-midnight dark:text-[#E6E8EF]">{item.title}</h3>
             <p className="text-sm text-[#6B7280] mt-1">
               {item.channelName} · {new Date(item.publishedAt).toLocaleDateString("pt-BR")}
             </p>
@@ -117,7 +117,7 @@ export function MentionDrawer({
                         <li key={c.commentId} className="text-[13px]">
                           <div className="flex items-center gap-2 mb-0.5">
                             {/* Autor: texto React puro (escape default) — input hostil do YouTube. */}
-                            <span className="font-medium text-[--color-midnight] dark:text-[#E6E8EF] truncate">{c.author}</span>
+                            <span className="font-medium text-midnight dark:text-[#E6E8EF] truncate">{c.author}</span>
                             <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium ${classificationClass(c.sentiment === "Mixed" ? null : c.sentiment)}`}>
                               {tEnum("sentiment", c.sentiment)}
                             </span>

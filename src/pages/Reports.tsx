@@ -17,7 +17,7 @@ export default function ReportsPage() {
         {templates.map(tpl => (
           <div key={tpl.id} className="bg-white rounded-lg border p-5">
             <span className="text-2xl">{tpl.emoji}</span>
-            <h3 className="text-sm font-semibold text-[--color-midnight] mt-2">{tpl.name}</h3>
+            <h3 className="text-sm font-semibold text-midnight dark:text-[#E6E8EF] mt-2">{tpl.name}</h3>
             <p className="text-xs text-[#6B7280] mt-1">{tpl.description}</p>
             <p className="text-[10px] text-[#6B7280] mt-2">{tpl.pages}</p>
             <button className="text-xs text-[#00A799] hover:underline font-medium mt-3 inline-block">
@@ -71,7 +71,7 @@ export default function ReportsPage() {
               <div key={report.id} className="flex items-center gap-4 py-2 border-b last:border-b-0">
                 <FileText className="w-5 h-5 text-[#EC4899] shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-[--color-midnight]">{report.name}</p>
+                  <p className="text-sm font-medium text-midnight dark:text-[#E6E8EF]">{report.name}</p>
                   <p className="text-xs text-[#6B7280]">{report.date} · {report.pages} páginas</p>
                 </div>
                 <span className={`text-[10px] font-medium px-2 py-0.5 rounded ${status.className}`}>{status.label}</span>

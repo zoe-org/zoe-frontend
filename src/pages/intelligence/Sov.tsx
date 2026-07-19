@@ -33,7 +33,7 @@ export default function SovPage() {
       ) : sov.isLoading ? (
         <BarsSkeleton />
       ) : brands.length === 0 ? (
-        <div className="px-8 py-16 text-center text-sm text-muted">
+        <div className="px-8 py-16 text-center text-sm text-ink-muted">
           Ainda não há dados de share of voice no período.
         </div>
       ) : (
@@ -120,7 +120,7 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <AlertCircle className="w-10 h-10 text-[#DC2626] mb-3" />
-      <h3 className="text-lg font-semibold text-[--color-midnight] dark:text-[#E6E8EF] mb-1">Não foi possível carregar</h3>
+      <h3 className="text-lg font-semibold text-midnight dark:text-[#E6E8EF] mb-1">Não foi possível carregar</h3>
       <p className="text-sm text-[#6B7280] mb-4">Tente novamente em instantes.</p>
       <button onClick={onRetry} className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors">
         Tentar de novo

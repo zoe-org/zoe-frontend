@@ -104,14 +104,14 @@ export default function SentimentPage() {
               <div className="font-display leading-none" style={{ fontSize: 64, color: "var(--color-teal-500)" }}>
                 {evolution.isLoading ? "—" : stats.netSigned}
               </div>
-              <div className="text-[12.5px] text-muted mt-2">escala −1 a +1 · {stats.total} menções</div>
+              <div className="text-[12.5px] text-ink-muted mt-2">escala −1 a +1 · {stats.total} menções</div>
             </div>
             <div className="p-7 border-b md:border-b-0 md:border-r border-border-soft">
               <div className="eyebrow mb-2">Volume total</div>
               <div className="font-display leading-none" style={{ fontSize: 56, color: "var(--ink)" }}>
                 {evolution.isLoading ? "—" : stats.total}
               </div>
-              <div className="text-[12px] text-muted mt-3">menções no período</div>
+              <div className="text-[12px] text-ink-muted mt-3">menções no período</div>
             </div>
             <div className="p-7">
               <div className="eyebrow mb-3">Distribuição</div>
@@ -125,7 +125,7 @@ export default function SentimentPage() {
                     <div className="flex items-baseline justify-between mb-1">
                       <span className="text-[12.5px] text-ink-2">{d.label}</span>
                       <div className="flex items-baseline gap-1.5">
-                        <span className="font-mono-zoe text-[11.5px] text-muted">{d.count}</span>
+                        <span className="font-mono-zoe text-[11.5px] text-ink-muted">{d.count}</span>
                         <span className="font-display" style={{ fontSize: 18, color: d.color }}>{d.pct}%</span>
                       </div>
                     </div>
@@ -143,9 +143,9 @@ export default function SentimentPage() {
             <div className="flex items-start justify-between mb-4">
               <div>
                 <div className="eyebrow">Evolução de sentimento</div>
-                <div className="text-[12px] text-muted mt-1">Últimos 30 dias</div>
+                <div className="text-[12px] text-ink-muted mt-1">Últimos 30 dias</div>
               </div>
-              <div className="flex items-center gap-4 text-[11.5px] text-muted">
+              <div className="flex items-center gap-4 text-[11.5px] text-ink-muted">
                 {series.map((s) => (
                   <span key={s.name} className="flex items-center gap-1.5">
                     <span className="w-2 h-2 rounded-full" style={{ background: s.color }} />
@@ -157,7 +157,7 @@ export default function SentimentPage() {
             {evolution.isLoading ? (
               <div className="h-[200px] rounded bg-[#F3F4F6] dark:bg-[#1A1D2D] animate-pulse" />
             ) : points.length === 0 ? (
-              <div className="py-12 text-center text-sm text-muted">Sem dados de sentimento no período.</div>
+              <div className="py-12 text-center text-sm text-ink-muted">Sem dados de sentimento no período.</div>
             ) : (
               <MultiLine series={series} labels={labels} height={200} />
             )}
@@ -167,12 +167,12 @@ export default function SentimentPage() {
           <section className="px-8 py-7">
             <div className="mb-5">
               <div className="eyebrow">Palavras e tópicos mais citados</div>
-              <div className="text-[12px] text-muted mt-1">Tamanho proporcional ao volume · cor indica sentimento</div>
+              <div className="text-[12px] text-ink-muted mt-1">Tamanho proporcional ao volume · cor indica sentimento</div>
             </div>
             {keywords.isLoading ? (
               <div className="h-16 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D] animate-pulse" />
             ) : (keywords.data?.items.length ?? 0) === 0 ? (
-              <div className="text-sm text-muted">Nenhuma palavra-chave no período.</div>
+              <div className="text-sm text-ink-muted">Nenhuma palavra-chave no período.</div>
             ) : (
               <div className="flex flex-wrap items-baseline gap-x-6 gap-y-3">
                 {keywords.data!.items.map((k) => (
@@ -220,7 +220,7 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <AlertCircle className="w-10 h-10 text-[#DC2626] mb-3" />
-      <h3 className="text-lg font-semibold text-[--color-midnight] dark:text-[#E6E8EF] mb-1">Não foi possível carregar</h3>
+      <h3 className="text-lg font-semibold text-midnight dark:text-[#E6E8EF] mb-1">Não foi possível carregar</h3>
       <p className="text-sm text-[#6B7280] mb-4">Tente novamente em instantes.</p>
       <button onClick={onRetry} className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors">
         Tentar de novo

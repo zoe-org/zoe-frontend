@@ -179,7 +179,7 @@ export default function LoginPage() {
       {/* Right panel */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white">
         <div className="w-full max-w-sm">
-          <h1 className="text-3xl font-bold text-[--color-midnight] mb-1">Entre na sua conta</h1>
+          <h1 className="text-3xl font-bold text-midnight dark:text-[#E6E8EF] mb-1">Entre na sua conta</h1>
           <p className="text-sm text-[#6B7280] mb-8">Bem-vindo(a) de volta.</p>
 
           <form onSubmit={onSubmit} className="space-y-4">
@@ -203,7 +203,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPw(!showPw)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-[--color-midnight]"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-midnight dark:hover:text-[#E6E8EF]"
                 >
                   {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>

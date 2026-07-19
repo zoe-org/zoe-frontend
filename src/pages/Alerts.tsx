@@ -27,7 +27,7 @@ export default function AlertsPage() {
             className={`px-4 py-2 text-xs font-medium border-b-2 transition-colors ${
               tab === t.key
                 ? "border-teal-500 text-teal-500"
-                : "border-transparent text-[#6B7280] hover:text-[--color-midnight]"
+                : "border-transparent text-[#6B7280] hover:text-midnight dark:hover:text-[#E6E8EF]"
             }`}
           >
             {t.label}
@@ -61,7 +61,7 @@ export default function AlertsPage() {
                       />
                     </button>
                     <div>
-                      <h3 className="text-sm font-semibold text-[--color-midnight]">{rule.name}</h3>
+                      <h3 className="text-sm font-semibold text-midnight dark:text-[#E6E8EF]">{rule.name}</h3>
                       <p className="text-xs text-[#6B7280] mt-0.5">{rule.condition}</p>
                       <p className="text-xs text-[#6B7280] mt-1">Notificar via: {rule.notifyVia.join(" + ")}</p>
                     </div>
@@ -84,7 +84,7 @@ export default function AlertsPage() {
               <div key={entry.id} className="flex items-start gap-3 bg-white rounded-lg border p-4">
                 <span className={`w-2.5 h-2.5 rounded-full mt-1 shrink-0 ${severityDot[entry.severity]}`} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-[--color-midnight]">{entry.description}</p>
+                  <p className="text-sm text-midnight dark:text-[#E6E8EF]">{entry.description}</p>
                   <p className="text-xs text-[#6B7280] mt-1">
                     Regra: {entry.ruleName} · {entry.datetime}
                   </p>

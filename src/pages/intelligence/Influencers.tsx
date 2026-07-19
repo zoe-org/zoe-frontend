@@ -361,7 +361,7 @@ export default function InfluencersPage() {
                 aria-pressed={active}
                 className={`px-3 py-3 text-[13px] font-medium border-b-2 transition-colors -mb-[1px] ${
                   active
-                    ? "border-teal-500 text-[--color-teal-600] dark:text-teal-300"
+                    ? "border-teal-500 text-teal-600 dark:text-teal-300"
                     : "border-transparent text-muted hover:text-ink"
                 }`}
               >

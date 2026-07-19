@@ -34,7 +34,7 @@ export function TenantSwitcher() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className="border flex items-center gap-1.5 text-xs text-[--color-midnight] dark:text-[#E6E8EF] hover:bg-[#F9FAFB] dark:hover:bg-[#1A1D2D] px-3 py-2 rounded-md transition-colors cursor-pointer"
+          className="border flex items-center gap-1.5 text-xs text-midnight dark:text-[#E6E8EF] hover:bg-[#F9FAFB] dark:hover:bg-[#1A1D2D] px-3 py-2 rounded-md transition-colors cursor-pointer"
           aria-label="Trocar tenant"
         >
           <span className="w-2 h-2 rounded-full" style={{ backgroundColor: activeColor }} />
