@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { Search, Plus, X, Check, AlertCircle, ExternalLink, ShieldCheck, Clock } from "lucide-react"
+import { Search, Plus, X, Check, AlertCircle, ExternalLink, ShieldCheck, Clock, Loader2 } from "lucide-react"
 import { useAuth } from "@/features/auth/AuthContext"
 import { ApiError } from "@/lib/api"
 import { EmptyState } from "@/components/ui/empty-state"
@@ -9,15 +9,38 @@ import {
 } from "@/components/ui/select"
 import {
   useTenantBrands, useBrandKeywords, useBrandMutations, useSubscribeFlow,
-  resolveOutcome, type TenantBrandSummary,
+  resolveOutcome, brandsApi, type TenantBrandSummary,
 } from "@/lib/api/brands"
 import { useDashboardSummary } from "@/lib/api/dashboard"
+import { useActiveBrand } from "@/features/brands/BrandContext"
 
 // Paleta do design (brand-modal.jsx) para o seletor de cor.
 const PALETTE = ["#00A799", "#8B5CF6", "#EF4444", "#2563EB", "#F59E0B", "#14B8A6", "#EC4899"]
 
 /** Categorias do design. Livre no backend (string), lista fechada na UI. */
-const CATEGORIES = ["Fintech", "Delivery", "Beleza", "Varejo", "Bebidas", "Tecnologia", "Alimentos", "Outro"]
+const CATEGORIES = [
+  "Finanças",
+  "Tecnologia",
+  "Varejo",
+  "Beleza",
+  "Moda",
+  "Alimentos",
+  "Bebidas",
+  "Restaurantes",
+  "Delivery",
+  "Saúde",
+  "Bem-estar",
+  "Educação",
+  "Entretenimento",
+  "Viagens",
+  "Mobilidade",
+  "Esportes",
+  "Casa & Decoração",
+  "Pets",
+  "Indústria",
+  "Agronegócio",
+  "Outro",
+];
 
 /**
  * z-index para popovers do Radix abertos DE DENTRO do modal.
@@ -30,6 +53,35 @@ const CATEGORIES = ["Fintech", "Delivery", "Beleza", "Varejo", "Bebidas", "Tecno
  * Vale para QUALQUER popover Radix adicionado ao modal (select, dropdown, popover).
  */
 const SELECT_IN_MODAL_Z = "z-[100]"
+
+/** Espelha o ChannelIdPattern do ResolveBrandIdentityQueryValidator. */
+const CHANNEL_ID_RE = /^UC[0-9A-Za-z_-]{22}$/
+
+/**
+ * Normaliza a entrada de canal para o ID canônico que o backend exige.
+ * Aceita o ID puro OU uma URL `/channel/<id>` (o caso mais comum de copiar/colar).
+ * Handles (`@nome`) retornam null de propósito: eles exigem a API do YouTube,
+ * então o caller cai no `POST /resolve-channel`. Este caminho local existe pra
+ * que ID puro continue funcionando mesmo sem `YouTube:ApiKey` configurada.
+ */
+function parseChannelId(input: string): string | null {
+  const s = input.trim()
+  if (!s) return null
+  if (CHANNEL_ID_RE.test(s)) return s
+  const fromUrl = s.match(/\/channel\/(UC[0-9A-Za-z_-]{22})/)
+  return fromUrl ? fromUrl[1] : null
+}
+
+/**
+ * Extrai a mensagem ÚTIL de um erro da API. O backend devolve ProblemDetails
+ * (RFC 7807) com `errors` do FluentValidation — mostrar "não foi possível"
+ * genérico joga fora exatamente a informação que o usuário precisa pra corrigir.
+ */
+function apiMessage(err: unknown, fallback: string): string {
+  if (!(err instanceof ApiError)) return fallback
+  const firstFieldError = Object.values(err.problem?.errors ?? {}).flat()[0]
+  return firstFieldError || err.problem?.detail || err.message || fallback
+}
 
 /** Fallback determinístico quando o tenant ainda não escolheu cor. */
 function derivedColor(slug: string): string {
@@ -74,6 +126,7 @@ const STATUSES = [
 export default function BrandsPage() {
   const navigate = useNavigate()
   const { role } = useAuth()
+  const { setBrand } = useActiveBrand()
   const canManage = canManageBrands(role)
 
   const brands = useTenantBrands()
@@ -192,7 +245,7 @@ export default function BrandsPage() {
             key={selected.tenantBrandId}
             brand={selected}
             canManage={canManage}
-            onOpenDashboard={() => navigate(`/dashboard?brand=${selected.brandId}`)}
+            onOpenDashboard={() => { setBrand(selected.brandId); navigate("/dashboard") }}
             onUnsubscribed={() => setSelectedId(null)}
           />
         )}
@@ -365,27 +418,12 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
               </Select>
             </Field>
             <Field label="Cor de identificação">
-              <div className="flex items-center gap-2">
-                {PALETTE.map((c) => {
-                  const active = brandColor(brand).toUpperCase() === c.toUpperCase()
-                  return (
-                    <button
-                      key={c}
-                      type="button"
-                      disabled={!canManage}
-                      onClick={() => m.update.mutate({ color: c })}
-                      aria-label={`Cor ${c}`}
-                      aria-pressed={active}
-                      className="w-6 h-6 rounded-md transition-shadow disabled:opacity-60"
-                      style={{
-                        background: c,
-                        border: active ? "2px solid var(--ink)" : "2px solid transparent",
-                        boxShadow: active ? `0 0 0 2px var(--surface), 0 0 0 3px ${c}` : "none",
-                      }}
-                    />
-                  )
-                })}
-              </div>
+              <ColorSwatches
+                value={brandColor(brand)}
+                onChange={(c) => m.update.mutate({ color: c })}
+                disabled={!canManage}
+                size={24}
+              />
             </Field>
           </div>
 
@@ -428,6 +466,11 @@ function BrandModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [color, setColor] = useState(PALETTE[0])
   const [channels, setChannels] = useState<string[]>([])
   const [channelDraft, setChannelDraft] = useState("")
+  const [channelError, setChannelError] = useState<string | null>(null)
+  // Título vindo do YouTube: é o que deixa o usuário confirmar que o UC… opaco
+  // que acabou de entrar é mesmo o canal que ele colou.
+  const [channelTitles, setChannelTitles] = useState<Record<string, string>>({})
+  const [resolvingChannel, setResolvingChannel] = useState(false)
   const [pick, setPick] = useState<string | "new" | null>(null)
   const [keywords, setKeywords] = useState<string[]>([])
   const [draft, setDraft] = useState("")
@@ -442,7 +485,8 @@ function BrandModal({ open, onClose }: { open: boolean; onClose: () => void }) {
 
   const close = useCallback(() => {
     setStep(0); setName(""); setRelationship("OwnBrand"); setPick(null)
-    setCategory(""); setColor(PALETTE[0]); setChannels([]); setChannelDraft("")
+    setCategory(""); setColor(PALETTE[0]); setChannels([]); setChannelDraft(""); setChannelError(null)
+    setChannelTitles({}); setResolvingChannel(false)
     setKeywords([]); setDraft("")
     flow.resolve.reset(); flow.link.reset(); flow.create.reset()
     onClose()
@@ -462,6 +506,47 @@ function BrandModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   }, [open, close])
 
   if (!open) return null
+
+  const commitChannel = (id: string, title?: string | null) => {
+    if (!channels.includes(id)) setChannels([...channels, id])
+    if (title) setChannelTitles((t) => ({ ...t, [id]: title }))
+    setChannelDraft("")
+    setChannelError(null)
+  }
+
+  /**
+   * O domínio exige o ID canônico `UC…`, mas ninguém tem isso em mãos: o botão
+   * "Compartilhar" do YouTube entrega `youtube.com/@marca`. Então:
+   *   1. ID puro ou `/channel/<id>` → resolve local, sem rede;
+   *   2. `@handle` → backend traduz via `channels?forHandle=` (1 unidade de quota).
+   * Validar antes evita que UM canal malformado derrube o resolve inteiro.
+   */
+  const addChannel = async () => {
+    const local = parseChannelId(channelDraft)
+    if (local) { commitChannel(local); return }
+
+    const raw = channelDraft.trim()
+    if (!raw.includes("@")) {
+      setChannelError("Cole o link do canal (youtube.com/@marca), o @handle ou o ID que começa com UC.")
+      return
+    }
+
+    setResolvingChannel(true)
+    setChannelError(null)
+    try {
+      const r = await brandsApi.resolveChannel(raw)
+      if (r.channelId) commitChannel(r.channelId, r.title)
+      else setChannelError(
+        r.reason === "channel_not_found"
+          ? "Não encontramos esse canal no YouTube. Confira o @handle."
+          : "Não conseguimos resolver esse @handle agora. Tente colar o ID do canal (UC…).",
+      )
+    } catch (err) {
+      setChannelError(apiMessage(err, "Não conseguimos consultar o YouTube agora."))
+    } finally {
+      setResolvingChannel(false)
+    }
+  }
 
   const addKeyword = () => {
     const v = draft.trim().toLowerCase()
@@ -550,7 +635,7 @@ function BrandModal({ open, onClose }: { open: boolean; onClose: () => void }) {
                   />
                   <div
                     className="text-[11px] font-semibold"
-                    style={{ color: i === step ? "var(--color-teal-700)" : i < step ? "var(--muted)" : "var(--muted-2)" }}
+                    style={{ color: i === step ? "var(--color-teal-700)" : i < step ? "var(--ink-muted)" : "#9CA3AF" }}
                   >
                     {s}
                   </div>
@@ -615,39 +700,42 @@ function BrandModal({ open, onClose }: { open: boolean; onClose: () => void }) {
                       <div className="flex gap-2">
                         <input
                           value={channelDraft}
-                          onChange={(e) => setChannelDraft(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key !== "Enter") return
-                            e.preventDefault()
-                            const v = channelDraft.trim()
-                            if (v && !channels.includes(v)) setChannels([...channels, v])
-                            setChannelDraft("")
-                          }}
-                          placeholder="UCxxxxxxxxxxxxxxxxxxxxxx"
-                          className="flex-1 h-10 px-3.5 text-[13px] font-mono-zoe rounded-lg border border-border-soft bg-transparent outline-none focus:border-teal-500"
+                          onChange={(e) => { setChannelDraft(e.target.value); setChannelError(null) }}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addChannel() } }}
+                          placeholder="youtube.com/@marca, @marca ou UCxxxxxxxx…"
+                          className="flex-1 h-10 px-3.5 text-[13px] font-mono-zoe rounded-lg border bg-transparent outline-none focus:border-teal-500"
+                          style={{ borderColor: channelError ? "var(--color-neg)" : "var(--border-soft)" }}
+                          aria-invalid={Boolean(channelError)}
                         />
                         <button
                           type="button"
-                          disabled={!channelDraft.trim()}
-                          onClick={() => {
-                            const v = channelDraft.trim()
-                            if (v && !channels.includes(v)) setChannels([...channels, v])
-                            setChannelDraft("")
-                          }}
+                          disabled={!channelDraft.trim() || resolvingChannel}
+                          onClick={addChannel}
+                          aria-label="Adicionar canal"
                           className="h-10 px-3.5 text-[13px] rounded-lg border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors disabled:opacity-50"
                         >
-                          <Plus className="w-3.5 h-3.5" />
+                          {resolvingChannel
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : <Plus className="w-3.5 h-3.5" />}
                         </button>
                       </div>
+                      {channelError && (
+                        <p className="text-[11.5px] text-neg mt-1.5">{channelError}</p>
+                      )}
                       {channels.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 mt-2">
                           {channels.map((ch) => (
                             <span
                               key={ch}
+                              title={ch}
                               className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-md text-[12px] font-mono-zoe bg-[#F3F4F6] dark:bg-[#1A1D2D]"
                               style={{ color: "var(--ink-2)" }}
                             >
-                              {ch}
+                              {/* Título quando o YouTube confirmou: é o que
+                                  permite conferir o canal sem decorar o UC…. */}
+                              {channelTitles[ch]
+                                ? <span className="font-sans">{channelTitles[ch]}</span>
+                                : ch}
                               <button
                                 type="button"
                                 onClick={() => setChannels(channels.filter((x) => x !== ch))}
@@ -666,26 +754,12 @@ function BrandModal({ open, onClose }: { open: boolean; onClose: () => void }) {
                       </p>
                     </Field>
                     <Field label="Cor de identificação">
-                      <div className="flex items-center gap-2">
-                        {PALETTE.map((c) => (
-                          <button
-                            key={c}
-                            type="button"
-                            onClick={() => setColor(c)}
-                            aria-label={`Cor ${c}`}
-                            aria-pressed={color === c}
-                            className="w-7.5 h-7.5 rounded-lg transition-shadow"
-                            style={{
-                              background: c,
-                              border: color === c ? "2px solid var(--ink)" : "2px solid transparent",
-                              boxShadow: color === c ? `0 0 0 2px var(--surface), 0 0 0 3px ${c}` : "none",
-                            }}
-                          />
-                        ))}
-                      </div>
+                      <ColorSwatches value={color} onChange={setColor} size={30} />
                     </Field>
                     {flow.resolve.isError && (
-                      <p className="text-[12.5px] text-neg">Não foi possível buscar. Tente novamente.</p>
+                      <p className="text-[12.5px] text-neg">
+                        {apiMessage(flow.resolve.error, "Não foi possível buscar. Tente novamente.")}
+                      </p>
                     )}
                   </div>
                 )}
@@ -793,7 +867,9 @@ function BrandModal({ open, onClose }: { open: boolean; onClose: () => void }) {
                       ))}
                     </div>
                     {(flow.link.isError || flow.create.isError) && (
-                      <p className="text-[12.5px] text-neg mt-3">Não foi possível assinar. Tente novamente.</p>
+                      <p className="text-[12.5px] text-neg mt-3">
+                        {apiMessage(flow.link.error ?? flow.create.error, "Não foi possível assinar. Tente novamente.")}
+                      </p>
                     )}
                   </div>
                 )}
@@ -856,10 +932,85 @@ function Avatar({ name, slug, color, size, radius, font }: {
   )
 }
 
+/**
+ * Paleta do design + swatch de cor PERSONALIZADA (input nativo `type="color"`).
+ *
+ * O custom commita no `onBlur`, não a cada `onChange`: o input de cor dispara
+ * eventos continuamente enquanto o usuário arrasta no picker, e no card de
+ * Assinatura cada evento viraria um PUT na API. O `draft` mostra a cor ao vivo;
+ * o commit acontece uma vez, ao sair do campo — e o draft PERMANECE depois pra
+ * não piscar a cor antiga enquanto o refetch da lista não chega.
+ */
+function ColorSwatches({ value, onChange, disabled, size }: {
+  value: string
+  onChange: (hex: string) => void
+  disabled?: boolean
+  size: number
+}) {
+  const [draft, setDraft] = useState<string | null>(null)
+  const shown = (draft ?? value).toUpperCase()
+  const isCustom = !PALETTE.some((c) => c.toUpperCase() === shown)
+
+  const ring = (c: string) => ({
+    border: "2px solid var(--ink)",
+    boxShadow: `0 0 0 2px var(--surface), 0 0 0 3px ${c}`,
+  })
+
+  return (
+    <div className="flex items-center gap-2">
+      {PALETTE.map((c) => {
+        const active = !isCustom && shown === c.toUpperCase()
+        return (
+          <button
+            key={c}
+            type="button"
+            disabled={disabled}
+            onClick={() => { setDraft(null); onChange(c) }}
+            aria-label={`Cor ${c}`}
+            aria-pressed={active}
+            className="rounded-md transition-shadow disabled:opacity-60"
+            style={{
+              width: size,
+              height: size,
+              background: c,
+              ...(active ? ring(c) : { border: "2px solid transparent" }),
+            }}
+          />
+        )
+      })}
+
+      {/* Cor personalizada: quando não há custom ativo, o swatch mostra um
+          gradiente que comunica "escolher outra cor". */}
+      <label
+        title="Cor personalizada"
+        aria-label="Cor personalizada"
+        className={`relative rounded-md transition-shadow ${disabled ? "opacity-60" : "cursor-pointer"}`}
+        style={{
+          width: size,
+          height: size,
+          background: isCustom
+            ? shown
+            : "conic-gradient(from 180deg, #EF4444, #F59E0B, #14B8A6, #2563EB, #8B5CF6, #EC4899, #EF4444)",
+          ...(isCustom ? ring(shown) : { border: "2px solid transparent" }),
+        }}
+      >
+        <input
+          type="color"
+          disabled={disabled}
+          value={shown.toLowerCase()}
+          onChange={(e) => setDraft(e.target.value.toUpperCase())}
+          onBlur={() => { if (draft && draft !== value.toUpperCase()) onChange(draft) }}
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-default"
+        />
+      </label>
+    </div>
+  )
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="text-[11.5px] text-ink-muted mb-1.5">{label}</div>
+      <div className="text-[13px] text-ink mb-1 font-medium">{label}</div>
       {children}
     </div>
   )

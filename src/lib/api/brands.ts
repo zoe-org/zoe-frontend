@@ -49,6 +49,15 @@ export type ResolveBrandResponse = {
   candidates: BrandCandidate[]
 }
 
+export type ResolveChannelResponse = {
+  channelId: string | null
+  title: string | null
+  subscriberCount: number
+  /** false + channelId != null = aceito sem confirmar na API do YouTube. */
+  verified: boolean
+  reason: string | null
+}
+
 /** Normaliza o outcome do resolve (número ou string) num literal estável. */
 export function resolveOutcome(o: number | string): "AutoLink" | "Candidates" | "NoMatch" {
   if (typeof o === "string") return o as "AutoLink" | "Candidates" | "NoMatch"
@@ -79,6 +88,11 @@ export const brandsApi = {
   // duplicada quando dois tenants escrevem o nome de formas diferentes.
   resolve: (name: string, officialChannelIds?: string[]) =>
     apiClient.post<ResolveBrandResponse>("/api/me/brands/resolve", { name, officialChannelIds }),
+
+  // Traduz o que o usuário cola (link do "Compartilhar", @handle ou o UC...) no
+  // ID canônico. O domínio só aceita UC..., mas ninguém tem esse ID em mãos.
+  resolveChannel: (input: string) =>
+    apiClient.post<ResolveChannelResponse>("/api/me/brands/resolve-channel", { input }),
   link: (brandId: string, body?: SubscribePayload) =>
     apiClient.post("/api/me/brands/link", { brandId, ...body }),
   create: (name: string, body?: SubscribePayload) =>

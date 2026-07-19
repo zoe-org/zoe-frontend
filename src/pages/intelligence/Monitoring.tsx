@@ -1,24 +1,34 @@
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { Search, AlertCircle } from "lucide-react"
+import { Search, AlertCircle, List, LayoutGrid } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { MentionDrawer } from "@/components/features/MentionDrawer"
 import { EmptyState } from "@/components/ui/empty-state"
 import { ConfidenceBadge } from "@/components/ui/confidence-badge"
+import { VideoThumb } from "@/components/ui/video-thumb"
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
-import { useTenantBrands } from "@/lib/api/brands"
-import { useVideosFeed, type VideoFilters, type VideoListItem } from "@/lib/api/videos"
+import { useActiveBrand } from "@/features/brands/BrandContext"
+import { useVideosFeed, useVideosSummary, type VideoFilters, type VideoListItem } from "@/lib/api/videos"
 import { tEnum } from "@/i18n/enums"
 
+/** 1234 → "1,2 mil"; 1_234_567 → "1,2 mi". Compacto pt-BR para views. */
+function compactNumber(n: number): string {
+  return new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 }).format(n)
+}
+
+// Tabs pill preenchidas (design). A cor do ativo é a do próprio sentimento —
+// é o que dá leitura imediata de "estou olhando o quê".
 const SENT_TABS = [
-  { key: "", label: "Todos" },
-  { key: "Positive", label: "Positivo" },
-  { key: "Neutral", label: "Neutro" },
-  { key: "Negative", label: "Negativo" },
-  { key: "Inconclusive", label: "Indeterminado" },
+  // teal-500 explícito: `--color-primary` é o quase-preto do shadcn, NÃO a cor
+  // da marca — usá-lo aqui daria uma pill preta no lugar da teal.
+  { key: "", label: "Todos", color: "var(--color-teal-500)" },
+  { key: "Positive", label: "Positivo", color: "var(--color-pos)" },
+  { key: "Neutral", label: "Neutro", color: "#6B7280" },
+  { key: "Negative", label: "Negativo", color: "var(--color-neg)" },
+  { key: "Inconclusive", label: "Indeterminado", color: "#6B7280" },
 ] as const
 
 const PERIODS = [
@@ -40,10 +50,46 @@ function classificationClass(cls: string | null): string {
   return "text-[#6B7280] bg-[#F3F4F6]"
 }
 
+/**
+ * Filtro em forma de pill (design). Envolve um `Select` do Radix em vez de um
+ * botão decorativo: o mock só mostra o chevron, mas aqui ele precisa abrir de
+ * verdade. Ativo = tem valor diferente do padrão.
+ */
+function FilterChip({
+  value, onChange, options, placeholder,
+}: {
+  value: string
+  onChange: (v: string) => void
+  options: readonly { key: string; label: string }[]
+  placeholder: string
+}) {
+  const active = value !== ""
+  return (
+    <Select value={value || "__all"} onValueChange={(v) => onChange(v === "__all" ? "" : v)}>
+      <SelectTrigger
+        aria-label={placeholder}
+        className={`h-8 rounded-full px-3.5 text-[13px] font-medium border transition-colors ${
+          active
+            ? "border-teal-500 text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-900/25"
+            : "border-border-soft text-ink-2 bg-transparent"
+        }`}
+      >
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((o) => (
+          <SelectItem key={o.key || "__all"} value={o.key || "__all"}>{o.label}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
 export default function MonitoringPage() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
-  const brands = useTenantBrands()
+  // Marca ativa é GLOBAL (seletor no header); só os filtros ficam na URL.
+  const brand = useActiveBrand()
 
   const setParam = (key: string, value: string) => {
     setParams((prev) => {
@@ -54,17 +100,16 @@ export default function MonitoringPage() {
     }, { replace: true })
   }
 
-  // Marca ativa: da URL, senão a primeira assinada. Filtros vêm da URL (deep-link).
-  const brandList = brands.data?.items ?? []
-  const urlBrand = params.get("brand")
-  const brandId = urlBrand && brandList.some((b) => b.brandId === urlBrand)
-    ? urlBrand
-    : brandList[0]?.brandId ?? null
+  const brandList = brand.brands
+  const brandId = brand.brandId
 
   const sent = params.get("sent") ?? ""
   const period = params.get("period") ?? ""
   const min = params.get("min") ?? ""
   const q = params.get("q") ?? ""
+  // Na URL junto com os filtros: a preferência de visualização sobrevive ao
+  // refresh e viaja no link compartilhado.
+  const view = params.get("view") === "grid" ? "grid" : "list"
 
   // Busca com debounce local → URL (deep-link + não refetch a cada tecla).
   const [searchInput, setSearchInput] = useState(q)
@@ -88,15 +133,31 @@ export default function MonitoringPage() {
   }, [brandId, sent, q, period, min])
 
   const feed = useVideosFeed(filters)
+  const summary = useVideosSummary(filters)
   const items = feed.data?.pages.flatMap((p) => p.items) ?? []
+
+  // Contagem por aba. Enquanto a summary não chega, undefined → não renderiza
+  // número (melhor do que mostrar 0 e piscar pro valor real).
+  const tabCount = (key: string): number | undefined => {
+    const s = summary.data
+    if (!s) return undefined
+    switch (key) {
+      case "": return s.total
+      case "Positive": return s.positive
+      case "Neutral": return s.neutral
+      case "Negative": return s.negative
+      case "Inconclusive": return s.inconclusive
+      default: return undefined
+    }
+  }
 
   const [selected, setSelected] = useState<VideoListItem | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const openDrawer = (item: VideoListItem) => { setSelected(item); setDrawerOpen(true) }
 
   // ── Estados de topo: sem marca / carregando marcas ────────────────────
-  if (brands.isLoading) return <PageSkeleton />
-  if (brands.isError) return <ErrorState onRetry={() => brands.refetch()} />
+  if (brand.isLoading) return <PageSkeleton />
+  if (brand.isError) return <ErrorState onRetry={() => brand.refetch()} />
   if (brandList.length === 0) {
     return (
       <EmptyState
@@ -111,29 +172,24 @@ export default function MonitoringPage() {
   return (
     <div className="-m-6 border-t border-border-soft" style={{ background: "var(--surface)", color: "var(--ink)" }}>
       {/* Hero */}
-      <section className="px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
+      <section className="px-8 pt-7  " style={{ background: "var(--surface)" }}>
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div className="flex-1 max-w-[640px] min-w-[280px]">
-            <div className="eyebrow mb-3">Monitoramento · Feed</div>
+            <div className="eyebrow mb-3">Intelligence · Feed</div>
             <h1 className="font-display m-0" style={{ fontSize: 36, lineHeight: 1.1, color: "var(--ink)" }}>
-              Menções analisadas{" "}
-              <span style={{ color: "var(--ink-muted-2)" }}>em vídeo, áudio e comentários.</span>
+              Monitoramento
             </h1>
+            {summary.data && (
+              <div className="text-[14px] text-ink-muted mt-3">
+                Feed completo de menções detectadas em vídeo. {" "}
+                <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>{summary.data.total}</span>{" "}
+                {summary.data.total === 1 ? "vídeo analisado" : "vídeos analisados"}
+                {period && ` nos últimos ${period} dias`}.
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2">
-            {/* Seletor de marca (só quando há mais de uma assinada) */}
-            {brandList.length > 1 && (
-              <Select value={brandId ?? undefined} onValueChange={(v) => setParam("brand", v)}>
-                <SelectTrigger className="h-8 text-[13px]"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {brandList.map((b) => (
-                    <SelectItem key={b.brandId} value={b.brandId}>
-                      {b.displayName ?? b.brandName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+            {/* Seletor de marca vive no header agora (BrandSwitcher). */}
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-ink-muted" />
               <input
@@ -148,43 +204,70 @@ export default function MonitoringPage() {
         </div>
       </section>
 
-      {/* Filtros: período + score mínimo */}
-      <section className="px-8 py-3 border-b border-border-soft flex flex-wrap items-center gap-3">
-        <Select value={period || "all"} onValueChange={(v) => setParam("period", v === "all" ? "" : v)}>
-          <SelectTrigger className="h-7 text-[12px]"><SelectValue placeholder="Período" /></SelectTrigger>
-          <SelectContent>
-            {PERIODS.map((p) => (
-              <SelectItem key={p.key || "all"} value={p.key || "all"}>{p.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={min || "any"} onValueChange={(v) => setParam("min", v === "any" ? "" : v)}>
-          <SelectTrigger className="h-7 text-[12px]"><SelectValue placeholder="Score" /></SelectTrigger>
-          <SelectContent>
-            {MIN_SCORES.map((m) => (
-              <SelectItem key={m.key || "any"} value={m.key || "any"}>{m.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* Filtros em pill (design) */}
+      <section className="px-8 py-3 border-b border-border-soft flex flex-wrap items-center gap-2">
+        <FilterChip
+          value={period} onChange={(v) => setParam("period", v)}
+          options={PERIODS} placeholder="Todo o período"
+        />
+        <FilterChip
+          value={min} onChange={(v) => setParam("min", v)}
+          options={MIN_SCORES} placeholder="Qualquer score"
+        />
       </section>
 
-      {/* Tabs de classificação (filtro server-side) */}
-      <section className="px-8 border-b border-border-soft flex items-center gap-1 sticky top-13 z-10" style={{ background: "var(--surface)" }}>
-        {SENT_TABS.map((tab) => {
-          const active = sent === tab.key
-          return (
+      {/* Tabs de classificação (filtro server-side) + toggle de visualização */}
+      <section
+        className="px-8 py-3 border-b border-border-soft flex items-center justify-between gap-4 sticky top-13 z-10"
+        style={{ background: "var(--surface)" }}
+      >
+        <div className="flex items-center gap-1 flex-wrap">
+          {SENT_TABS.map((tab) => {
+            const active = sent === tab.key
+            const count = tabCount(tab.key)
+            return (
+              <button
+                key={tab.key || "all"}
+                onClick={() => setParam("sent", tab.key)}
+                aria-pressed={active}
+                className={`px-4 py-2 text-[13.5px] font-semibold rounded-lg transition-colors ${
+                  active ? "text-white" : "text-ink-muted hover:text-ink"
+                }`}
+                style={active ? { background: tab.color } : undefined}
+              >
+                {tab.label}
+                {count !== undefined && (
+                  <span className="ml-1.5 font-medium" style={{ opacity: active ? 0.85 : 0.6 }}>
+                    ({count})
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Lista ↔ grade: com thumbnail, a grade vira uma leitura visual rápida. */}
+        <div className="flex items-center gap-0.5 p-0.5 rounded-lg border border-border-soft shrink-0">
+          {([
+            { key: "list", label: "Lista", Icon: List },
+            { key: "grid", label: "Grade", Icon: LayoutGrid },
+          ] as const).map(({ key, label, Icon }) => (
             <button
-              key={tab.key || "all"}
-              onClick={() => setParam("sent", tab.key)}
-              aria-pressed={active}
-              className={`px-3 py-3 text-[13px] font-medium border-b-2 transition-colors -mb-[1px] ${
-                active ? "border-teal-500 text-teal-600 dark:text-teal-300" : "border-transparent text-ink-muted hover:text-ink"
+              key={key}
+              onClick={() => setParam("view", key === "list" ? "" : key)}
+              aria-pressed={view === key}
+              title={label}
+              aria-label={label}
+              className={`p-1.5 rounded-md transition-colors ${
+                view === key
+                  ? "bg-[#F3F4F6] dark:bg-[#1A1D2D] text-ink"
+                  : "text-ink-muted hover:text-ink"
               }`}
             >
-              {tab.label}
+              <Icon className="w-3.5 h-3.5" />
             </button>
-          )
-        })}
+          ))}
+        </div>
       </section>
 
       {/* Feed */}
@@ -201,39 +284,100 @@ export default function MonitoringPage() {
         />
       ) : (
         <section>
-          {items.map((m) => (
-            <button
-              key={m.analysisId}
-              onClick={() => openDrawer(m)}
-              className="grid items-center gap-4 px-8 py-4 border-b border-border-soft w-full text-left cursor-pointer hover:bg-[#FAFBFC] dark:hover:bg-[#181B28] transition-colors"
-              style={{ gridTemplateColumns: "1fr 200px 150px 90px" }}
-            >
-              <div className="min-w-0">
-                <div className="text-[14px] font-medium truncate mb-0.5" style={{ color: "var(--ink)" }}>
-                  {m.title}
+          {view === "grid" ? (
+            <div className="grid gap-4 px-8 py-6" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
+              {items.map((m) => (
+                <button
+                  key={m.analysisId}
+                  onClick={() => openDrawer(m)}
+                  className="rounded-lg border border-border-soft overflow-hidden text-left cursor-pointer hover:border-teal-500 transition-colors"
+                >
+                  <div className="relative">
+                    <VideoThumb
+                      youtubeVideoId={m.youtubeVideoId}
+                      durationSeconds={m.durationSeconds}
+                      className="w-full aspect-video rounded-none"
+                      playSize={34}
+                    />
+                    {m.classificacao && (
+                      <span className={`absolute top-2 left-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${classificationClass(m.classificacao)}`}>
+                        {tEnum("classification", m.classificacao)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="p-3.5">
+                    <div className="text-[13.5px] font-medium leading-snug line-clamp-2 mb-1.5" style={{ color: "var(--ink)" }}>
+                      {m.title}
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[11.5px] text-ink-muted mb-2">
+                      <span className="truncate">{m.channelName}</span>
+                      {m.views != null && (
+                        <>
+                          <span>·</span>
+                          <span className="font-mono-zoe shrink-0">{compactNumber(m.views)} views</span>
+                        </>
+                      )}
+                      <span>·</span>
+                      <span className="shrink-0">
+                        {formatDistanceToNow(new Date(m.publishedAt), { addSuffix: true, locale: ptBR })}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <ConfidenceBadge pipelinePath={m.pipelinePath} confidence={m.confidence} />
+                      <span className="font-mono-zoe text-[12px] shrink-0" style={{ color: "var(--ink)" }}>
+                        {m.score != null ? m.score.toFixed(2) : "—"}
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            items.map((m) => (
+              <button
+                key={m.analysisId}
+                onClick={() => openDrawer(m)}
+                className="grid items-center gap-4 px-8 py-3.5 border-b border-border-soft w-full text-left cursor-pointer hover:bg-[#FAFBFC] dark:hover:bg-[#181B28] transition-colors"
+                style={{ gridTemplateColumns: "110px 1fr 200px 150px 90px" }}
+              >
+                <VideoThumb
+                  youtubeVideoId={m.youtubeVideoId}
+                  durationSeconds={m.durationSeconds}
+                  className="w-27.5 h-15.5"
+                />
+                <div className="min-w-0">
+                  <div className="text-[14px] font-medium truncate mb-0.5" style={{ color: "var(--ink)" }}>
+                    {m.title}
+                  </div>
+                  <div className="flex items-center gap-2 text-[11.5px] text-ink-muted flex-wrap">
+                    <span className="truncate font-medium text-ink-2">{m.channelName}</span>
+                    {m.views != null && (
+                      <>
+                        <span>·</span>
+                        <span className="font-mono-zoe">{compactNumber(m.views)} views</span>
+                      </>
+                    )}
+                    <span>·</span>
+                    <span>{formatDistanceToNow(new Date(m.publishedAt), { addSuffix: true, locale: ptBR })}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 text-[11.5px] text-ink-muted flex-wrap">
-                  <span className="truncate">{m.channelName}</span>
-                  <span>·</span>
-                  <span>{formatDistanceToNow(new Date(m.publishedAt), { addSuffix: true, locale: ptBR })}</span>
+                <div><ConfidenceBadge pipelinePath={m.pipelinePath} confidence={m.confidence} /></div>
+                <div>
+                  {m.classificacao && (
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${classificationClass(m.classificacao)}`}>
+                      {tEnum("classification", m.classificacao)}
+                    </span>
+                  )}
                 </div>
-              </div>
-              <div><ConfidenceBadge pipelinePath={m.pipelinePath} confidence={m.confidence} /></div>
-              <div>
-                {m.classificacao && (
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${classificationClass(m.classificacao)}`}>
-                    {tEnum("classification", m.classificacao)}
-                  </span>
-                )}
-              </div>
-              <div className="text-right">
-                <div className="font-mono-zoe text-[13px]" style={{ color: "var(--ink)" }}>
-                  {m.score != null ? m.score.toFixed(2) : "—"}
+                <div className="text-right">
+                  <div className="font-mono-zoe text-[13px]" style={{ color: "var(--ink)" }}>
+                    {m.score != null ? m.score.toFixed(2) : "—"}
+                  </div>
+                  <div className="text-[10px] text-ink-muted-2">score</div>
                 </div>
-                <div className="text-[10px] text-ink-muted-2">score</div>
-              </div>
-            </button>
-          ))}
+              </button>
+            ))
+          )}
 
           {feed.hasNextPage && (
             <div className="px-8 py-6 text-center">
@@ -249,7 +393,7 @@ export default function MonitoringPage() {
         </section>
       )}
 
-      <MentionDrawer item={selected} open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      <MentionDrawer item={selected} brandId={brandId} open={drawerOpen} onClose={() => setDrawerOpen(false)} />
     </div>
   )
 }
@@ -271,7 +415,9 @@ function FeedSkeleton() {
   return (
     <section className="animate-pulse">
       {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="flex items-center gap-4 px-8 py-4 border-b border-border-soft">
+        <div key={i} className="flex items-center gap-4 px-8 py-3.5 border-b border-border-soft">
+          {/* Mesma caixa 110×62 da thumbnail real — sem isso a linha "pula" ao carregar. */}
+          <div className="w-27.5 h-15.5 shrink-0 rounded-md bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
           <div className="flex-1 space-y-2">
             <div className="h-3.5 w-2/3 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
             <div className="h-3 w-1/3 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />

@@ -1,17 +1,17 @@
 import { useState, useEffect } from "react"
 import { useQueryClient } from "@tanstack/react-query"
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom"
+import { NavLink, Link, Outlet, useLocation, useNavigate } from "react-router-dom"
 import {
   House, Brain, Settings, Bell,
   ChevronDown, ChevronUp, Search, PanelLeftClose, PanelLeftOpen, ChevronsUpDown,
-  Sun, Moon, LogOut,
+  Sun, Moon, LogOut, Check, Plus,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useAuth } from "@/features/auth/AuthContext"
 import { useFeature } from "@/features/auth/useFeature"
 import { Breadcrumb } from "@/components/ui/breadcrumb"
-import { TenantSwitcher } from "@/components/layout/TenantSwitcher"
+import { BrandSwitcher } from "@/components/layout/BrandSwitcher"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
@@ -53,8 +53,19 @@ const SubNavItem = ({ to, children, badge }: { to: string, children: React.React
   </NavLink>
 )
 
+/** Hash determinístico → cor consistente por tenant (bolinha do workspace). */
+const TENANT_PALETTE = [
+  "#820AD1", "#00A799", "#F97316", "#0EA5E9",
+  "#DC2626", "#16A34A", "#D97706", "#7C3AED",
+]
+function tenantColor(id: string) {
+  let h = 0
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0
+  return TENANT_PALETTE[Math.abs(h) % TENANT_PALETTE.length]
+}
+
 export function AppShell() {
-  const { user, role, signOut, activeTenantId } = useAuth()
+  const { user, role, signOut, activeTenantId, memberships, switchTenant } = useAuth()
   const queryClient = useQueryClient()
   const hasIntelligence = useFeature("intelligence")
   const hasOperations = useFeature("operations")
@@ -206,12 +217,45 @@ export function AppShell() {
                 )}
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent side="top" align="start" className="w-56">
+            <DropdownMenuContent side="top" align="start" className="w-64">
               <DropdownMenuLabel className="text-xs">
                 <div className="font-semibold truncate">{user?.name ?? "User"}</div>
                 <div className="text-[#6B7280] font-normal truncate">{user?.email}</div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
+
+              {/* Workspaces: seleção mudou do topbar pra cá (o topbar agora é da marca). */}
+              {memberships.length > 0 && (
+                <>
+                  <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-[#6B7280] font-semibold">
+                    Workspaces
+                  </DropdownMenuLabel>
+                  {memberships.map((m) => {
+                    const isActive = m.tenantId === activeTenantId
+                    return (
+                      <DropdownMenuItem
+                        key={m.tenantId}
+                        onSelect={() => { if (!isActive) void switchTenant(m.tenantId) }}
+                        className="flex items-center gap-2 cursor-pointer"
+                      >
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: tenantColor(m.tenantId) }} />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{m.tenantName}</div>
+                          <div className="text-[11px] text-[#6B7280] truncate">{m.role}</div>
+                        </div>
+                        {isActive && <Check className="w-4 h-4 text-teal-500 shrink-0" />}
+                      </DropdownMenuItem>
+                    )
+                  })}
+                  <DropdownMenuItem asChild>
+                    <Link to="/onboarding/tenant" className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Plus className="w-4 h-4" /> Criar novo workspace
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+
               <DropdownMenuItem
                 className="cursor-pointer text-neg focus:text-neg"
                 onSelect={async () => { await signOut(); navigate("/login", { replace: true }) }}
@@ -238,7 +282,7 @@ export function AppShell() {
               className="w-75 h-8 pl-8 pr-3 text-xs  border border-[#E5E7EB] dark:border-[#262A3A] dark:text-[#E6E8EF] rounded-md outline-none focus:ring-1 focus:ring-teal-500"
             />
           </div>
-          <TenantSwitcher />
+          <BrandSwitcher />
           <button
             type="button"
             aria-label={isDark ? "Ativar modo claro" : "Ativar modo escuro"}

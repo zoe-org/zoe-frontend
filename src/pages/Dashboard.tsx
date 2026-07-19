@@ -7,10 +7,7 @@ import { useAuth } from "@/features/auth/AuthContext"
 import { AreaLine, Sparkline } from "@/components/ui/charts"
 import { EmptyState } from "@/components/ui/empty-state"
 import { ConfidenceBadge } from "@/components/ui/confidence-badge"
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select"
-import { useActiveBrand } from "@/features/brands/useActiveBrand"
+import { useActiveBrand } from "@/features/brands/BrandContext"
 import { useDashboardSummary, useSentimentEvolution } from "@/lib/api/dashboard"
 import { useVideosFeed } from "@/lib/api/videos"
 import { tEnum } from "@/i18n/enums"
@@ -82,16 +79,6 @@ export default function DashboardPage() {
               <span style={{ color: "var(--color-teal-500)" }}>{brand.active?.displayName ?? brand.active?.brandName}</span>
             </h1>
           </div>
-          {brand.brands.length > 1 && (
-            <Select value={brand.brandId ?? undefined} onValueChange={brand.setBrand}>
-              <SelectTrigger className="h-8 text-[13px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {brand.brands.map((b) => (
-                  <SelectItem key={b.brandId} value={b.brandId}>{b.displayName ?? b.brandName}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
         </div>
       </section>
 
@@ -161,7 +148,7 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between px-8 pt-6 pb-3">
           <div className="eyebrow">Menções recentes</div>
           <button
-            onClick={() => navigate(`/intelligence/monitoring?brand=${brand.brandId}`)}
+            onClick={() => navigate("/intelligence/monitoring")}
             className="text-[13px] text-teal-700 dark:text-teal-300 hover:text-teal-500 font-medium"
           >
             Ver todas →
@@ -179,7 +166,7 @@ export default function DashboardPage() {
           recent.map((m) => (
             <button
               key={m.analysisId}
-              onClick={() => navigate(`/intelligence/monitoring?brand=${brand.brandId}`)}
+              onClick={() => navigate("/intelligence/monitoring")}
               className="grid items-center gap-4 px-8 py-3.5 border-t border-border-soft w-full text-left cursor-pointer hover:bg-[#FAFBFC] dark:hover:bg-[#181B28] transition-colors"
               style={{ gridTemplateColumns: "1fr 200px 130px 80px" }}
             >
