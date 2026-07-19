@@ -58,6 +58,7 @@ export function AppShell() {
   const queryClient = useQueryClient()
   const hasIntelligence = useFeature("intelligence")
   const hasOperations = useFeature("operations")
+  const hasSov = useFeature("sov")
   const location = useLocation()
   const navigate = useNavigate()
   const { resolvedTheme, setTheme } = useTheme()
@@ -149,6 +150,7 @@ export function AppShell() {
                 <div className="ml-[21px] border-l-2 border-[#E5E7EB] dark:border-[#1C1F2E] flex flex-col mt-0 mb-2">
                   <SubNavItem to="/intelligence/monitoring">Monitoramento</SubNavItem>
                   <SubNavItem to="/intelligence/sentiment">Sentimento</SubNavItem>
+                  {hasSov && <SubNavItem to="/intelligence/sov">Share of Voice</SubNavItem>}
                   <SubNavItem to="/intelligence/influencers">Influenciadores</SubNavItem>
                   <SubNavItem to="/alerts" badge={<span className="bg-ember text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">3</span>}>Alertas</SubNavItem>
                 </div>

@@ -9,6 +9,7 @@ import OnboardingTenantPage from "@/pages/OnboardingTenant"
 import DashboardPage from "@/pages/Dashboard"
 import MonitoringPage from "@/pages/intelligence/Monitoring"
 import SentimentPage from "@/pages/intelligence/Sentiment"
+import SovPage from "@/pages/intelligence/Sov"
 import InfluencersPage from "@/pages/intelligence/Influencers"
 import BrandsPage from "@/pages/Brands"
 import AlertsPage from "@/pages/Alerts"
@@ -30,6 +31,8 @@ export const router = createBrowserRouter([
       { path: "/dashboard", element: <DashboardPage /> },
       { path: "/intelligence/monitoring", element: <MonitoringPage /> },
       { path: "/intelligence/sentiment", element: <SentimentPage /> },
+      // SoV: rota sempre montada; a própria página faz o gate (upsell sem a feature).
+      { path: "/intelligence/sov", element: <SovPage /> },
       { path: "/intelligence/influencers", element: <InfluencersPage /> },
       { path: "/mentions", element: <Navigate to="/intelligence/monitoring" replace /> },
       { path: "/brands", element: <BrandsPage /> },

@@ -22,7 +22,13 @@ export type SentimentPoint = {
 }
 export type SentimentEvolution = { brandId: string; points: SentimentPoint[] }
 
-export type SovBrand = { brandId: string; brandName: string; mentions: number; sharePct: number }
+export type SovBrand = {
+  brandId: string
+  brandName: string
+  mentions: number
+  sharePct: number
+  isYou: boolean
+}
 export type ShareOfVoice = { brands: SovBrand[] }
 
 export type TopVideo = {
@@ -62,6 +68,24 @@ function mockSentiment(brandId: string): SentimentEvolution {
     return { date: d.toISOString().slice(0, 10), positive: pos, neutral: neu, negative: neg, avgScore: (pos - neg) / total / 2 + 0.5 }
   })
   return { brandId, points }
+}
+
+function mockSov(tenantId: string): ShareOfVoice {
+  const r = seeded(tenantId + "sov")
+  const names = ["Sua marca", "Concorrente A", "Concorrente B", "Concorrente C", "Concorrente D"]
+  const raw = names.map((n, i) => ({ name: n, isYou: i === 0, weight: 10 + r() * 40 }))
+  const total = raw.reduce((a, b) => a + b.weight, 0)
+  return {
+    brands: raw
+      .map((b, i) => ({
+        brandId: `sov-${tenantId}-${i}`,
+        brandName: b.name,
+        mentions: Math.floor(b.weight * 3),
+        sharePct: Math.round((b.weight / total) * 100),
+        isYou: b.isYou,
+      }))
+      .sort((a, b) => b.sharePct - a.sharePct),
+  }
 }
 
 function mockTopKeywords(brandId: string): TopKeywords {
@@ -118,9 +142,9 @@ export const dashboardApi = {
     // TODO(3.A): apiClient.get(`/api/dashboard/keywords?brandId=${brandId}`, { signal: opts?.signal })
     mockResolve(mockTopKeywords(brandId), opts),
   // SoV é gated por feature `sov`; o backend também retorna 403 sem a feature.
-  sov: (opts?: Opts): Promise<ShareOfVoice> =>
+  sov: (tenantId: string, opts?: Opts): Promise<ShareOfVoice> =>
     // TODO(3.A): apiClient.get(`/api/dashboard/sov`, { signal: opts?.signal })
-    mockResolve({ brands: [] } as ShareOfVoice, opts),
+    mockResolve(mockSov(tenantId), opts),
 }
 
 // ── hooks (tenantId na key = isolamento por tenant) ────────────────────────
@@ -161,6 +185,21 @@ export function useTopKeywords(brandId: string | null) {
     queryKey: ["dashboard-top-keywords", activeTenantId, brandId],
     queryFn: ({ signal }) => dashboardApi.topKeywords(brandId!, { signal }),
     enabled: Boolean(activeTenantId && brandId),
+    staleTime: 60_000,
+  })
+}
+
+/**
+ * Share of Voice (tenant-level). `enabled` deve refletir a feature `sov` — a
+ * página não deve nem chamar quando gated; o backend também retorna 403, tratado
+ * como upsell na página (a UI não depende só de si).
+ */
+export function useShareOfVoice(enabled: boolean) {
+  const { activeTenantId } = useAuth()
+  return useQuery({
+    queryKey: ["dashboard-sov", activeTenantId],
+    queryFn: ({ signal }) => dashboardApi.sov(activeTenantId!, { signal }),
+    enabled: Boolean(activeTenantId && enabled),
     staleTime: 60_000,
   })
 }
