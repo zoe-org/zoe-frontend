@@ -4,7 +4,7 @@ import { NavLink, Link, Outlet, useLocation, useNavigate } from "react-router-do
 import {
   House, Brain, Settings, Bell,
   ChevronDown, ChevronUp, Search, PanelLeftClose, PanelLeftOpen, ChevronsUpDown,
-  Sun, Moon, LogOut, Check, Plus,
+  Sun, Moon, LogOut, Check, Plus, ShieldCheck,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -65,7 +65,7 @@ function tenantColor(id: string) {
 }
 
 export function AppShell() {
-  const { user, role, signOut, activeTenantId, memberships, switchTenant } = useAuth()
+  const { user, role, signOut, activeTenantId, memberships, switchTenant, isZoeAdmin } = useAuth()
   const queryClient = useQueryClient()
   const hasIntelligence = useFeature("intelligence")
   const hasOperations = useFeature("operations")
@@ -190,6 +190,23 @@ export function AppShell() {
                 </div>
               )}
             </>
+          )}
+
+          {/* Admin Zoe — curadoria de brands (ADR-021). Só aparece pro grupo
+              `zoe-admin`; a autoridade real é a policy ZoeAdmin no backend. */}
+          {isZoeAdmin && (
+            <NavLink
+              to="/admin/brands"
+              className={({ isActive }) =>
+                `flex items-center gap-2 py-2 font-medium text-[14px] transition-colors rounded-md ${sidebarOpen ? "px-3" : "justify-center px-2"} ${isActive
+                  ? "text-teal-500 dark:text-teal-300"
+                  : "text-[#697788] dark:text-[#8A91A3] hover:text-midnight dark:hover:text-[#E6E8EF]"
+                }`
+              }
+            >
+              <ShieldCheck className="w-[18px] h-[18px] shrink-0" strokeWidth={2.5} />
+              {sidebarOpen && <span>Curadoria</span>}
+            </NavLink>
           )}
         </nav>
 

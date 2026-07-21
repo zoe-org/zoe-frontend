@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { Search, AlertCircle, List, LayoutGrid } from "lucide-react"
+import { Search, AlertCircle, List, LayoutGrid, Download } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { MentionDrawer } from "@/components/features/MentionDrawer"
@@ -11,6 +11,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import { useActiveBrand } from "@/features/brands/BrandContext"
+import { toCsv, downloadCsv } from "@/lib/csv"
 import { useVideosFeed, useVideosSummary, type VideoFilters, type VideoListItem } from "@/lib/api/videos"
 import { tEnum } from "@/i18n/enums"
 
@@ -155,6 +156,31 @@ export default function MonitoringPage() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const openDrawer = (item: VideoListItem) => { setSelected(item); setDrawerOpen(true) }
 
+  /**
+   * Export CSV das menções carregadas (respeita os filtros ativos). Título e
+   * canal vêm do YouTube — input hostil — então TODO valor passa pelo
+   * `toCsv`, que desarma formula injection (RN-I-070).
+   *
+   * Escopo: exporta o que já foi carregado no feed (paginação por cursor), não
+   * dispara refetch de todas as páginas — por isso o `title` do botão avisa.
+   */
+  const exportCsv = () => {
+    if (items.length === 0) return
+    const csv = toCsv(items, [
+      { header: "Título", value: (m) => m.title },
+      { header: "Canal", value: (m) => m.channelName },
+      { header: "Publicado em", value: (m) => new Date(m.publishedAt).toLocaleDateString("pt-BR") },
+      { header: "Views", value: (m) => m.views ?? "" },
+      { header: "Classificação", value: (m) => (m.classificacao ? tEnum("classification", m.classificacao) : "") },
+      { header: "Score", value: (m) => (m.score != null ? m.score.toFixed(2) : "") },
+      { header: "Confiança", value: (m) => (m.confidence != null ? m.confidence.toFixed(2) : "") },
+      { header: "Cobertura", value: (m) => tEnum("pipelinePath", m.pipelinePath) },
+      { header: "URL", value: (m) => `https://www.youtube.com/watch?v=${m.youtubeVideoId}` },
+    ])
+    const brandSlug = brand.active?.brandSlug ?? "marca"
+    downloadCsv(`zoe-mencoes-${brandSlug}-${new Date().toISOString().slice(0, 10)}.csv`, csv)
+  }
+
   // ── Estados de topo: sem marca / carregando marcas ────────────────────
   if (brand.isLoading) return <PageSkeleton />
   if (brand.isError) return <ErrorState onRetry={() => brand.refetch()} />
@@ -200,6 +226,15 @@ export default function MonitoringPage() {
                 className="w-56 h-8 pl-8 pr-3 text-[12.5px] rounded-md border border-border-soft bg-transparent outline-none focus:border-teal-500"
               />
             </div>
+            <button
+              type="button"
+              onClick={exportCsv}
+              disabled={items.length === 0}
+              title="Exporta as menções já carregadas, com os filtros atuais"
+              className="inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors disabled:opacity-50"
+            >
+              <Download className="w-3.5 h-3.5" /> Exportar
+            </button>
           </div>
         </div>
       </section>

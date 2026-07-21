@@ -44,6 +44,12 @@ type AuthState = {
   features: string[]
   /** True quando o user logou mas ainda não tem nenhum tenant — onboarding pendente. */
   needsOnboarding: boolean
+  /**
+   * Admin da Zoe (grupo `zoe-admin` em `cognito:groups`) — espelha a policy
+   * `ZoeAdmin` do backend. É só pra ESCONDER navegação: a autoridade continua
+   * sendo o backend, que devolve 403 em `/api/admin/*` sem o grupo.
+   */
+  isZoeAdmin: boolean
   error: string | null
 }
 
@@ -68,6 +74,7 @@ const initialState: AuthState = {
   role: null,
   features: [],
   needsOnboarding: false,
+  isZoeAdmin: false,
   error: null,
 }
 
@@ -77,6 +84,18 @@ async function hasCognitoSession(): Promise<boolean> {
   try {
     const session = await fetchAuthSession()
     return Boolean(session.tokens?.idToken)
+  } catch {
+    return false
+  }
+}
+
+/** Grupo `zoe-admin` no idToken — mesma fonte que a policy `ZoeAdmin` do backend. */
+const ZOE_ADMIN_GROUP = "zoe-admin"
+async function readIsZoeAdmin(): Promise<boolean> {
+  try {
+    const session = await fetchAuthSession()
+    const groups = session.tokens?.idToken?.payload?.["cognito:groups"]
+    return Array.isArray(groups) && groups.includes(ZOE_ADMIN_GROUP)
   } catch {
     return false
   }
@@ -130,7 +149,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const me = await meApi.get()
       const activeTenantId = applyTenant(me.memberships)
-      const tenantCtx = await loadTenantContext(activeTenantId)
+      const [tenantCtx, isZoeAdmin] = await Promise.all([
+        loadTenantContext(activeTenantId),
+        readIsZoeAdmin(),
+      ])
       if (gen !== generationRef.current) return
       setState({
         isLoading: false,
@@ -142,6 +164,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: tenantCtx?.role ?? null,
         features: tenantCtx?.features ?? [],
         needsOnboarding: me.memberships.length === 0,
+        isZoeAdmin,
         error: null,
       })
     } catch (err) {
@@ -188,6 +211,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       role: DEV_MOCK.tenant.role,
       features: DEV_MOCK.tenant.features,
       needsOnboarding: false,
+      // Login mock local não é admin Zoe — pra ver a curadoria é preciso o
+      // grupo `zoe-admin` no Cognito de verdade.
+      isZoeAdmin: false,
       error: null,
     })
   }, [])

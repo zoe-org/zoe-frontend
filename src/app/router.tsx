@@ -14,6 +14,7 @@ import InfluencersPage from "@/pages/intelligence/Influencers"
 import BrandsPage from "@/pages/Brands"
 import AlertsPage from "@/pages/Alerts"
 import ReportsPage from "@/pages/Reports"
+import AdminBrandsPage from "@/pages/admin/AdminBrands"
 
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
@@ -38,6 +39,9 @@ export const router = createBrowserRouter([
       { path: "/brands", element: <BrandsPage /> },
       { path: "/alerts", element: <AlertsPage /> },
       { path: "/reports", element: <ReportsPage /> },
+      // Curadoria admin (ADR-021). O gate visual é o `isZoeAdmin`; a autoridade
+      // real é a policy ZoeAdmin no backend (403 em /api/admin/*).
+      { path: "/admin/brands", element: <AdminBrandsPage /> },
     ],
   },
 ])

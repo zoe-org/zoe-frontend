@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { Search, Plus, X, Check, AlertCircle, ExternalLink, ShieldCheck, Clock, Loader2 } from "lucide-react"
 import { useAuth } from "@/features/auth/AuthContext"
 import { ApiError } from "@/lib/api"
+import { apiMessage } from "@/lib/api-error"
 import { EmptyState } from "@/components/ui/empty-state"
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -70,17 +71,6 @@ function parseChannelId(input: string): string | null {
   if (CHANNEL_ID_RE.test(s)) return s
   const fromUrl = s.match(/\/channel\/(UC[0-9A-Za-z_-]{22})/)
   return fromUrl ? fromUrl[1] : null
-}
-
-/**
- * Extrai a mensagem ÚTIL de um erro da API. O backend devolve ProblemDetails
- * (RFC 7807) com `errors` do FluentValidation — mostrar "não foi possível"
- * genérico joga fora exatamente a informação que o usuário precisa pra corrigir.
- */
-function apiMessage(err: unknown, fallback: string): string {
-  if (!(err instanceof ApiError)) return fallback
-  const firstFieldError = Object.values(err.problem?.errors ?? {}).flat()[0]
-  return firstFieldError || err.problem?.detail || err.message || fallback
 }
 
 /** Fallback determinístico quando o tenant ainda não escolheu cor. */
