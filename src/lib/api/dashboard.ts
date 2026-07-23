@@ -69,6 +69,28 @@ export type TopicSentiment = {
 }
 export type TopicSentiments = { items: TopicSentiment[] }
 
+// Influenciadores: canais que mencionaram a marca, agregados por canal (Etapa 4.5).
+// `subscribers` vem de channel_snapshots (collector) — null até o pipeline popular,
+// e a tela degrada para tier-por-alcance nesse caso.
+export type Influencer = {
+  channelId: string
+  name: string
+  mentions: number
+  reach: number
+  avgScore: number
+  subscribers: number | null
+  platform: string
+  trend: "up" | "down" | "stable"
+}
+export type InfluencerTotals = {
+  totalMentions: number
+  totalReach: number
+  totalSubscribers: number
+  avgScore: number
+  count: number
+}
+export type Influencers = { items: Influencer[]; totals: InfluencerTotals }
+
 type Opts = { signal?: AbortSignal }
 
 const qs = (brandId: string) => `brandId=${encodeURIComponent(brandId)}`
@@ -86,6 +108,8 @@ export const dashboardApi = {
     apiClient.get(`/api/dashboard/impact?${qs(brandId)}`, { signal: opts?.signal }),
   topicSentiments: (brandId: string, opts?: Opts): Promise<TopicSentiments> =>
     apiClient.get(`/api/dashboard/topics?${qs(brandId)}`, { signal: opts?.signal }),
+  influencers: (brandId: string, opts?: Opts): Promise<Influencers> =>
+    apiClient.get(`/api/dashboard/influencers?${qs(brandId)}`, { signal: opts?.signal }),
   // SoV é tenant-level (sem brandId) e gated pela feature `sov`: sem ela o
   // backend devolve 403 e a página mostra o upsell. `_tenantId` fica só pra
   // isolar a cache key no hook.
@@ -150,6 +174,16 @@ export function useTopicSentiments(brandId: string | null) {
   return useQuery({
     queryKey: ["dashboard-topics", activeTenantId, brandId],
     queryFn: ({ signal }) => dashboardApi.topicSentiments(brandId!, { signal }),
+    enabled: Boolean(activeTenantId && brandId),
+    staleTime: 60_000,
+  })
+}
+
+export function useInfluencers(brandId: string | null) {
+  const { activeTenantId } = useAuth()
+  return useQuery({
+    queryKey: ["dashboard-influencers", activeTenantId, brandId],
+    queryFn: ({ signal }) => dashboardApi.influencers(brandId!, { signal }),
     enabled: Boolean(activeTenantId && brandId),
     staleTime: 60_000,
   })

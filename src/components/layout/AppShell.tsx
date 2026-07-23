@@ -70,6 +70,9 @@ export function AppShell() {
   const hasIntelligence = useFeature("intelligence")
   const hasOperations = useFeature("operations")
   const hasSov = useFeature("sov")
+  // Relatórios é add-on cross-módulo: o item some sem a feature (a rota segue
+  // montada e a própria página mostra o upsell, como no SoV).
+  const hasReports = useFeature("reports")
   const location = useLocation()
   const navigate = useNavigate()
   const { resolvedTheme, setTheme } = useTheme()
@@ -185,7 +188,7 @@ export function AppShell() {
               {sidebarOpen && gestaoOpen && (
                 <div className="ml-[21px] border-l-2 border-[#E5E7EB] dark:border-[#1C1F2E] flex flex-col mt-0 mb-2">
                   {hasIntelligence && <SubNavItem to="/brands">Marcas</SubNavItem>}
-                  <SubNavItem to="/reports">Relatórios</SubNavItem>
+                  {hasReports && <SubNavItem to="/reports">Relatórios</SubNavItem>}
                   <SubNavItem to="/users">Usuários</SubNavItem>
                 </div>
               )}

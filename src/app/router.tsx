@@ -14,6 +14,7 @@ import InfluencersPage from "@/pages/intelligence/Influencers"
 import BrandsPage from "@/pages/Brands"
 import AlertsPage from "@/pages/Alerts"
 import ReportsPage from "@/pages/Reports"
+import ReportViewPage from "@/pages/ReportView"
 import AdminBrandsPage from "@/pages/admin/AdminBrands"
 
 export const router = createBrowserRouter([
@@ -24,6 +25,13 @@ export const router = createBrowserRouter([
   {
     path: "/onboarding/tenant",
     element: <ProtectedRoute><OnboardingTenantPage /></ProtectedRoute>,
+  },
+  // View print-friendly do relatório: fora do AppShell de propósito — documento
+  // não imprime com sidebar/topbar. O gate da feature é feito pela própria página
+  // de origem e pelo backend (403).
+  {
+    path: "/reports/:reportId",
+    element: <ProtectedRoute><ReportViewPage /></ProtectedRoute>,
   },
   {
     element: <ProtectedRoute><AppShell /></ProtectedRoute>,
