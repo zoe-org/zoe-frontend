@@ -7,7 +7,7 @@ import {
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { useAuth } from "@/features/auth/AuthContext"
+import { useAuth } from "@/features/auth/context"
 import { useFeature } from "@/features/auth/useFeature"
 import { Breadcrumb } from "@/components/ui/breadcrumb"
 import { TenantSwitcher } from "@/components/layout/TenantSwitcher"
@@ -66,18 +66,22 @@ export function AppShell() {
   const [gestaoOpen, setGestaoOpen] = useState(() => getInitialOpenState(STORAGE_GESTAO_KEY))
 
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_SIDEBAR_KEY, String(sidebarOpen)) } catch { }
+    try { localStorage.setItem(STORAGE_SIDEBAR_KEY, String(sidebarOpen)) } catch { /* storage indisponível */ }
   }, [sidebarOpen])
 
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_INTEL_KEY, String(intelOpen)) } catch { }
+    try { localStorage.setItem(STORAGE_INTEL_KEY, String(intelOpen)) } catch { /* storage indisponível */ }
   }, [intelOpen])
 
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_GESTAO_KEY, String(gestaoOpen)) } catch { }
+    try { localStorage.setItem(STORAGE_GESTAO_KEY, String(gestaoOpen)) } catch { /* storage indisponível */ }
   }, [gestaoOpen])
 
-  useEffect(() => {
+  // Deriva a abertura das seções a partir da rota durante o render (não em efeito),
+  // pra evitar o passe de render em cascata que um setState em useEffect causaria.
+  const [lastPathname, setLastPathname] = useState(location.pathname)
+  if (location.pathname !== lastPathname) {
+    setLastPathname(location.pathname)
     if (
       location.pathname.startsWith("/intelligence") ||
       location.pathname === "/alerts"
@@ -91,7 +95,7 @@ export function AppShell() {
     ) {
       setGestaoOpen(true)
     }
-  }, [location.pathname])
+  }
 
   return (
     <div className="min-h-screen flex text-midnight position-relative bg-surface  dark:text-[#E6E8EF]">
