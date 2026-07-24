@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { ArrowUp, ArrowDown, Download, Sparkles, Play } from "lucide-react"
-import { useAuth } from "@/features/auth/AuthContext"
+import { useAuth } from "@/features/auth/context"
 import { Sparkline, AreaLine, Heatmap } from "@/components/ui/charts"
 import {
   trend30d,

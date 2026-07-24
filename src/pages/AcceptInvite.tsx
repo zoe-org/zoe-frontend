@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useNavigate, useParams, Link } from "react-router-dom"
-import { useAuth } from "@/features/auth/AuthContext"
+import { useAuth } from "@/features/auth/context"
 import { invitesApi } from "@/lib/api/invites"
 import { ApiError, setActiveTenantId } from "@/lib/api"
 import { Button } from "@/components/ui/button"
@@ -16,15 +16,20 @@ export default function AcceptInvitePage() {
   const [error, setError] = useState("")
   const [tenantName, setTenantName] = useState("")
 
+  // Deriva o status inicial (needs_login/accepting) durante o render, comparando
+  // com o último valor visto — evita setState síncrono dentro de um useEffect.
+  const authKey = isLoading ? "loading" : isAuthenticated ? "authed" : "anon"
+  const [lastAuthKey, setLastAuthKey] = useState(authKey)
+  if (authKey !== lastAuthKey) {
+    setLastAuthKey(authKey)
+    if (authKey === "anon") setStatus("needs_login")
+    if (authKey === "authed") setStatus("accepting")
+  }
+
   useEffect(() => {
-    if (isLoading) return
-    if (!isAuthenticated) {
-      setStatus("needs_login")
-      return
-    }
+    if (authKey !== "authed") return
 
     let cancelled = false
-    setStatus("accepting")
     invitesApi.accept(token)
       .then(async (res) => {
         if (cancelled) return
@@ -40,7 +45,7 @@ export default function AcceptInvitePage() {
         setStatus("error")
       })
     return () => { cancelled = true }
-  }, [isAuthenticated, isLoading, token, refresh])
+  }, [authKey, token, refresh])
 
   return (
     <div className="min-h-screen grid place-items-center bg-[#F9FAFB] p-6">
