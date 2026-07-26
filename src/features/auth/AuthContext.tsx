@@ -1,13 +1,10 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { fetchAuthSession, signOut as amplifySignOut } from "aws-amplify/auth"
 import { meApi, type Me, type Membership, type MeTenant } from "@/lib/api/me"
 import { ApiError, getActiveTenantId, setActiveTenantId } from "@/lib/api"
-
-export const useCognitoAuth = Boolean(
-  import.meta.env.VITE_COGNITO_USER_POOL_ID && import.meta.env.VITE_COGNITO_CLIENT_ID
-)
-
-export const DEV_CREDENTIALS = { email: "julia@zoe.ai", password: "zoe12345" }
+import { AuthContext } from "@/features/auth/context"
+import { useCognitoAuth } from "@/features/auth/constants"
+import type { AuthState, AuthActions } from "@/features/auth/types"
 
 const DEV_MOCK: { me: Me; tenant: MeTenant } = {
   me: {
@@ -77,8 +74,6 @@ const initialState: AuthState = {
   isZoeAdmin: false,
   error: null,
 }
-
-const AuthContext = createContext<(AuthState & AuthActions) | null>(null)
 
 async function hasCognitoSession(): Promise<boolean> {
   try {
@@ -220,7 +215,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const hasFeature = useCallback((code: string) => state.features.includes(code), [state.features])
 
-  useEffect(() => { refresh() }, [refresh])
+  useEffect(() => { void Promise.resolve().then(refresh) }, [refresh])
 
   const value = useMemo<AuthState & AuthActions>(() => ({
     ...state,
@@ -232,10 +227,4 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }), [state, refresh, switchTenant, signOut, devLogin, hasFeature])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-}
-
-export function useAuth() {
-  const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error("useAuth must be used within an AuthProvider")
-  return ctx
 }
