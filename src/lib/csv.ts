@@ -57,11 +57,11 @@ export function toCsv<T>(rows: readonly T[], columns: readonly CsvColumn<T>[]): 
 }
 
 /**
- * Dispara o download no browser. O BOM (`﻿`) é o que faz o Excel abrir
+ * Dispara o download no browser. O BOM (U+FEFF) é o que faz o Excel abrir
  * UTF-8 corretamente — sem ele, acentos viram mojibake.
  */
 export function downloadCsv(filename: string, csv: string): void {
-  const blob = new Blob(["﻿", csv], { type: "text/csv;charset=utf-8;" })
+  const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8;" })
   const url = URL.createObjectURL(blob)
   const link = document.createElement("a")
   link.href = url

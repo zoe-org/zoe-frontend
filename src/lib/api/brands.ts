@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "@/lib/api"
-import { useAuth } from "@/features/auth/AuthContext"
+import { useAuth } from "@/features/auth/context"
 
 // Espelha ListTenantBrandsResponse do zoe-api (GET /api/me/brands). camelCase
 // porque o read-API serializa assim (mesma convenção de me.ts/tenants.ts).

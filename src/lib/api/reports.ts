@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "@/lib/api"
-import { useAuth } from "@/features/auth/AuthContext"
+import { useAuth } from "@/features/auth/context"
 
 // Relatórios (Etapa 4.5). Add-on cross-módulo `reports`: sem a feature o backend
 // devolve 403 e a página mostra o upsell — mesmo padrão do Share of Voice.

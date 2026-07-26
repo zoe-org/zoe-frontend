@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react"
 import { Plus, Trash2, Copy, X, Mail, AlertCircle, Loader2, Check, Tag } from "lucide-react"
 import { toast } from "sonner"
-import { useAuth } from "@/features/auth/AuthContext"
+import { useAuth } from "@/features/auth/context"
 import { ApiError } from "@/lib/api"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import {

@@ -24,7 +24,7 @@ function placeholderColor(seed: string): string {
 }
 
 /** `durationSeconds` → `m:ss` ou `h:mm:ss`. 0/ausente vira null (não renderiza). */
-export function formatDuration(totalSeconds: number | null | undefined): string | null {
+function formatDuration(totalSeconds: number | null | undefined): string | null {
   if (!totalSeconds || totalSeconds <= 0) return null
   const s = Math.floor(totalSeconds % 60)
   const m = Math.floor((totalSeconds / 60) % 60)

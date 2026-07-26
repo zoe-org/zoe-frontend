@@ -6,7 +6,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { useFeature } from "@/features/auth/useFeature"
-import { useActiveBrand } from "@/features/brands/BrandContext"
+import { useActiveBrand } from "@/features/brands/context"
 import { ApiError } from "@/lib/api"
 import {
   useReports, useReportTemplates, useCreateReport, useDeleteReport,

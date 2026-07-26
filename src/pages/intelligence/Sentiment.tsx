@@ -5,7 +5,7 @@ import { MultiLine } from "@/components/ui/charts"
 import { EmptyState } from "@/components/ui/empty-state"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { SelectFilterChip } from "@/components/ui/select-filter-chip"
-import { useActiveBrand } from "@/features/brands/BrandContext"
+import { useActiveBrand } from "@/features/brands/context"
 import {
   useSentimentEvolution, useTopKeywords, useImpactEvents, useTopicSentiments,
 } from "@/lib/api/dashboard"

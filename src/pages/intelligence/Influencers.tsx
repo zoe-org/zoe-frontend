@@ -11,7 +11,7 @@ import {
 } from "lucide-react"
 import { EmptyState } from "@/components/ui/empty-state"
 import { EmptyBlock } from "@/components/ui/empty-block"
-import { useActiveBrand } from "@/features/brands/BrandContext"
+import { useActiveBrand } from "@/features/brands/context"
 import { useInfluencers, type Influencer } from "@/lib/api/dashboard"
 import { toCsv, downloadCsv } from "@/lib/csv"
 

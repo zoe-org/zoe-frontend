@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query"
 import { apiClient } from "@/lib/api"
-import { useAuth } from "@/features/auth/AuthContext"
+import { useAuth } from "@/features/auth/context"
 
 // Espelha VideoListItem / ListVideosResponse do zoe-api (GET /api/videos?brandId=).
 export type VideoListItem = {
