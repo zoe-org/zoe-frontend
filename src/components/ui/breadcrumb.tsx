@@ -5,18 +5,24 @@ const routeLabels: Record<string, string> = {
   "/intelligence/monitoring": "Monitoramento",
   "/intelligence/sentiment": "Sentimento",
   "/intelligence/influencers": "Influenciadores",
+  "/intelligence/sov": "Share of Voice",
   "/alerts": "Alertas",
   "/brands": "Marcas",
   "/reports": "Relatórios",
+  "/users": "Usuários",
+  "/admin/brands": "Curadoria",
 }
 
 const parentGroups: Record<string, string> = {
   "/intelligence/monitoring": "Intelligence",
   "/intelligence/sentiment": "Intelligence",
   "/intelligence/influencers": "Intelligence",
+  "/intelligence/sov": "Intelligence",
   "/alerts": "Intelligence",
   "/brands": "Gestão",
   "/reports": "Gestão",
+  "/users": "Gestão",
+  "/admin/brands": "Administração",
 }
 
 export function Breadcrumb() {

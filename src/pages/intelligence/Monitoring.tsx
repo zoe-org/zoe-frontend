@@ -7,12 +7,10 @@ import { MentionDrawer } from "@/components/features/MentionDrawer"
 import { EmptyState } from "@/components/ui/empty-state"
 import { ConfidenceBadge } from "@/components/ui/confidence-badge"
 import { VideoThumb } from "@/components/ui/video-thumb"
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select"
+import { SelectFilterChip } from "@/components/ui/select-filter-chip"
 import { useActiveBrand } from "@/features/brands/BrandContext"
 import { toCsv, downloadCsv } from "@/lib/csv"
-import { useVideosFeed, useVideosSummary, type VideoFilters, type VideoListItem } from "@/lib/api/videos"
+import { useVideosFeed, useVideosSummary, type VideoFilters, type VideoListItem, type VideoSort } from "@/lib/api/videos"
 import { tEnum } from "@/i18n/enums"
 
 /** 1234 → "1,2 mil"; 1_234_567 → "1,2 mi". Compacto pt-BR para views. */
@@ -45,45 +43,18 @@ const MIN_SCORES = [
   { key: "0.7", label: "Score ≥ 0,70" },
 ] as const
 
+// Ordenação do feed (keyset-safe no backend). "Mais vistos" fica de fora por ora
+// — views vem de subquery e paginar keyset sobre ela é frágil.
+const SORT_OPTIONS = [
+  { key: "", label: "Mais recentes" },
+  { key: "oldest", label: "Mais antigos" },
+  { key: "score", label: "Maior score" },
+] as const
+
 function classificationClass(cls: string | null): string {
   if (cls === "Positive") return "text-[#16A34A] bg-[#F0FDF4]"
   if (cls === "Negative") return "text-[#DC2626] bg-[#FEF2F2]"
   return "text-[#6B7280] bg-[#F3F4F6]"
-}
-
-/**
- * Filtro em forma de pill (design). Envolve um `Select` do Radix em vez de um
- * botão decorativo: o mock só mostra o chevron, mas aqui ele precisa abrir de
- * verdade. Ativo = tem valor diferente do padrão.
- */
-function FilterChip({
-  value, onChange, options, placeholder,
-}: {
-  value: string
-  onChange: (v: string) => void
-  options: readonly { key: string; label: string }[]
-  placeholder: string
-}) {
-  const active = value !== ""
-  return (
-    <Select value={value || "__all"} onValueChange={(v) => onChange(v === "__all" ? "" : v)}>
-      <SelectTrigger
-        aria-label={placeholder}
-        className={`h-8 rounded-full px-3.5 text-[13px] font-medium border transition-colors ${
-          active
-            ? "border-teal-500 text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-900/25"
-            : "border-border-soft text-ink-2 bg-transparent"
-        }`}
-      >
-        <SelectValue placeholder={placeholder} />
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((o) => (
-          <SelectItem key={o.key || "__all"} value={o.key || "__all"}>{o.label}</SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  )
 }
 
 export default function MonitoringPage() {
@@ -108,6 +79,7 @@ export default function MonitoringPage() {
   const period = params.get("period") ?? ""
   const min = params.get("min") ?? ""
   const q = params.get("q") ?? ""
+  const sort = (params.get("sort") ?? "") as VideoSort
   // Na URL junto com os filtros: a preferência de visualização sobrevive ao
   // refresh e viaja no link compartilhado.
   const view = params.get("view") === "grid" ? "grid" : "list"
@@ -130,8 +102,9 @@ export default function MonitoringPage() {
       search: q || undefined,
       from,
       minScore: min ? Number(min) : undefined,
+      sort: sort || undefined,
     }
-  }, [brandId, sent, q, period, min])
+  }, [brandId, sent, q, period, min, sort])
 
   const feed = useVideosFeed(filters)
   const summary = useVideosSummary(filters)
@@ -202,15 +175,16 @@ export default function MonitoringPage() {
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div className="flex-1 max-w-[640px] min-w-[280px]">
             <div className="eyebrow mb-3">Intelligence · Feed</div>
-            <h1 className="font-display m-0" style={{ fontSize: 36, lineHeight: 1.1, color: "var(--ink)" }}>
+            <h1 className="font-display m-0" style={{ fontSize: 34, lineHeight: 1.1, color: "var(--ink)" }}>
               Monitoramento
             </h1>
             {summary.data && (
-              <div className="text-[14px] text-ink-muted mt-3">
-                Feed completo de menções detectadas em vídeo. {" "}
-                <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>{summary.data.total}</span>{" "}
-                {summary.data.total === 1 ? "vídeo analisado" : "vídeos analisados"}
-                {period && ` nos últimos ${period} dias`}.
+              <div className="text-[14px] text-ink-muted mt-1.5 max-w-140">
+                Feed completo de menções detectadas em vídeo.{" "}
+                <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>
+                  {summary.data.total} {summary.data.total === 1 ? "item" : "itens"}
+                </span>
+                {period ? ` nos últimos ${period} dias` : " no período"}.
               </div>
             )}
           </div>
@@ -241,11 +215,11 @@ export default function MonitoringPage() {
 
       {/* Filtros em pill (design) */}
       <section className="px-8 py-3 border-b border-border-soft flex flex-wrap items-center gap-2">
-        <FilterChip
+        <SelectFilterChip
           value={period} onChange={(v) => setParam("period", v)}
           options={PERIODS} placeholder="Todo o período"
         />
-        <FilterChip
+        <SelectFilterChip
           value={min} onChange={(v) => setParam("min", v)}
           options={MIN_SCORES} placeholder="Qualquer score"
         />
@@ -281,27 +255,40 @@ export default function MonitoringPage() {
           })}
         </div>
 
-        {/* Lista ↔ grade: com thumbnail, a grade vira uma leitura visual rápida. */}
-        <div className="flex items-center gap-0.5 p-0.5 rounded-lg border border-border-soft shrink-0">
-          {([
-            { key: "list", label: "Lista", Icon: List },
-            { key: "grid", label: "Grade", Icon: LayoutGrid },
-          ] as const).map(({ key, label, Icon }) => (
-            <button
-              key={key}
-              onClick={() => setParam("view", key === "list" ? "" : key)}
-              aria-pressed={view === key}
-              title={label}
-              aria-label={label}
-              className={`p-1.5 rounded-md transition-colors ${
-                view === key
-                  ? "bg-[#F3F4F6] dark:bg-[#1A1D2D] text-ink"
-                  : "text-ink-muted hover:text-ink"
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-            </button>
-          ))}
+        <div className="flex items-center gap-3 shrink-0">
+          {/* Ordenar (design: "Ordenar: Mais recentes ▾") */}
+          <div className="flex items-center gap-2">
+            <span className="text-[12px] text-ink-muted">Ordenar:</span>
+            <SelectFilterChip
+              value={sort}
+              onChange={(v) => setParam("sort", v)}
+              options={SORT_OPTIONS}
+              placeholder="Mais recentes"
+            />
+          </div>
+
+          {/* Lista ↔ grade: com thumbnail, a grade vira uma leitura visual rápida. */}
+          <div className="flex items-center gap-0.5 p-0.5 rounded-lg border border-border-soft">
+            {([
+              { key: "list", label: "Lista", Icon: List },
+              { key: "grid", label: "Grade", Icon: LayoutGrid },
+            ] as const).map(({ key, label, Icon }) => (
+              <button
+                key={key}
+                onClick={() => setParam("view", key === "list" ? "" : key)}
+                aria-pressed={view === key}
+                title={label}
+                aria-label={label}
+                className={`p-1.5 rounded-md transition-colors ${
+                  view === key
+                    ? "bg-[#F3F4F6] dark:bg-[#1A1D2D] text-ink"
+                    : "text-ink-muted hover:text-ink"
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+              </button>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -421,7 +408,7 @@ export default function MonitoringPage() {
                 disabled={feed.isFetchingNextPage}
                 className="inline-flex items-center h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors disabled:opacity-50"
               >
-                {feed.isFetchingNextPage ? "Carregando..." : "Carregar mais"}
+                {feed.isFetchingNextPage ? "Carregando..." : "Carregar mais menções"}
               </button>
             </div>
           )}

@@ -33,6 +33,9 @@ export type VideosSummary = {
   inconclusive: number
 }
 
+// "" = mais recentes (padrão do backend); os demais mapeiam pra VideoSort.
+export type VideoSort = "" | "oldest" | "score"
+
 export type VideoFilters = {
   brandId: string
   from?: string
@@ -40,6 +43,7 @@ export type VideoFilters = {
   classificacao?: string
   minScore?: number
   search?: string
+  sort?: VideoSort
   limit?: number
 }
 
@@ -51,6 +55,7 @@ function buildQuery(f: VideoFilters, cursor?: string): string {
   if (f.classificacao) p.set("classificacao", f.classificacao)
   if (f.minScore != null) p.set("minScore", String(f.minScore))
   if (f.search) p.set("search", f.search)
+  if (f.sort) p.set("sort", f.sort)
   if (f.limit) p.set("limit", String(f.limit))
   if (cursor) p.set("cursor", cursor)
   return p.toString()

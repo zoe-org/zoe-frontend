@@ -7,8 +7,10 @@ import {
   Minus,
   ArrowUpDown,
   AlertCircle,
+  Users,
 } from "lucide-react"
 import { EmptyState } from "@/components/ui/empty-state"
+import { EmptyBlock } from "@/components/ui/empty-block"
 import { useActiveBrand } from "@/features/brands/BrandContext"
 import { useInfluencers, type Influencer } from "@/lib/api/dashboard"
 import { toCsv, downloadCsv } from "@/lib/csv"
@@ -36,6 +38,28 @@ const tierLabel: Record<Exclude<Tier, "all">, string> = {
   micro: "Micro",
 }
 
+// Cores por tier vindas do design (Mega laranja, Macro azul, Micro teal).
+const tierChipStyle: Record<Exclude<Tier, "all">, { bg: string; fg: string }> = {
+  mega: { bg: "#FFF7ED", fg: "#C2410C" },
+  macro: { bg: "#EFF6FF", fg: "#1D4ED8" },
+  micro: { bg: "#F0FDFB", fg: "#006B60" },
+}
+
+function TierChip({ tier }: { tier: Exclude<Tier, "all"> }) {
+  const c = tierChipStyle[tier]
+  return (
+    <span
+      className="font-semibold"
+      style={{
+        fontSize: 10.5, padding: "1px 7px", borderRadius: 4,
+        background: c.bg, color: c.fg, letterSpacing: "0.04em",
+      }}
+    >
+      {tierLabel[tier].toUpperCase()}
+    </span>
+  )
+}
+
 function fmtLargeNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
   if (n >= 1_000) return `${Math.round(n / 1_000)}K`
@@ -49,12 +73,19 @@ function scoreChipClass(score: number): string {
   return ""
 }
 
+// Ordenação do segmented control — na ordem do design (Alcance é o padrão).
+const SORTS: { key: SortKey; label: string }[] = [
+  { key: "reach", label: "Alcance" },
+  { key: "sentiment", label: "Sentimento" },
+  { key: "mentions", label: "Menções" },
+]
+
 export default function InfluencersPage() {
   const navigate = useNavigate()
   const brand = useActiveBrand()
   const inf = useInfluencers(brand.brandId)
 
-  const [sortKey, setSortKey] = useState<SortKey>("mentions")
+  const [sortKey, setSortKey] = useState<SortKey>("reach")
   const [sortAsc, setSortAsc] = useState(false)
   const [tier, setTier] = useState<Tier>("all")
 
@@ -142,26 +173,20 @@ export default function InfluencersPage() {
         style={{ background: "var(--surface)" }}
       >
         <div className="flex flex-wrap items-end justify-between gap-6">
-          <div className="flex-1 max-w-[680px] min-w-[280px]">
-            <div className="eyebrow mb-3">Influenciadores · rede de menções</div>
+          <div className="flex-1 max-w-140 min-w-70">
+            <div className="eyebrow mb-2.5">Intelligence · Pessoas</div>
             <h1
               className="font-display m-0"
-              style={{ fontSize: 36, lineHeight: 1.1, color: "var(--ink)" }}
+              style={{ fontSize: 34, lineHeight: 1.1, color: "var(--ink)" }}
             >
-              <span style={{ color: "var(--color-teal-500)" }}>
-                {advocates.length} {advocates.length === 1 ? "advogado" : "advogados"}
-              </span>{" "}
-              da marca
-              <span style={{ color: "var(--ink-muted-2)" }}>
-                {" "}e {attention.length} {attention.length === 1 ? "nome pedindo" : "nomes pedindo"} atenção.
-              </span>
+              Influenciadores
             </h1>
-            <div className="flex flex-wrap items-center gap-2 mt-4">
-              <span className="chip">Últimos 30 dias</span>
-              <span className="chip">YouTube</span>
-              <span className="chip">
-                <span className="font-mono-zoe">{influencers.length}</span> criadores
-              </span>
+            <div className="text-[14px] text-ink-muted mt-1.5 max-w-140">
+              Criadores que mencionaram sua marca nos últimos 30 dias.{" "}
+              <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>
+                {influencers.length} {influencers.length === 1 ? "perfil" : "perfis"}
+              </span>{" "}
+              {influencers.length === 1 ? "identificado" : "identificados"}.
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -181,16 +206,19 @@ export default function InfluencersPage() {
       ) : inf.isLoading ? (
         <TableSkeleton />
       ) : influencers.length === 0 ? (
-        <div className="px-8 py-16 text-center text-muted text-sm">
-          Nenhum influenciador com menções no período.
-        </div>
+        <EmptyBlock
+          className="py-20"
+          icon={<Users className="w-9 h-9" strokeWidth={1.5} />}
+          message="Nenhum influenciador no período"
+          hint="Assim que o pipeline analisar vídeos que mencionam esta marca, os criadores aparecem aqui — com alcance, sentimento e tendência."
+        />
       ) : (
         <>
           {/* Highlights */}
           <section className="grid grid-cols-1 md:grid-cols-3 border-b border-border-soft">
             <div className="p-7 border-b md:border-b-0 md:border-r border-border-soft">
               <div className="flex items-center justify-between mb-4">
-                <div className="eyebrow">Advogados · top sentimento</div>
+                <div className="eyebrow">Advogados da marca</div>
                 <span className="chip chip-pos text-[10px]">+ positivo</span>
               </div>
               {advocates.length === 0 ? (
@@ -208,7 +236,7 @@ export default function InfluencersPage() {
 
             <div className="p-7 border-b md:border-b-0 md:border-r border-border-soft">
               <div className="flex items-center justify-between mb-4">
-                <div className="eyebrow">Atenção · risco ou queda</div>
+                <div className="eyebrow">Requerem atenção</div>
                 <span className="chip chip-neg text-[10px]">monitorar</span>
               </div>
               {attention.length === 0 ? (
@@ -225,17 +253,20 @@ export default function InfluencersPage() {
             </div>
 
             <div className="p-7">
-              <div className="eyebrow mb-4">Visão geral · 30d</div>
+              <div className="eyebrow mb-4">Visão geral</div>
+              {/* Ordem e cores do design. O 4º slot do design é "novos este mês",
+                  que exige saber quando cada canal apareceu pela 1ª vez — o
+                  endpoint ainda não devolve isso, então fica "menções totais". */}
               <div className="grid grid-cols-2 gap-x-5 gap-y-5">
-                <OverviewStat value={fmtLargeNumber(totals?.totalReach ?? 0)} label="Alcance combinado" />
-                <OverviewStat value={`${totals?.totalMentions ?? 0}`} label="Menções totais" />
+                <OverviewStat value={`${totals?.count ?? 0}`} label="perfis · 30d" />
                 <OverviewStat
-                  value={hasSubs ? fmtLargeNumber(totals?.totalSubscribers ?? 0) : "—"}
-                  label="Audiência agregada"
+                  value={fmtLargeNumber(totals?.totalReach ?? 0)}
+                  label="alcance combinado"
+                  color="var(--color-teal-500)"
                 />
                 <OverviewStat
                   value={(totals?.avgScore ?? 0).toFixed(2)}
-                  label="Sentimento médio"
+                  label="sentimento médio"
                   color={
                     (totals?.avgScore ?? 0) >= 0.6
                       ? "var(--color-pos)"
@@ -244,48 +275,67 @@ export default function InfluencersPage() {
                         : "var(--ink)"
                   }
                 />
+                <OverviewStat value={`${totals?.totalMentions ?? 0}`} label="menções totais" />
               </div>
             </div>
           </section>
 
-          {/* Tier tabs (só quando há audiência) + sort */}
+          {/* Filtro de tier (pills preenchidas) + ordenação (segmented control) */}
           <section
-            className="px-8 border-b border-border-soft flex items-center justify-between gap-4 sticky top-13 z-10"
+            className="px-8 py-3 border-b border-border-soft flex items-center justify-between gap-4 flex-wrap sticky top-13 z-10"
             style={{ background: "var(--surface)" }}
           >
-            <div className="flex gap-1">
-              {hasSubs && tiers.map((t) => {
-                const active = tier === t.key
-                return (
-                  <button
-                    key={t.key}
-                    onClick={() => setTier(t.key)}
-                    aria-pressed={active}
-                    className={`px-3 py-3 text-[13px] font-medium border-b-2 transition-colors -mb-[1px] ${
-                      active
-                        ? "border-teal-500 text-teal-600 dark:text-teal-300"
-                        : "border-transparent text-muted hover:text-ink"
-                    }`}
-                  >
-                    {t.label}{" "}
-                    <span className="font-mono-zoe text-[11px] text-muted-2 ml-0.5">{t.count}</span>
-                  </button>
-                )
-              })}
-            </div>
-            <div className="flex items-center gap-3 py-2">
-              <div className="flex items-center gap-1.5 text-[12px] text-muted">
-                <ArrowUpDown className="w-3.5 h-3.5" />
-                <select
-                  value={sortKey}
-                  onChange={(e) => setSortKey(e.target.value as SortKey)}
-                  className="bg-transparent outline-none text-[12.5px] text-ink-2 cursor-pointer"
-                >
-                  <option value="mentions">Menções</option>
-                  <option value="reach">Alcance</option>
-                  <option value="subscribers">Audiência</option>
-                  <option value="sentiment">Sentimento</option>
-                </select>
+            {hasSubs ? (
+              <div className="flex items-center gap-1">
+                {tiers.map((t) => {
+                  const active = tier === t.key
+                  return (
+                    <button
+                      key={t.key}
+                      onClick={() => setTier(t.key)}
+                      aria-pressed={active}
+                      className={`px-3.5 py-2 rounded-lg text-[13px] font-medium transition-colors ${
+                        active ? "text-white" : "text-ink-muted hover:text-ink"
+                      }`}
+                      style={active ? { background: "var(--color-teal-500)" } : undefined}
+                    >
+                      {t.label}
+                      <span className="ml-1.5 font-mono-zoe text-[11px]" style={{ opacity: active ? 0.85 : 0.6 }}>
+                        {t.count}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            ) : (
+              // Sem inscritos capturados não dá pra separar por tier — melhor dizer
+              // isso do que mostrar abas vazias (o collector ainda não popula).
+              <span className="text-[12px] text-ink-muted-2">
+                Tiers por audiência aparecem quando o pipeline capturar os inscritos dos canais.
+              </span>
+            )}
+
+            <div className="flex items-center gap-2.5 shrink-0">
+              <span className="text-[12px] text-ink-muted">Ordenar:</span>
+              <div className="inline-flex p-0.5 rounded-lg bg-[#F3F4F6] dark:bg-[#1A1D2D]">
+                {SORTS.map((s) => {
+                  const active = sortKey === s.key
+                  return (
+                    <button
+                      key={s.key}
+                      onClick={() => { setSortKey(s.key); setSortAsc(false) }}
+                      aria-pressed={active}
+                      className={`px-3 py-1.5 rounded-md text-[12.5px] font-medium transition-colors ${
+                        active
+                          ? "text-ink shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
+                          : "text-ink-muted hover:text-ink"
+                      }`}
+                      style={active ? { background: "var(--surface)" } : undefined}
+                    >
+                      {s.label}
+                    </button>
+                  )
+                })}
               </div>
             </div>
           </section>
@@ -335,9 +385,7 @@ export default function InfluencersPage() {
                               <span className="font-medium truncate" style={{ color: "var(--ink)" }}>
                                 {c.name || "Canal sem nome"}
                               </span>
-                              {tierName && (
-                                <span className="chip text-[9.5px] px-1.5 py-[1px]">{tierLabel[tierName]}</span>
-                              )}
+                              {tierName && <TierChip tier={tierName} />}
                             </div>
                           </div>
                         </div>

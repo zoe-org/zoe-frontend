@@ -2,14 +2,14 @@ import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import {
   Lock, Sparkles, Calendar, FileText, TrendingUp, Users, ArrowRight,
-  Search, ExternalLink, Download, AlertCircle,
+  Search, ExternalLink, Download, AlertCircle, Trash2, Loader2,
 } from "lucide-react"
 import { toast } from "sonner"
 import { useFeature } from "@/features/auth/useFeature"
 import { useActiveBrand } from "@/features/brands/BrandContext"
 import { ApiError } from "@/lib/api"
 import {
-  useReports, useReportTemplates, useCreateReport,
+  useReports, useReportTemplates, useCreateReport, useDeleteReport,
   type Report, type ReportTemplate,
 } from "@/lib/api/reports"
 
@@ -58,6 +58,15 @@ export default function ReportsPage() {
   const list = useReports(hasReports)
   const templates = useReportTemplates(hasReports)
   const create = useCreateReport()
+  const del = useDeleteReport()
+
+  const handleDelete = (r: Report) => {
+    if (!window.confirm(`Apagar "${titleOf(r)}"? Esta ação não pode ser desfeita.`)) return
+    del.mutate(r.id, {
+      onSuccess: () => toast.success("Relatório apagado."),
+      onError: (e) => toast.error(e instanceof ApiError ? e.message : "Não foi possível apagar."),
+    })
+  }
 
   const [tab, setTab] = useState<"biblioteca">("biblioteca")
   const [search, setSearch] = useState("")
@@ -241,7 +250,13 @@ export default function ReportsPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             {filtered.map((r) => (
-              <ReportCard key={r.id} report={r} onOpen={() => navigate(`/reports/${r.id}`)} />
+              <ReportCard
+                key={r.id}
+                report={r}
+                onOpen={() => navigate(`/reports/${r.id}`)}
+                onDelete={() => handleDelete(r)}
+                deleting={del.isPending && del.variables === r.id}
+              />
             ))}
           </div>
         )}
@@ -263,9 +278,28 @@ const TEMPLATE_LABELS: Record<string, string> = {
   InfluencerDossier: "Dossiê de influenciadores",
 }
 
-function ReportCard({ report, onOpen }: { report: Report; onOpen: () => void }) {
+function ReportCard({
+  report, onOpen, onDelete, deleting,
+}: {
+  report: Report
+  onOpen: () => void
+  onDelete: () => void
+  deleting: boolean
+}) {
   const generating = report.status === "Generating"
   const failed = report.status === "Failed"
+
+  const DeleteBtn = (
+    <button
+      onClick={onDelete}
+      disabled={deleting}
+      title="Apagar relatório"
+      aria-label="Apagar relatório"
+      className="p-1.5 rounded-lg text-ink-muted hover:text-[var(--color-neg)] hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D] transition-colors disabled:opacity-50"
+    >
+      {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+    </button>
+  )
 
   return (
     <div
@@ -316,12 +350,14 @@ function ReportCard({ report, onOpen }: { report: Report; onOpen: () => void }) 
           >
             <Download className="w-3.5 h-3.5 text-ink-muted" />
           </button>
+          {DeleteBtn}
         </div>
       )}
 
       {failed && (
-        <div className="mt-3 pt-3 border-t border-border-soft text-[12px]" style={{ color: "var(--color-neg)" }}>
-          Falhou ao gerar.
+        <div className="flex items-center justify-between mt-3 pt-3 border-t border-border-soft">
+          <span className="text-[12px]" style={{ color: "var(--color-neg)" }}>Falhou ao gerar.</span>
+          {DeleteBtn}
         </div>
       )}
     </div>

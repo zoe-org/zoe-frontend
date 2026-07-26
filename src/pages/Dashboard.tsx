@@ -6,6 +6,7 @@ import { ptBR } from "date-fns/locale"
 import { useAuth } from "@/features/auth/AuthContext"
 import { AreaLine, Sparkline } from "@/components/ui/charts"
 import { EmptyState } from "@/components/ui/empty-state"
+import { EmptyBlock } from "@/components/ui/empty-block"
 import { ConfidenceBadge } from "@/components/ui/confidence-badge"
 import { useActiveBrand } from "@/features/brands/BrandContext"
 import { useDashboardSummary, useSentimentEvolution } from "@/lib/api/dashboard"
@@ -17,6 +18,19 @@ function getGreeting(): string {
   if (h < 12) return "Bom dia"
   if (h < 18) return "Boa tarde"
   return "Boa noite"
+}
+
+/**
+ * "Segunda, 17 abril" — formato do design. O `weekday: "long"` do pt-BR devolve
+ * "segunda-feira"; o design usa a forma curta capitalizada, então cortamos o
+ * "-feira" e subimos a inicial.
+ */
+function getTodayLabel(now: Date = new Date()): string {
+  const weekday = now
+    .toLocaleDateString("pt-BR", { weekday: "long" })
+    .replace(/-feira$/, "")
+  const dayMonth = now.toLocaleDateString("pt-BR", { day: "numeric", month: "long" })
+  return `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)}, ${dayMonth}`
 }
 
 function classificationClass(cls: string | null): string {
@@ -73,7 +87,9 @@ export default function DashboardPage() {
       <section className="px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div className="flex-1 min-w-70">
-            <div className="eyebrow mb-3">{getGreeting()}, {displayName}</div>
+            <div className="eyebrow mb-3">
+              {getGreeting()}, {displayName} · {getTodayLabel()}
+            </div>
             <h1 className="font-display m-0" style={{ fontSize: 40, lineHeight: 1.1, color: "var(--ink)" }}>
               Visão geral de{" "}
               <span style={{ color: "var(--color-teal-500)" }}>{brand.active?.displayName ?? brand.active?.brandName}</span>
@@ -109,7 +125,7 @@ export default function DashboardPage() {
           {evolution.isLoading ? (
             <div className="h-40 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D] animate-pulse" />
           ) : trend.length === 0 ? (
-            <div className="py-12 text-center text-sm text-ink-muted">Sem dados no período.</div>
+            <EmptyBlock className="h-40 justify-center" message="Sem menções no período" />
           ) : (
             <AreaLine data={trend} height={160} color="#00A799" fillOpacity={0.12} />
           )}
@@ -118,6 +134,8 @@ export default function DashboardPage() {
           <div className="eyebrow mb-4">Distribuição de sentimento</div>
           {evolution.isLoading ? (
             <div className="h-24 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D] animate-pulse" />
+          ) : (dist.pos + dist.neu + dist.neg) === 0 ? (
+            <EmptyBlock className="py-8" message="Sem dados no período" />
           ) : (
             <div className="flex flex-col gap-2.5">
               {[
@@ -159,9 +177,11 @@ export default function DashboardPage() {
         ) : feed.isError ? (
           <ErrorState onRetry={() => feed.refetch()} />
         ) : recent.length === 0 ? (
-          <div className="px-8 py-12 text-center text-sm text-ink-muted">
-            Ainda não há vídeos analisados para esta marca.
-          </div>
+          <EmptyBlock
+            className="py-14"
+            message="Ainda não há menções para esta marca"
+            hint="Assim que o pipeline analisar vídeos que a citam, as menções mais recentes aparecem aqui."
+          />
         ) : (
           recent.map((m) => (
             <button

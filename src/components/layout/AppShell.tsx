@@ -73,6 +73,10 @@ export function AppShell() {
   // Relatórios é add-on cross-módulo: o item some sem a feature (a rota segue
   // montada e a própria página mostra o upsell, como no SoV).
   const hasReports = useFeature("reports")
+  // Plano exibido abaixo do nome (design: "Intelligence · Owner"). O módulo é o
+  // que o tenant tem; combinado com a role vira a linha de contexto do usuário.
+  const planLabel = hasIntelligence ? "Intelligence" : hasOperations ? "Operations" : null
+  const userContext = [planLabel, role].filter(Boolean).join(" · ")
   const location = useLocation()
   const navigate = useNavigate()
   const { resolvedTheme, setTheme } = useTheme()
@@ -230,7 +234,7 @@ export function AppShell() {
                   <>
                     <div className="flex-1 min-w-0 text-[13px] text-left">
                       <div className="font-semibold text-[#111827] dark:text-[#E6E8EF] truncate">{user?.name ?? "User"}</div>
-                      <div className="text-[#6B7280] dark:text-[#8A91A3] text-xs truncate">{role ?? "—"}</div>
+                      <div className="text-[#6B7280] dark:text-[#8A91A3] text-xs truncate">{userContext || "—"}</div>
                     </div>
                     <ChevronsUpDown className="w-4 h-4 text-[#6B7280] dark:text-[#8A91A3]" />
                   </>
@@ -275,6 +279,13 @@ export function AppShell() {
                   <DropdownMenuSeparator />
                 </>
               )}
+
+              <DropdownMenuItem asChild>
+                <Link to="/settings" className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Settings className="w-4 h-4" /> Configurações
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
 
               <DropdownMenuItem
                 className="cursor-pointer text-neg focus:text-neg"

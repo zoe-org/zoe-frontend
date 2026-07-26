@@ -1,8 +1,10 @@
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { AlertCircle, ArrowUp, ArrowDown } from "lucide-react"
 import { MultiLine } from "@/components/ui/charts"
 import { EmptyState } from "@/components/ui/empty-state"
+import { EmptyBlock } from "@/components/ui/empty-block"
+import { SelectFilterChip } from "@/components/ui/select-filter-chip"
 import { useActiveBrand } from "@/features/brands/BrandContext"
 import {
   useSentimentEvolution, useTopKeywords, useImpactEvents, useTopicSentiments,
@@ -14,13 +16,27 @@ function keywordColor(sentiment: string): string {
   return "var(--color-warn)"
 }
 
+// Período do FilterChip. Chave vazia = "todo o período" (days=0 no backend);
+// os demais viram o próprio número de dias. Default: 30 dias (o "Último mês" do design).
+const PERIOD_OPTIONS = [
+  { key: "", label: "Todo o período" },
+  { key: "7", label: "Últimos 7 dias" },
+  { key: "30", label: "Últimos 30 dias" },
+  { key: "90", label: "Últimos 90 dias" },
+] as const
+
 export default function SentimentPage() {
   const navigate = useNavigate()
   const brand = useActiveBrand()
-  const evolution = useSentimentEvolution(brand.brandId)
-  const keywords = useTopKeywords(brand.brandId)
-  const impact = useImpactEvents(brand.brandId)
-  const topics = useTopicSentiments(brand.brandId)
+
+  const [period, setPeriod] = useState("30")
+  const days = period === "" ? 0 : Number(period)
+  const periodLabel = period === "" ? "Todo o período" : `Últimos ${period} dias`
+
+  const evolution = useSentimentEvolution(brand.brandId, days)
+  const keywords = useTopKeywords(brand.brandId, days)
+  const impact = useImpactEvents(brand.brandId, days)
+  const topics = useTopicSentiments(brand.brandId, days)
 
   const points = useMemo(() => evolution.data?.points ?? [], [evolution.data])
   const stats = useMemo(() => {
@@ -87,14 +103,30 @@ export default function SentimentPage() {
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div className="flex-1 max-w-160 min-w-70">
             <div className="eyebrow mb-3">Intelligence · Análise</div>
-            <h1 className="font-display m-0" style={{ fontSize: 36, lineHeight: 1.1, color: "var(--ink)" }}>
+            <h1 className="font-display m-0" style={{ fontSize: 34, lineHeight: 1.1, color: "var(--ink)" }}>
               Sentimento
             </h1>
-            <div className="text-[14px] text-ink-muted mt-2 max-w-140">
-              Evolução do sentimento ao longo do tempo e por tópico, a partir de áudio,
-              legenda e comentários analisados.
+            {/* O design traz "NPS calculado · BERT-pt" aqui; trocado por números
+                reais — não calculamos NPS nem usamos BERT-pt no pipeline. */}
+            <div className="text-[14px] text-ink-muted mt-1.5 max-w-140">
+              Análise de sentimento ao longo do tempo e por tópico.{" "}
+              <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>
+                {stats.total} {stats.total === 1 ? "menção" : "menções"}
+              </span>{" "}
+              · <span className="font-mono-zoe">{periodLabel.toLowerCase()}</span>.
             </div>
           </div>
+        </div>
+
+        {/* Filtro de período (o "Todas marcas"/"Semanal" do design ficaram de fora
+            — marca é global e não temos agregação semanal). */}
+        <div className="flex flex-wrap items-center gap-2 mt-5">
+          <SelectFilterChip
+            value={period}
+            onChange={setPeriod}
+            options={PERIOD_OPTIONS}
+            placeholder="Todo o período"
+          />
         </div>
       </section>
 
@@ -164,7 +196,7 @@ export default function SentimentPage() {
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <div className="eyebrow">Evolução de sentimento</div>
-                  <div className="text-[12px] text-ink-muted mt-1">Últimos 30 dias</div>
+                  <div className="text-[12px] text-ink-muted mt-1">{periodLabel}</div>
                 </div>
                 <div className="flex items-center gap-3 text-[11.5px] text-ink-muted flex-wrap justify-end">
                   {series.map((s) => (
@@ -177,8 +209,12 @@ export default function SentimentPage() {
               </div>
               {evolution.isLoading ? (
                 <div className="h-[200px] rounded bg-[#F3F4F6] dark:bg-[#1A1D2D] animate-pulse" />
-              ) : points.length === 0 ? (
-                <div className="py-12 text-center text-sm text-ink-muted">Sem dados de sentimento no período.</div>
+              ) : stats.total === 0 ? (
+                <EmptyBlock
+                  className="h-[200px] justify-center"
+                  message="Sem menções no período"
+                  hint="A linha do tempo aparece quando houver vídeos analisados para esta marca."
+                />
               ) : (
                 <MultiLine series={series} labels={labels} height={200} />
               )}
@@ -196,6 +232,8 @@ export default function SentimentPage() {
                     <div key={i} className="h-10 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
                   ))}
                 </div>
+              ) : (impact.data?.items?.length ?? 0) === 0 ? (
+                <EmptyBlock message="Sem eventos de impacto no período." />
               ) : (
                 <div>
                   {(impact.data?.items ?? []).slice(0, 5).map((ev, i) => (
@@ -238,6 +276,11 @@ export default function SentimentPage() {
                   <div key={i} className="h-28 rounded-xl bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
                 ))}
               </div>
+            ) : (topics.data?.items?.length ?? 0) === 0 ? (
+              <EmptyBlock
+                message="Nenhum tópico no período"
+                hint="Os tópicos são extraídos por IA das menções analisadas — aparecem quando houver vídeos processados."
+              />
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {(topics.data?.items ?? []).map((t) => (
@@ -276,7 +319,7 @@ export default function SentimentPage() {
             {keywords.isLoading ? (
               <div className="h-16 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D] animate-pulse" />
             ) : (keywords.data?.items.length ?? 0) === 0 ? (
-              <div className="text-sm text-ink-muted">Nenhuma palavra-chave no período.</div>
+              <EmptyBlock message="Nenhum termo no período." />
             ) : (
               <div className="flex flex-wrap items-baseline gap-x-6 gap-y-3">
                 {keywords.data!.items.map((k) => (

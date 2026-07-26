@@ -94,6 +94,8 @@ export const reportsApi = {
     apiClient.get(`/api/reports/${reportId}`, { signal: opts?.signal }),
   create: (input: CreateReportInput): Promise<CreateReportResult> =>
     apiClient.post("/api/reports", { format: "Pdf", ...input }),
+  remove: (reportId: string): Promise<void> =>
+    apiClient.delete(`/api/reports/${reportId}`),
 }
 
 // ── hooks (tenantId na key = isolamento por tenant) ────────────────────────
@@ -134,6 +136,15 @@ export function useCreateReport() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (input: CreateReportInput) => reportsApi.create(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["reports", activeTenantId] }),
+  })
+}
+
+export function useDeleteReport() {
+  const { activeTenantId } = useAuth()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (reportId: string) => reportsApi.remove(reportId),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["reports", activeTenantId] }),
   })
 }
