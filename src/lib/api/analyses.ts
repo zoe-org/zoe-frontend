@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "@/lib/api"
-import { useAuth } from "@/features/auth/AuthContext"
+import { useAuth } from "@/features/auth/context"
 
 // Espelha GetAnalysisDetailResponse e filhos do zoe-api (GET /api/analyses/{id}).
 export type ScoreComponent = {

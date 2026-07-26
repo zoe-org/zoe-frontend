@@ -11,6 +11,12 @@ export type AuthState = {
   features: string[]
   /** True quando o user logou mas ainda não tem nenhum tenant — onboarding pendente. */
   needsOnboarding: boolean
+  /**
+   * Admin da Zoe (grupo `zoe-admin` em `cognito:groups`) — espelha a policy
+   * `ZoeAdmin` do backend. É só pra ESCONDER navegação: a autoridade continua
+   * sendo o backend, que devolve 403 em `/api/admin/*` sem o grupo.
+   */
+  isZoeAdmin: boolean
   error: string | null
 }
 

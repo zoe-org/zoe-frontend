@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { Search, Plus, X, Check, AlertCircle, ExternalLink, ShieldCheck, Clock, Loader2 } from "lucide-react"
-import { useAuth } from "@/features/auth/AuthContext"
+import { useAuth } from "@/features/auth/context"
 import { ApiError } from "@/lib/api"
 import { apiMessage } from "@/lib/api-error"
 import { EmptyState } from "@/components/ui/empty-state"
@@ -13,7 +13,7 @@ import {
   resolveOutcome, brandsApi, type TenantBrandSummary,
 } from "@/lib/api/brands"
 import { useDashboardSummary } from "@/lib/api/dashboard"
-import { useActiveBrand } from "@/features/brands/BrandContext"
+import { useActiveBrand } from "@/features/brands/context"
 
 // Paleta do design (brand-modal.jsx) para o seletor de cor.
 const PALETTE = ["#00A799", "#8B5CF6", "#EF4444", "#2563EB", "#F59E0B", "#14B8A6", "#EC4899"]

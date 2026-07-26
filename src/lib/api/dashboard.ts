@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { apiClient } from "@/lib/api"
-import { useAuth } from "@/features/auth/AuthContext"
+import { useAuth } from "@/features/auth/context"
 
 // Endpoints /api/dashboard/* brand-scoped agora são REAIS (agregam das análises
 // no Postgres): summary, sentiment, top-videos, keywords, impact, topics. Marca

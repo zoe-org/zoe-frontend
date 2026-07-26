@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import {
   AlertCircle, Check, Clock, Plus, ShieldCheck, X, Loader2, GitMerge, RefreshCw,
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { ptBR } from "date-fns/locale"
-import { useAuth } from "@/features/auth/AuthContext"
+import { useAuth } from "@/features/auth/context"
 import { EmptyState } from "@/components/ui/empty-state"
 import { apiMessage } from "@/lib/api-error"
 import {
@@ -39,12 +39,9 @@ export default function AdminBrandsPage() {
   const items = useMemo(() => pending.data?.items ?? [], [pending.data])
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  // A brand sai da fila ao ser curada — o fallback pra `items[0]` já cobre o
+  // selectedId ficar apontando pra uma brand que saiu da lista.
   const selected = items.find((b) => b.brandId === selectedId) ?? items[0] ?? null
-
-  // A brand sai da fila ao ser curada — solta a seleção pra cair na próxima.
-  useEffect(() => {
-    if (selectedId && !items.some((b) => b.brandId === selectedId)) setSelectedId(null)
-  }, [items, selectedId])
 
   if (!isZoeAdmin) {
     return (
@@ -140,12 +137,16 @@ function VerificationPanel({ brandId }: { brandId: string }) {
   const d = detail.data
 
   // Semeia o formulário quando o detalhe chega: aliases já canônicos + canais
-  // atuais. O admin adiciona os sugeridos por cima.
-  useEffect(() => {
-    if (!d) return
+  // atuais. O admin adiciona os sugeridos por cima. Ajuste durante o render (e
+  // não em efeito) evita um commit extra — o componente já remonta por `key`
+  // quando o brandId muda, então isto só dispara uma vez por marca, quando a
+  // query resolve.
+  const [seeded, setSeeded] = useState<BrandVerificationDetail | null>(null)
+  if (d && seeded !== d) {
+    setSeeded(d)
     setAliases(d.canonicalAliases)
     setChannels(d.officialChannelIds)
-  }, [d])
+  }
 
   if (detail.isLoading) return <div className="p-8"><PanelSkeleton /></div>
   if (detail.isError || !d) {

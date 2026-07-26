@@ -4,7 +4,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useActiveBrand } from "@/features/brands/BrandContext"
+import { useActiveBrand } from "@/features/brands/context"
 
 /** Paleta do design pro fallback de cor quando o tenant não escolheu uma. */
 const PALETTE = ["#00A799", "#8B5CF6", "#EF4444", "#2563EB", "#F59E0B", "#14B8A6", "#EC4899"]
