@@ -152,7 +152,7 @@ export default function OnboardingTenantPage() {
               <span className="text-[10px] uppercase tracking-[0.18em] font-semibold text-teal-700">
                 Último passo
               </span>
-              <h1 className="text-2xl sm:text-3xl font-bold text-[--color-midnight] mt-2">
+              <h1 className="text-2xl sm:text-3xl font-bold text-midnight dark:text-[#E6E8EF] mt-2">
                 {firstName ? `Bem-vindo(a), ${firstName}` : "Crie seu workspace"}
               </h1>
               <p className="text-sm text-[#6B7280] mt-2">

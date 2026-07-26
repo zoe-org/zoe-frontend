@@ -1,16 +1,17 @@
 import { useState, useEffect } from "react"
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom"
+import { useQueryClient } from "@tanstack/react-query"
+import { NavLink, Link, Outlet, useLocation, useNavigate } from "react-router-dom"
 import {
   House, Brain, Settings, Bell,
   ChevronDown, ChevronUp, Search, PanelLeftClose, PanelLeftOpen, ChevronsUpDown,
-  Sun, Moon, LogOut,
+  Sun, Moon, LogOut, Check, Plus, ShieldCheck,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useAuth } from "@/features/auth/context"
 import { useFeature } from "@/features/auth/useFeature"
 import { Breadcrumb } from "@/components/ui/breadcrumb"
-import { TenantSwitcher } from "@/components/layout/TenantSwitcher"
+import { BrandSwitcher } from "@/components/layout/BrandSwitcher"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
@@ -36,7 +37,7 @@ const SubNavItem = ({ to, children, badge }: { to: string, children: React.React
     className={({ isActive }) =>
       `relative flex items-center font-medium justify-between py-1.5 pl-4 text-[13.5px] transition-colors ${isActive
         ? "text-teal-500 dark:text-teal-300"
-        : "text-[#697788] dark:text-[#8A91A3] hover:text-[--color-midnight] dark:hover:text-[#E6E8EF]"
+        : "text-[#697788] dark:text-[#8A91A3] hover:text-midnight dark:hover:text-[#E6E8EF]"
       }`
     }
   >
@@ -52,10 +53,30 @@ const SubNavItem = ({ to, children, badge }: { to: string, children: React.React
   </NavLink>
 )
 
+/** Hash determinístico → cor consistente por tenant (bolinha do workspace). */
+const TENANT_PALETTE = [
+  "#820AD1", "#00A799", "#F97316", "#0EA5E9",
+  "#DC2626", "#16A34A", "#D97706", "#7C3AED",
+]
+function tenantColor(id: string) {
+  let h = 0
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0
+  return TENANT_PALETTE[Math.abs(h) % TENANT_PALETTE.length]
+}
+
 export function AppShell() {
-  const { user, role, signOut } = useAuth()
+  const { user, role, signOut, activeTenantId, memberships, switchTenant, isZoeAdmin } = useAuth()
+  const queryClient = useQueryClient()
   const hasIntelligence = useFeature("intelligence")
   const hasOperations = useFeature("operations")
+  const hasSov = useFeature("sov")
+  // Relatórios é add-on cross-módulo: o item some sem a feature (a rota segue
+  // montada e a própria página mostra o upsell, como no SoV).
+  const hasReports = useFeature("reports")
+  // Plano exibido abaixo do nome (design: "Intelligence · Owner"). O módulo é o
+  // que o tenant tem; combinado com a role vira a linha de contexto do usuário.
+  const planLabel = hasIntelligence ? "Intelligence" : hasOperations ? "Operations" : null
+  const userContext = [planLabel, role].filter(Boolean).join(" · ")
   const location = useLocation()
   const navigate = useNavigate()
   const { resolvedTheme, setTheme } = useTheme()
@@ -64,6 +85,13 @@ export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(() => getInitialOpenState(STORAGE_SIDEBAR_KEY))
   const [intelOpen, setIntelOpen] = useState(() => getInitialOpenState(STORAGE_INTEL_KEY))
   const [gestaoOpen, setGestaoOpen] = useState(() => getInitialOpenState(STORAGE_GESTAO_KEY))
+
+  // Troca de tenant: descarta o cache do tenant anterior. O tenantId nas query
+  // keys já impede servir dado de outro tenant; isto libera memória e força um
+  // refetch limpo. Isolamento é preocupação de frontend também.
+  useEffect(() => {
+    queryClient.clear()
+  }, [activeTenantId, queryClient])
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_SIDEBAR_KEY, String(sidebarOpen)) } catch { /* storage indisponível */ }
@@ -119,7 +147,7 @@ export function AppShell() {
             className={({ isActive }) =>
               `flex items-center gap-2 py-2 font-medium text-[14px] transition-colors rounded-md ${sidebarOpen ? "px-3" : "justify-center px-2"} ${isActive
                 ? "text-[#00A799] dark:text-teal-300"
-                : "text-[#697788] dark:text-[#8A91A3] hover:text-[--color-midnight] dark:hover:text-[#E6E8EF]"
+                : "text-[#697788] dark:text-[#8A91A3] hover:text-midnight dark:hover:text-[#E6E8EF]"
               }`
             }
           >
@@ -144,6 +172,7 @@ export function AppShell() {
                 <div className="ml-[21px] border-l-2 border-[#E5E7EB] dark:border-[#1C1F2E] flex flex-col mt-0 mb-2">
                   <SubNavItem to="/intelligence/monitoring">Monitoramento</SubNavItem>
                   <SubNavItem to="/intelligence/sentiment">Sentimento</SubNavItem>
+                  {hasSov && <SubNavItem to="/intelligence/sov">Share of Voice</SubNavItem>}
                   <SubNavItem to="/intelligence/influencers">Influenciadores</SubNavItem>
                   <SubNavItem to="/alerts" badge={<span className="bg-ember text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">3</span>}>Alertas</SubNavItem>
                 </div>
@@ -167,11 +196,28 @@ export function AppShell() {
               {sidebarOpen && gestaoOpen && (
                 <div className="ml-[21px] border-l-2 border-[#E5E7EB] dark:border-[#1C1F2E] flex flex-col mt-0 mb-2">
                   {hasIntelligence && <SubNavItem to="/brands">Marcas</SubNavItem>}
-                  <SubNavItem to="/reports">Relatórios</SubNavItem>
+                  {hasReports && <SubNavItem to="/reports">Relatórios</SubNavItem>}
                   <SubNavItem to="/users">Usuários</SubNavItem>
                 </div>
               )}
             </>
+          )}
+
+          {/* Admin Zoe — curadoria de brands (ADR-021). Só aparece pro grupo
+              `zoe-admin`; a autoridade real é a policy ZoeAdmin no backend. */}
+          {isZoeAdmin && (
+            <NavLink
+              to="/admin/brands"
+              className={({ isActive }) =>
+                `flex items-center gap-2 py-2 font-medium text-[14px] transition-colors rounded-md ${sidebarOpen ? "px-3" : "justify-center px-2"} ${isActive
+                  ? "text-teal-500 dark:text-teal-300"
+                  : "text-[#697788] dark:text-[#8A91A3] hover:text-midnight dark:hover:text-[#E6E8EF]"
+                }`
+              }
+            >
+              <ShieldCheck className="w-[18px] h-[18px] shrink-0" strokeWidth={2.5} />
+              {sidebarOpen && <span>Curadoria</span>}
+            </NavLink>
           )}
         </nav>
 
@@ -192,19 +238,59 @@ export function AppShell() {
                   <>
                     <div className="flex-1 min-w-0 text-[13px] text-left">
                       <div className="font-semibold text-[#111827] dark:text-[#E6E8EF] truncate">{user?.name ?? "User"}</div>
-                      <div className="text-[#6B7280] dark:text-[#8A91A3] text-xs truncate">{role ?? "—"}</div>
+                      <div className="text-[#6B7280] dark:text-[#8A91A3] text-xs truncate">{userContext || "—"}</div>
                     </div>
                     <ChevronsUpDown className="w-4 h-4 text-[#6B7280] dark:text-[#8A91A3]" />
                   </>
                 )}
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent side="top" align="start" className="w-56">
+            <DropdownMenuContent side="top" align="start" className="w-64">
               <DropdownMenuLabel className="text-xs">
                 <div className="font-semibold truncate">{user?.name ?? "User"}</div>
                 <div className="text-[#6B7280] font-normal truncate">{user?.email}</div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
+
+              {/* Workspaces: seleção mudou do topbar pra cá (o topbar agora é da marca). */}
+              {memberships.length > 0 && (
+                <>
+                  <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-[#6B7280] font-semibold">
+                    Workspaces
+                  </DropdownMenuLabel>
+                  {memberships.map((m) => {
+                    const isActive = m.tenantId === activeTenantId
+                    return (
+                      <DropdownMenuItem
+                        key={m.tenantId}
+                        onSelect={() => { if (!isActive) void switchTenant(m.tenantId) }}
+                        className="flex items-center gap-2 cursor-pointer"
+                      >
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: tenantColor(m.tenantId) }} />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">{m.tenantName}</div>
+                          <div className="text-[11px] text-[#6B7280] truncate">{m.role}</div>
+                        </div>
+                        {isActive && <Check className="w-4 h-4 text-teal-500 shrink-0" />}
+                      </DropdownMenuItem>
+                    )
+                  })}
+                  <DropdownMenuItem asChild>
+                    <Link to="/onboarding/tenant" className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Plus className="w-4 h-4" /> Criar novo workspace
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+
+              <DropdownMenuItem asChild>
+                <Link to="/settings" className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Settings className="w-4 h-4" /> Configurações
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+
               <DropdownMenuItem
                 className="cursor-pointer text-neg focus:text-neg"
                 onSelect={async () => { await signOut(); navigate("/login", { replace: true }) }}
@@ -231,7 +317,7 @@ export function AppShell() {
               className="w-75 h-8 pl-8 pr-3 text-xs  border border-[#E5E7EB] dark:border-[#262A3A] dark:text-[#E6E8EF] rounded-md outline-none focus:ring-1 focus:ring-teal-500"
             />
           </div>
-          <TenantSwitcher />
+          <BrandSwitcher />
           <button
             type="button"
             aria-label={isDark ? "Ativar modo claro" : "Ativar modo escuro"}

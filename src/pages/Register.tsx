@@ -103,7 +103,7 @@ function StepIntentionLarge({ onNext, initialValue }: { onNext: (intent: string)
   return (
     <div className="w-full">
       <div className="mb-10">
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-[--color-midnight]">O que você quer fazer com a Zoe?</h1>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-midnight dark:text-[#E6E8EF]">O que você quer fazer com a Zoe?</h1>
         <p className="text-sm text-[#6B7280] mt-1">
           Personalizamos sua experiência com base no seu objetivo. Você poderá alterar depois.
         </p>
@@ -134,14 +134,14 @@ function StepIntentionLarge({ onNext, initialValue }: { onNext: (intent: string)
                 </span>
               )}
             </div>
-            <h3 className="text-xl mb-4 font-bold text-[--color-midnight]">{opt.title}</h3>
+            <h3 className="text-xl mb-4 font-bold text-midnight dark:text-[#E6E8EF]">{opt.title}</h3>
             <p className="text-sm text-[#6B7280] flex-1 leading-relaxed">{opt.desc}</p>
 
             <hr className="my-6" />
 
             <ul className="space-y-1.5 mb-4">
               {opt.features.map((feat, i) => (
-                <li key={i} className="flex items-center gap-2 text-sm text-[--color-midnight] font-medium">
+                <li key={i} className="flex items-center gap-2 text-sm text-midnight dark:text-[#E6E8EF] font-medium">
                   <div className="w-1 h-1 rounded-full bg-teal-500 shrink-0" />
                   {feat}
                 </li>
@@ -202,7 +202,7 @@ function StepAccount({ onNext, defaultEmail = "" }: { onNext: (data: AccountData
       {/* Left: Form */}
       <div className="flex-1 space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-[--color-midnight] mb-1">Crie sua conta</h1>
+          <h1 className="text-3xl font-bold text-midnight dark:text-[#E6E8EF] mb-1">Crie sua conta</h1>
           <p className="text-sm text-[#6B7280]">Leva menos de um minuto para entrar.</p>
         </div>
 
@@ -438,10 +438,10 @@ function StepVerification({
             <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
           </svg>
         </div>
-        <h1 className="text-3xl font-bold text-[--color-midnight]">Confirme seu e-mail</h1>
+        <h1 className="text-3xl font-bold text-midnight dark:text-[#E6E8EF]">Confirme seu e-mail</h1>
         <p className="text-sm text-[#6B7280] mt-2">
           Mandamos um código de 6 dígitos para<br />
-          <strong className="text-[--color-midnight]">{email}</strong>
+          <strong className="text-midnight dark:text-[#E6E8EF]">{email}</strong>
         </p>
       </div>
 
@@ -474,7 +474,7 @@ function StepVerification({
           )}
         </p>
         <div className="pt-3 border-t border-gray-100">
-          <button onClick={onBack} className="text-sm text-[#6B7280] hover:text-[--color-midnight] hover:underline transition-colors">
+          <button onClick={onBack} className="text-sm text-[#6B7280] hover:text-midnight dark:hover:text-[#E6E8EF] hover:underline transition-colors">
             Digitou o e-mail errado? Voltar
           </button>
         </div>

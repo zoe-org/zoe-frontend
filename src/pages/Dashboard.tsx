@@ -1,16 +1,17 @@
-import { useState } from "react"
-import { ArrowUp, ArrowDown, Download, Sparkles, Play } from "lucide-react"
-import { useAuth } from "@/features/auth/context"
-import { Sparkline, AreaLine, Heatmap } from "@/components/ui/charts"
-import {
-  trend30d,
-  competitors,
-  platformsBreakdown,
-  heatmap7x24,
-  editorialMentions,
-  editorialAlerts,
-  editorialInfluencers,
-} from "@/lib/mock/dashboard"
+import { useMemo } from "react"
+import { useNavigate } from "react-router-dom"
+import { AlertCircle, ArrowUp, ArrowDown } from "lucide-react"
+import { formatDistanceToNow } from "date-fns"
+import { ptBR } from "date-fns/locale"
+import { useAuth } from "@/features/auth/AuthContext"
+import { AreaLine, Sparkline } from "@/components/ui/charts"
+import { EmptyState } from "@/components/ui/empty-state"
+import { EmptyBlock } from "@/components/ui/empty-block"
+import { ConfidenceBadge } from "@/components/ui/confidence-badge"
+import { useActiveBrand } from "@/features/brands/BrandContext"
+import { useDashboardSummary, useSentimentEvolution } from "@/lib/api/dashboard"
+import { useVideosFeed } from "@/lib/api/videos"
+import { tEnum } from "@/i18n/enums"
 
 function getGreeting(): string {
   const h = new Date().getHours()
@@ -19,567 +20,281 @@ function getGreeting(): string {
   return "Boa noite"
 }
 
-function formatDateLong(d = new Date()): string {
-  return d
-    .toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })
-    .replace(/^./, (c) => c.toUpperCase())
+/**
+ * "Segunda, 17 abril" — formato do design. O `weekday: "long"` do pt-BR devolve
+ * "segunda-feira"; o design usa a forma curta capitalizada, então cortamos o
+ * "-feira" e subimos a inicial.
+ */
+function getTodayLabel(now: Date = new Date()): string {
+  const weekday = now
+    .toLocaleDateString("pt-BR", { weekday: "long" })
+    .replace(/-feira$/, "")
+  const dayMonth = now.toLocaleDateString("pt-BR", { day: "numeric", month: "long" })
+  return `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)}, ${dayMonth}`
 }
 
-function DeltaChip({
-  value,
-  kind = "pos",
-}: {
-  value: string
-  kind?: "pos" | "neg" | "warn"
-}) {
-  const Icon = kind === "neg" ? ArrowDown : ArrowUp
-  const cls = kind === "pos" ? "chip-pos" : kind === "neg" ? "chip-neg" : "chip-warn"
-  return (
-    <span className={`chip ${cls}`}>
-      <Icon className="w-2.5 h-2.5" /> {value}
-    </span>
-  )
-}
-
-function PlatformDot({ name }: { name: string }) {
-  const colors: Record<string, string> = {
-    YouTube: "#FF0000",
-    TikTok: "#000000",
-    Instagram: "#E1306C",
-  }
-  return (
-    <span
-      className="w-2 h-2 rounded-full inline-block"
-      style={{ background: colors[name] ?? "#9AA1AE" }}
-    />
-  )
-}
-
-type KpiProps = {
-  label: string
-  value: string
-  suffix?: string
-  delta?: string
-  deltaKind?: "pos" | "neg" | "warn"
-  deltaLabel?: string
-  trendData: number[]
-  accent?: boolean
-}
-
-function Kpi({ label, value, suffix, delta, deltaKind = "pos", deltaLabel, trendData, accent }: KpiProps) {
-  return (
-    <div className="px-5 pt-6 pb-5 flex flex-col gap-1 min-h-[150px]">
-      <div className="eyebrow">{label}</div>
-      <div className="flex items-baseline gap-1.5">
-        <span
-          className="font-display leading-none"
-          style={{
-            fontSize: 40,
-            color: accent ? "var(--color-teal-500)" : "var(--ink)",
-          }}
-        >
-          {value}
-        </span>
-        {suffix && <span className="text-sm text-ink-muted">{suffix}</span>}
-      </div>
-      <div className="flex items-center gap-2 mt-1.5">
-        {delta && <DeltaChip value={delta} kind={deltaKind} />}
-        {deltaLabel && <span className="text-[11.5px] text-ink-muted">{deltaLabel}</span>}
-      </div>
-      <div className="mt-3">
-        <Sparkline
-          data={trendData}
-          width={200}
-          height={28}
-          color={accent ? "#00A799" : "#9AA1AE"}
-        />
-      </div>
-    </div>
-  )
+function classificationClass(cls: string | null): string {
+  if (cls === "Positive") return "text-[#16A34A] bg-[#F0FDF4]"
+  if (cls === "Negative") return "text-[#DC2626] bg-[#FEF2F2]"
+  return "text-[#6B7280] bg-[#F3F4F6]"
 }
 
 export default function DashboardPage() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const displayName = user?.name?.split(" ")[0] ?? user?.email?.split("@")[0] ?? ""
-  const [range, setRange] = useState<"7d" | "30d" | "90d" | "1a">("30d")
-  const trendSpark = trend30d.slice(-14).map((d) => d.value)
-  const trendTotal = trend30d.reduce((a, b) => a + b.value, 0)
+
+  const brand = useActiveBrand()
+  const summary = useDashboardSummary(brand.brandId)
+  const evolution = useSentimentEvolution(brand.brandId)
+  const feed = useVideosFeed(brand.brandId ? { brandId: brand.brandId, limit: 6 } : null)
+
+  const points = useMemo(() => evolution.data?.points ?? [], [evolution.data])
+  const dist = useMemo(() => {
+    const pos = points.reduce((a, p) => a + p.positive, 0)
+    const neu = points.reduce((a, p) => a + p.neutral, 0)
+    const neg = points.reduce((a, p) => a + p.negative, 0)
+    const total = pos + neu + neg || 1
+    return { pos, neu, neg, total, pctPos: Math.round((pos / total) * 100), pctNeu: Math.round((neu / total) * 100), pctNeg: Math.round((neg / total) * 100) }
+  }, [points])
+
+  const trend = useMemo(
+    () => points.map((p, i) => ({ day: i, value: p.positive + p.neutral + p.negative, label: p.date.slice(5).replace("-", "/") })),
+    [points],
+  )
+  const sparkVolume = trend.slice(-14).map((t) => t.value)
+  const recent = feed.data?.pages[0]?.items.slice(0, 6) ?? []
+
+  // ── Estados de topo ───────────────────────────────────────────────────
+  if (brand.isLoading) return <PageSkeleton />
+  if (brand.isError) return <ErrorState onRetry={() => brand.refetch()} />
+  if (brand.brands.length === 0) {
+    return (
+      <EmptyState
+        title="Nenhuma marca assinada ainda"
+        description="Assine uma marca para ver o resumo de menções, sentimento e vídeos em destaque."
+        actionLabel="Assinar uma marca"
+        onAction={() => navigate("/brands")}
+      />
+    )
+  }
+
+  const s = summary.data
 
   return (
     <div className="-m-6">
       {/* Hero */}
-      <section
-        className="px-8 pt-7 pb-6 border-b border-border-soft"
-        style={{ background: "var(--surface)" }}
-      >
-        <div className="flex flex-wrap items-end justify-between gap-10">
-          <div className="flex-1">
+      <section className="px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
+        <div className="flex flex-wrap items-end justify-between gap-6">
+          <div className="flex-1 min-w-70">
             <div className="eyebrow mb-3">
-              {getGreeting()}, {displayName} · {formatDateLong()}
+              {getGreeting()}, {displayName} · {getTodayLabel()}
             </div>
-            <h1
-              className="font-display m-0"
-              style={{
-                fontSize: 40,
-                lineHeight: 1.1,
-                color: "var(--ink)",
-              }}
-            >
-              Sua marca está{" "}
-              <span style={{ color: "var(--color-teal-500)" }}>bombando</span> esta semana —
-              <span style={{ color: "var(--ink-muted-2)" }}>
-                {" "}mas vale ficar de olho em um pico negativo no TikTok.
-              </span>
+            <h1 className="font-display m-0" style={{ fontSize: 40, lineHeight: 1.1, color: "var(--ink)" }}>
+              Visão geral de{" "}
+              <span style={{ color: "var(--color-teal-500)" }}>{brand.active?.displayName ?? brand.active?.brandName}</span>
             </h1>
-            <div className="flex justify-between items-center mt-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="chip chip-primary">
-                  <Sparkles className="w-3 h-3" /> Resumo gerado por Zoe IA · há 4 min
-                </span>
-                <span className="chip">3 insights novos</span>
-                <span className="chip chip-warn">1 alerta requer atenção</span>
-              </div>
-              
-              <div className="flex-1 flex items-center justify-end gap-2">
-                <button className="inline-flex items-center gap-1.5 h-8 px-3 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors">
-                  <Download className="w-3.5 h-3.5" /> Exportar
-                </button>
-                <button className="inline-flex items-center gap-1.5 h-8 px-3 text-[13px] rounded-md text-white bg-teal-500 hover:bg-teal-600 transition-colors">
-                  <Sparkles className="w-3.5 h-3.5" /> Pedir análise
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       </section>
 
-      {/* KPI row */}
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 border-b border-border-soft">
-        <div className="border-r border-b lg:border-b-0 border-border-soft">
-          <Kpi
-            label="Menções · 7d"
-            value="847"
-            delta="+23%"
-            deltaLabel="vs semana anterior"
-            trendData={trendSpark}
-            accent
-          />
-        </div>
-        <div className="lg:border-r border-b lg:border-b-0 border-border-soft">
-          <Kpi
-            label="Sentimento positivo"
-            value="67"
-            suffix="%"
-            delta="+4pp"
-            deltaLabel="vs mês passado"
-            trendData={[58, 60, 61, 63, 64, 66, 67, 65, 66, 67, 68, 67]}
-          />
-        </div>
-        <div className="border-r border-b lg:border-b-0 border-border-soft">
-          <Kpi
-            label="Share of voice"
-            value="34"
-            suffix="%"
-            delta="+6pp"
-            deltaLabel="vs concorrentes"
-            trendData={[22, 25, 26, 28, 30, 29, 31, 32, 33, 33, 34, 34]}
-          />
-        </div>
-        <div>
-          <Kpi
-            label="Alcance estimado"
-            value="12.4"
-            suffix="M views"
-            delta="+1.8M"
-            deltaLabel="este mês"
-            trendData={[6, 7, 7.5, 8, 8.5, 9, 9.5, 10, 10.5, 11, 12, 12.4]}
-          />
-        </div>
+      {/* KPIs */}
+      <section className="grid grid-cols-1 md:grid-cols-3 border-b border-border-soft">
+        <Kpi
+          label="Menções · 30d"
+          loading={summary.isLoading}
+          value={s ? String(s.totalMentions) : "—"}
+          spark={sparkVolume}
+          accent
+          className="border-r border-b md:border-b-0 border-border-soft"
+        />
+        <Kpi
+          label="Score médio"
+          loading={summary.isLoading}
+          value={s ? s.avgScore.toFixed(2) : "—"}
+          spark={points.slice(-14).map((p) => p.avgScore)}
+          className="border-r border-b md:border-b-0 border-border-soft"
+        />
+        <DeltaKpi label="Variação · 30d" loading={summary.isLoading} value={s?.deltaPct30d ?? null} />
       </section>
 
-      {/* Trend + Sentiment distribution */}
+      {/* Tendência + Distribuição */}
       <section className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] border-b border-border-soft">
         <div className="lg:border-r border-b lg:border-b-0 border-border-soft p-7">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <div className="eyebrow">Tendência de menções</div>
-              <div className="flex items-baseline gap-2 mt-1">
-                <span
-                  className="font-display"
-                  style={{ fontSize: 32, color: "var(--ink)" }}
-                >
-                  {trendTotal}
-                </span>
-                <DeltaChip value="+18% vs período anterior" />
-              </div>
-            </div>
-            <div className="inline-flex bg-[#F3F4F6] dark:bg-[#1A1D2D] rounded-lg p-[3px]">
-              {(["7d", "30d", "90d", "1a"] as const).map((r) => (
-                <button
-                  key={r}
-                  aria-pressed={range === r}
-                  onClick={() => setRange(r)}
-                  className={`px-3 py-1.5 rounded-md text-[12.5px] font-medium transition ${range === r
-                      ? "bg-white dark:bg-[#2A2F45] text-ink shadow-sm"
-                      : "text-ink-muted"
-                    }`}
-                >
-                  {r}
-                </button>
+          <div className="eyebrow mb-4">Tendência de menções · 30 dias</div>
+          {evolution.isLoading ? (
+            <div className="h-40 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D] animate-pulse" />
+          ) : trend.length === 0 ? (
+            <EmptyBlock className="h-40 justify-center" message="Sem menções no período" />
+          ) : (
+            <AreaLine data={trend} height={160} color="#00A799" fillOpacity={0.12} />
+          )}
+        </div>
+        <div className="p-7">
+          <div className="eyebrow mb-4">Distribuição de sentimento</div>
+          {evolution.isLoading ? (
+            <div className="h-24 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D] animate-pulse" />
+          ) : (dist.pos + dist.neu + dist.neg) === 0 ? (
+            <EmptyBlock className="py-8" message="Sem dados no período" />
+          ) : (
+            <div className="flex flex-col gap-2.5">
+              {[
+                { label: "Positivo", pct: dist.pctPos, color: "var(--color-pos)", count: dist.pos },
+                { label: "Neutro", pct: dist.pctNeu, color: "#9AA1AE", count: dist.neu },
+                { label: "Negativo", pct: dist.pctNeg, color: "var(--color-neg)", count: dist.neg },
+              ].map((d) => (
+                <div key={d.label}>
+                  <div className="flex items-baseline justify-between mb-1">
+                    <span className="text-[12.5px] text-ink-2">{d.label}</span>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="font-mono-zoe text-[11.5px] text-ink-muted">{d.count}</span>
+                      <span className="font-display" style={{ fontSize: 18, color: d.color }}>{d.pct}%</span>
+                    </div>
+                  </div>
+                  <div className="h-[3px] bg-[#EEF0F2] dark:bg-[#1C1F2E] rounded-sm overflow-hidden">
+                    <div style={{ width: `${d.pct}%`, height: "100%", background: d.color }} />
+                  </div>
+                </div>
               ))}
             </div>
-          </div>
-          <AreaLine data={trend30d} height={160} color="#00A799" fillOpacity={0.12} />
-          <div className="flex justify-between mt-2">
-            <span className="font-mono-zoe text-[10.5px] text-ink-muted-2">19 MAR</span>
-            <span className="font-mono-zoe text-[10.5px] text-ink-muted-2">17 ABR</span>
-          </div>
-        </div>
-
-        <div className="p-7">
-          <div className="flex items-center justify-between mb-4">
-            <div className="eyebrow">Distribuição de sentimento</div>
-            <div className="font-mono-zoe text-[11px] text-ink-muted">BASE · 847 MENÇÕES</div>
-          </div>
-          <div className="flex gap-8 items-end">
-            {[
-              { label: "Positivo", pct: 67, color: "var(--color-pos)", count: 568 },
-              { label: "Neutro", pct: 22, color: "#9AA1AE", count: 186 },
-              { label: "Negativo", pct: 11, color: "var(--color-neg)", count: 93 },
-            ].map((d) => (
-              <div key={d.label} className="flex-1">
-                <div className="flex items-baseline gap-1">
-                  <span
-                    className="font-display leading-none"
-                    style={{ fontSize: 44, color: d.color }}
-                  >
-                    {d.pct}
-                  </span>
-                  <span style={{ fontSize: 14, color: d.color }}>%</span>
-                </div>
-                <div className="text-[12.5px] text-ink-muted mt-1">
-                  {d.label} · {d.count} menções
-                </div>
-                <div className="mt-2.5 h-[3px] bg-[#EEF0F2] dark:bg-[#1C1F2E] rounded-sm overflow-hidden">
-                  <div
-                    style={{
-                      width: `${d.pct}%`,
-                      height: "100%",
-                      background: d.color,
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+          )}
         </div>
       </section>
 
-      {/* Competitors + Heatmap */}
-      <section className="grid grid-cols-1 lg:grid-cols-2 border-b border-border-soft">
-        <div className="lg:border-r border-b lg:border-b-0 border-border-soft p-7">
-          <div className="flex items-center justify-between mb-4">
-            <div className="eyebrow">Share of voice · concorrentes</div>
-            <button className="text-[13px] text-teal-700 dark:text-teal-300 hover:text-teal-500 font-medium">
-              Comparar marcas →
+      {/* Menções recentes */}
+      <section>
+        <div className="flex items-center justify-between px-8 pt-6 pb-3">
+          <div className="eyebrow">Menções recentes</div>
+          <button
+            onClick={() => navigate("/intelligence/monitoring")}
+            className="text-[13px] text-teal-700 dark:text-teal-300 hover:text-teal-500 font-medium"
+          >
+            Ver todas →
+          </button>
+        </div>
+        {feed.isLoading ? (
+          <RecentSkeleton />
+        ) : feed.isError ? (
+          <ErrorState onRetry={() => feed.refetch()} />
+        ) : recent.length === 0 ? (
+          <EmptyBlock
+            className="py-14"
+            message="Ainda não há menções para esta marca"
+            hint="Assim que o pipeline analisar vídeos que a citam, as menções mais recentes aparecem aqui."
+          />
+        ) : (
+          recent.map((m) => (
+            <button
+              key={m.analysisId}
+              onClick={() => navigate("/intelligence/monitoring")}
+              className="grid items-center gap-4 px-8 py-3.5 border-t border-border-soft w-full text-left cursor-pointer hover:bg-[#FAFBFC] dark:hover:bg-[#181B28] transition-colors"
+              style={{ gridTemplateColumns: "1fr 200px 130px 80px" }}
+            >
+              <div className="min-w-0">
+                <div className="text-[13.5px] font-medium truncate mb-0.5" style={{ color: "var(--ink)" }}>{m.title}</div>
+                <div className="flex items-center gap-2 text-[11.5px] text-ink-muted">
+                  <span className="truncate">{m.channelName}</span>
+                  <span>·</span>
+                  <span>{formatDistanceToNow(new Date(m.publishedAt), { addSuffix: true, locale: ptBR })}</span>
+                </div>
+              </div>
+              <div><ConfidenceBadge pipelinePath={m.pipelinePath} confidence={m.confidence} /></div>
+              <div>
+                {m.classificacao && (
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${classificationClass(m.classificacao)}`}>
+                    {tEnum("classification", m.classificacao)}
+                  </span>
+                )}
+              </div>
+              <div className="text-right font-mono-zoe text-[13px]" style={{ color: "var(--ink)" }}>
+                {m.score != null ? m.score.toFixed(2) : "—"}
+              </div>
             </button>
-          </div>
-          <div className="flex flex-col gap-3.5">
-            {competitors.map((c) => (
-              <div key={c.name}>
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-2 h-2 rounded-sm"
-                      style={{ background: c.color }}
-                    />
-                    <span
-                      className="text-[13px]"
-                      style={{ fontWeight: c.isYou ? 600 : 400 }}
-                    >
-                      {c.name}
-                    </span>
-                    {c.isYou && (
-                      <span className="chip chip-primary text-[10px] py-[1px] px-1.5">
-                        VOCÊ
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono-zoe text-[12px] text-ink-muted">
-                      {c.sov}%
-                    </span>
-                    <span
-                      className="text-[11.5px] min-w-[36px] text-right"
-                      style={{
-                        color:
-                          c.delta > 0
-                            ? "var(--color-pos)"
-                            : c.delta < 0
-                              ? "var(--color-neg)"
-                              : "var(--ink-muted)",
-                      }}
-                    >
-                      {c.delta > 0 ? "+" : ""}
-                      {c.delta}pp
-                    </span>
-                  </div>
-                </div>
-                <div className="h-1.5 bg-[#F3F4F6] dark:bg-[#1C1F2E] rounded-sm overflow-hidden">
-                  <div
-                    style={{
-                      width: `${Math.min(c.sov * 2.5, 100)}%`,
-                      height: "100%",
-                      background: c.color,
-                      transition: "width .5s",
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="p-7">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <div className="eyebrow">Quando sua marca é mencionada</div>
-              <div className="text-[12px] text-ink-muted mt-1">
-                Dia da semana × hora · últimos 30 dias
-              </div>
-            </div>
-            <div className="flex items-center gap-2 text-[11px] text-ink-muted">
-              <span>menos</span>
-              <div className="flex gap-[2px]">
-                {["#F0FDFB", "#CCFBF4", "#5DE0D4", "#00A799", "#006B60"].map((c) => (
-                  <div
-                    key={c}
-                    className="w-3 h-2.5 rounded-sm"
-                    style={{ background: c }}
-                  />
-                ))}
-              </div>
-              <span>mais</span>
-            </div>
-          </div>
-          <Heatmap data={heatmap7x24} />
-        </div>
+          ))
+        )}
       </section>
+    </div>
+  )
+}
 
-      {/* Recent mentions + Alerts */}
-      <section className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] border-b border-border-soft">
-        <div className="lg:border-r border-b lg:border-b-0 border-border-soft">
-          <div className="flex items-center justify-between px-7 pt-5 pb-3.5">
-            <div>
-              <div className="eyebrow">Menções recentes</div>
-              <div className="text-[12px] text-ink-muted mt-1">Últimas 24 horas</div>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="flex items-center gap-1.5 px-2 py-1 rounded-md">
-                <span className="live-dot" />
-                <span className="text-[11.5px] text-ink-muted">ao vivo</span>
-              </span>
-              <button className="text-[13px] text-teal-700 dark:text-teal-300 hover:text-teal-500 font-medium">
-                Ver todas ({editorialMentions.length}) →
-              </button>
-            </div>
-          </div>
-          <div>
-            {editorialMentions.map((m) => (
-              <button
-                key={m.id}
-                className="grid items-center gap-3.5 px-7 py-3 border-t border-border-soft w-full text-left cursor-pointer hover:bg-[#FAFBFC] dark:hover:bg-[#181B28] transition-colors"
-                style={{ gridTemplateColumns: "84px 1fr auto auto" }}
-              >
-                <div
-                  className="relative w-[84px] h-12 rounded-md overflow-hidden flex items-center justify-center"
-                  style={{ background: m.thumbColor }}
-                >
-                  <Play className="w-4.5 h-4.5 text-white/90" />
-                  <span className="absolute bottom-1 right-1 font-mono-zoe bg-black/70 text-white text-[9px] px-1 py-[1px] rounded-sm">
-                    {m.duration}
-                  </span>
-                </div>
-                <div className="min-w-0">
-                  <div className="text-[13.5px] font-medium truncate mb-0.5" style={{ color: "var(--ink)" }}>
-                    {m.title}
-                  </div>
-                  <div className="flex items-center gap-2 text-[11.5px] text-ink-muted">
-                    <span>{m.author}</span>
-                    <span>·</span>
-                    <span className="font-mono-zoe">{m.views} views</span>
-                    <span>·</span>
-                    <span>{m.when} atrás</span>
-                    {m.hasLogo && (
-                      <span className="chip chip-primary text-[9.5px] px-1.5 py-[1px]">
-                        LOGO
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <PlatformDot name={m.platform} />
-                  <span className="text-[11.5px] text-ink-muted">{m.platform}</span>
-                </div>
-                <span
-                  className={`chip ${m.sentiment === "pos" ? "chip-pos" : m.sentiment === "neg" ? "chip-neg" : ""}`}
-                >
-                  {m.sentiment === "pos"
-                    ? "Positivo"
-                    : m.sentiment === "neg"
-                      ? "Negativo"
-                      : "Neutro"}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
+// ── KPIs ────────────────────────────────────────────────────────────────
 
-        <div className="p-7">
-          <div className="flex items-start justify-between mb-3.5">
-            <div>
-              <div className="eyebrow">Alertas ativos</div>
-              <div className="text-[12px] text-ink-muted mt-1">
-                3 pendentes · 1 crítico
-              </div>
-            </div>
-            <button className="text-[13px] text-teal-700 dark:text-teal-300 hover:text-teal-500 font-medium">
-              Configurar →
-            </button>
-          </div>
-          <div className="flex flex-col gap-2.5">
-            {editorialAlerts.map((a) => {
-              const color =
-                a.level === "critical"
-                  ? "var(--color-neg)"
-                  : a.level === "warn"
-                    ? "var(--color-warn)"
-                    : "var(--color-teal-500)"
-              const bg =
-                a.level === "critical"
-                  ? "var(--neg-bg)"
-                  : a.level === "warn"
-                    ? "var(--warn-bg)"
-                    : "var(--color-teal-50)"
-              return (
-                <button
-                  key={a.id}
-                  className="block text-left px-3.5 py-3 rounded-[10px] w-full border border-transparent hover:border-border-soft transition-colors"
-                  style={{ background: bg }}
-                >
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span
-                      className="w-2 h-2 rounded-full"
-                      style={{ background: color }}
-                    />
-                    <span
-                      className="text-[13px] font-semibold"
-                      style={{ color: "var(--ink)" }}
-                    >
-                      {a.title}
-                    </span>
-                    <span className="flex-1" />
-                    <span className="font-mono-zoe text-[10.5px] text-ink-muted">
-                      {a.time}
-                    </span>
-                  </div>
-                  <div
-                    className="text-[12.5px] leading-snug"
-                    style={{ color: "var(--ink-2)" }}
-                  >
-                    {a.detail}
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      </section>
+function Kpi({ label, value, spark, accent, loading, className }: {
+  label: string; value: string; spark: number[]; accent?: boolean; loading?: boolean; className?: string
+}) {
+  return (
+    <div className={`px-5 pt-6 pb-5 flex flex-col gap-1 min-h-[150px] ${className ?? ""}`}>
+      <div className="eyebrow">{label}</div>
+      {loading ? (
+        <div className="h-10 w-24 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D] animate-pulse" />
+      ) : (
+        <span className="font-display leading-none" style={{ fontSize: 40, color: accent ? "var(--color-teal-500)" : "var(--ink)" }}>
+          {value}
+        </span>
+      )}
+      {!loading && spark.length > 1 && (
+        <div className="mt-3"><Sparkline data={spark} width={200} height={28} color={accent ? "#00A799" : "#9AA1AE"} /></div>
+      )}
+    </div>
+  )
+}
 
-      {/* Influencers + Platforms */}
-      <section className="grid grid-cols-1 lg:grid-cols-2">
-        <div className="lg:border-r border-b lg:border-b-0 border-border-soft p-7">
-          <div className="flex items-start justify-between mb-3.5">
-            <div>
-              <div className="eyebrow">Top influenciadores · 30d</div>
-              <div className="text-[12px] text-ink-muted mt-1">Por alcance combinado</div>
-            </div>
-            <button className="text-[13px] text-teal-700 dark:text-teal-300 hover:text-teal-500 font-medium">
-              Ver ranking →
-            </button>
-          </div>
-          <div className="flex flex-col">
-            {editorialInfluencers.map((inf, i) => (
-              <div
-                key={inf.handle}
-                className={`flex items-center gap-3 py-2.5 ${i === 0 ? "" : "border-t border-border-soft"}`}
-              >
-                <span className="font-mono-zoe text-[11px] text-ink-muted-2 w-[18px]">
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                <div
-                  className="w-7 h-7 rounded-full shrink-0"
-                  style={{ background: `hsl(${i * 67}, 40%, 70%)` }}
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="text-[13px] font-medium truncate">{inf.name}</div>
-                  <div className="font-mono-zoe text-[10.5px] text-ink-muted truncate">
-                    {inf.handle}
-                  </div>
-                </div>
-                <div className="text-right min-w-[60px]">
-                  <div className="font-mono-zoe text-[12px]" style={{ color: "var(--ink)" }}>
-                    {inf.reach}
-                  </div>
-                  <div className="text-[10px] text-ink-muted">alcance</div>
-                </div>
-                <div className="min-w-[70px] text-right">
-                  <span
-                    className={`chip text-[11px] ${inf.sentiment > 0.3
-                        ? "chip-pos"
-                        : inf.sentiment < -0.1
-                          ? "chip-neg"
-                          : ""
-                      }`}
-                  >
-                    {inf.sentiment > 0 ? "+" : ""}
-                    {inf.sentiment.toFixed(2)}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+function DeltaKpi({ label, value, loading }: { label: string; value: number | null; loading?: boolean }) {
+  const positive = (value ?? 0) >= 0
+  const Icon = positive ? ArrowUp : ArrowDown
+  return (
+    <div className="px-5 pt-6 pb-5 flex flex-col gap-1 min-h-[150px]">
+      <div className="eyebrow">{label}</div>
+      {loading ? (
+        <div className="h-10 w-24 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D] animate-pulse" />
+      ) : (
+        <span className="font-display leading-none" style={{ fontSize: 40, color: value == null ? "var(--ink)" : positive ? "var(--color-pos)" : "var(--color-neg)" }}>
+          {value == null ? "—" : `${positive ? "+" : ""}${value}%`}
+        </span>
+      )}
+      {!loading && value != null && (
+        <span className={`chip mt-3 w-fit ${positive ? "chip-pos" : "chip-neg"}`}>
+          <Icon className="w-2.5 h-2.5" /> vs. 30d anteriores
+        </span>
+      )}
+    </div>
+  )
+}
 
-        <div className="p-7">
-          <div className="eyebrow mb-3.5">Por plataforma</div>
-          {platformsBreakdown.map((p) => (
-            <div key={p.name} className="mb-3.5">
-              <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-2">
-                  {p.name !== "Outros" && <PlatformDot name={p.name} />}
-                  <span className="text-[13px]">{p.name}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="font-mono-zoe text-[11.5px] text-ink-muted">
-                    {p.count}
-                  </span>
-                  <span className="font-mono-zoe text-[12px] text-ink-muted">{p.pct}%</span>
-                </div>
-              </div>
-              <div className="h-1 bg-[#F3F4F6] dark:bg-[#1C1F2E] rounded-sm overflow-hidden">
-                <div
-                  style={{
-                    width: `${p.pct}%`,
-                    height: "100%",
-                    background: p.color,
-                  }}
-                />
-              </div>
-            </div>
-          ))}
+// ── Estados ───────────────────────────────────────────────────────────
+
+function PageSkeleton() {
+  return (
+    <div className="-m-6 animate-pulse">
+      <div className="px-8 pt-7 pb-6 border-b border-border-soft"><div className="h-10 w-80 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" /></div>
+      <div className="grid grid-cols-1 md:grid-cols-3 border-b border-border-soft">
+        {[0, 1, 2].map((i) => <div key={i} className="p-6 border-r border-border-soft"><div className="h-10 w-24 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" /></div>)}
+      </div>
+      <div className="p-7"><div className="h-40 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" /></div>
+    </div>
+  )
+}
+
+function RecentSkeleton() {
+  return (
+    <div className="animate-pulse">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="flex items-center gap-4 px-8 py-3.5 border-t border-border-soft">
+          <div className="flex-1 space-y-2"><div className="h-3.5 w-2/3 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" /><div className="h-3 w-1/3 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" /></div>
+          <div className="h-5 w-24 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
         </div>
-      </section>
+      ))}
+    </div>
+  )
+}
+
+function ErrorState({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 text-center">
+      <AlertCircle className="w-10 h-10 text-[#DC2626] mb-3" />
+      <h3 className="text-lg font-semibold text-midnight dark:text-[#E6E8EF] mb-1">Não foi possível carregar</h3>
+      <p className="text-sm text-[#6B7280] mb-4">Tente novamente em instantes.</p>
+      <button onClick={onRetry} className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors">Tentar de novo</button>
     </div>
   )
 }

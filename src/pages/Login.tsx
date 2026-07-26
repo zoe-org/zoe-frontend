@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { auth } from "@/features/auth/useAuth"
-import { useAuth } from "@/features/auth/context"
-import { DEV_CREDENTIALS, useCognitoAuth } from "@/features/auth/constants"
+import { applyRememberMe } from "@/lib/cognito"
+import { useAuth, DEV_CREDENTIALS, useCognitoAuth } from "@/features/auth/AuthContext"
 import { translateCognitoError } from "@/features/auth/errors"
 import { useNavigate, useLocation, Link } from "react-router-dom"
 import { Eye, EyeOff} from "lucide-react"
@@ -33,6 +33,7 @@ export default function LoginPage() {
   const { isAuthenticated, devLogin, refresh } = useAuth()
   const form = useForm({ resolver: zodResolver(schema) })
   const [showPw, setShowPw] = useState(false)
+  const [remember, setRemember] = useState(true)
   const [slide, setSlide] = useState(0)
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
@@ -65,6 +66,7 @@ export default function LoginPage() {
     }
 
     try {
+      applyRememberMe(remember)
       await auth.login(email, password)
       await refresh()
       nav(returnTo, { replace: true })
@@ -177,7 +179,7 @@ export default function LoginPage() {
       {/* Right panel */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white">
         <div className="w-full max-w-sm">
-          <h1 className="text-3xl font-bold text-[--color-midnight] mb-1">Entre na sua conta</h1>
+          <h1 className="text-3xl font-bold text-midnight dark:text-[#E6E8EF] mb-1">Entre na sua conta</h1>
           <p className="text-sm text-[#6B7280] mb-8">Bem-vindo(a) de volta.</p>
 
           <form onSubmit={onSubmit} className="space-y-4">
@@ -201,7 +203,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPw(!showPw)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-[--color-midnight]"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-midnight dark:hover:text-[#E6E8EF]"
                 >
                   {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -213,10 +215,15 @@ export default function LoginPage() {
 
             <div className="flex items-center justify-between text-sm">
               <label className="flex items-center gap-2 text-[#6B7280]">
-                <input type="checkbox" className="rounded border-[#E5E7EB]" />
+                <input
+                  type="checkbox"
+                  checked={remember}
+                  onChange={(e) => setRemember(e.target.checked)}
+                  className="rounded border-[#E5E7EB] accent-teal-500"
+                />
                 Manter conectado
               </label>
-              <a href="#" className="text-teal-500 hover:underline">Esqueci a senha</a>
+              <Link to="/forgot-password" className="text-teal-500 hover:underline">Esqueci a senha</Link>
             </div>
 
             {error && <p className="text-xs text-[#DC2626]">{error}</p>}
