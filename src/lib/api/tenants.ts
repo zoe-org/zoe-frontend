@@ -69,6 +69,9 @@ export const tenantsApi = {
   removeMember: (tenantId: string, userId: string) =>
     apiClient.delete(`/api/tenants/${tenantId}/members/${userId}`, { tenantId }),
 
+  changeMemberRole: (tenantId: string, userId: string, role: TenantRole) =>
+    apiClient.patch(`/api/tenants/${tenantId}/members/${userId}/role`, { role }, { tenantId }),
+
   listInvites: (tenantId: string) =>
     apiClient.get<PendingInvite[]>(`/api/tenants/${tenantId}/invites`, { tenantId }),
 
@@ -114,6 +117,11 @@ export function useTeamMutations() {
   return {
     removeMember: useMutation({
       mutationFn: (userId: string) => tenantsApi.removeMember(activeTenantId!, userId),
+      onSuccess: invalidateMembers,
+    }),
+    changeMemberRole: useMutation({
+      mutationFn: (v: { userId: string; role: TenantRole }) =>
+        tenantsApi.changeMemberRole(activeTenantId!, v.userId, v.role),
       onSuccess: invalidateMembers,
     }),
     createInvite: useMutation({

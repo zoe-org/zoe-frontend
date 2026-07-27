@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { fetchAuthSession, signOut as amplifySignOut } from "aws-amplify/auth"
 import { meApi, type Me, type Membership, type MeTenant } from "@/lib/api/me"
 import { ApiError, getActiveTenantId, setActiveTenantId } from "@/lib/api"
+import { clearPendingInviteToken } from "@/features/auth/pendingInvite"
 import { AuthContext } from "@/features/auth/context"
 import { useCognitoAuth } from "@/features/auth/constants"
 import type { AuthState, AuthActions } from "@/features/auth/types"
@@ -159,6 +160,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await amplifySignOut().catch(() => { /* já deslogado */ })
     }
     setActiveTenantId(null)
+    clearPendingInviteToken()
     setState({ ...initialState, isLoading: false })
   }, [])
 

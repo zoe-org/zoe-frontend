@@ -9,7 +9,9 @@ import { auth } from "@/features/auth/useAuth"
 import { useAuth } from "@/features/auth/context"
 import { translateCognitoError } from "@/features/auth/errors"
 import { setOnboardingIntent, type OnboardingIntent } from "@/features/auth/onboardingIntent"
-import { ApiError } from "@/lib/api"
+import { getPendingInviteToken, clearPendingInviteToken } from "@/features/auth/pendingInvite"
+import { invitesApi } from "@/lib/api/invites"
+import { ApiError, setActiveTenantId } from "@/lib/api"
 import { useNavigate, useLocation, Link } from "react-router-dom"
 import { Check, ArrowLeft, Eye, EyeOff, BriefcaseBusiness, Blocks } from "lucide-react"
 import ZoeLogo from "@/assets/zoe-logo.svg?react"
@@ -19,19 +21,19 @@ import { ShaderGradientCanvas, ShaderGradient } from '@shadergradient/react'
 
 const stepsData = ["Objetivo", "Criar conta", "Verificação"]
 
-function Stepper({ currentStep }: { currentStep: number }) {
+function Stepper({ steps, activeIndex }: { steps: string[]; activeIndex: number }) {
   return (
     <div className="space-y-6">
-      {stepsData.map((label, idx) => {
+      {steps.map((label, idx) => {
         const stepNum = idx + 1
-        const isCompleted = stepNum < currentStep
-        const isActive = stepNum === currentStep
+        const isCompleted = idx < activeIndex
+        const isActive = idx === activeIndex
 
         return (
           <div key={idx} className="relative flex items-start gap-4">
-            {idx !== stepsData.length - 1 && (
+            {idx !== steps.length - 1 && (
               <div
-                className={`absolute left-4 top-8 bottom-[-1.5rem] w-[2px] -translate-x-[1px] transition-colors duration-500 ${stepNum < currentStep ? 'bg-white' : 'bg-white/20'
+                className={`absolute left-4 top-8 bottom-[-1.5rem] w-[2px] -translate-x-[1px] transition-colors duration-500 ${idx < activeIndex ? 'bg-white' : 'bg-white/20'
                   }`}
               />
             )}
@@ -187,7 +189,7 @@ const accountSchema = z.object({
 
 type AccountData = z.infer<typeof accountSchema>
 
-function StepAccount({ onNext, defaultEmail = "" }: { onNext: (data: AccountData) => void; defaultEmail?: string }) {
+function StepAccount({ onNext, defaultEmail = "", emailLocked = false }: { onNext: (data: AccountData) => void; defaultEmail?: string; emailLocked?: boolean }) {
   const form = useForm<AccountData>({ resolver: zodResolver(accountSchema), defaultValues: { email: defaultEmail } })
   const [error, setError] = useState("")
   const [showPw, setShowPw] = useState(false)
@@ -251,8 +253,18 @@ function StepAccount({ onNext, defaultEmail = "" }: { onNext: (data: AccountData
 
           <div className="space-y-1.5">
             <Label htmlFor="email">E-mail corporativo</Label>
-            <Input id="email" type="email" {...form.register("email")} placeholder="joao@empresa.com" aria-invalid={!!form.formState.errors.email} />
-            {form.formState.errors.email && <p className="text-xs text-destructive">{form.formState.errors.email.message}</p>}
+            <Input
+              id="email"
+              type="email"
+              {...form.register("email")}
+              placeholder="joao@empresa.com"
+              aria-invalid={!!form.formState.errors.email}
+              readOnly={emailLocked}
+              className={emailLocked ? "bg-[#F3F4F6] text-[#6B7280] cursor-not-allowed" : undefined}
+            />
+            {emailLocked
+              ? <p className="text-xs text-[#6B7280]">E-mail do convite — não pode ser alterado.</p>
+              : form.formState.errors.email && <p className="text-xs text-destructive">{form.formState.errors.email.message}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -414,6 +426,27 @@ function StepVerification({
       // signIn programático e hidrata o contexto. O ProtectedRoute leva pro onboarding
       // automaticamente quando o user não tem memberships ainda.
       await auth.login(email, password)
+
+      // Fluxo de convite: em vez de criar um workspace, aceita o convite pendente e
+      // entra direto no workspace convidado. O refresh vem DEPOIS do aceite pra que
+      // needsOnboarding já esteja falso (evita o desvio pro /onboarding/tenant).
+      const inviteToken = getPendingInviteToken()
+      if (inviteToken) {
+        try {
+          const res = await invitesApi.accept(inviteToken)
+          setActiveTenantId(res.tenantId)
+          clearPendingInviteToken()
+          await refresh()
+          nav("/dashboard", { replace: true })
+        } catch {
+          // Conta criada, mas o aceite falhou (expirou/revogado/e-mail divergente).
+          // A própria página do convite mostra o motivo e oferece o retry.
+          await refresh()
+          nav(`/invite/${inviteToken}`, { replace: true })
+        }
+        return
+      }
+
       await refresh()
       nav("/dashboard", { replace: true })
     } catch (err) {
@@ -485,12 +518,21 @@ function StepVerification({
 
 export default function RegisterPage() {
   const location = useLocation()
-  const initial = (location.state ?? null) as { email?: string; step?: number } | null
+  const initial = (location.state ?? null) as { email?: string; step?: number; invite?: boolean } | null
 
-  const [step, setStep] = useState(initial?.step ?? 1)
+  // Modo convite: usuário chegou pelo link de convite (AcceptInvite) sem ter conta.
+  // Pula a escolha de objetivo (não cria workspace), trava o e-mail e, ao final,
+  // aceita o convite pendente em vez do onboarding.
+  const inviteMode = Boolean(initial?.invite) || getPendingInviteToken() != null
+
+  const [step, setStep] = useState(initial?.step ?? (inviteMode ? 2 : 1))
   const [intent, setIntent] = useState("")
   const [email, setEmail] = useState(initial?.email ?? "")
   const [password, setPassword] = useState<string | null>(null)
+
+  const minStep = inviteMode ? 2 : 1
+  const steps = inviteMode ? ["Criar conta", "Verificação"] : stepsData
+  const activeIndex = inviteMode ? step - 2 : step - 1
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] flex flex-col lg:flex-row">
@@ -542,21 +584,25 @@ export default function RegisterPage() {
             <ZoeLogo className="w-18 h-full text-white drop-shadow-md" />
 
             <div className="hidden lg:block">
-              <h2 className="text-xl font-bold tracking-tight mb-1.5">Comece grátis</h2>
+              <h2 className="text-xl font-bold tracking-tight mb-1.5">
+                {inviteMode ? "Aceite seu convite" : "Comece grátis"}
+              </h2>
               <p className="text-sm text-white/70 font-medium leading-relaxed">
-                Complete essas rápidas etapas para configurar e acessar a sua dashboard.
+                {inviteMode
+                  ? "Complete seu cadastro para entrar no workspace que te convidou."
+                  : "Complete essas rápidas etapas para configurar e acessar a sua dashboard."}
               </p>
             </div>
           </div>
 
           <div className="hidden lg:block">
-            <Stepper currentStep={step} />
+            <Stepper steps={steps} activeIndex={activeIndex} />
           </div>
 
           {/* Mobile Stepper */}
           <div className="lg:hidden flex items-center justify-between mt-4">
-            <div className="text-sm font-bold text-white">Passo {step} de 3</div>
-            <div className="text-xs  text-white/70 font-medium mi">{stepsData[step - 1]}</div>
+            <div className="text-sm font-bold text-white">Passo {activeIndex + 1} de {steps.length}</div>
+            <div className="text-xs  text-white/70 font-medium mi">{steps[activeIndex]}</div>
           </div>
 
           <div className="hidden lg:block text-sm font-medium text-white/70">
@@ -573,7 +619,7 @@ export default function RegisterPage() {
         <div className="w-full max-w-5xl mx-auto flex-1 flex flex-col">
           {/* Header Row */}
           <div className="flex items-center justify-between mb-6">
-            {step > 1 ? (
+            {step > minStep ? (
               <button
                 onClick={() => setStep(step - 1)}
                 className="flex items-center gap-2 text-sm font-bold text-[#6B7280] hover:text-teal-500 transition-colors"
@@ -607,6 +653,7 @@ export default function RegisterPage() {
               <div className="w-full ">
                 <StepAccount
                   defaultEmail={email}
+                  emailLocked={inviteMode}
                   onNext={(data) => {
                     setEmail(data.email)
                     setPassword(data.password)

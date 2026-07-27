@@ -1,51 +1,86 @@
 import { useEffect, useState } from "react"
-import { useNavigate, useParams, Link } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
 import { useAuth } from "@/features/auth/context"
-import { invitesApi } from "@/lib/api/invites"
+import { invitesApi, type InvitePreview } from "@/lib/api/invites"
+import { setPendingInviteToken, clearPendingInviteToken } from "@/features/auth/pendingInvite"
 import { ApiError, setActiveTenantId } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import ZoeLogo from "@/assets/zoe-logo.svg?react"
 
-type Status = "loading" | "needs_login" | "accepting" | "success" | "error"
+// Resultado terminal de uma operação assíncrona (prévia inválida ou aceite). O
+// estado "em andamento" (loading/needs_login/accepting) é derivado do render, pra
+// não chamar setState síncrono dentro de um effect.
+type Result =
+  | { kind: "error"; message: string }
+  | { kind: "success"; tenantName: string }
 
 export default function AcceptInvitePage() {
   const { token = "" } = useParams<{ token: string }>()
   const nav = useNavigate()
   const { isAuthenticated, isLoading, refresh } = useAuth()
-  const [status, setStatus] = useState<Status>("loading")
-  const [error, setError] = useState("")
-  const [tenantName, setTenantName] = useState("")
+  const [preview, setPreview] = useState<InvitePreview | null>(null)
+  const [result, setResult] = useState<Result | null>(null)
 
-  // Deriva o status inicial (needs_login/accepting) durante o render, comparando
-  // com o último valor visto — evita setState síncrono dentro de um useEffect.
-  const authKey = isLoading ? "loading" : isAuthenticated ? "authed" : "anon"
-  const [lastAuthKey, setLastAuthKey] = useState(authKey)
-  if (authKey !== lastAuthKey) {
-    setLastAuthKey(authKey)
-    if (authKey === "anon") setStatus("needs_login")
-    if (authKey === "authed") setStatus("accepting")
-  }
+  // Convite utilizável = prévia carregada e sem bloqueio (aceito/expirado).
+  const usable = preview !== null && !preview.accepted && !preview.expired
 
+  // 1. Prévia pública do convite (não exige login) — valida token/expiração/aceite
+  //    antes de qualquer coisa e alimenta a tela de "criar conta".
   useEffect(() => {
-    if (authKey !== "authed") return
+    let cancelled = false
+    invitesApi.preview(token)
+      .then((p) => {
+        if (cancelled) return
+        setPreview(p)
+        if (p.accepted) {
+          clearPendingInviteToken()
+          setResult({ kind: "error", message: "Este convite já foi aceito." })
+        } else if (p.expired) {
+          clearPendingInviteToken()
+          setResult({ kind: "error", message: "Este convite expirou. Peça um novo ao administrador do workspace." })
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return
+        const message = err instanceof ApiError && err.status === 404
+          ? "Convite não encontrado. O link pode estar incorreto ou ter sido revogado."
+          : err instanceof ApiError ? err.message : "Falha ao carregar o convite."
+        setResult({ kind: "error", message })
+      })
+    return () => { cancelled = true }
+  }, [token])
+
+  // 2. Com a prévia OK e usuário logado: aceita automaticamente. Anônimo vê os CTAs.
+  useEffect(() => {
+    if (!usable || isLoading || !isAuthenticated || result) return
 
     let cancelled = false
     invitesApi.accept(token)
       .then(async (res) => {
         if (cancelled) return
-        setTenantName(res.tenantName)
         setActiveTenantId(res.tenantId)
+        clearPendingInviteToken()
         await refresh()
-        setStatus("success")
+        setResult({ kind: "success", tenantName: res.tenantName })
       })
       .catch((err) => {
         if (cancelled) return
         const message = err instanceof ApiError ? err.message : "Falha ao aceitar convite."
-        setError(message)
-        setStatus("error")
+        setResult({ kind: "error", message })
       })
     return () => { cancelled = true }
-  }, [authKey, token, refresh])
+  }, [usable, isLoading, isAuthenticated, result, token, refresh])
+
+  // View derivada — nenhum setState síncrono em effect.
+  const status: "loading" | "needs_login" | "accepting" | "success" | "error" =
+    result?.kind === "error" ? "error"
+    : result?.kind === "success" ? "success"
+    : !preview || isLoading ? "loading"
+    : !isAuthenticated ? "needs_login"
+    : "accepting"
+
+  const error = result?.kind === "error" ? result.message : ""
+  const tenantName = result?.kind === "success" ? result.tenantName : (preview?.tenantName ?? "")
 
   return (
     <div className="min-h-screen grid place-items-center bg-[#F9FAFB] p-6">
@@ -60,21 +95,31 @@ export default function AcceptInvitePage() {
           </>
         )}
 
-        {status === "needs_login" && (
+        {status === "needs_login" && preview && (
           <>
-            <h1 className="text-xl font-bold mb-1">Entre para aceitar o convite</h1>
+            <h1 className="text-xl font-bold mb-1">
+              Você foi convidado(a) para <span className="text-teal-500">{preview.tenantName}</span>
+            </h1>
             <p className="text-sm text-[#6B7280] mb-6">
-              Use a conta com o e-mail que recebeu o convite.
+              {preview.inviterName} convidou <strong className="text-midnight dark:text-[#E6E8EF]">{preview.email}</strong>.
+              Entre ou crie sua conta com esse e-mail para aceitar.
             </p>
             <Button
               onClick={() => nav(`/login`, { state: { from: `/invite/${token}` } })}
               className="w-full bg-teal-500 hover:bg-teal-500/90 text-white"
             >
-              Entrar
+              Já tenho conta — Entrar
             </Button>
-            <p className="text-xs text-[#6B7280] mt-4">
-              Não tem conta? <Link to="/register" className="text-teal-500 font-semibold">Comece grátis</Link>
-            </p>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setPendingInviteToken(token)
+                nav("/register", { state: { email: preview.email, step: 2, invite: true } })
+              }}
+              className="w-full mt-3"
+            >
+              Criar conta
+            </Button>
           </>
         )}
 
