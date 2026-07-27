@@ -53,13 +53,49 @@ function RoleChip({ role }: { role: string }) {
   )
 }
 
+// Papel editável (Admin/Owner). Só Owner pode conceder/alterar o papel Owner —
+// então a opção Owner fica desabilitada para Admins, e um membro que já é Owner
+// vira somente-leitura para quem não é Owner (o backend também recusa).
+function RoleCell({
+  member, canEdit, isOwner, isSelf, pending, onChange,
+}: {
+  member: TenantMember
+  canEdit: boolean
+  isOwner: boolean
+  isSelf: boolean
+  pending: boolean
+  onChange: (role: TenantRole) => void
+}) {
+  const readOnly = !canEdit || isSelf || (member.role === "Owner" && !isOwner)
+  if (readOnly) return <RoleChip role={member.role} />
+
+  const meta = ROLE_META[member.role]
+  return (
+    <select
+      value={member.role}
+      disabled={pending}
+      onChange={(e) => onChange(e.target.value as TenantRole)}
+      title="Alterar papel do membro"
+      className="font-semibold cursor-pointer rounded-md border border-border-soft bg-transparent outline-none focus:border-teal-500 disabled:opacity-50 hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D] transition-colors"
+      style={{ fontSize: 12, padding: "3px 8px", color: meta.color }}
+    >
+      {ROLE_ORDER.map((r) => (
+        <option key={r} value={r} disabled={r === "Owner" && !isOwner} style={{ color: "var(--ink)" }}>
+          {r}
+        </option>
+      ))}
+    </select>
+  )
+}
+
 export default function UsersPage() {
   const { user, role } = useAuth()
   const isAdmin = role === "Owner" || role === "Admin"
+  const isOwner = role === "Owner"
 
   const members = useMembers()
   const invites = useInvites(isAdmin)
-  const { removeMember, revokeInvite } = useTeamMutations()
+  const { removeMember, revokeInvite, changeMemberRole } = useTeamMutations()
 
   const [tab, setTab] = useState<Tab>("pessoas")
   const [inviteOpen, setInviteOpen] = useState(false)
@@ -80,6 +116,19 @@ export default function UsersPage() {
       onSuccess: () => toast.success("Membro removido."),
       onError: (e) => toast.error(e instanceof ApiError ? e.message : "Não foi possível remover."),
     })
+  }
+
+  const handleRoleChange = (m: TenantMember, nextRole: TenantRole) => {
+    if (nextRole === m.role) return
+    const who = m.name || m.email
+    if (!window.confirm(`Alterar o papel de ${who} para ${nextRole}?`)) return
+    changeMemberRole.mutate(
+      { userId: m.userId, role: nextRole },
+      {
+        onSuccess: () => toast.success("Papel atualizado."),
+        onError: (e) => toast.error(e instanceof ApiError ? e.message : "Não foi possível alterar o papel."),
+      },
+    )
   }
 
   const handleRevoke = (inv: PendingInvite) => {
@@ -197,7 +246,16 @@ export default function UsersPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="py-3.5"><RoleChip role={m.role} /></td>
+                        <td className="py-3.5">
+                          <RoleCell
+                            member={m}
+                            canEdit={isAdmin}
+                            isOwner={isOwner}
+                            isSelf={isSelf}
+                            pending={changeMemberRole.isPending}
+                            onChange={(next) => handleRoleChange(m, next)}
+                          />
+                        </td>
                         <td className="py-3.5">
                           <BrandsCell member={m} canEdit={isAdmin} onEdit={() => setEditingBrands(m)} />
                         </td>
@@ -289,7 +347,7 @@ export default function UsersPage() {
         </section>
       )}
 
-      {inviteOpen && <InviteModal onClose={() => setInviteOpen(false)} />}
+      {inviteOpen && <InviteModal isOwner={isOwner} onClose={() => setInviteOpen(false)} />}
       {editingBrands && (
         <AssignBrandsModal member={editingBrands} onClose={() => setEditingBrands(null)} />
       )}
@@ -469,13 +527,19 @@ function AssignBrandsModal({ member, onClose }: { member: TenantMember; onClose:
 
 // ── Modal de convite ─────────────────────────────────────────────────────
 
-// Owner não pode ser convidado (regra do backend). Ordem/rótulos do design.
-const INVITE_ROLES: TenantRole[] = ["Admin", "Manager", "Viewer"]
+// Owner só pode ser concedido por um Owner (regra do backend) — a opção só aparece
+// quando o autor é Owner. Ordem/rótulos do design.
+const BASE_INVITE_ROLES: TenantRole[] = ["Admin", "Manager", "Viewer"]
 
-function InviteModal({ onClose }: { onClose: () => void }) {
+function InviteModal({ isOwner, onClose }: { isOwner: boolean; onClose: () => void }) {
   const { createInvite } = useTeamMutations()
   const brandsQuery = useTenantBrands()
   const brands = useMemo(() => brandsQuery.data?.items ?? [], [brandsQuery.data])
+
+  const inviteRoles = useMemo<TenantRole[]>(
+    () => (isOwner ? ["Owner", ...BASE_INVITE_ROLES] : BASE_INVITE_ROLES),
+    [isOwner],
+  )
 
   const [email, setEmail] = useState("")
   const [role, setRole] = useState<TenantRole>("Viewer")
@@ -611,8 +675,11 @@ function InviteModal({ onClose }: { onClose: () => void }) {
 
               {/* Papel — botões (design) */}
               <label className="block text-[13px] font-semibold text-ink-2 mb-2">Papel</label>
-              <div className="grid grid-cols-3 gap-2">
-                {INVITE_ROLES.map((r) => {
+              <div
+                className="grid gap-2"
+                style={{ gridTemplateColumns: `repeat(${inviteRoles.length}, minmax(0, 1fr))` }}
+              >
+                {inviteRoles.map((r) => {
                   const meta = ROLE_META[r]
                   const active = role === r
                   return (

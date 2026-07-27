@@ -1,5 +1,6 @@
 import { Navigate, useLocation } from "react-router-dom"
 import { useAuth } from "@/features/auth/context"
+import { getPendingInviteToken } from "@/features/auth/pendingInvite"
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, needsOnboarding } = useAuth()
@@ -15,6 +16,15 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />
+  }
+
+  // Convidado sem workspace: manda pro aceite do convite em vez de criar um workspace
+  // por engano. Cobre um reload no meio do fluxo ou o accept que ainda não concluiu.
+  if (needsOnboarding && !location.pathname.startsWith("/invite/")) {
+    const inviteToken = getPendingInviteToken()
+    if (inviteToken) {
+      return <Navigate to={`/invite/${inviteToken}`} replace />
+    }
   }
 
   if (needsOnboarding && !location.pathname.startsWith("/onboarding")) {
