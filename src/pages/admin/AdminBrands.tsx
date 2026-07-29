@@ -7,6 +7,7 @@ import { ptBR } from "date-fns/locale"
 import { useAuth } from "@/features/auth/context"
 import { EmptyState } from "@/components/ui/empty-state"
 import { apiMessage } from "@/lib/api-error"
+import { brandsApi } from "@/lib/api/brands"
 import {
   usePendingBrands, useBrandVerification, useCurationMutations,
   type MergeAnalysesPolicy, type BrandVerificationDetail,
@@ -129,6 +130,9 @@ function VerificationPanel({ brandId }: { brandId: string }) {
   const [channels, setChannels] = useState<string[]>([])
   const [channelDraft, setChannelDraft] = useState("")
   const [channelError, setChannelError] = useState<string | null>(null)
+  const [resolvingChannel, setResolvingChannel] = useState(false)
+  // Título por channel id — permite conferir o canal sem decorar o UC….
+  const [channelTitles, setChannelTitles] = useState<Record<string, string>>({})
   const [notes, setNotes] = useState("")
   const [reprocess, setReprocess] = useState(true)
   const [rejecting, setRejecting] = useState(false)
@@ -165,15 +169,41 @@ function VerificationPanel({ brandId }: { brandId: string }) {
   }
   const isPromoted = (keyword: string) => aliases.some((a) => a.toLowerCase() === keyword.toLowerCase())
 
-  const addChannel = () => {
-    const id = parseChannelId(channelDraft)
-    if (!id) {
-      setChannelError("Use o ID do canal (UC…, 24 caracteres) ou o link youtube.com/channel/…")
-      return
-    }
+  const commitChannel = (id: string, title?: string | null) => {
     if (!channels.includes(id)) setChannels([...channels, id])
+    if (title) setChannelTitles((t) => ({ ...t, [id]: title }))
     setChannelDraft("")
     setChannelError(null)
+  }
+
+  // Mesmo fluxo do form de nova marca (Brands.tsx): ID puro ou `/channel/<id>`
+  // resolve local; `@handle`/link do "Compartilhar" (youtube.com/@marca) vai ao
+  // backend traduzir via `channels?forHandle=`. Ninguém tem o UC… em mãos.
+  const addChannel = async () => {
+    const local = parseChannelId(channelDraft)
+    if (local) { commitChannel(local); return }
+
+    const raw = channelDraft.trim()
+    if (!raw.includes("@")) {
+      setChannelError("Cole o link do canal (youtube.com/@marca), o @handle ou o ID que começa com UC.")
+      return
+    }
+
+    setResolvingChannel(true)
+    setChannelError(null)
+    try {
+      const r = await brandsApi.resolveChannel(raw)
+      if (r.channelId) commitChannel(r.channelId, r.title)
+      else setChannelError(
+        r.reason === "channel_not_found"
+          ? "Não encontramos esse canal no YouTube. Confira o @handle."
+          : "Não conseguimos resolver esse @handle agora. Tente colar o ID do canal (UC…).",
+      )
+    } catch (err) {
+      setChannelError(apiMessage(err, "Não conseguimos consultar o YouTube agora."))
+    } finally {
+      setResolvingChannel(false)
+    }
   }
 
   const busy = m.verify.isPending || m.reject.isPending || m.merge.isPending || m.reprocess.isPending
@@ -238,26 +268,27 @@ function VerificationPanel({ brandId }: { brandId: string }) {
           <input
             value={channelDraft}
             onChange={(e) => { setChannelDraft(e.target.value); setChannelError(null) }}
-            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addChannel() } }}
-            placeholder="UCxxxxxxxx… ou link /channel/…"
-            className="flex-1 h-9 px-3 text-[13px] font-mono-zoe rounded-lg border bg-transparent outline-none focus:border-teal-500"
+            onKeyDown={(e) => { if (e.key === "Enter" && !resolvingChannel) { e.preventDefault(); addChannel() } }}
+            placeholder="link youtube.com/@marca, @handle ou UCxxxxxxxx…"
+            disabled={resolvingChannel}
+            className="flex-1 h-9 px-3 text-[13px] font-mono-zoe rounded-lg border bg-transparent outline-none focus:border-teal-500 disabled:opacity-50"
             style={{ borderColor: channelError ? "var(--color-neg)" : "var(--border-soft)" }}
           />
           <button
             type="button"
             onClick={addChannel}
-            disabled={!channelDraft.trim()}
+            disabled={!channelDraft.trim() || resolvingChannel}
             className="h-9 px-3 rounded-lg border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors disabled:opacity-50"
           >
-            <Plus className="w-3.5 h-3.5" />
+            {resolvingChannel ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
           </button>
         </div>
         {channelError && <p className="text-[11.5px] text-neg mt-1.5">{channelError}</p>}
         {channels.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-2.5">
             {channels.map((ch) => (
-              <span key={ch} className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-md text-[12px] font-mono-zoe bg-[#F3F4F6] dark:bg-[#1A1D2D]" style={{ color: "var(--ink-2)" }}>
-                {ch}
+              <span key={ch} title={ch} className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-md text-[12px] font-mono-zoe bg-[#F3F4F6] dark:bg-[#1A1D2D]" style={{ color: "var(--ink-2)" }}>
+                {channelTitles[ch] ? <span className="font-sans">{channelTitles[ch]}</span> : ch}
                 <button onClick={() => setChannels(channels.filter((x) => x !== ch))} aria-label={`Remover ${ch}`} className="text-ink-muted hover:text-neg">
                   <X className="w-3 h-3" />
                 </button>

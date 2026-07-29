@@ -10,6 +10,7 @@ const routeLabels: Record<string, string> = {
   "/brands": "Marcas",
   "/reports": "Relatórios",
   "/users": "Usuários",
+  "/settings": "Configurações",
   "/admin/brands": "Curadoria",
 }
 
