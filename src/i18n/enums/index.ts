@@ -3,7 +3,10 @@
 // nunca hard-coded na tela. Fallback SEMPRE pro valor cru — um enum novo ainda
 // não traduzido não pode crashar a UI.
 
-export type EnumKind = "classification" | "sentiment" | "nerMode" | "pipelinePath"
+export type EnumKind =
+  | "classification" | "sentiment" | "nerMode" | "pipelinePath"
+  | "kycStatus" | "rosterStatus"
+  | "contractModality" | "contractStatus" | "escrowState" | "campaignStatus"
 
 type LocaleDictionaries = Record<EnumKind, Record<string, string>>
 
@@ -33,6 +36,57 @@ const dictionaries: Record<string, LocaleDictionaries> = {
       VideoCaption: "Análise completa",
       CaptionFallback: "Legenda + comentários",
       CommentsOnly: "Apenas comentários",
+    },
+    // Operations. KYC é do domínio do criador (InfluencerKycStatus) e vale na
+    // plataforma toda; o status do elenco (TenantInfluencerStatus) é do vínculo
+    // com ESTE workspace. São coisas diferentes de propósito.
+    kycStatus: {
+      NotStarted: "Não iniciado",
+      Pending: "Em análise",
+      Verified: "Verificado",
+      Rejected: "Recusado",
+    },
+    rosterStatus: {
+      Active: "Ativo",
+      Paused: "Pausado",
+      Archived: "Arquivado",
+    },
+    contractModality: {
+      Publipost: "Publipost",
+      Ambassador: "Embaixador",
+      Barter: "Permuta",
+      Affiliate: "Afiliado",
+      License: "Licenciamento",
+      Ugc: "UGC",
+      Events: "Eventos",
+      Cocreation: "Cocriação",
+      SocialManagement: "Gestão de redes",
+      Exclusivity: "Exclusividade",
+    },
+    campaignStatus: {
+      Draft: "Rascunho",
+      Active: "Ativa",
+      Completed: "Concluída",
+      Cancelled: "Cancelada",
+    },
+    contractStatus: {
+      Draft: "Rascunho",
+      SentForSignature: "Aguardando assinatura",
+      Signed: "Assinado",
+      Cancelled: "Cancelado",
+    },
+    // Estados da custódia. "Releasable" é liberável, não liberado — a diferença
+    // entre os dois é a aprovação humana, então os rótulos não podem se confundir.
+    escrowState: {
+      PendingDeposit: "Aguardando depósito",
+      Funded: "Fundos reservados",
+      InProduction: "Em produção",
+      Delivered: "Entregue",
+      UnderReview: "Em revisão",
+      Releasable: "Liberável",
+      Released: "Liberado",
+      Disputed: "Em disputa",
+      Refunded: "Devolvido",
     },
   },
 }

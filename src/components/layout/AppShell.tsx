@@ -2,7 +2,7 @@ import { useState, useEffect } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { NavLink, Link, Outlet, useLocation, useNavigate } from "react-router-dom"
 import {
-  House, Brain, Settings, Bell,
+  House, Brain, Settings, Bell, Handshake,
   ChevronDown, ChevronUp, Search, PanelLeftClose, PanelLeftOpen, ChevronsUpDown,
   Sun, Moon, LogOut, Check, Plus, ShieldCheck,
 } from "lucide-react"
@@ -19,6 +19,7 @@ import ZoeLogo from "@/assets/zoe-logo.svg?react"
 
 const STORAGE_INTEL_KEY = "zoe_sidebar_intel_open"
 const STORAGE_GESTAO_KEY = "zoe_sidebar_gestao_open"
+const STORAGE_OPS_KEY = "zoe_sidebar_ops_open"
 const STORAGE_SIDEBAR_KEY = "zoe_sidebar_open"
 
 function getInitialOpenState(key: string): boolean {
@@ -85,6 +86,7 @@ export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(() => getInitialOpenState(STORAGE_SIDEBAR_KEY))
   const [intelOpen, setIntelOpen] = useState(() => getInitialOpenState(STORAGE_INTEL_KEY))
   const [gestaoOpen, setGestaoOpen] = useState(() => getInitialOpenState(STORAGE_GESTAO_KEY))
+  const [opsOpen, setOpsOpen] = useState(() => getInitialOpenState(STORAGE_OPS_KEY))
 
   // Troca de tenant: descarta o cache do tenant anterior. O tenantId nas query
   // keys já impede servir dado de outro tenant; isto libera memória e força um
@@ -105,6 +107,10 @@ export function AppShell() {
     try { localStorage.setItem(STORAGE_GESTAO_KEY, String(gestaoOpen)) } catch { /* storage indisponível */ }
   }, [gestaoOpen])
 
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_OPS_KEY, String(opsOpen)) } catch { /* storage indisponível */ }
+  }, [opsOpen])
+
   // Deriva a abertura das seções a partir da rota durante o render (não em efeito),
   // pra evitar o passe de render em cascata que um setState em useEffect causaria.
   const [lastPathname, setLastPathname] = useState(location.pathname)
@@ -122,6 +128,9 @@ export function AppShell() {
       location.pathname === "/users"
     ) {
       setGestaoOpen(true)
+    }
+    if (location.pathname.startsWith("/operations")) {
+      setOpsOpen(true)
     }
   }
 
@@ -175,6 +184,30 @@ export function AppShell() {
                   {hasSov && <SubNavItem to="/intelligence/sov">Share of Voice</SubNavItem>}
                   <SubNavItem to="/intelligence/influencers">Influenciadores</SubNavItem>
                   <SubNavItem to="/alerts" badge={<span className="bg-ember text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">3</span>}>Alertas</SubNavItem>
+                </div>
+              )}
+            </>
+          )}
+
+          {hasOperations && (
+            <>
+              <button
+                onClick={() => sidebarOpen ? setOpsOpen(!opsOpen) : setSidebarOpen(true)}
+                className={`w-full flex items-center py-2 rounded-md text-[14px] font-medium transition-colors text-[#697788] dark:text-[#8A91A3] ${sidebarOpen ? "pl-3 justify-between" : "justify-center px-2"}`}
+              >
+                <span className={`flex items-center ${sidebarOpen ? "gap-2" : ""}`}>
+                  <Handshake className="w-[18px] h-[18px] shrink-0" strokeWidth={2.5} />
+                  {sidebarOpen && <span>Operations</span>}
+                </span>
+                {sidebarOpen && (opsOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
+              </button>
+
+              {sidebarOpen && opsOpen && (
+                <div className="ml-[21px] border-l-2 border-[#E5E7EB] dark:border-[#1C1F2E] flex flex-col mt-0 mb-2">
+                  {/* A ordem do menu é a ordem do fluxo: campanha → elenco → contrato. */}
+                  <SubNavItem to="/operations/campaigns">Campanhas</SubNavItem>
+                  <SubNavItem to="/operations/influencers">Elenco</SubNavItem>
+                  <SubNavItem to="/operations/contracts">Contratos</SubNavItem>
                 </div>
               )}
             </>

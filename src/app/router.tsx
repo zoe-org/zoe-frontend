@@ -15,6 +15,10 @@ import BrandsPage from "@/pages/Brands"
 import AlertsPage from "@/pages/Alerts"
 import ReportsPage from "@/pages/Reports"
 import ReportViewPage from "@/pages/ReportView"
+import OperationsCampaignsPage from "@/pages/operations/Campaigns"
+import OperationsContractDetailPage from "@/pages/operations/ContractDetail"
+import OperationsContractsPage from "@/pages/operations/Contracts"
+import OperationsRosterPage from "@/pages/operations/Roster"
 import UsersPage from "@/pages/Users"
 import SettingsPage from "@/pages/Settings"
 import AdminBrandsPage from "@/pages/admin/AdminBrands"
@@ -46,6 +50,12 @@ export const router = createBrowserRouter([
       { path: "/intelligence/sov", element: <SovPage /> },
       { path: "/intelligence/influencers", element: <InfluencersPage /> },
       { path: "/mentions", element: <Navigate to="/intelligence/monitoring" replace /> },
+      // Operations: rota sempre montada. O gate real é o [RequiresFeature] do
+      // backend (403); o item no menu é que some sem a feature.
+      { path: "/operations/campaigns", element: <OperationsCampaignsPage /> },
+      { path: "/operations/influencers", element: <OperationsRosterPage /> },
+      { path: "/operations/contracts", element: <OperationsContractsPage /> },
+      { path: "/operations/contracts/:contractId", element: <OperationsContractDetailPage /> },
       { path: "/brands", element: <BrandsPage /> },
       { path: "/alerts", element: <AlertsPage /> },
       { path: "/reports", element: <ReportsPage /> },
