@@ -10,7 +10,7 @@ import { EmptyBlock } from "@/components/ui/empty-block"
 import { ConfidenceBadge } from "@/components/ui/confidence-badge"
 import { useActiveBrand } from "@/features/brands/context"
 import { useDashboardSummary, useSentimentEvolution } from "@/lib/api/dashboard"
-import { useVideosFeed } from "@/lib/api/videos"
+import { useVideosFeed, useVideosSummary } from "@/lib/api/videos"
 import { tEnum } from "@/i18n/enums"
 
 function getGreeting(): string {
@@ -48,6 +48,13 @@ export default function DashboardPage() {
   const summary = useDashboardSummary(brand.brandId)
   const evolution = useSentimentEvolution(brand.brandId)
   const feed = useVideosFeed(brand.brandId ? { brandId: brand.brandId, limit: 6 } : null)
+  // ADR-035: os agregados acima são earned-only por definição. Este contador existe
+  // pra que o cliente ENCONTRE o próprio conteúdo em vez de achar que sumiu — mas
+  // não soma em nada: é navegação, não métrica. Sem `owned`, a pergunta "cadê meus
+  // vídeos?" vira ticket de suporte.
+  const ownedCount = useVideosSummary(
+    brand.brandId ? { brandId: brand.brandId, channelRelation: "owned" } : null,
+  )
 
   const points = useMemo(() => evolution.data?.points ?? [], [evolution.data])
   const dist = useMemo(() => {
@@ -95,6 +102,12 @@ export default function DashboardPage() {
               <span style={{ color: "var(--color-teal-500)" }}>{brand.active?.displayName ?? brand.active?.brandName}</span>
             </h1>
           </div>
+
+          <OwnedContentHint
+            count={ownedCount.data?.total ?? 0}
+            brandId={brand.brandId}
+            onNavigate={(to) => navigate(to)}
+          />
         </div>
       </section>
 
@@ -285,6 +298,44 @@ function RecentSkeleton() {
         </div>
       ))}
     </div>
+  )
+}
+
+/**
+ * Ponte para o conteúdo próprio (ADR-035). Os KPIs desta página são earned-only
+ * por DEFINIÇÃO de métrica — owned nunca entra em menções, score médio ou
+ * variação. Sem esta ponte, o cliente que publica no próprio canal simplesmente
+ * não acha os vídeos dele e conclui que o produto está quebrado.
+ *
+ * NAVEGA, não soma: virar contador ao lado dos KPIs sugeriria que faz parte do
+ * mesmo total, que é exatamente a confusão que a ADR corrige.
+ */
+function OwnedContentHint({
+  count,
+  brandId,
+  onNavigate,
+}: {
+  count: number
+  brandId: string | null
+  onNavigate: (to: string) => void
+}) {
+  if (!brandId || count === 0) return null
+
+  return (
+    <button
+      onClick={() => onNavigate("/intelligence/monitoring?rel=owned")}
+      className="text-left px-4 py-3 rounded-lg border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors cursor-pointer"
+    >
+      <div className="font-mono-zoe text-[17px]" style={{ color: "var(--ink)" }}>
+        {count}
+      </div>
+      <div className="text-[11.5px] text-ink-muted mt-0.5">
+        {count === 1 ? "vídeo do seu canal" : "vídeos do seu canal"}
+      </div>
+      <div className="text-[10.5px] text-ink-muted-2 mt-1 max-w-48 leading-snug">
+        Fora dos números acima — métricas medem o que <em>terceiros</em> publicam.
+      </div>
+    </button>
   )
 }
 

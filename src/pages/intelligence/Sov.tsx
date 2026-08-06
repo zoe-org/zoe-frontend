@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react"
-import { Lock, AlertCircle, Sparkles, Download, ArrowUp, ArrowDown } from "lucide-react"
+import { Link } from "react-router-dom"
+import { Lock, AlertCircle, Sparkles, Download, ArrowUp, ArrowDown, ChevronRight } from "lucide-react"
 import { MultiLine } from "@/components/ui/charts"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { SelectFilterChip } from "@/components/ui/select-filter-chip"
@@ -114,9 +115,24 @@ export default function SovPage() {
                         <div className="flex items-center gap-2.5 min-w-0">
                           <span className="font-mono-zoe text-[11px] text-ink-muted-2 w-4">{i + 1}</span>
                           <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: c }} />
-                          <span className="text-[13.5px] truncate" style={{ fontWeight: b.isYou ? 700 : 500, color: "var(--ink)" }}>
-                            {b.brandName}
-                          </span>
+                          {/* ADR-035, D6: o SoV mantém o número limpo (earned puro) e o
+                              clique leva ao detalhe, onde earned e owned aparecem em
+                              painéis separados. Só concorrente — a própria marca tem a
+                              tela de reação em canal próprio, que é outra pergunta. */}
+                          {b.isYou ? (
+                            <span className="text-[13.5px] truncate" style={{ fontWeight: 700, color: "var(--ink)" }}>
+                              {b.brandName}
+                            </span>
+                          ) : (
+                            <Link
+                              to={`/intelligence/competitive/${b.brandId}`}
+                              className="text-[13.5px] truncate hover:underline inline-flex items-center gap-1 group"
+                              style={{ fontWeight: 500, color: "var(--ink)" }}
+                            >
+                              {b.brandName}
+                              <ChevronRight className="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity shrink-0" aria-hidden />
+                            </Link>
+                          )}
                           {b.isYou && <span className="chip chip-primary text-[10px] px-1.5 py-px">VOCÊ</span>}
                         </div>
                         <div className="flex items-center gap-3 shrink-0">

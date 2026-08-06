@@ -188,6 +188,14 @@ export default function InfluencersPage() {
               </span>{" "}
               {influencers.length === 1 ? "identificado" : "identificados"}.
             </div>
+            {/* ADR-035, D4: o canal da própria marca é excluído por definição —
+                sem isto ele apareceria como o maior "influenciador" sobre si mesma,
+                que era exatamente o sintoma que a ADR corrigiu. Não há controle
+                para incluir: seria mudar a definição da métrica, não filtrá-la. */}
+            <p className="text-[11.5px] text-ink-muted-2 mt-2 leading-snug max-w-140">
+              Apenas canais de terceiros. O seu próprio canal não entra neste mapa — ele
+              não é um influenciador sobre a sua marca.
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <button

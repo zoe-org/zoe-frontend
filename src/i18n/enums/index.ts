@@ -3,7 +3,12 @@
 // nunca hard-coded na tela. Fallback SEMPRE pro valor cru — um enum novo ainda
 // não traduzido não pode crashar a UI.
 
-export type EnumKind = "classification" | "sentiment" | "nerMode" | "pipelinePath"
+export type EnumKind =
+  | "classification"
+  | "sentiment"
+  | "nerMode"
+  | "pipelinePath"
+  | "channelRelation"
 
 type LocaleDictionaries = Record<EnumKind, Record<string, string>>
 
@@ -33,6 +38,15 @@ const dictionaries: Record<string, LocaleDictionaries> = {
       VideoCaption: "Análise completa",
       CaptionFallback: "Legenda + comentários",
       CommentsOnly: "Apenas comentários",
+      // ADR-035. Rótulos escolhidos pra não colidir com os degradados acima:
+      // "Apenas comentários" (CommentsOnly) é falha de download; estes são
+      // POLÍTICA. Mesmo número de confiança, significados opostos (doc 05 §4).
+      OwnedComments: "Conteúdo próprio",
+      OwnedNoSignal: "Comentários desativados",
+    },
+    channelRelation: {
+      Owned: "Conteúdo próprio",
+      ThirdParty: "Terceiros",
     },
   },
 }

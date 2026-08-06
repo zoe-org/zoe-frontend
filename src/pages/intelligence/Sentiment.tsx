@@ -115,6 +115,7 @@ export default function SentimentPage() {
               </span>{" "}
               · <span className="font-mono-zoe">{periodLabel.toLowerCase()}</span>.
             </div>
+            <EarnedOnlyNote />
           </div>
         </div>
 
@@ -360,6 +361,26 @@ function PageSkeleton() {
       </div>
       <div className="p-7"><div className="h-[200px] rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" /></div>
     </div>
+  )
+}
+
+/**
+ * Nota de rodapé da exclusão de owned (ADR-035, D4). Existe pra evitar o ticket
+ * "por que meu vídeo não aparece aqui": a exclusão é definição da métrica, não
+ * bug nem filtro que o usuário esqueceu de ligar — e por isso não há controle
+ * para desligá-la nesta página.
+ */
+function EarnedOnlyNote() {
+  return (
+    <p className="text-[11.5px] text-ink-muted-2 mt-2 leading-snug max-w-140">
+      Considera apenas conteúdo de terceiros. Vídeos publicados no seu próprio canal
+      ficam de fora por definição — o roteiro é seu, então medi-los seria medir a
+      própria marca.{" "}
+      <a href="/intelligence/monitoring?rel=owned" className="underline hover:text-ink-muted">
+        Ver conteúdo próprio
+      </a>
+      .
+    </p>
   )
 }
 

@@ -174,6 +174,9 @@ export function AppShell() {
                   <SubNavItem to="/intelligence/sentiment">Sentimento</SubNavItem>
                   {hasSov && <SubNavItem to="/intelligence/sov">Share of Voice</SubNavItem>}
                   <SubNavItem to="/intelligence/influencers">Influenciadores</SubNavItem>
+                  {/* ADR-035: única tela que mede conteúdo próprio. Sem entrada de
+                      menu, o cliente que publica no canal dele não acha os vídeos. */}
+                  <SubNavItem to="/intelligence/owned">Canal próprio</SubNavItem>
                   <SubNavItem to="/alerts" badge={<span className="bg-ember text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">3</span>}>Alertas</SubNavItem>
                 </div>
               )}

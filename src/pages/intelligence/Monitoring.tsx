@@ -10,7 +10,16 @@ import { VideoThumb } from "@/components/ui/video-thumb"
 import { SelectFilterChip } from "@/components/ui/select-filter-chip"
 import { useActiveBrand } from "@/features/brands/context"
 import { toCsv, downloadCsv } from "@/lib/csv"
-import { useVideosFeed, useVideosSummary, type VideoFilters, type VideoListItem, type VideoSort } from "@/lib/api/videos"
+import { startOfToday, windowFrom } from "@/lib/date-window"
+import {
+  useVideosFeed,
+  useVideosSummary,
+  hasSelfMeasuredScore,
+  parseChannelRelation,
+  type VideoFilters,
+  type VideoListItem,
+  type VideoSort,
+} from "@/lib/api/videos"
 import { tEnum } from "@/i18n/enums"
 
 /** 1234 → "1,2 mil"; 1_234_567 → "1,2 mi". Compacto pt-BR para views. */
@@ -37,6 +46,17 @@ const PERIODS = [
   { key: "90", label: "Últimos 90 dias" },
 ] as const
 
+// ADR-035, D4. Filtro de VIEW: vive na URL como os demais, some quando o usuário
+// sai. NÃO existe equivalente em /configuracoes de propósito — flag persistida
+// faria a mesma marca ter dois SoVs dependendo de quem olha, quebraria a série
+// temporal no dia em que alguém virasse a chave, e tornaria incomparáveis
+// relatórios exportados em datas diferentes.
+const CHANNEL_RELATIONS = [
+  { key: "", label: "Terceiros" },
+  { key: "owned", label: "Meu conteúdo" },
+  { key: "all", label: "Tudo" },
+] as const
+
 const MIN_SCORES = [
   { key: "", label: "Qualquer score" },
   { key: "0.5", label: "Score ≥ 0,50" },
@@ -50,6 +70,28 @@ const SORT_OPTIONS = [
   { key: "oldest", label: "Mais antigos" },
   { key: "score", label: "Maior score" },
 ] as const
+
+/**
+ * Score exibido na listagem. Em vídeo owned pelo path pesado o número existe mas
+ * não é leitura de audiência (doc 05 §4.1) — exibi-lo ao lado dos earned convida
+ * a comparação que a ADR-035 existe pra impedir. O badge ao lado explica.
+ */
+function scoreLabel(m: VideoListItem): string {
+  if (hasSelfMeasuredScore(m)) return "—"
+  return m.score != null ? m.score.toFixed(2) : "—"
+}
+
+/** Marca visual do conteúdo próprio na listagem (doc 05 §2). */
+function OwnedTag() {
+  return (
+    <span
+      className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium"
+      style={{ color: "var(--color-teal-700, #0F766E)", background: "var(--color-teal-50, #F0FDFA)" }}
+    >
+      Conteúdo próprio
+    </span>
+  )
+}
 
 function classificationClass(cls: string | null): string {
   if (cls === "Positive") return "text-[#16A34A] bg-[#F0FDF4]"
@@ -80,6 +122,12 @@ export default function MonitoringPage() {
   const min = params.get("min") ?? ""
   const q = params.get("q") ?? ""
   const sort = (params.get("sort") ?? "") as VideoSort
+  // "" na URL = earned (o default). Manter o default fora da URL deixa o link
+  // limpo no caso comum e explícito quando o usuário mudou de propósito.
+  const rel = params.get("rel") ?? ""
+  // Fallback em earned pra qualquer coisa que não seja "owned"/"all" — ver
+  // parseChannelRelation. URL é compartilhável; valor inválido não pode virar "all".
+  const channelRelation = parseChannelRelation(rel)
   // Na URL junto com os filtros: a preferência de visualização sobrevive ao
   // refresh e viaja no link compartilhado.
   const view = params.get("view") === "grid" ? "grid" : "list"
@@ -93,9 +141,12 @@ export default function MonitoringPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchInput])
 
+  // Mesma âncora de dia das telas owned: janela estável e igual entre usuários.
+  const [anchor] = useState(startOfToday)
+
   const filters: VideoFilters | null = useMemo(() => {
     if (!brandId) return null
-    const from = period ? new Date(Date.now() - Number(period) * 86_400_000).toISOString() : undefined
+    const from = windowFrom(period, anchor)
     return {
       brandId,
       classificacao: sent || undefined,
@@ -103,8 +154,9 @@ export default function MonitoringPage() {
       from,
       minScore: min ? Number(min) : undefined,
       sort: sort || undefined,
+      channelRelation,
     }
-  }, [brandId, sent, q, period, min, sort])
+  }, [brandId, sent, q, period, min, sort, channelRelation, anchor])
 
   const feed = useVideosFeed(filters)
   const summary = useVideosSummary(filters)
@@ -145,9 +197,14 @@ export default function MonitoringPage() {
       { header: "Publicado em", value: (m) => new Date(m.publishedAt).toLocaleDateString("pt-BR") },
       { header: "Views", value: (m) => m.views ?? "" },
       { header: "Classificação", value: (m) => (m.classificacao ? tEnum("classification", m.classificacao) : "") },
-      { header: "Score", value: (m) => (m.score != null ? m.score.toFixed(2) : "") },
+      // Score vazio em owned pelo path pesado, pelo mesmo motivo da tela: o número
+      // não mede audiência, e numa planilha ele perde o badge que explicava isso.
+      { header: "Score", value: (m) => (hasSelfMeasuredScore(m) || m.score == null ? "" : m.score.toFixed(2)) },
       { header: "Confiança", value: (m) => (m.confidence != null ? m.confidence.toFixed(2) : "") },
       { header: "Cobertura", value: (m) => tEnum("pipelinePath", m.pipelinePath) },
+      // Coluna explícita: exportação que mistura owned e earned sem declarar qual
+      // é qual é a forma mais fácil de a distinção se perder fora do produto.
+      { header: "Origem", value: (m) => tEnum("channelRelation", m.channelRelation) },
       { header: "URL", value: (m) => `https://www.youtube.com/watch?v=${m.youtubeVideoId}` },
     ])
     const brandSlug = brand.active?.brandSlug ?? "marca"
@@ -222,6 +279,10 @@ export default function MonitoringPage() {
         <SelectFilterChip
           value={min} onChange={(v) => setParam("min", v)}
           options={MIN_SCORES} placeholder="Qualquer score"
+        />
+        <SelectFilterChip
+          value={rel} onChange={(v) => setParam("rel", v)}
+          options={CHANNEL_RELATIONS} placeholder="Terceiros"
         />
       </section>
 
@@ -345,9 +406,13 @@ export default function MonitoringPage() {
                       </span>
                     </div>
                     <div className="flex items-center justify-between gap-2">
-                      <ConfidenceBadge pipelinePath={m.pipelinePath} confidence={m.confidence} />
+                      <ConfidenceBadge
+                        pipelinePath={m.pipelinePath}
+                        confidence={m.confidence}
+                        selfMeasured={hasSelfMeasuredScore(m)}
+                      />
                       <span className="font-mono-zoe text-[12px] shrink-0" style={{ color: "var(--ink)" }}>
-                        {m.score != null ? m.score.toFixed(2) : "—"}
+                        {scoreLabel(m)}
                       </span>
                     </div>
                   </div>
@@ -383,7 +448,14 @@ export default function MonitoringPage() {
                     <span>{formatDistanceToNow(new Date(m.publishedAt), { addSuffix: true, locale: ptBR })}</span>
                   </div>
                 </div>
-                <div><ConfidenceBadge pipelinePath={m.pipelinePath} confidence={m.confidence} /></div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <ConfidenceBadge
+                    pipelinePath={m.pipelinePath}
+                    confidence={m.confidence}
+                    selfMeasured={hasSelfMeasuredScore(m)}
+                  />
+                  {m.channelRelation === "Owned" && <OwnedTag />}
+                </div>
                 <div>
                   {m.classificacao && (
                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${classificationClass(m.classificacao)}`}>
@@ -393,7 +465,7 @@ export default function MonitoringPage() {
                 </div>
                 <div className="text-right">
                   <div className="font-mono-zoe text-[13px]" style={{ color: "var(--ink)" }}>
-                    {m.score != null ? m.score.toFixed(2) : "—"}
+                    {scoreLabel(m)}
                   </div>
                   <div className="text-[10px] text-ink-muted-2">score</div>
                 </div>
