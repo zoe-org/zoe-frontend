@@ -7,6 +7,7 @@ export type EnumKind =
   | "classification" | "sentiment" | "nerMode" | "pipelinePath"
   | "kycStatus" | "rosterStatus"
   | "contractModality" | "contractStatus" | "escrowState" | "campaignStatus"
+  | "deliveryStatus" | "briefingSentiment"
 
 type LocaleDictionaries = Record<EnumKind, Record<string, string>>
 
@@ -87,6 +88,23 @@ const dictionaries: Record<string, LocaleDictionaries> = {
       Released: "Liberado",
       Disputed: "Em disputa",
       Refunded: "Devolvido",
+    },
+    // Piso de sentimento exigido no briefing. "Qualquer" é opção legítima: campanha que
+    // pede review honesta não pode exigir tom positivo.
+    briefingSentiment: {
+      Any: "Qualquer",
+      Neutral: "Neutro ou melhor",
+      Positive: "Só positivo",
+    },
+    // Entrega e custódia compartilham o rótulo "Em revisão" de propósito: para o
+    // usuário é o mesmo momento. O que difere é o que está sendo revisado — o vídeo
+    // aqui, o dinheiro lá.
+    deliveryStatus: {
+      Submitted: "Aguardando revisão",
+      UnderReview: "Em revisão",
+      Approved: "Aprovada",
+      ReworkRequested: "Precisa correção",
+      Rejected: "Recusada",
     },
   },
 }

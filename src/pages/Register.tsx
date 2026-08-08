@@ -9,7 +9,10 @@ import { auth } from "@/features/auth/useAuth"
 import { useAuth } from "@/features/auth/context"
 import { translateCognitoError } from "@/features/auth/errors"
 import { setOnboardingIntent, type OnboardingIntent } from "@/features/auth/onboardingIntent"
-import { getPendingInviteToken, clearPendingInviteToken } from "@/features/auth/pendingInvite"
+import {
+  getPendingInviteToken, clearPendingInviteToken,
+  getPendingInfluencerInviteToken,
+} from "@/features/auth/pendingInvite"
 import { invitesApi } from "@/lib/api/invites"
 import { ApiError, setActiveTenantId } from "@/lib/api"
 import { useNavigate, useLocation, Link } from "react-router-dom"
@@ -447,6 +450,16 @@ function StepVerification({
         return
       }
 
+      // Convite de criador: não há workspace para entrar nem membership para criar —
+      // o aceite registra a pessoa como influenciadora. Por isso a própria tela do
+      // convite conduz o fim do fluxo, em vez do dashboard.
+      const creatorToken = getPendingInfluencerInviteToken()
+      if (creatorToken) {
+        await refresh()
+        nav(`/convite-criador/${creatorToken}`, { replace: true })
+        return
+      }
+
       await refresh()
       nav("/dashboard", { replace: true })
     } catch (err) {
@@ -523,7 +536,11 @@ export default function RegisterPage() {
   // Modo convite: usuário chegou pelo link de convite (AcceptInvite) sem ter conta.
   // Pula a escolha de objetivo (não cria workspace), trava o e-mail e, ao final,
   // aceita o convite pendente em vez do onboarding.
-  const inviteMode = Boolean(initial?.invite) || getPendingInviteToken() != null
+  // O convite de criador entra no mesmo modo: ele também não cria workspace, então a
+  // escolha de objetivo não faz sentido para ele.
+  const inviteMode = Boolean(initial?.invite)
+    || getPendingInviteToken() != null
+    || getPendingInfluencerInviteToken() != null
 
   const [step, setStep] = useState(initial?.step ?? (inviteMode ? 2 : 1))
   const [intent, setIntent] = useState("")

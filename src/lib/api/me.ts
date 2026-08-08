@@ -11,6 +11,12 @@ export type Me = {
   id: string
   email: string
   name: string
+  /**
+   * `Tenant` ou `Influencer`. Distingue duas contas que parecem idênticas — as duas com
+   * zero memberships: o criador convidado, que nunca terá workspace, e quem ainda não
+   * criou o seu. Sem isso o criador seria mandado para o onboarding de workspace.
+   */
+  userType: string
   memberships: Membership[]
 }
 

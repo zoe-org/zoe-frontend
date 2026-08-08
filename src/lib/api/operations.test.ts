@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   canReceivePayout, payoutBlockReason,
   CONTRACT_MODALITIES, MODALITY_ESCROW, supportsEscrow, escrowRejectionReason,
-  CAMPAIGN_MODALITIES, fmtCents,
+  CAMPAIGN_MODALITIES, fmtCents, allowedCampaignTransitions,
   fieldInputKind, contractProgress, type ContractField,
 } from "@/lib/api/operations"
 
@@ -61,7 +61,7 @@ describe("matriz modalidade × custódia", () => {
 
   it("permuta é recusada por não ter dinheiro, não por falta de mecânica", () => {
     expect(escrowRejectionReason("Barter")).toContain("não tem fluxo financeiro")
-    expect(escrowRejectionReason("Affiliate")).toContain("por etapas ou recorrente")
+    expect(escrowRejectionReason("Affiliate")).toContain("custódia por etapas")
   })
 
   it("modalidade suportada não tem motivo de recusa", () => {
@@ -72,19 +72,23 @@ describe("matriz modalidade × custódia", () => {
 })
 
 describe("modalidades oferecidas para campanha", () => {
-  it("exclui as que exigem custódia por etapas", () => {
-    expect([...CAMPAIGN_MODALITIES].sort()).toEqual(["Barter", "Events", "Publipost", "Ugc"])
+  it("oferece todas as dez — a regra proíbe custódia, não o contrato", () => {
+    expect([...CAMPAIGN_MODALITIES].sort()).toEqual([...CONTRACT_MODALITIES].sort())
   })
 
-  it("inclui permuta, que não tem dinheiro mas tem contrato e entrega", () => {
-    expect(CAMPAIGN_MODALITIES).toContain("Barter")
-    expect(supportsEscrow("Barter")).toBe(false)
-  })
-
-  it("nenhuma oferecida é recusada pelo backend por milestone", () => {
+  it("toda modalidade sem custódia tem um motivo para mostrar na tela", () => {
+    // A regra teme o silêncio, não a ausência de escrow: se não há proteção
+    // financeira, a tela precisa ter o que dizer.
     for (const m of CAMPAIGN_MODALITIES) {
-      expect(MODALITY_ESCROW[m]).not.toBe("RequiresMilestoneEscrow")
+      if (supportsEscrow(m)) continue
+      expect(escrowRejectionReason(m)).toBeTruthy()
     }
+  })
+
+  it("avisa que o pagamento sai da plataforma quando falta a custódia por etapas", () => {
+    expect(escrowRejectionReason("Ambassador")).toContain("fora da Zoe")
+    // Permuta não: lá não há pagamento nenhum a acontecer fora.
+    expect(escrowRejectionReason("Barter")).not.toContain("fora da Zoe")
   })
 })
 
@@ -139,5 +143,24 @@ describe("contractProgress", () => {
   it("contrato sem obrigatórios não divide por zero", () => {
     expect(contractProgress([field({ isRequired: false, value: null })]))
       .toEqual({ required: 0, filled: 0 })
+  })
+})
+
+describe("allowedCampaignTransitions", () => {
+  it("rascunho ativa ou cancela", () => {
+    expect(allowedCampaignTransitions("Draft")).toEqual(["Activate", "Cancel"])
+  })
+
+  it("ativa conclui ou cancela — não volta para rascunho", () => {
+    expect(allowedCampaignTransitions("Active")).toEqual(["Complete", "Cancel"])
+  })
+
+  it("encerrada não oferece nada: reabrir reescreveria o contexto de contratos assinados", () => {
+    expect(allowedCampaignTransitions("Completed")).toEqual([])
+    expect(allowedCampaignTransitions("Cancelled")).toEqual([])
+  })
+
+  it("status desconhecido não oferece transição em vez de chutar", () => {
+    expect(allowedCampaignTransitions("AlgoNovo")).toEqual([])
   })
 })

@@ -204,10 +204,13 @@ export function AppShell() {
 
               {sidebarOpen && opsOpen && (
                 <div className="ml-[21px] border-l-2 border-[#E5E7EB] dark:border-[#1C1F2E] flex flex-col mt-0 mb-2">
-                  {/* A ordem do menu é a ordem do fluxo: campanha → elenco → contrato. */}
+                  {/* A ordem do menu é a ordem do fluxo: campanha → elenco →
+                      contrato → entrega → custódia. */}
                   <SubNavItem to="/operations/campaigns">Campanhas</SubNavItem>
                   <SubNavItem to="/operations/influencers">Elenco</SubNavItem>
                   <SubNavItem to="/operations/contracts">Contratos</SubNavItem>
+                  <SubNavItem to="/operations/deliveries">Entregas</SubNavItem>
+                  <SubNavItem to="/operations/escrow">Custódia</SubNavItem>
                 </div>
               )}
             </>

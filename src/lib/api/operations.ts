@@ -117,8 +117,45 @@ export type CampaignDelivery = {
   isReviewOverdue: boolean
 }
 
+/**
+ * Briefing auditável (RN-O-030/031). É a régua contra a qual a auditoria automática vai
+ * medir a entrega — por isso tudo aqui é tipado e verificável, não texto livre.
+ */
+export type CampaignBriefing = {
+  keywords: string[]
+  requiredHashtags: string[]
+  requiresLogo: boolean
+  minLogoSeconds: number | null
+  minSentiment: BriefingSentiment
+  requiresConarDisclosure: boolean
+  deliverySlaDays: number | null
+  /** Herdado pelos contratos da campanha. O threshold segue sendo por contrato. */
+  defaultAuditThreshold: number
+  /**
+   * Se há alguma verificação concreta configurada. Falso quando não há menção, hashtag
+   * nem logo — a tela usa isto para não prometer auditoria sobre um briefing vazio.
+   */
+  isAuditable: boolean
+}
+
+export type BriefingSentiment = "Any" | "Neutral" | "Positive"
+
+export const BRIEFING_SENTIMENTS: BriefingSentiment[] = ["Any", "Neutral", "Positive"]
+
+export type CampaignBriefingInput = Partial<{
+  keywords: string[]
+  requiredHashtags: string[]
+  requiresLogo: boolean
+  minLogoSeconds: number | null
+  minSentiment: BriefingSentiment
+  requiresConarDisclosure: boolean
+  deliverySlaDays: number | null
+  defaultAuditThreshold: number
+}>
+
 export type CampaignDetail = Omit<CampaignSummary, "contractCount"> & {
   notes: string | null
+  briefing: CampaignBriefing
   contracts: CampaignContract[]
   deliveries: CampaignDelivery[]
 }
@@ -132,9 +169,30 @@ export type CreateCampaignBody = {
   endsAt?: string
   budgetCents?: number
   notes?: string
+  briefing?: CampaignBriefingInput
 }
 
 export type CampaignTransition = "Activate" | "Complete" | "Cancel"
+
+/**
+ * Transições possíveis a partir de cada status, espelhando `Campaign.Activate/Complete/
+ * Cancel` no domínio: rascunho ativa ou cancela, ativa conclui ou cancela, e encerrada é
+ * encerrada. A autoridade é o domínio — isto existe para a tela não oferecer um botão que
+ * já se sabe que vai falhar.
+ */
+export function allowedCampaignTransitions(status: string): CampaignTransition[] {
+  switch (status) {
+    case "Draft": return ["Activate", "Cancel"]
+    case "Active": return ["Complete", "Cancel"]
+    default: return []
+  }
+}
+
+export const CAMPAIGN_TRANSITION_LABEL: Record<CampaignTransition, string> = {
+  Activate: "Ativar campanha",
+  Complete: "Concluir campanha",
+  Cancel: "Cancelar campanha",
+}
 
 export type UpdateCampaignBody = {
   name?: string
@@ -145,7 +203,63 @@ export type UpdateCampaignBody = {
   budgetCents?: number
   notes?: string
   transition?: CampaignTransition
+  briefing?: CampaignBriefingInput
 }
+
+export type UpdateCampaignResponse = {
+  campaignId: string
+  name: string
+  status: string
+  budgetCents: number
+}
+
+
+// ————————————————————— Convite de criador —————————————————————
+
+export type InviteInfluencerBody = {
+  email: string
+  fullName: string
+  countryCode?: string
+  displayName?: string
+  message?: string
+}
+
+/** `emailDelivery`: Sent | Failed | Disabled — decide se o link copiável é o caminho. */
+export type InviteInfluencerResponse = {
+  inviteId: string
+  campaignId: string
+  influencerId: string
+  email: string
+  token: string
+  expiresAt: string
+  influencerCreated: boolean
+  emailDelivery: string
+}
+
+export type InfluencerInvitePreview = {
+  email: string
+  influencerName: string
+  campaignName: string
+  modality: string
+  tenantName: string
+  inviterName: string
+  message: string | null
+  expiresAt: string
+  expired: boolean
+  accepted: boolean
+}
+
+export type AcceptInfluencerInviteResponse = {
+  inviteId: string
+  influencerId: string
+  campaignId: string
+  campaignName: string
+  tenantName: string
+  kycStatus: string
+}
+
+/** Rota da tela de aceite. Espelha o LinkPath que o backend põe no e-mail. */
+export const INFLUENCER_INVITE_PATH = "convite-criador"
 
 // ————————————————————————————— Contratos —————————————————————————————
 
@@ -186,13 +300,13 @@ export function supportsEscrow(modality: string): boolean {
 }
 
 /**
- * Modalidades que uma campanha aceita: as que têm custódia e a permuta, que não tem
- * fluxo financeiro. As que exigem custódia por etapas ficam fora do seletor inteiro —
- * oferecer e recusar depois seria teatro, e o backend também as recusa.
+ * Toda modalidade cria campanha. O que a RN-O-039 proíbe é o contrato **com
+ * custódia** em modalidade não suportada — e a Permuta prova que contrato sem
+ * dinheiro é legítimo. Nas seis deferidas o pagamento corre fora da plataforma,
+ * e a tela precisa dizer isso: o que a regra teme é o silêncio, não a ausência
+ * de custódia.
  */
-export const CAMPAIGN_MODALITIES = CONTRACT_MODALITIES.filter(
-  (m) => MODALITY_ESCROW[m] !== "RequiresMilestoneEscrow",
-)
+export const CAMPAIGN_MODALITIES = CONTRACT_MODALITIES
 
 /**
  * Por que esta modalidade não aceita custódia. `null` = aceita.
@@ -208,7 +322,9 @@ export function escrowRejectionReason(modality: string): string | null {
     case "NoFinancialFlow":
       return "Permuta não tem fluxo financeiro: o contrato e o fluxo de entrega existem, mas não há valor a custodiar."
     default:
-      return "Esta modalidade exige custódia por etapas ou recorrente, que ainda não existe. O contrato pode ser criado sem custódia."
+      return "Esta modalidade depende de custódia por etapas, que a plataforma ainda não faz. "
+        + "O contrato e a entrega funcionam normalmente, mas o pagamento acontece fora da Zoe — "
+        + "sem o dinheiro reservado antes da produção."
   }
 }
 
@@ -350,6 +466,44 @@ export const operationsApi = {
   addInfluencer: (body: AddInfluencerBody) =>
     apiClient.post<AddInfluencerResponse>("/api/operations/influencers", body),
 
+  listEscrow: (state?: string, opts?: { signal?: AbortSignal }) =>
+    apiClient.get<ListEscrowResponse>(
+      `/api/operations/escrow${state ? `?state=${encodeURIComponent(state)}` : ""}`,
+      { signal: opts?.signal },
+    ),
+
+  /**
+   * Dispara o gatilho. Fund/Release/Refund **enfileiram** e devolvem `to: null` com
+   * `queued: true` — nenhuma operação financeira roda dentro do request (RN-O-044).
+   * StartProduction transiciona na hora porque não move dinheiro.
+   */
+  applyEscrowAction: (escrowAccountId: string, action: EscrowAction) =>
+    apiClient.post<{
+      escrowAccountId: string
+      from: string
+      to: string | null
+      queued: boolean
+      message: string | null
+    }>(`/api/operations/escrow/${escrowAccountId}/${action}`),
+
+  listDeliveries: (status?: string, opts?: { signal?: AbortSignal }) =>
+    apiClient.get<ListDeliveriesResponse>(
+      `/api/operations/deliveries${status ? `?status=${encodeURIComponent(status)}` : ""}`,
+      { signal: opts?.signal },
+    ),
+
+  submitDelivery: (body: { contractId: string; submittedUrl: string }) =>
+    apiClient.post<{ deliveryId: string; status: DeliveryStatus }>(
+      "/api/operations/deliveries", body),
+
+  startDeliveryReview: (deliveryId: string) =>
+    apiClient.post<{ deliveryId: string; status: DeliveryStatus; reviewDueAt: string }>(
+      `/api/operations/deliveries/${deliveryId}/start-review`),
+
+  decideDelivery: (deliveryId: string, decision: DeliveryDecision, notes?: string) =>
+    apiClient.post<DecideDeliveryResponse>(
+      `/api/operations/deliveries/${deliveryId}/decision`, { decision, notes }),
+
   listContracts: (status?: string, opts?: { signal?: AbortSignal }) =>
     apiClient.get<ListContractsResponse>(
       `/api/operations/contracts${status ? `?status=${encodeURIComponent(status)}` : ""}`,
@@ -370,7 +524,22 @@ export const operationsApi = {
       "/api/operations/campaigns", body),
 
   updateCampaign: (campaignId: string, body: UpdateCampaignBody) =>
-    apiClient.patch(`/api/operations/campaigns/${campaignId}`, body),
+    apiClient.patch<UpdateCampaignResponse>(
+      `/api/operations/campaigns/${campaignId}`, body),
+
+  inviteInfluencer: (campaignId: string, body: InviteInfluencerBody) =>
+    apiClient.post<InviteInfluencerResponse>(
+      `/api/operations/campaigns/${campaignId}/invites`, body),
+
+  // Prévia pública: `noTenant` porque quem abre o link ainda não pertence a workspace
+  // nenhum — e não vai pertencer, já que criador não é membro do contratante.
+  previewInfluencerInvite: (token: string) =>
+    apiClient.get<InfluencerInvitePreview>(
+      `/api/influencer-invites/${encodeURIComponent(token)}`, { noTenant: true }),
+
+  acceptInfluencerInvite: (token: string) =>
+    apiClient.post<AcceptInfluencerInviteResponse>(
+      "/api/influencer-invites/accept", { token }, { noTenant: true }),
 
   createContract: (body: CreateContractBody) =>
     apiClient.post<CreateContractResponse>("/api/operations/contracts", body),
@@ -440,6 +609,15 @@ export function useCampaignMutations(campaignId?: string) {
       mutationFn: (body: UpdateCampaignBody) => operationsApi.updateCampaign(campaignId!, body),
       onSuccess: refresh,
     }),
+    invite: useMutation({
+      mutationFn: (body: InviteInfluencerBody) =>
+        operationsApi.inviteInfluencer(campaignId!, body),
+      onSuccess: () => {
+        refresh()
+        // O convite entra no elenco: o contador da tela de criadores muda junto.
+        qc.invalidateQueries({ queryKey: ["operations-roster", activeTenantId] })
+      },
+    }),
   }
 }
 
@@ -500,6 +678,179 @@ export function useContractDetailMutations(contractId: string | undefined) {
     markSigned: useMutation({
       mutationFn: () => operationsApi.markContractSigned(contractId!),
       onSuccess: refresh,
+    }),
+  }
+}
+
+/**
+ * Máquina de estados da custódia — **nove**, na ordem em que o domínio transiciona.
+ * O protótipo desenha seis; faltam nele `Delivered` (entregue mas revisão não aberta),
+ * `Disputed` e `Refunded`. Onde diverge, vale a máquina, que é a implementada e testada.
+ */
+export const ESCROW_STATES = [
+  "PendingDeposit", "Funded", "InProduction", "Delivered", "UnderReview",
+  "Releasable", "Released", "Disputed", "Refunded",
+] as const
+
+export type EscrowState = (typeof ESCROW_STATES)[number]
+
+/**
+ * Fila de entregas. Os estados vêm de `DeliveryStatus` no domínio — cinco, e nenhum
+ * deles é financeiro: o que acontece com o dinheiro é `escrowState`, que vem junto
+ * só para a tela poder dizer "aprovada mas ainda não paga" sem inventar estado.
+ */
+export const DELIVERY_STATUSES = [
+  "Submitted", "UnderReview", "Approved", "ReworkRequested", "Rejected",
+] as const
+
+export type DeliveryStatus = (typeof DELIVERY_STATUSES)[number]
+
+export type DeliverySummary = {
+  deliveryId: string
+  contractId: string
+  campaignId: string
+  campaignName: string
+  influencerName: string
+  submittedUrl: string
+  youtubeVideoId: string
+  status: DeliveryStatus
+  submissionAttempt: number
+  submittedAt: string
+  reviewDueAt: string | null
+  isReviewOverdue: boolean
+  decidedByUserId: string | null
+  decisionNotes: string | null
+  /** `AiAudit` na 8.6; hoje sempre a aprovação manual. */
+  auditType: string | null
+  escrowState: EscrowState | null
+  escrowAmountCents: number | null
+}
+
+export type ListDeliveriesResponse = { items: DeliverySummary[] }
+
+export type DeliveryDecision = "Approve" | "RequestRework" | "Reject"
+
+export type DecideDeliveryResponse = {
+  deliveryId: string
+  status: DeliveryStatus
+  auditReportId: string
+  decidedByUserId: string
+  escrowState: EscrowState | null
+  canResubmit: boolean
+}
+
+/** Miniatura do próprio YouTube — a entrega é um vídeo publicado, então ela existe. */
+export const youtubeThumb = (videoId: string) =>
+  `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
+
+export const youtubeWatch = (videoId: string) =>
+  `https://www.youtube.com/watch?v=${videoId}`
+
+export function useDeliveries(status?: string) {
+  const { activeTenantId } = useAuth()
+  return useQuery({
+    queryKey: ["operations-deliveries", activeTenantId, status ?? null],
+    queryFn: ({ signal }) => operationsApi.listDeliveries(status, { signal }),
+    enabled: Boolean(activeTenantId),
+    staleTime: 30_000,
+  })
+}
+
+export function useDeliveryMutations() {
+  const { activeTenantId } = useAuth()
+  const qc = useQueryClient()
+  // A decisão mexe na custódia (aprovar torna liberável, rejeitar leva a disputa),
+  // então campanhas e custódia saem do cache junto com a fila.
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["operations-deliveries", activeTenantId] })
+    qc.invalidateQueries({ queryKey: ["operations-campaign", activeTenantId] })
+    qc.invalidateQueries({ queryKey: ["operations-escrow", activeTenantId] })
+  }
+
+  return {
+    submit: useMutation({
+      mutationFn: (body: { contractId: string; submittedUrl: string }) =>
+        operationsApi.submitDelivery(body),
+      onSuccess: refresh,
+    }),
+    startReview: useMutation({
+      mutationFn: (deliveryId: string) => operationsApi.startDeliveryReview(deliveryId),
+      onSuccess: refresh,
+    }),
+    decide: useMutation({
+      mutationFn: (v: { deliveryId: string; decision: DeliveryDecision; notes?: string }) =>
+        operationsApi.decideDelivery(v.deliveryId, v.decision, v.notes),
+      onSuccess: refresh,
+    }),
+  }
+}
+
+export type EscrowSummary = {
+  escrowAccountId: string
+  contractId: string
+  campaignId: string
+  campaignName: string
+  influencerId: string
+  influencerName: string
+  state: EscrowState
+  isTerminal: boolean
+  /** O que a máquina de estados permite daqui. A tela não adivinha. */
+  allowedTriggers: string[]
+  amountCents: number
+  currency: string
+  takeRateBps: number
+  takeRateCents: number
+  netToInfluencerCents: number
+  authorizationExpiresAt: string | null
+  isAuthorizationExpired: boolean
+  disputeReason: string | null
+  payoutAccountMissing: boolean
+  /** Operação financeira já enfileirada e ainda não processada (RN-O-044). */
+  hasPendingCommand: boolean
+  createdAt: string
+}
+
+export type EscrowTotals = {
+  heldCents: number
+  releasedCents: number
+  refundedCents: number
+  activeCount: number
+}
+
+export type ListEscrowResponse = { items: EscrowSummary[]; totals: EscrowTotals }
+
+export type EscrowAction = "fund" | "start-production" | "release" | "refund"
+
+/** Gatilho do domínio que cada ação dispara — é o que aparece em `allowedTriggers`. */
+export const ESCROW_ACTION_TRIGGER: Record<EscrowAction, string> = {
+  "fund": "Fund",
+  "start-production": "StartProduction",
+  "release": "Release",
+  "refund": "Refund",
+}
+
+export function useEscrowAccounts(state?: string) {
+  const { activeTenantId } = useAuth()
+  return useQuery({
+    queryKey: ["operations-escrow", activeTenantId, state ?? null],
+    queryFn: ({ signal }) => operationsApi.listEscrow(state, { signal }),
+    enabled: Boolean(activeTenantId),
+    staleTime: 15_000,
+  })
+}
+
+export function useEscrowMutations() {
+  const { activeTenantId } = useAuth()
+  const qc = useQueryClient()
+  return {
+    apply: useMutation({
+      mutationFn: (v: { escrowAccountId: string; action: EscrowAction }) =>
+        operationsApi.applyEscrowAction(v.escrowAccountId, v.action),
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: ["operations-escrow", activeTenantId] })
+        qc.invalidateQueries({ queryKey: ["operations-deliveries", activeTenantId] })
+        qc.invalidateQueries({ queryKey: ["operations-campaign", activeTenantId] })
+      },
     }),
   }
 }
