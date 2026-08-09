@@ -149,11 +149,11 @@ describe("describeRuleCondition", () => {
 
 describe("describeChannels", () => {
   it("traduz e junta", () => {
-    expect(describeChannels(["InApp", "Email"])).toBe("No app + E-mail")
+    expect(describeChannels(["InApp", "Email"])).toBe("no app + e-mail")
   })
 
   it("cai em 'No app' se vier vazio — InApp é garantido pelo domínio", () => {
-    expect(describeChannels([])).toBe("No app")
+    expect(describeChannels([])).toBe("no app")
   })
 })
 

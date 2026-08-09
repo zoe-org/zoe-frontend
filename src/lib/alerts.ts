@@ -69,11 +69,23 @@ export function describeRuleCondition(rule: Pick<AlertRule, "type" | "threshold"
   }
 }
 
-/** Canais em texto. InApp é sempre garantido pelo backend, então nunca vem vazio na prática. */
+/** Rótulo curto de um canal, para o chip na linha da regra. */
+export function describeChannelShort(channel: AlertChannel): string {
+  const labels: Record<AlertChannel, string> = { InApp: "no app", Email: "e-mail" }
+  return labels[channel] ?? channel
+}
+
+/** Canais em texto corrido. InApp é garantido pelo backend, então nunca vem vazio na prática. */
 export function describeChannels(channels: readonly AlertChannel[]): string {
-  const labels: Record<AlertChannel, string> = { InApp: "No app", Email: "E-mail" }
-  const named = channels.map((c) => labels[c] ?? c)
-  return named.length > 0 ? named.join(" + ") : "No app"
+  const named = channels.map(describeChannelShort)
+  return named.length > 0 ? named.join(" + ") : "no app"
+}
+
+/** Classe de chip por severidade — reusa os utilitários de `globals.css`. */
+export const SEVERITY_CHIP_CLASS: Record<AlertSeverity, string> = {
+  Info: "chip chip-primary",
+  Warning: "chip chip-warn",
+  Critical: "chip chip-neg",
 }
 
 // ── Snapshot do disparo ────────────────────────────────────────────────────
