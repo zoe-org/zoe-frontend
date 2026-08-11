@@ -102,6 +102,8 @@ export type AlertSnapshot = {
   views?: number | null
   videoTitle?: string | null
   pipelinePath?: string | null
+  /** `"Owned"` | `"ThirdParty"`. Ausente em disparo anterior a 2026-08-09. */
+  channelRelation?: string | null
 }
 
 /**
@@ -131,6 +133,25 @@ export function describeAlertEvent(event: Pick<AlertEvent, "snapshot" | "ruleNam
 export function alertEventVideoTitle(event: Pick<AlertEvent, "snapshot">): string | null {
   const title = parseAlertSnapshot(event.snapshot)?.videoTitle
   return typeof title === "string" && title.trim() !== "" ? title.trim() : null
+}
+
+/**
+ * Origem do vídeo que disparou o alerta (ADR-035 / ADR-036 D6).
+ *
+ * <b>Só</b> de `channelRelation`, nunca derivado de `pipelinePath`: enquanto o
+ * collector não roteia owned, o vídeo owned vem pelo caminho pesado e o path diz
+ * `Full` — a heurística erraria no regime atual, justamente no rótulo que existe
+ * pra explicar owned.
+ *
+ * `null` em disparo anterior a 09/08, quando o campo não viajava no snapshot.
+ * Ausência vira ausência de chip, não "earned" — rotular errado é pior que não
+ * rotular, porque a ação do usuário é oposta nos dois casos.
+ */
+export function alertEventOrigin(event: Pick<AlertEvent, "snapshot">): "owned" | "earned" | null {
+  const relation = parseAlertSnapshot(event.snapshot)?.channelRelation
+  if (relation === "Owned") return "owned"
+  if (relation === "ThirdParty") return "earned"
+  return null
 }
 
 // ── Formulário ─────────────────────────────────────────────────────────────

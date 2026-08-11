@@ -16,7 +16,7 @@ import {
 import {
   KEYWORD_MAX_LENGTH, MENTION_VOLUME_WINDOW_LABEL, NAME_MAX_LENGTH,
   RULE_TYPE_LABEL, SEVERITY_CHIP_CLASS, SEVERITY_COLOR, SEVERITY_LABEL,
-  alertEventVideoTitle, describeAlertEvent, describeChannelShort, describeRuleCondition,
+  alertEventOrigin, alertEventVideoTitle, describeAlertEvent, describeChannelShort, describeRuleCondition,
   emptyRuleForm, ruleToForm, toCreatePayload, toUpdatePayload, validateAlertRuleForm,
   type AlertRuleForm,
 } from "@/lib/alerts"
@@ -97,6 +97,17 @@ export default function AlertsPage() {
       { header: "Gravidade", value: (e) => SEVERITY_LABEL[e.severity] },
       { header: "Motivo", value: (e) => describeAlertEvent(e) },
       { header: "Vídeo", value: (e) => alertEventVideoTitle(e) ?? "" },
+      // Coluna explícita, mesmo motivo do CSV de Monitoramento: exportação que
+      // mistura owned e earned sem declarar qual induz a leitura errada na planilha.
+      {
+        header: "Origem",
+        value: (e) => {
+          const origin = alertEventOrigin(e)
+          if (origin === "owned") return "Canal próprio"
+          if (origin === "earned") return "Terceiro"
+          return "" // disparo anterior a 09/08: campo ausente vira célula vazia, não um palpite
+        },
+      },
       { header: "Link", value: (e) => `https://www.youtube.com/watch?v=${e.youtubeVideoId}` },
       { header: "Lido", value: (e) => (e.isRead ? "Sim" : "Não") },
       { header: "E-mail enviado", value: (e) => (e.emailNotified ? "Sim" : "Não") },
@@ -130,12 +141,13 @@ export default function AlertsPage() {
             <h1 className="font-display m-0" style={{ fontSize: 34, lineHeight: 1.1, color: "var(--ink)" }}>
               Alertas
             </h1>
+            {/* Sem números aqui: a faixa de KPI logo abaixo mostra exatamente
+                "regras ativas" e "disparos não lidos". Repetir os dois valores a
+                20px de distância não informa — e a ADR-036 avisa que esta tela vai
+                passar a ter dois números de leitura possíveis, o que torna
+                duplicação sem rótulo pior do que redundante. */}
             <div className="text-[14px] text-ink-muted mt-1.5 max-w-140">
-              Regras automáticas para não perder nada.{" "}
-              <span className="font-mono-zoe">{enabledCount}</span>{" "}
-              {enabledCount === 1 ? "regra ativa" : "regras ativas"} ·{" "}
-              <span className="font-mono-zoe">{unreadCount}</span>{" "}
-              {unreadCount === 1 ? "disparo não lido" : "disparos não lidos"}.
+              Regras que vigiam suas marcas e avisam quando algo acontece — sem você precisar abrir o dashboard.
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -231,6 +243,7 @@ export default function AlertsPage() {
 
       {tab === "history" ? (
         <HistoryList
+          hasRules={ruleItems.length > 0}
           events={eventItems}
           isLoading={events.isLoading}
           error={events.isError ? events.error : null}
@@ -308,8 +321,9 @@ function MarkAllButton({ unreadCount }: { unreadCount: number }) {
 // ── WS-F2 · Histórico ──────────────────────────────────────────────────────
 
 function HistoryList({
-  events, isLoading, error, unreadOnly, hasNextPage, isFetchingNextPage, onLoadMore,
+  hasRules, events, isLoading, error, unreadOnly, hasNextPage, isFetchingNextPage, onLoadMore,
 }: {
+  hasRules: boolean
   events: AlertEvent[]
   isLoading: boolean
   error: unknown
@@ -331,6 +345,19 @@ function HistoryList({
   }
   if (isLoading) return <div className="py-16 text-center text-ink-muted text-[13px]">Carregando…</div>
   if (events.length === 0) {
+    // Sem NENHUMA regra, "quando uma regra bater…" descreve um futuro que não vai
+    // chegar: não há regra pra bater. O empty state precisa dizer o que falta
+    // fazer, não o que aconteceria se algo existisse.
+    if (!hasRules && !unreadOnly) {
+      return (
+        <EmptyBlock
+          className="py-16"
+          icon={<BellOff className="w-7 h-7" strokeWidth={1.5} />}
+          message="Nenhuma regra configurada ainda"
+          hint="Os disparos aparecem aqui depois que existir ao menos uma regra. Comece pela aba Regras."
+        />
+      )
+    }
     return (
       <EmptyBlock
         className="py-16"
@@ -339,7 +366,7 @@ function HistoryList({
         hint={
           unreadOnly
             ? "Tudo em dia por aqui."
-            : "Quando uma regra bater numa análise recém-processada, o disparo aparece nesta linha do tempo."
+            : "Suas regras estão ativas — quando uma delas bater numa análise recém-processada, o disparo aparece aqui."
         }
       />
     )
@@ -349,6 +376,7 @@ function HistoryList({
     <>
       {events.map((event) => {
         const videoTitle = alertEventVideoTitle(event)
+        const origin = alertEventOrigin(event)
         return (
           <div
             key={event.id}
@@ -372,6 +400,16 @@ function HistoryList({
                   {describeAlertEvent(event)}
                 </span>
                 <ReadPill isRead={event.isRead} />
+                {/* Origem (ADR-035 / D6): disparo no canal da própria marca é
+                    indistinguível de crise de terceiro sem rótulo, e a ação do
+                    usuário é OPOSTA nos dois casos. `null` (disparo anterior a
+                    09/08, sem o campo no snapshot) não renderiza nada — rotular
+                    errado é pior que não rotular. */}
+                {origin === "owned" && (
+                  <span className="chip text-[10.5px]" title="Vídeo publicado no canal oficial da própria marca">
+                    canal próprio
+                  </span>
+                )}
               </div>
               {videoTitle && <div className="text-[12.5px] text-ink-muted mb-1 truncate">{videoTitle}</div>}
               <div className="flex items-center gap-2 text-[11px] text-ink-muted-2 flex-wrap">
@@ -539,7 +577,7 @@ function RulesList({
               <button
                 onClick={() => confirmRemove(rule)}
                 disabled={remove.isPending}
-                className="p-1.5 rounded-md text-ink-muted hover:text-[color:var(--color-neg)] hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D] cursor-pointer disabled:opacity-50"
+                className="p-1.5 rounded-md text-ink-muted hover:text-neg hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D] cursor-pointer disabled:opacity-50"
                 aria-label={`Excluir ${rule.name}`}
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -635,7 +673,7 @@ function RuleModal({
             placeholder="Ex.: Queda de sentimento em vídeo grande"
             className={inputClass(showError("name"))}
           />
-          {showError("name") && <p className="text-[11.5px] text-[color:var(--color-neg)] mt-1">{errors.name}</p>}
+          {showError("name") && <p className="text-[11.5px] text-neg mt-1">{errors.name}</p>}
 
           <label className="block text-[13px] font-semibold text-ink-2 mt-5 mb-1.5">Marca monitorada</label>
           {rule ? (
@@ -655,7 +693,7 @@ function RuleModal({
               ))}
             </select>
           )}
-          {showError("brandId") && <p className="text-[11.5px] text-[color:var(--color-neg)] mt-1">{errors.brandId}</p>}
+          {showError("brandId") && <p className="text-[11.5px] text-neg mt-1">{errors.brandId}</p>}
 
           {/* Gatilho como cards (design), mas com os 3 tipos que o backend avalia —
               os 5 do design (pico negativo, influenciador, tópico, SoV, logo)
@@ -735,8 +773,8 @@ function RuleModal({
               </p>
             </>
           )}
-          {showError("threshold") && <p className="text-[11.5px] text-[color:var(--color-neg)] mt-1">{errors.threshold}</p>}
-          {showError("keyword") && <p className="text-[11.5px] text-[color:var(--color-neg)] mt-1">{errors.keyword}</p>}
+          {showError("threshold") && <p className="text-[11.5px] text-neg mt-1">{errors.threshold}</p>}
+          {showError("keyword") && <p className="text-[11.5px] text-neg mt-1">{errors.keyword}</p>}
 
           <label className="block text-[13px] font-semibold text-ink-2 mt-5 mb-1.5">Gravidade</label>
           <div className="flex gap-2">

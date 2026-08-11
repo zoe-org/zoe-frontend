@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   MENTION_VOLUME_MAX,
-  alertEventVideoTitle, describeAlertEvent, describeChannels, describeRuleCondition,
+  alertEventOrigin, alertEventVideoTitle, describeAlertEvent, describeChannels, describeRuleCondition,
   emptyRuleForm, parseAlertSnapshot, parseDecimalPtBr, ruleToForm,
   toCreatePayload, toUpdatePayload, validateAlertRuleForm,
   type AlertRuleForm,
@@ -171,6 +171,32 @@ describe("snapshot do disparo", () => {
 
   it("extrai o título do vídeo", () => {
     expect(alertEventVideoTitle({ snapshot })).toBe("Análise do produto")
+  })
+
+  describe("origem do disparo (ADR-035 / D6)", () => {
+    const withRelation = (relation: unknown) =>
+      alertEventOrigin({ snapshot: JSON.stringify({ channelRelation: relation }) })
+
+    it("traduz os dois valores do enum", () => {
+      expect(withRelation("Owned")).toBe("owned")
+      expect(withRelation("ThirdParty")).toBe("earned")
+    })
+
+    // Disparo anterior a 09/08 não tem o campo. Ausência vira ausência de chip,
+    // NUNCA "earned": rotular owned como terceiro inverte a ação do usuário.
+    it("devolve null quando o campo não veio, em vez de assumir earned", () => {
+      expect(alertEventOrigin({ snapshot: null })).toBeNull()
+      expect(alertEventOrigin({ snapshot: "{}" })).toBeNull()
+      expect(withRelation(null)).toBeNull()
+      expect(withRelation("ValorNovo")).toBeNull()
+    })
+
+    // pipelinePath NÃO é fonte: owned pelo caminho pesado reporta `Full`, e essa
+    // é a maioria dos owned enquanto o collector não roteia.
+    it("ignora pipelinePath — não é fonte de origem", () => {
+      expect(alertEventOrigin({ snapshot: JSON.stringify({ pipelinePath: "OwnedComments" }) })).toBeNull()
+      expect(alertEventOrigin({ snapshot: JSON.stringify({ pipelinePath: "Full", channelRelation: "Owned" }) })).toBe("owned")
+    })
   })
 
   // O histórico importa mais que a riqueza do detalhe: um snapshot antigo com
