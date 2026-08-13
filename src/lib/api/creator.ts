@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { apiClient } from "@/lib/api"
+import { apiClient, apiBlob } from "@/lib/api"
 import { useAuth } from "@/features/auth/context"
 import type { DeliveryStatus, EscrowState } from "@/lib/api/operations"
 
@@ -45,12 +45,61 @@ export type CreatorWorkspace = {
   engagements: CreatorEngagement[]
 }
 
+/**
+ * O contrato como o criador o vê. As cláusulas chegam com os valores já substituídos — o
+ * mesmo texto que a marca vê e que vai para o PDF, para que ele não leia um documento
+ * diferente do que assina.
+ */
+export type CreatorContract = {
+  contractId: string
+  campaignId: string
+  campaignName: string
+  brandName: string
+  modalityLabel: string
+  status: string
+  signedAt: string | null
+  amountCents: number | null
+  takeRateCents: number | null
+  netToInfluencerCents: number | null
+  takeRateBps: number | null
+  escrowState: EscrowState | null
+  clauses: CreatorContractClause[]
+  fields: CreatorContractField[]
+}
+
+export type CreatorContractClause = {
+  order: number
+  title: string
+  body: string
+  /** Cláusula de sistema: imutável em qualquer nível de personalização (RN-O-038). */
+  isSystem: boolean
+}
+
+export type CreatorContractField = {
+  placeholder: string
+  label: string
+  value: string | null
+}
+
 export const creatorApi = {
   workspace: (opts?: { signal?: AbortSignal }) =>
     apiClient.get<CreatorWorkspace>("/api/creator/workspace", {
       noTenant: true,
       signal: opts?.signal,
     }),
+
+  contract: (contractId: string, opts?: { signal?: AbortSignal }) =>
+    apiClient.get<CreatorContract>(`/api/creator/contracts/${contractId}`, {
+      noTenant: true,
+      signal: opts?.signal,
+    }),
+
+  /**
+   * PDF do contrato. Buscado como blob e não por link direto: `<a href>` não carrega o
+   * cabeçalho de autorização, e o endpoint é protegido.
+   */
+  contractDocument: (contractId: string) =>
+    apiBlob(`/api/creator/contracts/${contractId}/document`, { noTenant: true }),
 
   submitDelivery: (body: { contractId: string; submittedUrl: string }) =>
     apiClient.post<{
@@ -68,6 +117,17 @@ export function useCreatorWorkspace() {
     queryFn: ({ signal }) => creatorApi.workspace({ signal }),
     enabled: isAuthenticated && isCreator,
     staleTime: 30_000,
+    retry: false,
+  })
+}
+
+export function useCreatorContract(contractId: string | null) {
+  const { isAuthenticated, isCreator } = useAuth()
+  return useQuery({
+    queryKey: ["creator-contract", contractId],
+    queryFn: ({ signal }) => creatorApi.contract(contractId!, { signal }),
+    enabled: isAuthenticated && isCreator && Boolean(contractId),
+    staleTime: 60_000,
     retry: false,
   })
 }

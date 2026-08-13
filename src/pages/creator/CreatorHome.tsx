@@ -1,5 +1,7 @@
 import { useState } from "react"
-import { Loader2, LogOut, Upload, Wallet, ExternalLink, AlertCircle, Play } from "lucide-react"
+import {
+  Loader2, LogOut, Upload, Wallet, ExternalLink, AlertCircle, Play, FileText, Megaphone,
+} from "lucide-react"
 import { toast } from "sonner"
 import { ApiError } from "@/lib/api"
 import { Input } from "@/components/ui/input"
@@ -12,6 +14,7 @@ import {
   useCreatorWorkspace, useCreatorMutations,
   type CreatorEngagement, type CreatorDelivery,
 } from "@/lib/api/creator"
+import { CreatorContractPanel } from "@/pages/creator/CreatorContractPanel"
 import ZoeLogo from "@/assets/zoe-logo.svg?react"
 
 const DELIVERY_COLOR: Record<string, string> = {
@@ -33,6 +36,7 @@ const DELIVERY_COLOR: Record<string, string> = {
 export default function CreatorHomePage() {
   const { user, signOut } = useAuth()
   const workspace = useCreatorWorkspace()
+  const [tab, setTab] = useState<"campanhas" | "contratos">("campanhas")
 
   const d = workspace.data
 
@@ -111,15 +115,63 @@ export default function CreatorHomePage() {
               </div>
             )}
 
-            <div className="flex flex-col gap-4">
-              {d.engagements.map((e) => (
-                <EngagementCard key={e.contractId} e={e} />
-              ))}
+            {/* Duas abas, como o time definiu: acompanhar o trabalho e ler o contrato
+                são momentos diferentes, e misturá-los numa lista só faz o contrato
+                desaparecer embaixo das entregas. */}
+            <div className="flex gap-1 mb-5">
+              <TabButton
+                active={tab === "campanhas"}
+                onClick={() => setTab("campanhas")}
+                icon={<Megaphone className="w-3.5 h-3.5" />}
+                label="Campanhas"
+                count={d.engagements.length}
+              />
+              <TabButton
+                active={tab === "contratos"}
+                onClick={() => setTab("contratos")}
+                icon={<FileText className="w-3.5 h-3.5" />}
+                label="Contratos"
+                count={d.engagements.length}
+              />
             </div>
+
+            {tab === "campanhas" ? (
+              <div className="flex flex-col gap-4">
+                {d.engagements.map((e) => (
+                  <EngagementCard key={e.contractId} e={e} />
+                ))}
+              </div>
+            ) : (
+              <CreatorContractPanel engagements={d.engagements} />
+            )}
           </>
         ) : null}
       </main>
     </div>
+  )
+}
+
+function TabButton({
+  active, onClick, icon, label, count,
+}: {
+  active: boolean
+  onClick: () => void
+  icon: React.ReactNode
+  label: string
+  count: number
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-semibold transition-colors"
+      style={active
+        ? { background: "var(--color-teal-500)", color: "#fff" }
+        : { color: "var(--ink-muted)" }}
+    >
+      {icon}
+      {label}
+      <span className="font-normal" style={{ opacity: 0.75 }}>({count})</span>
+    </button>
   )
 }
 
