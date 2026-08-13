@@ -227,7 +227,7 @@ export type InviteInfluencerBody = {
 /** `emailDelivery`: Sent | Failed | Disabled — decide se o link copiável é o caminho. */
 export type InviteInfluencerResponse = {
   inviteId: string
-  campaignId: string
+  campaignId: string | null
   influencerId: string
   email: string
   token: string
@@ -239,8 +239,9 @@ export type InviteInfluencerResponse = {
 export type InfluencerInvitePreview = {
   email: string
   influencerName: string
-  campaignName: string
-  modality: string
+  /** Nulo em convite de elenco: a marca chamou a pessoa sem ação específica. */
+  campaignName: string | null
+  modality: string | null
   tenantName: string
   inviterName: string
   message: string | null
@@ -527,6 +528,10 @@ export const operationsApi = {
     apiClient.patch<UpdateCampaignResponse>(
       `/api/operations/campaigns/${campaignId}`, body),
 
+  /** Convite de elenco, sem campanha: a marca monta time antes de existir ação. */
+  inviteToRoster: (body: InviteInfluencerBody) =>
+    apiClient.post<InviteInfluencerResponse>("/api/operations/influencers/invites", body),
+
   inviteInfluencer: (campaignId: string, body: InviteInfluencerBody) =>
     apiClient.post<InviteInfluencerResponse>(
       `/api/operations/campaigns/${campaignId}/invites`, body),
@@ -724,6 +729,30 @@ export type DeliverySummary = {
   auditType: string | null
   escrowState: EscrowState | null
   escrowAmountCents: number | null
+  /** Parecer da máquina. Nulo em revisão manual — a ausência é informação. */
+  audit: DeliveryAudit | null
+}
+
+/**
+ * Resultado da auditoria automática (RN-O-056 a 061). `isApprovable` diz que a nota
+ * alcançou o mínimo — **não** que a entrega está aprovada: o clique continua sendo humano,
+ * e o botão de aprovar existe mesmo abaixo do threshold.
+ */
+export type DeliveryAudit = {
+  score: number
+  appliedThreshold: number
+  isApprovable: boolean
+  /** Auditoria sobre dado degradado: a nota vale menos e a tela precisa dizer isso. */
+  isDegraded: boolean
+  pipelinePath: string | null
+  auditedAt: string
+  checklist: DeliveryAuditItem[]
+}
+
+export type DeliveryAuditItem = {
+  criterion: string
+  passed: boolean
+  detail: string | null
 }
 
 export type ListDeliveriesResponse = { items: DeliverySummary[] }
@@ -861,6 +890,11 @@ export function useRosterMutations() {
   return {
     add: useMutation({
       mutationFn: (body: AddInfluencerBody) => operationsApi.addInfluencer(body),
+      onSuccess: () =>
+        qc.invalidateQueries({ queryKey: ["operations-roster", activeTenantId] }),
+    }),
+    invite: useMutation({
+      mutationFn: (body: InviteInfluencerBody) => operationsApi.inviteToRoster(body),
       onSuccess: () =>
         qc.invalidateQueries({ queryKey: ["operations-roster", activeTenantId] }),
     }),

@@ -7,7 +7,7 @@ export type EnumKind =
   | "classification" | "sentiment" | "nerMode" | "pipelinePath"
   | "kycStatus" | "rosterStatus"
   | "contractModality" | "contractStatus" | "escrowState" | "campaignStatus"
-  | "deliveryStatus" | "briefingSentiment"
+  | "deliveryStatus" | "briefingSentiment" | "auditCriterion"
 
 type LocaleDictionaries = Record<EnumKind, Record<string, string>>
 
@@ -88,6 +88,15 @@ const dictionaries: Record<string, LocaleDictionaries> = {
       Released: "Liberado",
       Disputed: "Em disputa",
       Refunded: "Devolvido",
+    },
+    // Critérios da auditoria (RN-O-059). Cada um deriva de um item do briefing.
+    auditCriterion: {
+      BrandMention: "Menção à marca",
+      RequiredHashtags: "Hashtags obrigatórias",
+      LogoVisibility: "Logo visível",
+      SentimentAlignment: "Tom alinhado",
+      AdDisclosure: "Identificação de publicidade",
+      AudienceQuality: "Qualidade da audiência",
     },
     // Piso de sentimento exigido no briefing. "Qualquer" é opção legítima: campanha que
     // pede review honesta não pode exigir tom positivo.

@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
-import { X, Loader2, Play, Check, RotateCcw, Ban, ExternalLink, Clock } from "lucide-react"
+import {
+  X, Loader2, Play, Check, RotateCcw, Ban, ExternalLink, Clock, AlertTriangle,
+} from "lucide-react"
 import { toast } from "sonner"
 import { ApiError } from "@/lib/api"
 import { EmptyBlock } from "@/components/ui/empty-block"
@@ -11,7 +13,7 @@ import { fmtDate } from "@/pages/operations/format"
 import { TableSkeleton, ErrorState } from "@/pages/operations/shared"
 import {
   useDeliveries, useDeliveryMutations, fmtCents, youtubeThumb, youtubeWatch,
-  type DeliverySummary, type DeliveryDecision,
+  type DeliverySummary, type DeliveryDecision, type DeliveryAudit,
 } from "@/lib/api/operations"
 
 const STATUS_COLOR: Record<string, string> = {
@@ -34,12 +36,13 @@ const NO_DELIVERIES: DeliverySummary[] = []
  *
  * Duas divergências conscientes, das quais a regra de negócio venceu:
  *
- * 1. **Não há badge de score.** O protótipo estampa 92/58/81 em cada card, mas
- *    `audit_score` é da auditoria por IA (Etapa 8.6) e não existe. Número inventado
- *    numa tela que decide pagamento é pior que número ausente.
- * 2. **Aprovar não paga.** O protótipo tem "Aprovar e liberar" num só botão; aqui
- *    aprovar apenas torna a custódia liberável (RN-O-043). A captura é passo separado
- *    e humano — a IA nunca libera pagamento sozinha, e nem o clique de aprovação.
+ * 1. **A nota só aparece quando existe.** O protótipo estampa 92/58/81 em todo card;
+ *    aqui o badge some em entrega de revisão manual, que não tem nota. Número inventado
+ *    numa tela que decide pagamento é pior que espaço vazio.
+ * 2. **Aprovar não paga, e a nota não decide.** O protótipo tem "Aprovar e liberar" num
+ *    só botão; aqui aprovar apenas torna a custódia liberável (RN-O-043), e o botão
+ *    continua disponível mesmo com a nota abaixo do mínimo — a IA é gate de qualidade,
+ *    não autoridade financeira (RN-O-056).
  */
 export default function OperationsDeliveriesPage() {
   const [tab, setTab] = useState<string>("all")
@@ -154,9 +157,23 @@ function DeliveryCard({ d, onOpen }: { d: DeliverySummary; onOpen: () => void })
         <span className="absolute top-2.5 left-2.5">
           <DeliveryChip status={d.status} small />
         </span>
+        {/* A nota ocupa o canto que o protótipo reservou. Só aparece quando existe —
+            entrega em revisão manual não tem nota, e inventar um número aqui seria pior
+            que o espaço vazio. */}
+        {d.audit && (
+          <span
+            className="absolute top-2.5 right-2.5 font-mono-zoe text-[11px] font-semibold px-1.5 py-0.5 rounded"
+            style={{
+              background: "rgba(0,0,0,.7)",
+              color: d.audit.isApprovable ? "#34D399" : "#FCA5A5",
+            }}
+          >
+            {d.audit.score}
+          </span>
+        )}
         {d.isReviewOverdue && (
           <span
-            className="absolute top-2.5 right-2.5 text-[10.5px] font-semibold px-1.5 py-0.5 rounded"
+            className="absolute bottom-2.5 right-2.5 text-[10.5px] font-semibold px-1.5 py-0.5 rounded"
             style={{ background: "rgba(0,0,0,.7)", color: "#FCD34D" }}
           >
             prazo vencido
@@ -180,6 +197,102 @@ function DeliveryCard({ d, onOpen }: { d: DeliverySummary; onOpen: () => void })
         )}
       </div>
     </button>
+  )
+}
+
+/**
+ * Conformidade da entrega. Quando houve auditoria, mostra a nota, o threshold que valeu e
+ * o checklist item a item; quando não houve, diz que a revisão é manual — a ausência de
+ * parecer é informação, não um vazio.
+ *
+ * A nota **não** esconde nem habilita o botão de aprovar: ela informa. Quem decide é quem
+ * paga, inclusive contra o parecer da máquina (RN-O-056).
+ */
+function AuditCard({ audit }: { audit: DeliveryAudit | null }) {
+  if (!audit) {
+    return (
+      <div
+        className="rounded-lg border border-border-soft p-4 mt-4"
+        style={{ background: "var(--bg, #FAFBFC)" }}
+      >
+        <div className="eyebrow mb-2">Conformidade</div>
+        <p className="text-[12.5px] text-ink-muted m-0">
+          Revisão manual: assista ao vídeo e confira menção da marca, logo, tom e o
+          disclosure de publicidade. A auditoria automática entra com o combo Intelligence,
+          e mesmo lá o clique final continua sendo seu.
+        </p>
+      </div>
+    )
+  }
+
+  const color = audit.isApprovable ? "#00A799" : "#DC2626"
+  const failures = audit.checklist.filter((i) => !i.passed)
+
+  return (
+    <div
+      className="rounded-lg border border-border-soft p-4 mt-4"
+      style={{ background: "var(--bg, #FAFBFC)" }}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <div className="eyebrow">Auditoria</div>
+        <span
+          className="text-[10.5px] font-semibold px-2 py-0.5 rounded"
+          style={{ background: `${color}18`, color }}
+        >
+          {audit.isApprovable ? "atingiu a nota" : "abaixo da nota"}
+        </span>
+      </div>
+
+      <div className="flex items-baseline gap-2 mb-3">
+        <span className="font-display" style={{ fontSize: 40, lineHeight: 1, color }}>
+          {audit.score}
+        </span>
+        <span className="text-[12.5px] text-ink-muted">
+          / 100 · mínimo {audit.appliedThreshold}
+        </span>
+      </div>
+
+      {/* RN-O-061: pipeline degradado num contexto que decide pagamento tem de aparecer. */}
+      {audit.isDegraded && (
+        <div
+          className="flex items-start gap-1.5 rounded p-2.5 text-[11.5px] mb-3"
+          style={{ background: "#D9770615", color: "#D97706" }}
+        >
+          <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+          <span>
+            Análise limitada ({tEnum("pipelinePath", audit.pipelinePath)}). Um item pode ter
+            falhado por falta de dado, não por descumprimento — vale assistir ao vídeo antes
+            de decidir.
+          </span>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-1.5">
+        {audit.checklist.map((item) => (
+          <div key={item.criterion} className="flex items-start gap-1.5 text-[12.5px]">
+            {item.passed
+              ? <Check className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: "#00A799" }} />
+              : <X className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: "#DC2626" }} />}
+            <span style={{ color: item.passed ? "var(--ink)" : "#DC2626" }}>
+              {tEnum("auditCriterion", item.criterion)}
+              {item.detail && (
+                <span className="text-ink-muted"> — {item.detail}</span>
+              )}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* O texto muda com o resultado, mas a mensagem de fundo é a mesma nos dois casos:
+          a nota não decide. */}
+      <p className="text-[11px] text-ink-muted mt-3 mb-0">
+        {audit.isApprovable
+          ? "A nota alcançou o mínimo do contrato. Ainda assim, a aprovação é sua — a auditoria não libera pagamento sozinha."
+          : failures.length > 0
+            ? "Peça correção com estes pontos: o criador recebe a lista e pode reenviar. Você também pode aprovar mesmo assim, se entender que o caso é válido."
+            : "A nota ficou abaixo do mínimo do contrato."}
+      </p>
+    </div>
   )
 }
 
@@ -290,19 +403,7 @@ function ReviewDrawer({ d, onClose }: { d: DeliverySummary; onClose: () => void 
             </div>
           )}
 
-          {/* O lugar do score existe e fica explícito enquanto a auditoria não chega.
-              Melhor dizer que a revisão é manual do que deixar um vazio sem explicação. */}
-          <div
-            className="rounded-lg border border-border-soft p-4 mt-4"
-            style={{ background: "var(--bg, #FAFBFC)" }}
-          >
-            <div className="eyebrow mb-2">Conformidade</div>
-            <p className="text-[12.5px] text-ink-muted m-0">
-              Revisão manual: assista ao vídeo e confira menção da marca, logo, tom e o
-              disclosure de publicidade. A auditoria automática — score e checklist — entra
-              com o combo Intelligence, e mesmo lá o clique final continua sendo seu.
-            </p>
-          </div>
+          <AuditCard audit={d.audit} />
 
           {d.escrowState && (
             <div className="rounded-lg border border-border-soft p-4 mt-4">

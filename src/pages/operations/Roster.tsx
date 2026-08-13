@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { Plus, X, Loader2, Users } from "lucide-react"
+import { Plus, X, Loader2, Users, UserPlus, Copy, Check } from "lucide-react"
 import { toast } from "sonner"
 import { ApiError } from "@/lib/api"
 import { Input } from "@/components/ui/input"
@@ -10,8 +10,8 @@ import { tEnum } from "@/i18n/enums"
 import { fmtDate, initials } from "@/pages/operations/format"
 import { Field, TableSkeleton, ErrorState } from "@/pages/operations/shared"
 import {
-  useRoster, useRosterMutations, payoutBlockReason,
-  type RosterItem, type AddInfluencerBody,
+  useRoster, useRosterMutations, payoutBlockReason, INFLUENCER_INVITE_PATH,
+  type RosterItem, type AddInfluencerBody, type InviteInfluencerResponse,
 } from "@/lib/api/operations"
 
 // Cor por estado do KYC. Verificado é o único verde: os outros três são graus
@@ -27,6 +27,7 @@ const KYC_COLOR: Record<string, string> = {
 export default function OperationsRosterPage() {
   const roster = useRoster()
   const [addOpen, setAddOpen] = useState(false)
+  const [inviteOpen, setInviteOpen] = useState(false)
 
   const items = useMemo(() => roster.data?.items ?? [], [roster.data])
 
@@ -49,6 +50,14 @@ export default function OperationsRosterPage() {
             </div>
           </div>
           <RoleGate minRole="Admin">
+            {/* Convidar nao depende de campanha: a marca monta elenco antes de existir
+                acao, e o criador e da marca, nao do projeto. */}
+            <button
+              onClick={() => setInviteOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 mr-2 rounded-lg text-[13px] font-medium border border-border-soft"
+            >
+              <UserPlus className="w-3.5 h-3.5" /> Convidar criador
+            </button>
             <button
               onClick={() => setAddOpen(true)}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-medium text-white transition-colors"
@@ -97,6 +106,7 @@ export default function OperationsRosterPage() {
       </section>
 
       {addOpen && <AddInfluencerModal onClose={() => setAddOpen(false)} />}
+      {inviteOpen && <InviteToRosterModal onClose={() => setInviteOpen(false)} />}
     </div>
   )
 }
@@ -135,6 +145,153 @@ function RosterRow({ item, index }: { item: RosterItem; index: number }) {
       <td className="py-3.5 font-mono-zoe text-ink-2">{item.contractCount}</td>
       <td className="px-8 py-3.5 font-mono-zoe text-ink-2">{fmtDate(item.addedAt)}</td>
     </tr>
+  )
+}
+
+/**
+ * Convite de elenco — sem campanha. A diferença para "Adicionar criador" é quem assume o
+ * cadastro: aqui a própria pessoa cria a conta e preenche os dados dela pelo link. É o
+ * caminho preferível, porque dados fiscais e conta de recebimento são dela.
+ */
+function InviteToRosterModal({ onClose }: { onClose: () => void }) {
+  const { invite } = useRosterMutations()
+  const [email, setEmail] = useState("")
+  const [fullName, setFullName] = useState("")
+  const [message, setMessage] = useState("")
+  const [sent, setSent] = useState<InviteInfluencerResponse | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  const link = sent ? `${window.location.origin}/${INFLUENCER_INVITE_PATH}/${sent.token}` : ""
+
+  const submit = async () => {
+    try {
+      const res = await invite.mutateAsync({
+        email: email.trim(),
+        fullName: fullName.trim(),
+        message: message.trim() || undefined,
+      })
+      setSent(res)
+      if (res.emailDelivery === "Sent") toast.success(`Convite enviado para ${res.email}.`)
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409) {
+        toast.error("Esse criador já tem um convite pendente neste workspace.")
+        return
+      }
+      toast.error(e instanceof ApiError ? e.message : "Não foi possível convidar.")
+    }
+  }
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(link)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      toast.error("Não foi possível copiar — selecione o link manualmente.")
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[90] flex items-center justify-center p-4"
+      style={{ background: "rgba(7,9,26,0.32)", backdropFilter: "blur(2px)" }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-xl border border-border-soft shadow-2xl p-6"
+        style={{ background: "var(--surface)" }}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Convidar criador para o elenco"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between mb-5">
+          <div>
+            <div className="eyebrow mb-1">Elenco</div>
+            <h2 className="font-display m-0" style={{ fontSize: 20, color: "var(--ink)" }}>
+              {sent ? "Convite criado" : "Convidar criador"}
+            </h2>
+          </div>
+          <button onClick={onClose} className="text-ink-muted hover:opacity-70" aria-label="Fechar">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {sent ? (
+          <>
+            {sent.emailDelivery !== "Sent" && (
+              <div className="rounded-lg p-3 text-[12px] mb-4" style={{ background: "#D9770615", color: "#D97706" }}>
+                {sent.emailDelivery === "Disabled"
+                  ? "O envio de e-mail não está configurado neste ambiente."
+                  : "O e-mail não saiu."}{" "}
+                Mande o link abaixo — o convite já existe e é válido.
+              </div>
+            )}
+
+            <div className="text-[11px] text-ink-muted mb-1.5">Link do convite</div>
+            <div className="flex items-center gap-2 mb-4">
+              <input
+                readOnly
+                value={link}
+                onFocus={(e) => e.currentTarget.select()}
+                className="flex-1 px-2.5 py-2 rounded-lg border border-border-soft font-mono-zoe text-[11.5px] bg-transparent"
+                style={{ color: "var(--ink)" }}
+              />
+              <button onClick={copy} className="px-2.5 py-2 rounded-lg border border-border-soft shrink-0" aria-label="Copiar link">
+                {copied ? <Check className="w-3.5 h-3.5" style={{ color: "var(--color-teal-500)" }} />
+                        : <Copy className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+
+            <p className="text-[11.5px] text-ink-muted mb-5">
+              Vence em {fmtDate(sent.expiresAt)}. Ele precisa entrar com o e-mail{" "}
+              <span className="font-mono-zoe">{sent.email}</span>. As campanhas você amarra
+              depois — o convite não prende ninguém a uma ação específica.
+            </p>
+
+            <button
+              onClick={onClose}
+              className="w-full px-4 py-2.5 rounded-lg text-[14px] font-medium text-white"
+              style={{ background: "var(--color-teal-500)" }}
+            >
+              Fechar
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="space-y-4">
+              <Field label="E-mail" hint="É por ele que o convite é validado no aceite.">
+                <Input value={email} onChange={(e) => setEmail(e.target.value)}
+                       type="email" placeholder="criador@email.com" />
+              </Field>
+              <Field label="Nome">
+                <Input value={fullName} onChange={(e) => setFullName(e.target.value)}
+                       placeholder="Como ele assina o contrato" />
+              </Field>
+              <Field label="Mensagem" hint="Opcional. Aparece na tela que o criador abre.">
+                <Input value={message} onChange={(e) => setMessage(e.target.value)}
+                       placeholder="Queremos você no nosso elenco." />
+              </Field>
+            </div>
+
+            <div className="flex gap-2 mt-6">
+              <button onClick={onClose} className="flex-1 px-4 py-2.5 rounded-lg text-[14px] border border-border-soft">
+                Cancelar
+              </button>
+              <button
+                onClick={submit}
+                disabled={invite.isPending || !email.trim() || !fullName.trim()}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[14px] font-medium text-white disabled:opacity-50"
+                style={{ background: "var(--color-teal-500)" }}
+              >
+                {invite.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                Enviar convite
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   )
 }
 

@@ -54,8 +54,10 @@ export default function InfluencerInvitePage() {
     try {
       const res = await operationsApi.acceptInfluencerInvite(token)
       clearPendingInfluencerInviteToken()
-      setAccepted(res.campaignName)
-      toast.success(`Você entrou na campanha ${res.campaignName}.`)
+      setAccepted(res.campaignName ?? res.tenantName)
+      toast.success(res.campaignName
+        ? `Você entrou na campanha ${res.campaignName}.`
+        : `Você entrou no elenco de ${res.tenantName}.`)
     } catch (e) {
       // O backend recusa por motivos que a pessoa precisa entender: e-mail diferente
       // do convite, ou conta que já pertence a um workspace.
@@ -106,17 +108,30 @@ function Preview({
     <>
       <div className="flex items-center gap-2 mb-5">
         <Handshake className="w-5 h-5" style={{ color: "var(--color-teal-500)" }} />
-        <div className="eyebrow">Convite de campanha</div>
+        <div className="eyebrow">{data.campaignName ? "Convite de campanha" : "Convite de elenco"}</div>
       </div>
 
       <h1 className="font-display m-0 mb-2" style={{ fontSize: 26, lineHeight: 1.15, color: "var(--ink)" }}>
         {data.tenantName} convidou você
       </h1>
 
+      {/* Sem campanha o convite é para o elenco: a marca quer a pessoa por perto, e a
+          ação específica vem depois — ou nunca. Dizer "campanha" aqui seria prometer
+          trabalho que ainda não existe. */}
       <p className="text-[14px] text-ink-muted mb-5">
-        Para a campanha <span style={{ color: "var(--ink)" }}>{data.campaignName}</span>{" "}
-        ({tEnum("contractModality", data.modality)}), no nome de{" "}
-        <span style={{ color: "var(--ink)" }}>{data.influencerName}</span>.
+        {data.campaignName ? (
+          <>
+            Para a campanha <span style={{ color: "var(--ink)" }}>{data.campaignName}</span>
+            {data.modality && <> ({tEnum("contractModality", data.modality)})</>}, no nome de{" "}
+            <span style={{ color: "var(--ink)" }}>{data.influencerName}</span>.
+          </>
+        ) : (
+          <>
+            Para fazer parte do elenco de criadores, no nome de{" "}
+            <span style={{ color: "var(--ink)" }}>{data.influencerName}</span>. As campanhas
+            chegam depois, conforme surgirem.
+          </>
+        )}
       </p>
 
       {data.message && (
