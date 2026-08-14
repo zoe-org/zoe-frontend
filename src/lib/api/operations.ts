@@ -222,6 +222,11 @@ export type InviteInfluencerBody = {
   countryCode?: string
   displayName?: string
   message?: string
+  /** Proposta de trabalho. Só o endpoint de campanha aceita — o de elenco ignora. */
+  expectedDeliverables?: string
+  /** Centavos. A API recusa em campanha de permuta: GMV zero não comporta cachê. */
+  feeCents?: number
+  deliveryDeadline?: string
 }
 
 /** `emailDelivery`: Sent | Failed | Disabled — decide se o link copiável é o caminho. */
@@ -234,6 +239,10 @@ export type InviteInfluencerResponse = {
   expiresAt: string
   influencerCreated: boolean
   emailDelivery: string
+  /** Ecoados do que FICOU gravado, não do que foi pedido. */
+  expectedDeliverables: string | null
+  feeCents: number | null
+  deliveryDeadline: string | null
 }
 
 export type InfluencerInvitePreview = {
@@ -248,6 +257,24 @@ export type InfluencerInvitePreview = {
   expiresAt: string
   expired: boolean
   accepted: boolean
+  expectedDeliverables: string | null
+  feeCents: number | null
+  deliveryDeadline: string | null
+  /** Deriva da modalidade da campanha. A tela mostra "permuta" no lugar do valor. */
+  isBarter: boolean
+  /** Os critérios contra os quais a entrega vai ser medida. Nulo se a campanha ainda não tem briefing. */
+  briefing: InviteBriefing | null
+}
+
+export type InviteBriefing = {
+  keywords: string[]
+  requiredHashtags: string[]
+  requiresLogo: boolean
+  minLogoSeconds: number | null
+  minSentiment: string
+  requiresConarDisclosure: boolean
+  deliverySlaDays: number | null
+  auditThreshold: number
 }
 
 export type AcceptInfluencerInviteResponse = {
@@ -894,9 +921,17 @@ export function useRosterMutations() {
         qc.invalidateQueries({ queryKey: ["operations-roster", activeTenantId] }),
     }),
     invite: useMutation({
-      mutationFn: (body: InviteInfluencerBody) => operationsApi.inviteToRoster(body),
-      onSuccess: () =>
-        qc.invalidateQueries({ queryKey: ["operations-roster", activeTenantId] }),
+      // Um convite, dois destinos. Com campanha ele é proposta de trabalho e vai para o
+      // endpoint dela — que é o único que aceita cachê, porque só ali existe modalidade
+      // para dizer se permuta o recusa. Sem campanha é convite de elenco.
+      mutationFn: ({ campaignId, ...body }: InviteInfluencerBody & { campaignId?: string }) =>
+        campaignId
+          ? operationsApi.inviteInfluencer(campaignId, body)
+          : operationsApi.inviteToRoster(body),
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: ["operations-roster", activeTenantId] })
+        qc.invalidateQueries({ queryKey: ["operations-campaigns", activeTenantId] })
+      },
     }),
   }
 }
