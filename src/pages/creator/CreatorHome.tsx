@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { Link } from "react-router-dom"
 import {
   Loader2, LogOut, Upload, Wallet, ExternalLink, AlertCircle, Play, FileText, Megaphone,
 } from "lucide-react"
@@ -105,12 +106,16 @@ export default function CreatorHomePage() {
                     Conta de recebimento pendente
                   </div>
                   <p className="text-[12.5px] text-ink-muted m-0">{d.payoutBlockedReason}</p>
-                  {/* Sem Stripe Connect não há para onde mandar: prometer um botão de
-                      conectar seria prometer integração que não existe (bloqueio do G1). */}
-                  <p className="text-[11.5px] text-ink-muted mt-1.5 mb-0">
-                    A conexão da conta abre quando a marca concluir a configuração de
-                    pagamentos. Você não precisa fazer nada agora.
-                  </p>
+                  {/* O texto anterior dizia "você não precisa fazer nada agora", verdade
+                      enquanto o Connect não existia. Agora existe, e mandar o criador
+                      esperar seria travar o pagamento dele por informação velha. */}
+                  <Link
+                    to="/criador/recebimento"
+                    className="inline-flex items-center gap-1.5 text-[12.5px] font-medium mt-2"
+                    style={{ color: "#D97706" }}
+                  >
+                    Conectar conta de recebimento <ExternalLink className="w-3 h-3" />
+                  </Link>
                 </div>
               </div>
             )}

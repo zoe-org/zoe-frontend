@@ -81,7 +81,39 @@ export type CreatorContractField = {
   value: string | null
 }
 
+/**
+ * Início do cadastro da conta de recebimento.
+ *
+ * `onboardingUrl` é do provedor, **de uso único e expira em minutos** — por isso não se
+ * guarda: cada clique pede um novo.
+ */
+export type StartPayoutOnboarding = {
+  onboardingUrl: string | null
+  expiresAt: string | null
+  accountCreated: boolean
+  kycStatus: string
+  /** Preenchido quando o provedor recusou ou não há provedor no ambiente. */
+  message: string | null
+}
+
+export type PayoutStatus = {
+  hasAccount: boolean
+  /** A única pergunta que libera dinheiro. */
+  canReceivePayout: boolean
+  kycStatus: string
+  pendingRequirements: string[]
+  disabledReason: string | null
+}
+
 export const creatorApi = {
+  startPayoutOnboarding: () =>
+    apiClient.post<StartPayoutOnboarding>("/api/creator/payout-account", {}, { noTenant: true }),
+
+  // POST apesar de parecer leitura: ele escreve. A verificação acontece do lado do
+  // provedor sem avisar ninguém, então alguém precisa perguntar.
+  syncPayoutStatus: () =>
+    apiClient.post<PayoutStatus>("/api/creator/payout-account/sync", {}, { noTenant: true }),
+
   workspace: (opts?: { signal?: AbortSignal }) =>
     apiClient.get<CreatorWorkspace>("/api/creator/workspace", {
       noTenant: true,
@@ -130,6 +162,25 @@ export function useCreatorContract(contractId: string | null) {
     staleTime: 60_000,
     retry: false,
   })
+}
+
+export function usePayoutMutations() {
+  const qc = useQueryClient()
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["creator-workspace"] })
+    qc.invalidateQueries({ queryKey: ["creator-payout"] })
+  }
+
+  return {
+    start: useMutation({
+      mutationFn: () => creatorApi.startPayoutOnboarding(),
+      onSuccess: refresh,
+    }),
+    sync: useMutation({
+      mutationFn: () => creatorApi.syncPayoutStatus(),
+      onSuccess: refresh,
+    }),
+  }
 }
 
 export function useCreatorMutations() {

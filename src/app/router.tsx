@@ -7,6 +7,7 @@ import ForgotPasswordPage from "@/pages/ForgotPassword"
 import AcceptInvitePage from "@/pages/AcceptInvite"
 import InfluencerInvitePage from "@/pages/InfluencerInvite"
 import CreatorHomePage from "@/pages/creator/CreatorHome"
+import CreatorPayoutPage from "@/pages/creator/CreatorPayout"
 import OnboardingTenantPage from "@/pages/OnboardingTenant"
 import DashboardPage from "@/pages/Dashboard"
 import MonitoringPage from "@/pages/intelligence/Monitoring"
@@ -41,6 +42,13 @@ export const router = createBrowserRouter([
   {
     path: "/criador",
     element: <ProtectedRoute><CreatorHomePage /></ProtectedRoute>,
+  },
+  {
+    // Fora do AppShell pelo mesmo motivo da home do criador: não há workspace para o
+    // shell da marca representar. É para cá que o provedor devolve quem concluiu o
+    // cadastro — a returnUrl que o backend monta aponta exatamente para esta rota.
+    path: "/criador/recebimento",
+    element: <ProtectedRoute><CreatorPayoutPage /></ProtectedRoute>,
   },
   {
     path: "/onboarding/tenant",
