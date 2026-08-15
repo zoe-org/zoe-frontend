@@ -16,6 +16,7 @@ import {
   type CreatorEngagement, type CreatorDelivery,
 } from "@/lib/api/creator"
 import { CreatorContractPanel } from "@/pages/creator/CreatorContractPanel"
+import { CreatorDraftUpload } from "@/pages/creator/CreatorDraftUpload"
 import ZoeLogo from "@/assets/zoe-logo.svg?react"
 
 const DELIVERY_COLOR: Record<string, string> = {
@@ -184,6 +185,9 @@ function EngagementCard({ e }: { e: CreatorEngagement }) {
   const { submit } = useCreatorMutations()
   const [url, setUrl] = useState("")
 
+  // Contrato que não exige corte publica direto — ao vivo, por exemplo.
+  const draftApproved = !e.requiresDraftApproval || e.draft?.status === "Approved"
+
   const send = async () => {
     try {
       await submit.mutateAsync({ contractId: e.contractId, submittedUrl: url.trim() })
@@ -225,7 +229,16 @@ function EngagementCard({ e }: { e: CreatorEngagement }) {
         </div>
       )}
 
-      {e.canSubmitDelivery ? (
+      {/* Primeiro portão. Vem antes do campo do link de propósito: a ordem na tela é a
+          ordem do processo, e mostrar o campo do publicado por cima faria o criador
+          publicar antes de a marca ver. */}
+      {e.canSubmitDelivery && (
+        <div className="mb-4">
+          <CreatorDraftUpload engagement={e} />
+        </div>
+      )}
+
+      {e.canSubmitDelivery && draftApproved ? (
         <div>
           <div className="text-[11px] text-ink-muted mb-1.5">
             Link do vídeo já publicado no YouTube

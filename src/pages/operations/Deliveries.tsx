@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react"
+import { DeliveryDrafts } from "@/pages/operations/DeliveryDrafts"
 import { Link } from "react-router-dom"
 import {
   X, Loader2, Play, Check, RotateCcw, Ban, ExternalLink, Clock, AlertTriangle,
@@ -46,6 +47,9 @@ const NO_DELIVERIES: DeliverySummary[] = []
  */
 export default function OperationsDeliveriesPage() {
   const [tab, setTab] = useState<string>("all")
+  // Os dois portões são momentos distintos do processo — cortes por aprovar e vídeos já
+  // publicados. Numa lista só, a distinção some e alguém aprova o que não pretendia.
+  const [gate, setGate] = useState<"drafts" | "published">("published")
   const [selected, setSelected] = useState<string | null>(null)
   const deliveries = useDeliveries()
 
@@ -79,8 +83,18 @@ export default function OperationsDeliveriesPage() {
     ["Rejected", "Recusadas"],
   ]
 
+  if (gate === "drafts") {
+    return (
+      <div className="flex flex-col gap-5">
+        <GateHeader gate={gate} onChange={setGate} />
+        <DeliveryDrafts />
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-5">
+      <GateHeader gate={gate} onChange={setGate} />
       <div>
         <div className="eyebrow mb-2">Operations · Qualidade</div>
         <h1 className="font-display m-0" style={{ fontSize: 32, lineHeight: 1.1, color: "var(--ink)" }}>
@@ -515,5 +529,42 @@ function ReviewDrawer({ d, onClose }: { d: DeliverySummary; onClose: () => void 
         </div>
       </div>
     </>
+  )
+}
+
+/**
+ * Alterna entre os dois portões. Fica acima do título de propósito: é a pergunta que vem
+ * antes de "qual entrega", porque cada portão decide uma coisa diferente.
+ */
+function GateHeader({
+  gate,
+  onChange,
+}: {
+  gate: "drafts" | "published"
+  onChange: (g: "drafts" | "published") => void
+}) {
+  const options: [typeof gate, string, string][] = [
+    ["drafts", "Cortes por aprovar", "Antes de publicar"],
+    ["published", "Entregas publicadas", "Libera pagamento"],
+  ]
+
+  return (
+    <div className="flex gap-2 flex-wrap">
+      {options.map(([id, label, hint]) => (
+        <button
+          key={id}
+          onClick={() => onChange(id)}
+          className="px-4 py-2.5 rounded-lg text-left transition-colors border"
+          style={
+            gate === id
+              ? { background: "var(--color-teal-500)", color: "#fff", borderColor: "transparent" }
+              : { color: "var(--ink-muted)", borderColor: "var(--border-soft)" }
+          }
+        >
+          <div className="text-[13px] font-semibold">{label}</div>
+          <div className="text-[11px]" style={{ opacity: 0.75 }}>{hint}</div>
+        </button>
+      ))}
+    </div>
   )
 }

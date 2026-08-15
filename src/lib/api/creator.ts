@@ -19,6 +19,18 @@ export type CreatorDelivery = {
   decisionNotes: string | null
 }
 
+/** O corte enviado antes de publicar — primeiro dos dois portões. */
+export type CreatorDraft = {
+  draftId: string
+  /** AwaitingReview | Approved | ChangesRequested */
+  status: string
+  revision: number
+  fileName: string | null
+  submittedAt: string
+  /** O que a marca pediu para mudar. É o que o criador lê para refazer. */
+  decisionNotes: string | null
+}
+
 export type CreatorEngagement = {
   contractId: string
   campaignId: string
@@ -33,6 +45,9 @@ export type CreatorEngagement = {
   /** Já em português, vindo do backend — é a mesma regra do domínio, traduzida lá. */
   blockedReason: string | null
   deliveries: CreatorDelivery[]
+  /** Nulo enquanto nenhum corte foi enviado — é quando a tela pede o arquivo. */
+  draft: CreatorDraft | null
+  requiresDraftApproval: boolean
 }
 
 export type CreatorWorkspace = {
@@ -106,6 +121,22 @@ export type PayoutStatus = {
 }
 
 export const creatorApi = {
+  /** Passo 1 do envio: autoriza a subida e devolve para onde mandar o arquivo. */
+  requestDraftUpload: (body: { contractId: string; fileName: string; contentType: string }) =>
+    apiClient.post<{ uploadUrl: string; mediaKey: string; expiresAt: string }>(
+      "/api/creator/deliveries/draft-upload", body, { noTenant: true }),
+
+  /** Passo 3: confirma que subiu e põe na fila de revisão da marca. */
+  submitDraft: (body: {
+    contractId: string
+    mediaKey: string
+    fileName?: string
+    sizeBytes?: number
+    creatorNotes?: string
+  }) =>
+    apiClient.post<{ draftId: string; status: string; revision: number }>(
+      "/api/creator/deliveries/draft", body, { noTenant: true }),
+
   startPayoutOnboarding: () =>
     apiClient.post<StartPayoutOnboarding>("/api/creator/payout-account", {}, { noTenant: true }),
 
@@ -161,6 +192,51 @@ export function useCreatorContract(contractId: string | null) {
     enabled: isAuthenticated && isCreator && Boolean(contractId),
     staleTime: 60_000,
     retry: false,
+  })
+}
+
+/**
+ * Envio do corte em três passos: autorizar, subir, confirmar.
+ *
+ * O passo 2 vai DIRETO para o storage, fora da API — vídeo é grande, e passá-lo por
+ * dentro do backend prenderia por minutos o mesmo worker que atende todo o resto.
+ */
+export function useDraftUpload() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (v: { contractId: string; file: File; notes?: string }) => {
+      const contentType = v.file.type || "video/mp4"
+
+      const auth = await creatorApi.requestDraftUpload({
+        contractId: v.contractId,
+        fileName: v.file.name,
+        contentType,
+      })
+
+      // O Content-Type tem de bater com o que foi assinado: o storage recusa a escrita
+      // se divergir, e a mensagem dele não diria que o problema é esse.
+      const upload = await fetch(auth.uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": contentType },
+        body: v.file,
+      })
+
+      if (!upload.ok) {
+        throw new Error(
+          "O arquivo não subiu. Verifique sua conexão e tente de novo — nada foi perdido.",
+        )
+      }
+
+      return creatorApi.submitDraft({
+        contractId: v.contractId,
+        mediaKey: auth.mediaKey,
+        fileName: v.file.name,
+        sizeBytes: v.file.size,
+        creatorNotes: v.notes?.trim() || undefined,
+      })
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["creator-workspace"] }),
   })
 }
 

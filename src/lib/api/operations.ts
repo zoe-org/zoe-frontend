@@ -885,6 +885,64 @@ export const ESCROW_ACTION_TRIGGER: Record<EscrowAction, string> = {
   "refund": "Refund",
 }
 
+/** Corte esperando decisão da marca — primeiro dos dois portões. */
+export type DeliveryDraftItem = {
+  draftId: string
+  contractId: string
+  campaignId: string
+  campaignName: string
+  influencerName: string
+  /** AwaitingReview | Approved | ChangesRequested */
+  status: string
+  revision: number
+  fileName: string | null
+  sizeBytes: number | null
+  creatorNotes: string | null
+  decisionNotes: string | null
+  submittedAt: string
+  /** Assinada a cada consulta e de curta duração — não guardar. */
+  previewUrl: string | null
+}
+
+export function useDeliveryDrafts(status?: string) {
+  const { activeTenantId } = useAuth()
+  return useQuery({
+    queryKey: ["operations-drafts", activeTenantId, status ?? null],
+    queryFn: ({ signal }) =>
+      apiClient.get<{ items: DeliveryDraftItem[] }>(
+        `/api/operations/deliveries/drafts${status ? `?status=${status}` : ""}`,
+        { signal },
+      ),
+    enabled: Boolean(activeTenantId),
+    // Curto: o previewUrl assinado vence, e servir um vencido do cache mostraria um
+    // player quebrado sem explicação.
+    staleTime: 10_000,
+  })
+}
+
+export function useDeliveryDraftMutations() {
+  const { activeTenantId } = useAuth()
+  const qc = useQueryClient()
+
+  return {
+    decide: useMutation({
+      mutationFn: (v: {
+        draftId: string
+        decision: "Approve" | "RequestChanges"
+        notes?: string
+      }) =>
+        apiClient.post<{ draftId: string; status: string; publicationReleased: boolean }>(
+          `/api/operations/deliveries/drafts/${v.draftId}/decision`,
+          { decision: v.decision, notes: v.notes },
+        ),
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: ["operations-drafts", activeTenantId] })
+        qc.invalidateQueries({ queryKey: ["operations-deliveries", activeTenantId] })
+      },
+    }),
+  }
+}
+
 export function useEscrowAccounts(state?: string) {
   const { activeTenantId } = useAuth()
   return useQuery({
