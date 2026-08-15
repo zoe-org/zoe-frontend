@@ -10,6 +10,8 @@ import { useTheme } from "next-themes"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useAuth } from "@/features/auth/context"
 import { useFeature } from "@/features/auth/useFeature"
+import { useAlertUnreadCount } from "@/lib/api/alerts"
+import { useRealtimeConnection } from "@/lib/realtime"
 import { Breadcrumb } from "@/components/ui/breadcrumb"
 import { BrandSwitcher } from "@/components/layout/BrandSwitcher"
 import {
@@ -30,6 +32,22 @@ function getInitialOpenState(key: string): boolean {
   }
 }
 
+
+/**
+ * Contador real de alertas não lidos (WS-F2) — era um "3" fixo do mock.
+ * Silencioso por design: enquanto carrega, ou se a chamada falhar, não renderiza
+ * nada. Um badge de erro na sidebar chamaria atenção para um problema que o
+ * usuário não pode resolver dali.
+ */
+const AlertsBadge = () => {
+  const { data } = useAlertUnreadCount()
+  if (!data) return null
+  return (
+    <span className="bg-ember text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+      {data > 99 ? "99+" : data}
+    </span>
+  )
+}
 
 const SubNavItem = ({ to, children, badge }: { to: string, children: React.ReactNode, badge?: React.ReactNode }) => (
   <NavLink
@@ -67,6 +85,9 @@ function tenantColor(id: string) {
 export function AppShell() {
   const { user, role, signOut, activeTenantId, memberships, switchTenant, isZoeAdmin } = useAuth()
   const queryClient = useQueryClient()
+  // WS-F3 — mantém a conexão de tempo real viva pro app inteiro logado (não só
+  // Alertas: é daqui que o badge da sidebar recebe o "novo" sem precisar navegar).
+  useRealtimeConnection()
   const hasIntelligence = useFeature("intelligence")
   const hasOperations = useFeature("operations")
   const hasSov = useFeature("sov")
@@ -177,7 +198,7 @@ export function AppShell() {
                   {/* ADR-035: única tela que mede conteúdo próprio. Sem entrada de
                       menu, o cliente que publica no canal dele não acha os vídeos. */}
                   <SubNavItem to="/intelligence/owned">Canal próprio</SubNavItem>
-                  <SubNavItem to="/alerts" badge={<span className="bg-ember text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">3</span>}>Alertas</SubNavItem>
+                  <SubNavItem to="/alerts" badge={<AlertsBadge />}>Alertas</SubNavItem>
                 </div>
               )}
             </>
