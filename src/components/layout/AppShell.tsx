@@ -11,6 +11,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useAuth } from "@/features/auth/context"
 import { useFeature } from "@/features/auth/useFeature"
 import { useAlertUnreadCount } from "@/lib/api/alerts"
+import { useRealtimeConnection } from "@/lib/realtime"
 import { Breadcrumb } from "@/components/ui/breadcrumb"
 import { BrandSwitcher } from "@/components/layout/BrandSwitcher"
 import {
@@ -84,6 +85,9 @@ function tenantColor(id: string) {
 export function AppShell() {
   const { user, role, signOut, activeTenantId, memberships, switchTenant, isZoeAdmin } = useAuth()
   const queryClient = useQueryClient()
+  // WS-F3 — mantém a conexão de tempo real viva pro app inteiro logado (não só
+  // Alertas: é daqui que o badge da sidebar recebe o "novo" sem precisar navegar).
+  useRealtimeConnection()
   const hasIntelligence = useFeature("intelligence")
   const hasOperations = useFeature("operations")
   const hasSov = useFeature("sov")
