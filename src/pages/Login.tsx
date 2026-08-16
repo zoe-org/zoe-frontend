@@ -2,11 +2,12 @@ import { useState, useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
+import { signInWithRedirect } from "aws-amplify/auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { auth } from "@/features/auth/useAuth"
-import { applyRememberMe } from "@/lib/cognito"
+import { applyRememberMe, hasFederatedLogin } from "@/lib/cognito"
 import { useAuth } from "@/features/auth/context"
 import { DEV_CREDENTIALS, useCognitoAuth } from "@/features/auth/constants"
 import { translateCognitoError } from "@/features/auth/errors"
@@ -38,8 +39,26 @@ export default function LoginPage() {
   const [slide, setSlide] = useState(0)
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
+  const [federatedLoading, setFederatedLoading] = useState<"Google" | "Microsoft" | null>(null)
 
   const returnTo = (location.state as { from?: string } | null)?.from ?? "/dashboard"
+
+  // signInWithRedirect navega o browser inteiro pro Hosted UI do Cognito — não
+  // há await útil aqui (a página troca antes de qualquer coisa retornar). O
+  // resto do fluxo (troca do code por token, refresh() do contexto) acontece
+  // em /auth/callback, pra onde o Cognito redireciona de volta.
+  const onFederatedLogin = async (provider: "Google" | "Microsoft") => {
+    setError("")
+    setFederatedLoading(provider)
+    try {
+      // Google é provider nativo do Amplify; Microsoft é OIDC customizado no
+      // Cognito (provider_name="Microsoft" no Terraform) — precisa de {custom}.
+      await signInWithRedirect({ provider: provider === "Google" ? "Google" : { custom: "Microsoft" } })
+    } catch {
+      setError("Não foi possível iniciar o login. Tente novamente.")
+      setFederatedLoading(null)
+    }
+  }
 
   useEffect(() => {
     if (isAuthenticated) nav(returnTo, { replace: true })
@@ -180,12 +199,14 @@ export default function LoginPage() {
       {/* Right panel */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white">
         <div className="w-full max-w-sm">
-          <h1 className="text-3xl font-bold text-midnight dark:text-[#E6E8EF] mb-1">Entre na sua conta</h1>
+          {/* Cor fixa de propósito (sem dark:) — esta página é sempre clara,
+              independente do tema salvo de uma sessão autenticada anterior. */}
+          <h1 className="text-3xl font-bold text-midnight mb-1">Entre na sua conta</h1>
           <p className="text-sm text-[#6B7280] mb-8">Bem-vindo(a) de volta.</p>
 
           <form onSubmit={onSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="email">E-mail</Label>
+              <Label htmlFor="email" className="text-midnight">E-mail</Label>
               <Input id="email" placeholder="seu@email.com" {...form.register("email")} />
               {form.formState.errors.email && (
                 <p className="text-xs text-[#DC2626]">{form.formState.errors.email.message as string}</p>
@@ -193,7 +214,7 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="password">Senha</Label>
+              <Label htmlFor="password" className="text-midnight">Senha</Label>
               <div className="relative">
                 <Input
                   id="password"
@@ -240,11 +261,23 @@ export default function LoginPage() {
           </div>
 
           <div className="flex gap-5 justify-center items-center" >
-            <Button variant="outline" disabled>
-              <Google className="w-4 h-4 mr-2"/> Entrar com Google
+            <Button
+              variant="outline"
+              type="button"
+              className="text-midnight"
+              disabled={!useCognitoAuth || !hasFederatedLogin || federatedLoading !== null}
+              onClick={() => onFederatedLogin("Google")}
+            >
+              <Google className="w-4 h-4 mr-2"/> {federatedLoading === "Google" ? "Redirecionando..." : "Entrar com Google"}
             </Button>
-            <Button variant="outline" disabled>
-              <Microsoft className="w-4 h-4 mr-2"/> Entrar com Microsoft
+            <Button
+              variant="outline"
+              type="button"
+              className="text-midnight"
+              disabled={!useCognitoAuth || !hasFederatedLogin || federatedLoading !== null}
+              onClick={() => onFederatedLogin("Microsoft")}
+            >
+              <Microsoft className="w-4 h-4 mr-2"/> {federatedLoading === "Microsoft" ? "Redirecionando..." : "Entrar com Microsoft"}
             </Button>
           </div>
 

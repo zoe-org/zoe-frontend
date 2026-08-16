@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from "react-router-dom"
 import { AppShell } from "@/components/layout/AppShell"
 import { ProtectedRoute } from "@/features/auth/ProtectedRoute"
 import LoginPage from "@/pages/Login"
+import AuthCallbackPage from "@/pages/AuthCallback"
 import RegisterPage from "@/pages/Register"
 import ForgotPasswordPage from "@/pages/ForgotPassword"
 import AcceptInvitePage from "@/pages/AcceptInvite"
@@ -23,6 +24,7 @@ import AdminBrandsPage from "@/pages/admin/AdminBrands"
 
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
+  { path: "/auth/callback", element: <AuthCallbackPage /> },
   { path: "/register", element: <RegisterPage /> },
   { path: "/forgot-password", element: <ForgotPasswordPage /> },
   { path: "/invite/:token", element: <AcceptInvitePage /> },
