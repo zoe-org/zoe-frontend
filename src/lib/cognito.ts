@@ -2,12 +2,30 @@ import { Amplify } from "aws-amplify"
 import { cognitoUserPoolsTokenProvider } from "aws-amplify/auth/cognito"
 import { defaultStorage, sessionStorage as amplifySessionStorage } from "aws-amplify/utils"
 
+const cognitoDomain = import.meta.env.VITE_COGNITO_DOMAIN as string | undefined
+
+/** Login social (Google/Microsoft) só fica disponível com o domínio do Hosted UI configurado. */
+export const hasFederatedLogin = Boolean(cognitoDomain)
+
 Amplify.configure({
   Auth: {
     Cognito: {
       userPoolId: import.meta.env.VITE_COGNITO_USER_POOL_ID,
       userPoolClientId: import.meta.env.VITE_COGNITO_CLIENT_ID,
-      loginWith: { email: true },
+      loginWith: {
+        email: true,
+        ...(cognitoDomain
+          ? {
+              oauth: {
+                domain: cognitoDomain,
+                scopes: ["email", "openid", "profile"],
+                redirectSignIn: [`${window.location.origin}/auth/callback`],
+                redirectSignOut: [`${window.location.origin}/auth/logout`],
+                responseType: "code" as const,
+              },
+            }
+          : {}),
+      },
     },
   },
 })
