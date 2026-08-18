@@ -1,7 +1,10 @@
 import { useMemo, useState } from "react"
-import { Bell, BellOff, Check, Download, ExternalLink, Pencil, Plus, Trash2, X } from "lucide-react"
+import { Bell, BellOff, Check, ChevronRight, Download, Pencil, Plus, Trash2, X } from "lucide-react"
 import { toast } from "sonner"
 import { EmptyBlock } from "@/components/ui/empty-block"
+import { AlertEventDrawer } from "@/components/features/AlertEventDrawer"
+import { StatBand } from "@/components/ui/stat-band"
+import { TabPill } from "@/components/ui/tab-pill"
 import { EmptyState } from "@/components/ui/empty-state"
 import { SelectFilterChip } from "@/components/ui/select-filter-chip"
 import { RoleGate } from "@/features/auth/RoleGate"
@@ -82,6 +85,9 @@ export default function AlertsPage() {
   const unreadCount = events.data?.pages[0]?.unreadCount ?? 0
 
   const [editing, setEditing] = useState<AlertRule | "new" | null>(null)
+  const [selectedEvent, setSelectedEvent] = useState<AlertEvent | null>(null)
+  // Mutação própria do drawer: a da lista vive dentro de HistoryList.
+  const markReadFromDrawer = useMarkAlertRead()
 
   /**
    * Exporta o que já foi carregado (paginação por cursor), não força refetch de
@@ -171,43 +177,29 @@ export default function AlertsPage() {
         </div>
       </section>
 
-      {/* KPIs — só os três que a API sustenta. O design pedia "tempo médio de
-          resposta" e "taxa de falso positivo": não há carimbo de reconhecimento
-          nem loop de feedback, então seriam números inventados. */}
-      <section className="grid grid-cols-3 border-b border-border-soft">
-        {[
+      {/* Faixa de números — só os três que a API sustenta. O design pedia
+          "tempo médio de resposta" e "taxa de falso positivo": não há carimbo de
+          reconhecimento nem loop de feedback, então seriam números inventados. */}
+      <StatBand
+        items={[
           {
             label: "Regras ativas",
             value: enabledCount,
-            sub: `de ${ruleItems.length} ${ruleItems.length === 1 ? "configurada" : "configuradas"}`,
-            accent: true,
+            hint: `de ${ruleItems.length} ${ruleItems.length === 1 ? "configurada" : "configuradas"}`,
+            tone: "accent",
           },
           {
             label: "Disparos não lidos",
             value: unreadCount,
-            sub: unreadCount === 0 ? "tudo em dia" : "no workspace inteiro",
+            hint: unreadCount === 0 ? "tudo em dia" : "no workspace inteiro",
           },
           {
             label: "Marcas monitoradas",
             value: brand.brands.length,
-            sub: "toda regra é de uma marca",
+            hint: "toda regra é de uma marca",
           },
-        ].map((k, i) => (
-          <div key={k.label} className={`px-6 py-5 ${i < 2 ? "border-r border-border-soft" : ""}`}>
-            <div className="eyebrow">{k.label}</div>
-            <div className="flex items-baseline gap-1.5 mt-2">
-              <span
-                className="font-display"
-                style={{ fontSize: 40, lineHeight: 1, color: k.accent ? "var(--color-teal-500)" : "var(--ink)" }}
-              >
-                {k.value}
-              </span>
-            </div>
-            <div className="text-[11.5px] text-ink-muted mt-2">{k.sub}</div>
-          </div>
-        ))}
-      </section>
-
+        ]}
+      />
       {/* Tabs + filtros do histórico na mesma faixa */}
       <section className="px-8 py-4 border-b border-border-soft flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-1.5">
@@ -251,6 +243,7 @@ export default function AlertsPage() {
           hasNextPage={Boolean(events.hasNextPage)}
           isFetchingNextPage={events.isFetchingNextPage}
           onLoadMore={() => events.fetchNextPage()}
+          onOpen={setSelectedEvent}
         />
       ) : (
         <RulesList
@@ -260,6 +253,17 @@ export default function AlertsPage() {
           onEdit={setEditing}
         />
       )}
+
+      <AlertEventDrawer
+        event={selectedEvent}
+        open={selectedEvent !== null}
+        onClose={() => setSelectedEvent(null)}
+        onMarkRead={(id) => markReadFromDrawer.mutate(id, {
+          onSuccess: () => setSelectedEvent((e) => (e ? { ...e, isRead: true } : e)),
+          onError: (e) => toast.error(e instanceof ApiError ? e.message : "Não foi possível marcar como lido."),
+        })}
+        isMarking={markReadFromDrawer.isPending}
+      />
 
       {editing && (
         <RuleModal
@@ -272,34 +276,6 @@ export default function AlertsPage() {
   )
 }
 
-function TabPill({
-  active, onClick, label, count, badge,
-}: { active: boolean; onClick: () => void; label: string; count?: number; badge?: number }) {
-  return (
-    <button
-      onClick={onClick}
-      className="px-4 py-2 rounded-lg text-[13.5px] font-semibold transition-colors cursor-pointer inline-flex items-center gap-1.5"
-      style={{
-        background: active ? "var(--color-teal-500)" : "transparent",
-        color: active ? "#fff" : "var(--ink-muted)",
-      }}
-    >
-      {label}
-      {count !== undefined && (
-        <span className="font-medium" style={{ opacity: active ? 0.8 : 0.6 }}>({count})</span>
-      )}
-      {/* Badge só quando há o que ver — um "(0)" permanente vira ruído. */}
-      {badge !== undefined && badge > 0 && (
-        <span
-          className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-          style={{ background: active ? "rgba(255,255,255,0.25)" : "var(--color-ember)", color: "#fff" }}
-        >
-          {badge > 99 ? "99+" : badge}
-        </span>
-      )}
-    </button>
-  )
-}
 
 function MarkAllButton({ unreadCount }: { unreadCount: number }) {
   const markAll = useMarkAllAlertsRead()
@@ -321,7 +297,7 @@ function MarkAllButton({ unreadCount }: { unreadCount: number }) {
 // ── WS-F2 · Histórico ──────────────────────────────────────────────────────
 
 function HistoryList({
-  hasRules, events, isLoading, error, unreadOnly, hasNextPage, isFetchingNextPage, onLoadMore,
+  hasRules, events, isLoading, error, unreadOnly, hasNextPage, isFetchingNextPage, onLoadMore, onOpen,
 }: {
   hasRules: boolean
   events: AlertEvent[]
@@ -331,6 +307,7 @@ function HistoryList({
   hasNextPage: boolean
   isFetchingNextPage: boolean
   onLoadMore: () => void
+  onOpen: (event: AlertEvent) => void
 }) {
   const markRead = useMarkAlertRead()
 
@@ -425,16 +402,6 @@ function HistoryList({
             <span className="font-mono-zoe text-[12px] text-ink-muted">{formatDateTime(event.triggeredAt)}</span>
 
             <div className="flex items-center gap-1 justify-self-end">
-              <a
-                href={`https://www.youtube.com/watch?v=${event.youtubeVideoId}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D]"
-                aria-label="Ver vídeo no YouTube"
-                title="Ver vídeo no YouTube"
-              >
-                <ExternalLink className="w-4 h-4" />
-              </a>
               {!event.isRead && (
                 <button
                   onClick={() => markRead.mutate(event.id, {
@@ -448,6 +415,14 @@ function HistoryList({
                   <Check className="w-4 h-4" />
                 </button>
               )}
+              <button
+                onClick={() => onOpen(event)}
+                className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D] cursor-pointer"
+                aria-label={`Abrir detalhe de ${event.ruleName}`}
+                title="Ver detalhe"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
         )
