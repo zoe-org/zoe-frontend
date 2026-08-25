@@ -9,7 +9,8 @@ import { tEnum } from "@/i18n/enums"
 import { fmtDate } from "@/pages/operations/format"
 import { TableSkeleton } from "@/pages/operations/shared"
 import {
-  useContract, useContractDetailMutations,
+  useContract, useContractDetailMutations, useEscrowMutations, useCustomClauseMutations,
+  CUSTOM_CONTRACTS_UPGRADE_CODE,
   fieldInputKind, contractProgress,
   type ContractField, type ContractDetail,
 } from "@/lib/api/operations"
@@ -166,7 +167,7 @@ export default function ContractDetailPage() {
             onError: (e) => toast.error(e instanceof ApiError ? e.message : "Não foi possível marcar."),
           })} pending={markSigned.isPending} />
 
-          <ClausesPanel clauses={data.clauses} />
+          <ClausesPanel contract={data} />
         </aside>
       </div>
     </div>
@@ -311,19 +312,234 @@ function SignaturePanel({
         </RoleGate>
       )}
 
-      {data.status === "Signed" && (
+      {data.status === "Signed" && data.usesEscrow && !data.escrowAccountId && (
+        <OpenEscrowPanel contractId={data.contractId} />
+      )}
+
+      {data.status === "Signed" && data.escrowAccountId && (
         <p className="text-[12.5px]" style={{ color: "var(--color-teal-500)" }}>
-          Assinado. A custódia já pode ser aberta.
+          Assinado, com custódia aberta.{" "}
+          <Link to="/operations/escrow" className="underline">Ver no quadro</Link>
+        </p>
+      )}
+
+      {data.status === "Signed" && !data.usesEscrow && (
+        <p className="text-[12.5px] text-ink-muted">
+          Assinado. Este contrato não usa custódia — não há fluxo financeiro a abrir.
         </p>
       )}
     </div>
   )
 }
 
-function ClausesPanel({ clauses }: { clauses: ContractDetail["clauses"] }) {
+/**
+ * Abre a custódia de um contrato assinado.
+ *
+ * <p>Existe aqui, e não no quadro de custódia, porque é aqui que a pergunta aparece: o
+ * contrato acabou de ser assinado e o próximo passo é reservar o dinheiro. A ordem
+ * contrato assinado → depósito → produção é imutável (RN-O-034).</p>
+ *
+ * <p>A taxa da plataforma NÃO é pedida: ela é termo do contrato e a custódia herda. Pedir
+ * de novo abriria espaço para divergir do que foi assinado.</p>
+ */
+function OpenEscrowPanel({ contractId }: { contractId: string }) {
+  const { open } = useEscrowMutations()
+  const [amount, setAmount] = useState("")
+
+  const cents = Math.round(Number(amount.replace(/\./g, "").replace(",", ".")) * 100)
+  const valid = Number.isFinite(cents) && cents > 0
+
+  const submit = async () => {
+    if (!valid) return
+    try {
+      await open.mutateAsync({ contractId, amountCents: cents })
+      toast.success("Custódia aberta. O próximo passo é o depósito.")
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Não foi possível abrir a custódia.")
+    }
+  }
+
+  return (
+    <RoleGate allow={["Owner", "Admin", "Manager"]}>
+      <div
+        className="rounded-xl border p-4"
+        style={{ background: "var(--surface)", borderColor: "var(--color-teal-500)" }}
+      >
+        <div className="text-[13.5px] font-medium mb-1" style={{ color: "var(--color-teal-500)" }}>
+          Assinado — abra a custódia
+        </div>
+        <p className="text-[12.5px] text-ink-muted m-0 mb-3">
+          O valor fica reservado no provedor antes de o criador começar a produzir. Nenhum
+          centavo passa por conta da Zoe.
+        </p>
+
+        <div className="flex gap-2 flex-wrap sm:flex-nowrap">
+          <div className="flex-1 min-w-[160px]">
+            <div className="text-[11px] text-ink-muted mb-1.5">Valor bruto do contrato</div>
+            <Input
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              inputMode="decimal"
+              placeholder="15000,00"
+            />
+          </div>
+          <button
+            onClick={submit}
+            disabled={!valid || open.isPending}
+            className="self-end inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-[13.5px] font-medium text-white disabled:opacity-50 shrink-0"
+            style={{ background: "var(--color-teal-500)" }}
+          >
+            {open.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            Abrir custódia
+          </button>
+        </div>
+
+        <p className="text-[11.5px] text-ink-muted mt-2 mb-0">
+          A taxa da plataforma vem do contrato assinado — não é pedida de novo aqui.
+        </p>
+      </div>
+    </RoleGate>
+  )
+}
+
+/**
+ * Cláusulas do contrato, com edição das próprias — Nível 2 da personalização (RN-O-024).
+ *
+ * <p>Cláusula de sistema aparece com cadeado e sem qualquer controle: escrow, disclosure
+ * CONAR e auditoria são imutáveis em todos os níveis. Não é o front decidindo isso — o
+ * domínio recusa de qualquer forma; aqui a tela apenas não oferece o que seria negado.</p>
+ *
+ * <p>Sem o add-on, a resposta do backend traz <code>custom_contracts_required</code> e a
+ * tela abre o convite de upgrade. Esconder o recurso converteria zero.</p>
+ */
+function ClausesPanel({ contract }: { contract: ContractDetail }) {
+  const clauses = contract.clauses
+  const isDraft = contract.status === "Draft"
+
+  const update = useCustomClauseMutations(contract.contractId)
+  const [editing, setEditing] = useState(false)
+  const [upgrade, setUpgrade] = useState(false)
+  const [drafts, setDrafts] = useState<{ title: string; body: string }[]>([])
+
+  // A faixa 50–89 identifica as próprias. Não há flag no DTO: a ordem É a semântica,
+  // e derivar daqui evita um campo que pode divergir do que o domínio impõe.
+  const isCustom = (order: number) => order >= 50 && order < 90
+
+  const startEditing = () => {
+    setDrafts(clauses.filter((c) => isCustom(c.order)).map((c) => ({ title: c.title, body: c.body })))
+    setEditing(true)
+  }
+
+  const save = async () => {
+    const clean = drafts.filter((d) => d.title.trim() && d.body.trim())
+    try {
+      await update.mutateAsync(clean)
+      setEditing(false)
+      toast.success(clean.length === 0 ? "Cláusulas próprias removidas." : "Cláusulas salvas.")
+    } catch (e) {
+      if (e instanceof ApiError && e.problem?.code === CUSTOM_CONTRACTS_UPGRADE_CODE) {
+        setEditing(false)
+        setUpgrade(true)
+        return
+      }
+      toast.error(e instanceof ApiError ? e.message : "Não foi possível salvar.")
+    }
+  }
+
   return (
     <div className="rounded-xl border border-border-soft p-4">
-      <div className="eyebrow mb-2.5">Cláusulas ({clauses.length})</div>
+      <div className="flex items-center justify-between gap-2 mb-2.5">
+        <div className="eyebrow">Cláusulas ({clauses.length})</div>
+        {isDraft && !editing && (
+          <RoleGate allow={["Owner", "Admin", "Manager"]}>
+            <button
+              onClick={startEditing}
+              className="text-[11.5px] font-medium inline-flex items-center gap-1"
+              style={{ color: "var(--color-teal-500)" }}
+            >
+              <PenLine className="w-3 h-3" /> Cláusulas próprias
+            </button>
+          </RoleGate>
+        )}
+      </div>
+
+      {upgrade && (
+        <div
+          className="rounded-lg p-3 mb-3 text-[12.5px]"
+          style={{ background: "#00A79912", border: "1px solid var(--color-teal-500)" }}
+        >
+          <div className="font-medium mb-0.5" style={{ color: "var(--color-teal-500)" }}>
+            Cláusulas próprias são um add-on
+          </div>
+          <p className="m-0 text-ink-2">
+            Preencher valores e ocultar campos você já pode. Acrescentar cláusulas ao
+            contrato faz parte do pacote de contratos personalizados — fale com o time
+            comercial para habilitar.
+          </p>
+          <button
+            onClick={() => setUpgrade(false)}
+            className="text-[11.5px] mt-2 underline text-ink-muted"
+          >
+            Entendi
+          </button>
+        </div>
+      )}
+
+      {editing && (
+        <div className="flex flex-col gap-2.5 mb-3">
+          {drafts.map((d, i) => (
+            <div key={i} className="rounded-lg border border-border-soft p-2.5 flex flex-col gap-2">
+              <Input
+                value={d.title}
+                onChange={(e) =>
+                  setDrafts((p) => p.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)))
+                }
+                placeholder="Título da cláusula"
+              />
+              <textarea
+                value={d.body}
+                onChange={(e) =>
+                  setDrafts((p) => p.map((x, j) => (j === i ? { ...x, body: e.target.value } : x)))
+                }
+                placeholder="Texto da cláusula"
+                rows={3}
+                className="w-full px-2.5 py-2 rounded-lg border border-border-soft text-[13px] bg-transparent resize-y"
+                style={{ color: "var(--ink)" }}
+              />
+              <button
+                onClick={() => setDrafts((p) => p.filter((_, j) => j !== i))}
+                className="self-start text-[11.5px] text-ink-muted underline"
+              >
+                Remover
+              </button>
+            </div>
+          ))}
+
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => setDrafts((p) => [...p, { title: "", body: "" }])}
+              className="px-3 py-1.5 rounded-lg text-[12.5px] border border-border-soft"
+            >
+              + Adicionar cláusula
+            </button>
+            <button
+              onClick={save}
+              disabled={update.isPending}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-medium text-white disabled:opacity-50"
+              style={{ background: "var(--color-teal-500)" }}
+            >
+              {update.isPending && <Loader2 className="w-3 h-3 animate-spin" />} Salvar
+            </button>
+            <button
+              onClick={() => setEditing(false)}
+              className="px-3 py-1.5 rounded-lg text-[12.5px] border border-border-soft"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
       <ol className="flex flex-col gap-2 m-0 p-0 list-none">
         {clauses.map((c) => (
           <li key={c.order} className="text-[12.5px] flex items-start gap-1.5">

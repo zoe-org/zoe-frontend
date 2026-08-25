@@ -23,6 +23,12 @@ export type RosterItem = {
   status: string
   addedAt: string
   contractCount: number
+  /**
+   * Estado do relacionamento, derivado no backend: Contratado | Aceito | Convidado |
+   * ConviteExpirado, ou o status no elenco (Active/Paused/Archived) quando não houve
+   * convite. Não existe "Recusou" — o convite não tem recusa explícita.
+   */
+  relationshipStatus: string
 }
 
 export type ListRosterResponse = { items: RosterItem[] }
@@ -415,7 +421,7 @@ export type ContractField = {
   value: string | null
 }
 
-export type ContractClause = { order: number; title: string; isSystem: boolean }
+export type ContractClause = { order: number; title: string; isSystem: boolean; body: string }
 
 export type ContractDetail = {
   contractId: string
@@ -432,6 +438,9 @@ export type ContractDetail = {
   reviewSlaDays: number
   maxResubmissions: number
   autoReleaseOnTimeout: boolean
+  /** Custódia já aberta. Nulo com usesEscrow = a tela oferece abrir. */
+  escrowAccountId: string | null
+  escrowState: string | null
   signedAt: string | null
   signatureProviderRef: string | null
   fields: ContractField[]
@@ -494,6 +503,10 @@ export const operationsApi = {
   addInfluencer: (body: AddInfluencerBody) =>
     apiClient.post<AddInfluencerResponse>("/api/operations/influencers", body),
 
+  updateCustomClauses: (contractId: string, clauses: { title: string; body: string }[]) =>
+    apiClient.put<{ contractId: string; clauseCount: number }>(
+      `/api/operations/contracts/${contractId}/custom-clauses`, { clauses }),
+
   listEscrow: (state?: string, opts?: { signal?: AbortSignal }) =>
     apiClient.get<ListEscrowResponse>(
       `/api/operations/escrow${state ? `?state=${encodeURIComponent(state)}` : ""}`,
@@ -505,6 +518,17 @@ export const operationsApi = {
    * `queued: true` — nenhuma operação financeira roda dentro do request (RN-O-044).
    * StartProduction transiciona na hora porque não move dinheiro.
    */
+  /** Abre a custódia de um contrato assinado. A taxa NÃO vai aqui — vem do contrato. */
+  openEscrow: (body: { contractId: string; amountCents: number; currency?: string }) =>
+    apiClient.post<{
+      escrowAccountId: string
+      contractId: string
+      state: EscrowState
+      amountCents: number
+      takeRateCents: number
+      netToInfluencerCents: number
+    }>("/api/operations/escrow", body),
+
   applyEscrowAction: (escrowAccountId: string, action: EscrowAction) =>
     apiClient.post<{
       escrowAccountId: string
@@ -859,6 +883,11 @@ export type EscrowSummary = {
   netToInfluencerCents: number
   authorizationExpiresAt: string | null
   isAuthorizationExpired: boolean
+  /**
+   * Quando a reserva caducou sem renovação (RN-O-046). Preenchido = o dinheiro NÃO está
+   * mais separado, e a liberação vai recusar.
+   */
+  authorizationLapsedAt: string | null
   disputeReason: string | null
   payoutAccountMissing: boolean
   /** Operação financeira já enfileirada e ainda não processada (RN-O-044). */
@@ -953,10 +982,35 @@ export function useEscrowAccounts(state?: string) {
   })
 }
 
+/** Código que o backend devolve quando falta o add-on — a tela abre upgrade, não erro. */
+export const CUSTOM_CONTRACTS_UPGRADE_CODE = "custom_contracts_required"
+
+export function useCustomClauseMutations(contractId: string) {
+  const { activeTenantId } = useAuth()
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: (clauses: { title: string; body: string }[]) =>
+      operationsApi.updateCustomClauses(contractId, clauses),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["operations-contract", activeTenantId, contractId] })
+    },
+  })
+}
+
 export function useEscrowMutations() {
   const { activeTenantId } = useAuth()
   const qc = useQueryClient()
   return {
+    open: useMutation({
+      mutationFn: (v: { contractId: string; amountCents: number }) =>
+        operationsApi.openEscrow(v),
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: ["operations-escrow", activeTenantId] })
+        qc.invalidateQueries({ queryKey: ["operations-contract", activeTenantId] })
+        qc.invalidateQueries({ queryKey: ["operations-contracts", activeTenantId] })
+      },
+    }),
     apply: useMutation({
       mutationFn: (v: { escrowAccountId: string; action: EscrowAction }) =>
         operationsApi.applyEscrowAction(v.escrowAccountId, v.action),

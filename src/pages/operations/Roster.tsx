@@ -31,11 +31,19 @@ export default function OperationsRosterPage() {
   const [addOpen, setAddOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
 
-  const items = useMemo(() => roster.data?.items ?? [], [roster.data])
+  const all = useMemo(() => roster.data?.items ?? [], [roster.data])
+  const [rel, setRel] = useState<string>("")
+
+  const items = useMemo(
+    () => (rel ? all.filter((i) => i.relationshipStatus === rel) : all),
+    [all, rel],
+  )
 
   return (
     <div className="-m-6 border-t border-border-soft" style={{ color: "var(--ink)" }}>
       {/* Hero */}
+      <RelationshipTabs items={all} value={rel} onChange={setRel} />
+
       <section className="px-8 pt-7 pb-5 border-b border-border-soft" style={{ background: "var(--surface)" }}>
         <div className="flex items-start justify-between gap-6 flex-wrap">
           <div>
@@ -147,6 +155,71 @@ function RosterRow({ item, index }: { item: RosterItem; index: number }) {
       <td className="py-3.5 font-mono-zoe text-ink-2">{item.contractCount}</td>
       <td className="px-8 py-3.5 font-mono-zoe text-ink-2">{fmtDate(item.addedAt)}</td>
     </tr>
+  )
+}
+
+/**
+ * Filtro por estado do relacionamento.
+ *
+ * <p>As abas saem dos dados, não de uma lista fixa: só aparece o estado que existe no
+ * elenco. Aba com zero é aba que o usuário clica e não entende por que está vazia.</p>
+ *
+ * <p><b>Não há "Recusou".</b> O convite tem aceite e vencimento, e nenhuma recusa
+ * explícita — o criador aceita ou deixa vencer. O protótipo mostra essa aba; o domínio
+ * não sabe produzi-la, e inventá-la aqui seria rotular como recusa o que é silêncio.</p>
+ */
+function RelationshipTabs({
+  items,
+  value,
+  onChange,
+}: {
+  items: RosterItem[]
+  value: string
+  onChange: (v: string) => void
+}) {
+  const counts = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const i of items) m.set(i.relationshipStatus, (m.get(i.relationshipStatus) ?? 0) + 1)
+    return m
+  }, [items])
+
+  // Ordem do fluxo, não alfabética: é a jornada do criador com a marca.
+  const ORDER = ["Convidado", "Aceito", "Contratado", "Active", "Paused", "ConviteExpirado", "Archived"]
+  const present = ORDER.filter((k) => counts.has(k))
+
+  if (present.length <= 1) return null
+
+  return (
+    <div className="flex gap-1 flex-wrap">
+      <TabButton label="Todos" count={items.length} active={value === ""} onClick={() => onChange("")} />
+      {present.map((k) => (
+        <TabButton
+          key={k}
+          label={tEnum("relationshipStatus", k)}
+          count={counts.get(k) ?? 0}
+          active={value === k}
+          onClick={() => onChange(k)}
+        />
+      ))}
+    </div>
+  )
+}
+
+function TabButton({
+  label, count, active, onClick,
+}: { label: string; count: number; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="px-3 py-1.5 rounded-lg text-[12.5px] font-medium transition-colors"
+      style={
+        active
+          ? { background: "var(--color-teal-500)", color: "#fff" }
+          : { color: "var(--ink-muted)", border: "1px solid var(--border-soft)" }
+      }
+    >
+      {label} <span style={{ opacity: 0.7 }}>({count})</span>
+    </button>
   )
 }
 

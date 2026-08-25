@@ -197,8 +197,14 @@ function EscrowCard({
           <Wallet className="w-2.5 h-2.5" /> sem conta de recebimento
         </div>
       )}
-      {e.isAuthorizationExpired && (
-        <div className="flex items-center gap-1 text-[10.5px] mt-2" style={{ color: "#DC2626" }}>
+      {/* Caduca é pior que vencida: vencida é a data ter passado, caduca é a renovação
+          ter falhado — o dinheiro NÃO está mais reservado e a liberação vai recusar. */}
+      {e.authorizationLapsedAt ? (
+        <div className="flex items-center gap-1 text-[10.5px] mt-2 font-semibold" style={{ color: "#DC2626" }}>
+          <AlertTriangle className="w-2.5 h-2.5" /> reserva caiu — refinanciar
+        </div>
+      ) : e.isAuthorizationExpired && (
+        <div className="flex items-center gap-1 text-[10.5px] mt-2" style={{ color: "#D97706" }}>
           <Clock className="w-2.5 h-2.5" /> autorização vencida
         </div>
       )}
@@ -296,7 +302,24 @@ function EscrowDrawer({ e, onClose }: { e: EscrowSummary; onClose: () => void })
             </div>
           )}
 
-          {e.authorizationExpiresAt && !e.isTerminal && (
+          {e.authorizationLapsedAt && !e.isTerminal && (
+            <div
+              className="rounded-lg p-3 mt-4 flex items-start gap-2.5"
+              style={{ background: "#DC262612", border: "1px solid #DC2626" }}
+            >
+              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" style={{ color: "#DC2626" }} />
+              <div className="text-[12.5px]" style={{ color: "var(--ink-2)" }}>
+                <div className="font-semibold mb-0.5" style={{ color: "#DC2626" }}>
+                  O dinheiro não está mais reservado
+                </div>
+                A renovação da autorização falhou em {fmtDate(e.authorizationLapsedAt)} e o
+                provedor soltou a reserva. A entrega e o trabalho do criador seguem valendo —
+                o que falta é financiar de novo antes de liberar o pagamento.
+              </div>
+            </div>
+          )}
+
+          {e.authorizationExpiresAt && !e.authorizationLapsedAt && !e.isTerminal && (
             <p
               className="text-[11.5px] mt-4 mb-0"
               style={{ color: e.isAuthorizationExpired ? "#DC2626" : "var(--ink-muted)" }}

@@ -7,7 +7,7 @@ export type EnumKind =
   | "classification" | "sentiment" | "nerMode" | "pipelinePath"
   | "kycStatus" | "rosterStatus"
   | "contractModality" | "contractStatus" | "escrowState" | "campaignStatus"
-  | "deliveryStatus" | "briefingSentiment" | "auditCriterion"
+  | "deliveryStatus" | "briefingSentiment" | "auditCriterion" | "relationshipStatus"
 
 type LocaleDictionaries = Record<EnumKind, Record<string, string>>
 
@@ -46,6 +46,17 @@ const dictionaries: Record<string, LocaleDictionaries> = {
       Pending: "Em análise",
       Verified: "Verificado",
       Rejected: "Recusado",
+    },
+    // Estado derivado do relacionamento com o criador. Mistura ciclo do convite,
+    // existência de contrato e status no elenco — por isso não espelha um enum só.
+    relationshipStatus: {
+      Convidado: "Convidado",
+      Aceito: "Aceito",
+      Contratado: "Contratado",
+      ConviteExpirado: "Convite expirado",
+      Active: "No elenco",
+      Paused: "Pausado",
+      Archived: "Arquivado",
     },
     rosterStatus: {
       Active: "Ativo",
