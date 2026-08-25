@@ -12,6 +12,8 @@ import { setOnboardingIntent, type OnboardingIntent } from "@/features/auth/onbo
 import {
   getPendingInviteToken, clearPendingInviteToken,
   getPendingInfluencerInviteToken,
+  getPendingInviteEmail,
+  clearPendingInviteEmail,
 } from "@/features/auth/pendingInvite"
 import { invitesApi } from "@/lib/api/invites"
 import { ApiError, setActiveTenantId } from "@/lib/api"
@@ -439,6 +441,7 @@ function StepVerification({
           const res = await invitesApi.accept(inviteToken)
           setActiveTenantId(res.tenantId)
           clearPendingInviteToken()
+          clearPendingInviteEmail()
           await refresh()
           nav("/dashboard", { replace: true })
         } catch {
@@ -455,6 +458,9 @@ function StepVerification({
       // convite conduz o fim do fluxo, em vez do dashboard.
       const creatorToken = getPendingInfluencerInviteToken()
       if (creatorToken) {
+        // O token fica: quem conduz o aceite é a tela do convite. Só o e-mail sai, que
+        // já cumpriu o papel de destravar o cadastro.
+        clearPendingInviteEmail()
         await refresh()
         nav(`/convite-criador/${creatorToken}`, { replace: true })
         return
@@ -544,7 +550,9 @@ export default function RegisterPage() {
 
   const [step, setStep] = useState(initial?.step ?? (inviteMode ? 2 : 1))
   const [intent, setIntent] = useState("")
-  const [email, setEmail] = useState(initial?.email ?? "")
+  // Em modo convite o campo é travado, então o valor TEM de vir de algum lugar: do
+  // estado de navegação (convite de membro) ou do que a tela de convite guardou.
+  const [email, setEmail] = useState(initial?.email ?? getPendingInviteEmail() ?? "")
   const [password, setPassword] = useState<string | null>(null)
 
   const minStep = inviteMode ? 2 : 1

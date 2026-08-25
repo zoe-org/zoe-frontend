@@ -27,6 +27,27 @@ export function clearPendingInviteToken() {
  */
 const INFLUENCER_STORAGE_KEY = "zoe_pending_influencer_invite_token"
 
+/**
+ * E-mail do convite pendente.
+ *
+ * <p>Guardado junto do token porque o cadastro TRAVA o campo de e-mail em modo convite —
+ * o e-mail é a chave do aceite e não pode ser trocado. Sem guardá-lo, o campo ficava
+ * travado e vazio, e ninguém conseguia se cadastrar.</p>
+ */
+const EMAIL_KEY = "zoe_pending_invite_email"
+
+export function setPendingInviteEmail(email: string) {
+  try { localStorage.setItem(EMAIL_KEY, email) } catch { /* storage off */ }
+}
+
+export function getPendingInviteEmail(): string | null {
+  try { return localStorage.getItem(EMAIL_KEY) } catch { return null }
+}
+
+export function clearPendingInviteEmail() {
+  try { localStorage.removeItem(EMAIL_KEY) } catch { /* storage off */ }
+}
+
 export function setPendingInfluencerInviteToken(token: string) {
   try { localStorage.setItem(INFLUENCER_STORAGE_KEY, token) } catch { /* storage off */ }
 }

@@ -32,16 +32,24 @@ export default function CreatorPayoutPage() {
   const d = workspace.data
   const returned = params.get("status")
 
-  // Ao voltar do provedor, perguntar o estado real. Ele verifica no tempo dele e não
-  // avisa ninguém — sem esta chamada a tela mostraria "pendente" para quem acabou de
-  // concluir. Uma vez só: o ref evita repetir a cada re-render.
-  const syncedOnReturn = useRef(false)
+  // Sincroniza ao ENTRAR, não só ao voltar do provedor.
+  //
+  // O retorno pela returnUrl é o caminho feliz — e não é o mais comum. Quem conclui o
+  // cadastro costuma fechar a aba do provedor em vez de clicar em voltar, e aí o
+  // `?status=concluido` nunca chega: o banco fica dizendo "pendente" para quem já se
+  // verificou. Perguntar na montagem cobre os dois casos.
+  //
+  // Uma vez por visita: a verificação não muda de segundo em segundo, e o comando
+  // escreve — repetir a cada render encheria a trilha de auditoria de não-eventos.
+  const synced = useRef(false)
   useEffect(() => {
-    if (!returned || syncedOnReturn.current) return
-    syncedOnReturn.current = true
+    if (synced.current) return
+    synced.current = true
 
     sync.mutate(undefined, {
-      onSettled: () => setParams({}, { replace: true }),
+      // Limpa a query string quando veio pelo retorno: recarregar a página não deve
+      // reexibir "seu link venceu" de uma tentativa que já passou.
+      onSettled: () => { if (returned) setParams({}, { replace: true }) },
     })
   }, [returned, sync, setParams])
 

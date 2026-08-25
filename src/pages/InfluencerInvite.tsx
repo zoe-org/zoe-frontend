@@ -7,6 +7,7 @@ import { ApiError } from "@/lib/api"
 import { useAuth } from "@/features/auth/context"
 import {
   setPendingInfluencerInviteToken,
+  setPendingInviteEmail,
   clearPendingInfluencerInviteToken,
 } from "@/features/auth/pendingInvite"
 import { tEnum } from "@/i18n/enums"
@@ -41,6 +42,12 @@ export default function InfluencerInvitePage() {
   useEffect(() => {
     if (token) setPendingInfluencerInviteToken(token)
   }, [token])
+
+  // O e-mail vai junto: o cadastro trava esse campo em modo convite, e sem tê-lo aqui
+  // ele ficava travado E vazio — ninguém conseguia se cadastrar.
+  useEffect(() => {
+    if (preview.data?.email) setPendingInviteEmail(preview.data.email)
+  }, [preview.data?.email])
 
   // Convite que não tem mais para onde ir (vencido, já aceito, inexistente) precisa
   // sair do armazenamento: senão o ProtectedRoute devolve a pessoa para cá em loop.
