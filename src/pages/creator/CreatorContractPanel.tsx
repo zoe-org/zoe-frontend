@@ -1,11 +1,13 @@
 import { useState } from "react"
-import { Loader2, FileText, Lock, Download, AlertCircle } from "lucide-react"
+import { Loader2, FileText, Lock, Download, AlertCircle, Send } from "lucide-react"
 import { toast } from "sonner"
 import { ApiError } from "@/lib/api"
 import { tEnum } from "@/i18n/enums"
 import { fmtDate } from "@/pages/operations/format"
 import { fmtCents } from "@/lib/api/operations"
-import { useCreatorContract, creatorApi, type CreatorEngagement } from "@/lib/api/creator"
+import {
+  useCreatorContract, useResendSignature, creatorApi, type CreatorEngagement,
+} from "@/lib/api/creator"
 
 /**
  * O contrato pela ótica do criador.
@@ -58,7 +60,18 @@ export function CreatorContractPanel({ engagements }: { engagements: CreatorEnga
 }
 
 function ContractView({ contractId }: { contractId: string }) {
+
+  const resend = async () => {
+    try {
+      const r = await resending.mutateAsync()
+      if (r.sent) toast.success("Link reenviado. Confira seu e-mail.")
+      else toast.error(r.message ?? "O provedor não reenviou o aviso.")
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Não foi possível reenviar.")
+    }
+  }
   const contract = useCreatorContract(contractId)
+  const resending = useResendSignature(contractId)
   const [downloading, setDownloading] = useState(false)
 
   const openPdf = async () => {
@@ -121,6 +134,33 @@ function ContractView({ contractId }: { contractId: string }) {
             Abrir PDF
           </button>
         </div>
+
+        {/* Assinar é a ação mais urgente desta tela: até acontecer, nada avança — sem
+            contrato assinado não há depósito, e sem depósito não há produção.
+
+            A Clicksign não expõe link de assinatura pela API, então o que a tela oferece é
+            reenviar o aviso. Resolve o problema real, que é o e-mail ter se perdido. */}
+        {c.canResendSignature && (
+          <div className="mt-4 rounded-lg p-3.5" style={{ background: "#D9770610" }}>
+            <div className="text-[13px] font-medium mb-1" style={{ color: "#D97706" }}>
+              Aguardando sua assinatura
+            </div>
+            <p className="text-[12.5px] text-ink-2 m-0">
+              O link foi enviado para o seu e-mail pela Clicksign. Não achou? Peça de novo.
+            </p>
+            <button
+              onClick={resend}
+              disabled={resending.isPending}
+              className="mt-2.5 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[12.5px] font-medium border border-border-soft disabled:opacity-50"
+            >
+              {resending.isPending
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <Send className="w-3.5 h-3.5" />}
+              Reenviar link de assinatura
+            </button>
+          </div>
+        )}
+
 
         {/* O criador tem direito de ver quanto a plataforma retém — é o que a cláusula de
             sistema declara às partes, então a tela não pode esconder. */}

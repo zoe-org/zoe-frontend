@@ -77,6 +77,11 @@ export type CreatorContract = {
   takeRateCents: number | null
   netToInfluencerCents: number | null
   takeRateBps: number | null
+  /**
+   * Se a tela pode oferecer o reenvio do aviso. A Clicksign não expõe link de assinatura
+   * pela API — o caminho até o documento é o e-mail que ela dispara.
+   */
+  canResendSignature: boolean
   escrowState: EscrowState | null
   clauses: CreatorContractClause[]
   fields: CreatorContractField[]
@@ -136,6 +141,10 @@ export const creatorApi = {
   }) =>
     apiClient.post<{ draftId: string; status: string; revision: number }>(
       "/api/creator/deliveries/draft", body, { noTenant: true }),
+
+  resendSignature: (contractId: string) =>
+    apiClient.post<{ sent: boolean; message: string | null }>(
+      `/api/creator/contracts/${contractId}/resend-signature`, {}, { noTenant: true }),
 
   startPayoutOnboarding: () =>
     apiClient.post<StartPayoutOnboarding>("/api/creator/payout-account", {}, { noTenant: true }),
@@ -237,6 +246,12 @@ export function useDraftUpload() {
       })
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["creator-workspace"] }),
+  })
+}
+
+export function useResendSignature(contractId: string) {
+  return useMutation({
+    mutationFn: () => creatorApi.resendSignature(contractId),
   })
 }
 
