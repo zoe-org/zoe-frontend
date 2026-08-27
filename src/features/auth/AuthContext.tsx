@@ -26,6 +26,7 @@ const DEV_MOCK: { me: Me; tenant: MeTenant } = {
       name: "Zoe Dev",
       slug: "zoe-dev",
       status: "Active",
+      taxId: null,
     },
     role: "Owner",
     features: ["intelligence", "operations"],

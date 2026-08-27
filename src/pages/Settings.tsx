@@ -6,6 +6,7 @@ import { useAuth } from "@/features/auth/context"
 import { ApiError } from "@/lib/api"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { useFeatureCatalog, useFeatureMutations, type FeatureCatalog } from "@/lib/api/features"
+import { meApi } from "@/lib/api/me"
 
 type Tab = "perfil" | "addons" | "aparencia"
 
@@ -17,7 +18,7 @@ function initials(name?: string | null, email?: string | null): string {
 }
 
 export default function SettingsPage() {
-  const { user, role, memberships, activeTenantId, hasFeature } = useAuth()
+  const { user, role, memberships, activeTenantId, activeTenant, hasFeature } = useAuth()
   const isAdmin = role === "Owner" || role === "Admin"
 
   const [tab, setTab] = useState<Tab>("perfil")
@@ -98,6 +99,13 @@ export default function SettingsPage() {
               <div className="h-px bg-border-soft my-3.5" />
               <Row label="Seu papel" value={role ?? "—"} />
               <Row label="Workspaces" value={`${memberships.length}`} />
+
+              <div className="h-px bg-border-soft my-3.5" />
+              <TenantTaxId
+                tenantId={activeTenantId}
+                current={activeTenant?.tenant.taxId ?? null}
+                canEdit={isAdmin}
+              />
             </div>
           </div>
         )}
@@ -107,6 +115,78 @@ export default function SettingsPage() {
         {tab === "aparencia" && <AppearanceTab />}
       </section>
     </div>
+  )
+}
+
+/**
+ * CNPJ do contratante.
+ *
+ * <p>Identifica a parte no contrato e no documento fiscal — sem ele o contrato sai sem
+ * qualificar quem contrata, e a nota da taxa não pode ser emitida.</p>
+ *
+ * <p>Só Owner e Admin editam: é dado que aparece em documento com validade jurídica.</p>
+ */
+function TenantTaxId({
+  tenantId, current, canEdit,
+}: {
+  tenantId: string | null
+  current: string | null
+  canEdit: boolean
+}) {
+  const [value, setValue] = useState("")
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState<string | null>(null)
+
+  const shown = saved ?? current
+
+  if (shown) return <Row label="CNPJ" value={shown} />
+
+  if (!canEdit) {
+    return <Row label="CNPJ" value="não informado" />
+  }
+
+  const submit = async (ev: React.FormEvent) => {
+    ev.preventDefault()
+    if (!tenantId) return
+    setSaving(true)
+    try {
+      const r = await meApi.setTaxId(tenantId, value)
+      setSaved(r.formatted)
+      toast.success("CNPJ registrado.")
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Não foi possível registrar o CNPJ.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <form onSubmit={submit}>
+      <label className="block text-[11.5px] text-ink-muted font-medium mb-1">
+        CNPJ
+      </label>
+      <p className="text-[11.5px] text-ink-muted m-0 mb-2">
+        Identifica sua empresa como parte nos contratos.
+      </p>
+      <div className="flex gap-2 flex-wrap">
+        <input
+          value={value}
+          onChange={(ev) => setValue(ev.target.value)}
+          placeholder="00.000.000/0000-00"
+          inputMode="numeric"
+          aria-label="CNPJ"
+          className="flex-1 min-w-[170px] px-3 py-2 text-[13px] rounded-lg border border-border-soft bg-[#FAFBFC] dark:bg-[#181B28]"
+          style={{ color: "var(--ink)" }}
+        />
+        <button
+          type="submit"
+          disabled={saving || value.trim().length === 0}
+          className="px-3.5 py-2 rounded-lg text-[13px] font-medium border border-border-soft disabled:opacity-50"
+        >
+          {saving ? "Salvando…" : "Salvar"}
+        </button>
+      </div>
+    </form>
   )
 }
 

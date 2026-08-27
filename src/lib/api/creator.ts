@@ -57,6 +57,8 @@ export type CreatorWorkspace = {
   kycStatus: string
   canReceivePayout: boolean
   payoutBlockedReason: string | null
+  /** Já com máscara, vindo do backend. Nulo enquanto ele não informar. */
+  taxId: string | null
   engagements: CreatorEngagement[]
 }
 
@@ -145,6 +147,10 @@ export const creatorApi = {
   resendSignature: (contractId: string) =>
     apiClient.post<{ sent: boolean; message: string | null }>(
       `/api/creator/contracts/${contractId}/resend-signature`, {}, { noTenant: true }),
+
+  setTaxId: (taxId: string) =>
+    apiClient.put<{ taxId: string; formatted: string }>(
+      "/api/creator/tax-id", { taxId }, { noTenant: true }),
 
   startPayoutOnboarding: () =>
     apiClient.post<StartPayoutOnboarding>("/api/creator/payout-account", {}, { noTenant: true }),
@@ -252,6 +258,14 @@ export function useDraftUpload() {
 export function useResendSignature(contractId: string) {
   return useMutation({
     mutationFn: () => creatorApi.resendSignature(contractId),
+  })
+}
+
+export function useSetCreatorTaxId() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (taxId: string) => creatorApi.setTaxId(taxId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["creator-workspace"] }),
   })
 }
 

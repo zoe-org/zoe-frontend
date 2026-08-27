@@ -12,7 +12,7 @@ import { tEnum } from "@/i18n/enums"
 import { fmtDate, initials } from "@/pages/operations/format"
 import { fmtCents, youtubeThumb, youtubeWatch } from "@/lib/api/operations"
 import {
-  useCreatorWorkspace, useCreatorMutations,
+  useCreatorWorkspace, useCreatorMutations, useSetCreatorTaxId,
   type CreatorEngagement, type CreatorDelivery,
 } from "@/lib/api/creator"
 import { CreatorContractPanel } from "@/pages/creator/CreatorContractPanel"
@@ -35,6 +35,74 @@ const DELIVERY_COLOR: Record<string, string> = {
  * O que ele faz aqui é o que o fluxo lhe reserva: ver em que campanhas foi contratado,
  * quanto vai receber, e mandar o link do vídeo quando a produção estiver liberada.
  */
+/**
+ * CPF ou CNPJ do criador.
+ *
+ * <p>Não confundir com o cadastro de recebimento: lá os dados fiscais ficam com o provedor
+ * de pagamentos de propósito, e continuam ficando. O documento é pedido aqui por outro
+ * motivo — um contrato precisa <b>identificar quem assina</b>, e o provedor não devolve
+ * esse dado para nós.</p>
+ *
+ * <p>Some depois de preenchido: é campo que se toca uma vez, e mantê-lo em destaque
+ * ocuparia a tela com uma tarefa já concluída.</p>
+ */
+function TaxIdCard({ current }: { current: string | null }) {
+  const [value, setValue] = useState("")
+  const save = useSetCreatorTaxId()
+
+  if (current) return null
+
+  const submit = async (ev: React.FormEvent) => {
+    ev.preventDefault()
+    try {
+      await save.mutateAsync(value)
+      toast.success("Documento registrado.")
+    } catch (e) {
+      toast.error(
+        e instanceof ApiError ? e.message : "Não foi possível registrar o documento.")
+    }
+  }
+
+  return (
+    <form
+      onSubmit={submit}
+      className="rounded-xl border border-border-soft p-5 mb-4"
+      style={{ background: "var(--surface)" }}
+    >
+      <div className="flex items-start gap-2.5 mb-1">
+        <FileText className="w-4 h-4 mt-0.5 shrink-0" style={{ color: "#D97706" }} />
+        <div>
+          <div className="text-[13.5px] font-semibold" style={{ color: "var(--ink)" }}>
+            Informe seu CPF ou CNPJ
+          </div>
+          <p className="text-[12.5px] text-ink-muted m-0 mt-0.5">
+            É o que identifica você como parte no contrato. Sem ele o documento sai
+            incompleto.
+          </p>
+        </div>
+      </div>
+
+      <div className="flex gap-2 mt-3 flex-wrap">
+        <Input
+          value={value}
+          onChange={(ev) => setValue(ev.target.value)}
+          placeholder="000.000.000-00"
+          inputMode="numeric"
+          className="max-w-[220px]"
+          aria-label="CPF ou CNPJ"
+        />
+        <button
+          type="submit"
+          disabled={save.isPending || value.trim().length === 0}
+          className="px-3.5 py-2 rounded-lg text-[13px] font-medium border border-border-soft disabled:opacity-50"
+        >
+          {save.isPending ? "Salvando…" : "Salvar"}
+        </button>
+      </div>
+    </form>
+  )
+}
+
 export default function CreatorHomePage() {
   const { user, signOut } = useAuth()
   const workspace = useCreatorWorkspace()
@@ -140,6 +208,10 @@ export default function CreatorHomePage() {
                 count={d.engagements.length}
               />
             </div>
+
+            {/* Fica acima das abas porque vale para as duas: sem documento, o contrato
+                sai sem identificar a parte contratada. */}
+            <TaxIdCard current={d.taxId} />
 
             {tab === "campanhas" ? (
               <div className="flex flex-col gap-4">

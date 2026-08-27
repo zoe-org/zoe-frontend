@@ -25,6 +25,8 @@ export type TenantInfo = {
   name: string
   slug: string | null
   status: string
+  /** CNPJ já com máscara. Nulo enquanto ninguém informar. */
+  taxId: string | null
 }
 
 export type MeTenant = {
@@ -39,4 +41,9 @@ export const meApi = {
   /** Contexto do tenant ativo. Requer X-Tenant-Id (injetado pelo client). */
   getTenant: (tenantId?: string) =>
     apiClient.get<MeTenant>("/api/me/tenant", tenantId ? { tenantId } : undefined),
+
+  /** CNPJ do contratante. Aceita com ou sem máscara; o backend normaliza e valida. */
+  setTaxId: (tenantId: string, taxId: string) =>
+    apiClient.put<{ taxId: string; formatted: string }>(
+      `/api/tenants/${tenantId}/tax-id`, { taxId }),
 }
