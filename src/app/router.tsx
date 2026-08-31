@@ -19,6 +19,7 @@ import ReportsPage from "@/pages/Reports"
 import ReportViewPage from "@/pages/ReportView"
 import UsersPage from "@/pages/Users"
 import UsagePage from "@/pages/Usage"
+import PlanPage from "@/pages/Plan"
 import SettingsPage from "@/pages/Settings"
 import AdminBrandsPage from "@/pages/admin/AdminBrands"
 
@@ -60,6 +61,9 @@ export const router = createBrowserRouter([
       // Consumo: sem gate de feature, igual ao backend — ver o próprio gasto não é
       // funcionalidade paga, e gatear esconderia justamente de quem está em apuros.
       { path: "/usage", element: <UsagePage /> },
+      // Plano e faturamento: leitura para qualquer membro, troca gated por Admin/Owner
+      // no backend — quem avalia a compra nem sempre é quem assina.
+      { path: "/plan", element: <PlanPage /> },
       { path: "/settings", element: <SettingsPage /> },
       // Curadoria admin (ADR-021). O gate visual é o `isZoeAdmin`; a autoridade
       // real é a policy ZoeAdmin no backend (403 em /api/admin/*).
