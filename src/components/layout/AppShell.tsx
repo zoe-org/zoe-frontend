@@ -4,13 +4,14 @@ import { NavLink, Link, Outlet, useLocation, useNavigate } from "react-router-do
 import {
   House, Brain, Settings, Bell,
   ChevronDown, ChevronUp, Search, PanelLeftClose, PanelLeftOpen, ChevronsUpDown,
-  Sun, Moon, LogOut, Check, Plus, ShieldCheck,
+  Sun, Moon, LogOut, Check, Plus, ShieldCheck, AlertCircle,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useAuth } from "@/features/auth/context"
 import { useFeature } from "@/features/auth/useFeature"
 import { useAlertUnreadCount } from "@/lib/api/alerts"
+import { useSubscription } from "@/lib/api/billing"
 import { useRealtimeConnection } from "@/lib/realtime"
 import { Breadcrumb } from "@/components/ui/breadcrumb"
 import { BrandSwitcher } from "@/components/layout/BrandSwitcher"
@@ -160,6 +161,8 @@ export function AppShell() {
             {sidebarOpen ? <PanelLeftClose className="h-5" /> : <PanelLeftOpen className="h-5" />}
           </button>
         </div>
+
+        {sidebarOpen && <TrialBadge />}
 
         {/* Navigation */}
         <nav className={`flex-1 py-2 space-y-1 overflow-y-auto ${sidebarOpen ? "pl-2 pr-4" : "px-2"}`}>
@@ -362,6 +365,7 @@ export function AppShell() {
 
         {/* Content */}
         <main className="flex-1 p-6 overflow-y-auto">
+          <TrialBanner />
           <Outlet />
         </main>
       </div>
@@ -369,4 +373,66 @@ export function AppShell() {
   )
 }
 
+// ── Período de teste ───────────────────────────────────────────────────────
 
+/**
+ * Dias até o fim do teste, ou null fora dele. Conta contra o `asOf` da resposta — o
+ * relógio do servidor —, não contra o do navegador: render puro e sem depender da
+ * hora local estar certa.
+ */
+function useTrialDaysLeft(): number | null {
+  const { data } = useSubscription()
+  if (!data || data.status !== "Trialing" || !data.trialEndsAt) return null
+
+  const ms = new Date(data.trialEndsAt).getTime() - new Date(data.asOf).getTime()
+  return Math.max(0, Math.ceil(ms / 86_400_000))
+}
+
+function TrialBadge() {
+  const days = useTrialDaysLeft()
+  if (days === null) return null
+
+  return (
+    <Link
+      to="/plan"
+      className="mx-3 mb-1 flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-[12px] transition-colors hover:opacity-80"
+      style={{ background: "var(--color-teal-50)", color: "var(--color-teal-700)" }}
+    >
+      <span className="font-medium">Período de teste</span>
+      <span className="font-mono-zoe">{days === 1 ? "1 dia" : `${days} dias`}</span>
+    </Link>
+  )
+}
+
+/** Só nos últimos dias: faixa permanente vira ruído e para de ser lida. */
+function TrialBanner() {
+  const days = useTrialDaysLeft()
+  if (days === null || days > 3) return null
+
+  return (
+    <div
+      className="mb-5 flex items-start gap-3 rounded-[14px] border px-4 py-3.5"
+      style={{ background: "#FFFBEB", borderColor: "rgba(217,119,6,.32)" }}
+    >
+      <AlertCircle className="w-[17px] h-[17px] shrink-0 mt-0.5" style={{ color: "var(--color-warn)" }} />
+      <div className="flex-1">
+        <div className="text-[14px] font-semibold" style={{ color: "var(--color-warn)" }}>
+          {days === 0
+            ? "Seu período de teste termina hoje"
+            : `Seu período de teste termina em ${days === 1 ? "1 dia" : `${days} dias`}`}
+        </div>
+        <div className="text-[13px] mt-1 leading-relaxed" style={{ color: "var(--ink-2)" }}>
+          Sem um método de pagamento, a assinatura é cancelada e o acesso fica somente
+          leitura. Nenhum dado é apagado.
+        </div>
+      </div>
+      <Link
+        to="/plan"
+        className="shrink-0 h-8 px-3 inline-flex items-center rounded-lg text-[12.5px] font-medium text-white"
+        style={{ background: "var(--color-teal-500)" }}
+      >
+        Escolher plano
+      </Link>
+    </div>
+  )
+}

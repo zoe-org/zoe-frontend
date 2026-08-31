@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react"
+import { Link } from "react-router-dom"
 import { AlertCircle, Loader2, ShieldCheck } from "lucide-react"
 import { toast } from "sonner"
 import { EmptyBlock } from "@/components/ui/empty-block"
@@ -83,12 +84,23 @@ export default function UsagePage() {
 
   return (
     <div className="-m-6 border-t border-border-soft" style={{ background: "var(--surface)", color: "var(--ink)" }}>
-      <Hero data={data} planSlug={subscription.data?.planSlug ?? null} />
+      <Hero
+        data={data}
+        planSlug={subscription.data?.planSlug ?? null}
+        trialEndsAt={subscription.data?.status === "Trialing" ? subscription.data.trialEndsAt : null}
+      />
 
       <StateBanner data={data} paused={paused} hasQuota={hasQuota} />
 
       <div className="px-8 py-7 space-y-4">
-        <MeterCard data={data} tone={tone} hasQuota={hasQuota} paused={paused} />
+        <MeterCard
+          data={data}
+          tone={tone}
+          hasQuota={hasQuota}
+          paused={paused}
+          hasSubscription={subscription.data != null}
+          emTeste={subscription.data?.status === "Trialing"}
+        />
 
         <Projection projection={data.projection} paused={paused} hasQuota={hasQuota} />
 
@@ -109,7 +121,16 @@ export default function UsagePage() {
 
 // ── Cabeçalho ─────────────────────────────────────────────────────────────
 
-function Hero({ data, planSlug }: { data: UsageMeter; planSlug: string | null }) {
+function Hero({
+  data,
+  planSlug,
+  trialEndsAt,
+}: {
+  data: UsageMeter
+  planSlug: string | null
+  /** Não-nulo só durante o teste. É o que explica a cota reduzida logo abaixo. */
+  trialEndsAt: string | null
+}) {
   return (
     <section className="px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
       <div className="eyebrow mb-2.5">Gestão · Consumo</div>
@@ -123,6 +144,7 @@ function Hero({ data, planSlug }: { data: UsageMeter; planSlug: string | null })
         {dayMonth(data.periodStart)} a {dayMonth(data.periodEnd)} · {data.daysRemaining}{" "}
         {data.daysRemaining === 1 ? "dia restante" : "dias restantes"}
         {planSlug && <> · plano {planSlug}</>}
+        {trialEndsAt && <> · teste até {dayMonth(trialEndsAt)}</>}
       </div>
     </section>
   )
@@ -222,7 +244,16 @@ function bannerFor({ data, hasQuota }: BannerProps): { title: string; detail: st
 
 // ── Medidor ───────────────────────────────────────────────────────────────
 
-type MeterProps = { data: UsageMeter; tone: Tone; hasQuota: boolean; paused: boolean }
+type MeterProps = {
+  data: UsageMeter
+  tone: Tone
+  hasQuota: boolean
+  paused: boolean
+  /** Distingue Enterprise (pay-as-you-go) de workspace sem contrato nenhum. */
+  hasSubscription: boolean
+  /** Durante o teste a cota é a de trial, não a do tier — e isso precisa ser dito. */
+  emTeste: boolean
+}
 
 function MeterCard(p: MeterProps) {
   const t = TONE[p.tone]
@@ -256,15 +287,38 @@ function MeterCard(p: MeterProps) {
             <QuotaBar pct={pct} color={t.color} />
             <div className="flex justify-between mt-2 text-[11.5px] text-ink-muted-2 font-mono-zoe">
               <span>0</span>
-              <span>cota do plano · {int(p.data.quotaMinutes)} min</span>
+              <span>
+                {p.emTeste ? "cota do teste" : "cota do plano"} · {int(p.data.quotaMinutes)} min
+              </span>
             </div>
+
+            {/* Sem isto a tela se contradiz: aqui aparece a cota do teste e o card do
+                plano anuncia a cota cheia, sem nada ligando os dois números. */}
+            {p.emTeste && (
+              <div className="text-[12px] text-ink-muted mt-2.5 leading-relaxed">
+                Durante o período de teste a cota é reduzida. A cota cheia do plano passa a
+                valer quando a assinatura for paga.
+              </div>
+            )}
           </>
-        ) : (
-          // Enterprise é pay-as-you-go e tenant sem assinatura não tem cota: barra
-          // sem denominador desenharia um limite que não existe.
+        ) : p.hasSubscription ? (
+          // Enterprise: cota zero é pay-as-you-go. Barra sem denominador desenharia
+          // um limite que não existe.
           <div className="text-[12.5px] text-ink-muted">
-            Este workspace não tem cota fixa de minutos — o consumo é medido e cobrado pelo que
+            Este plano não tem cota fixa de minutos — o consumo é medido e cobrado pelo que
             for processado.
+          </div>
+        ) : (
+          // Sem assinatura NÃO é pay-as-you-go: não há contrato, e dizer "cobrado pelo
+          // que for processado" prometeria uma cobrança que não existe. O consumo é
+          // medido mesmo assim — o fail-safe não bloqueia quem não tem contrato.
+          <div className="text-[12.5px] text-ink-muted">
+            Este workspace ainda não tem assinatura. O consumo está sendo medido, mas não há
+            plano contratado —{" "}
+            <Link to="/plan" className="underline" style={{ color: "var(--color-teal-500)" }}>
+              escolha um plano
+            </Link>{" "}
+            para definir cota e cobrança.
           </div>
         )}
 

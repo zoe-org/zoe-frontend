@@ -52,7 +52,12 @@ export type BillingPlans = {
 export type ChangeSubscriptionInput = {
   planSlug: string
   extraBrandSlots?: number
+  /** Só na assinatura inicial. Omitido = com teste; a API recusa o segundo trial do mesmo usuário. */
+  withTrial?: boolean
 }
+
+/** Código de erro do D8: o usuário já consumiu o período de teste. */
+export const TRIAL_ALREADY_USED = "trial_already_used"
 
 export const billingApi = {
   /** Preço vem daqui, nunca de constante no frontend — ver GetBillingPlansQuery. */
@@ -74,13 +79,47 @@ export const billingApi = {
       .then((s) => s ?? null),
 }
 
-export function useBillingPlans() {
+/** Pedido feito ao provedor e ainda não confirmado pelo webhook. */
+export type PendingProjection = { planSlug: string; since: number }
+
+/** Janela de espera antes de desistir do repique. */
+export const PROJECTION_TIMEOUT_MS = 45_000
+const PROJECTION_POLL_MS = 2_000
+
+/**
+ * Intervalo de repique como FUNÇÃO: ela roda no agendamento da query, fora do render,
+ * onde consultar o relógio é legítimo. Calculado em render seria impuro — e o
+ * intervalo passaria a depender do dado que ele mesmo busca.
+ */
+function pollWhilePending<T>(
+  pending: PendingProjection | null | undefined,
+  arrived: (data: T | undefined) => boolean,
+) {
+  if (!pending) return false as const
+
+  return (query: { state: { data?: T } }) => {
+    if (arrived(query.state.data)) return false as const
+    if (Date.now() - pending.since > PROJECTION_TIMEOUT_MS) return false as const
+    return PROJECTION_POLL_MS
+  }
+}
+
+/**
+ * A projeção é assíncrona: o endpoint responde quando o STRIPE aceita, e a linha só
+ * existe aqui quando o webhook chega. Invalidar uma vez, no retorno da mutação, refaz
+ * a busca cedo demais e a tela congela no estado antigo.
+ */
+export function useBillingPlans(pending?: PendingProjection | null) {
   const { activeTenantId } = useAuth()
   return useQuery({
     queryKey: ["billing-plans", activeTenantId],
     queryFn: ({ signal }) => billingApi.plans({ signal }),
     enabled: Boolean(activeTenantId),
-    staleTime: 5 * 60_000,
+    staleTime: pending ? 0 : 5 * 60_000,
+    refetchInterval: pollWhilePending<BillingPlans>(
+      pending,
+      (d) => d?.currentPlanSlug === pending?.planSlug,
+    ),
   })
 }
 
@@ -104,12 +143,16 @@ export function useSubscriptionMutations() {
   }
 }
 
-export function useSubscription() {
+export function useSubscription(pending?: PendingProjection | null) {
   const { activeTenantId } = useAuth()
   return useQuery({
     queryKey: ["billing-subscription", activeTenantId],
     queryFn: ({ signal }) => billingApi.subscription({ signal }),
     enabled: Boolean(activeTenantId),
-    staleTime: 5 * 60_000,
+    staleTime: pending ? 0 : 5 * 60_000,
+    refetchInterval: pollWhilePending<Subscription | null>(
+      pending,
+      (d) => d?.planSlug === pending?.planSlug && !d?.readOnly,
+    ),
   })
 }

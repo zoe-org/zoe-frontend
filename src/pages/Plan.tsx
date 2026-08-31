@@ -5,10 +5,12 @@ import { EmptyBlock } from "@/components/ui/empty-block"
 import { ApiError } from "@/lib/api"
 import { useAuth } from "@/features/auth/context"
 import {
+  TRIAL_ALREADY_USED,
   useBillingPlans,
   useSubscription,
   useSubscriptionMutations,
   type BillingPlans,
+  type PendingProjection,
   type PlanOption,
   type Subscription,
 } from "@/lib/api/billing"
@@ -57,8 +59,12 @@ const day = (iso: string) =>
   new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })
 
 export default function PlanPage() {
-  const plans = useBillingPlans()
-  const subscription = useSubscription()
+  // O que foi PEDIDO ao provedor e ainda não virou projeção. Quem decide parar o
+  // repique é o callback do react-query, fora do render — relógio em render é impuro.
+  const [awaiting, setAwaiting] = useState<PendingProjection | null>(null)
+
+  const plans = useBillingPlans(awaiting)
+  const subscription = useSubscription(awaiting)
 
   if (plans.isLoading) return <SkeletonScreen />
 
@@ -75,6 +81,10 @@ export default function PlanPage() {
   const data = plans.data!
   const sub = subscription.data ?? null
 
+  // Chegou = a projeção já reflete o que foi pedido. Comparação pura sobre o dado
+  // buscado, sem relógio.
+  const arrived = awaiting != null && sub?.planSlug === awaiting.planSlug && !sub.readOnly
+
   return (
     <div className="-m-6 border-t border-border-soft" style={{ background: "var(--surface)", color: "var(--ink)" }}>
       <section className="px-8 pt-7 pb-6 border-b border-border-soft">
@@ -90,13 +100,16 @@ export default function PlanPage() {
 
       <div className="px-8 py-7 space-y-4">
         {!data.billingEnabled && <ProviderOffBanner />}
+        {awaiting && !arrived && <ProjectionBanner />}
         {sub && <CurrentSubscription sub={sub} />}
 
-        <PlanGrid data={data} sub={sub} />
+        <PlanGrid data={data} sub={sub} onRequested={setAwaiting} />
 
         <SharedSlotsNote />
 
-        {data.currentPlanSlug && <ExtraBrandCard data={data} />}
+        {data.currentPlanSlug && !sub?.readOnly && (
+          <ExtraBrandCard data={data} onRequested={setAwaiting} />
+        )}
 
         <BillingSection enabled={data.billingEnabled} hasSubscription={Boolean(sub)} />
       </div>
@@ -105,6 +118,34 @@ export default function PlanPage() {
 }
 
 // ── Avisos de estado ──────────────────────────────────────────────────────
+
+/**
+ * A projeção não é síncrona: o endpoint responde quando o Stripe aceita, e a linha só
+ * existe aqui quando o webhook chega. Sem dizer isso, a tela parecia simplesmente não
+ * ter feito nada — e o cliente clicava de novo.
+ */
+function ProjectionBanner() {
+  return (
+    <div
+      className="flex items-start gap-3 rounded-[14px] border px-4 py-3.5"
+      style={{ background: "var(--color-teal-50)", borderColor: "rgba(0,167,153,.28)" }}
+    >
+      <Loader2
+        className="w-[17px] h-[17px] shrink-0 mt-0.5 animate-spin"
+        style={{ color: "var(--color-teal-500)" }}
+      />
+      <div>
+        <div className="text-[14px] font-semibold" style={{ color: "var(--color-teal-500)" }}>
+          Aguardando confirmação do provedor
+        </div>
+        <div className="text-[13px] mt-1 leading-relaxed" style={{ color: "var(--ink-2)" }}>
+          O pedido foi aceito e o plano aparece aqui assim que o provedor confirmar,
+          normalmente em alguns segundos. Se demorar mais que isso, recarregue a página.
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function ProviderOffBanner() {
   return (
@@ -152,10 +193,20 @@ function CurrentSubscription({ sub }: { sub: Subscription }) {
             Período de {day(sub.currentPeriodStart)} a {day(sub.currentPeriodEnd)}
             {sub.extraBrandSlots > 0 && <> · {sub.extraBrandSlots} marca(s) extra</>}
           </div>
-          {sub.trialEndsAt && sub.status === "Trialing" && (
-            <div className="text-[12.5px] text-ink-muted mt-1">
-              O teste termina em {day(sub.trialEndsAt)}. Sem método de pagamento até lá, a
-              assinatura é cancelada e o acesso fica somente leitura.
+          {sub.status === "Trialing" && (
+            <div className="text-[12.5px] text-ink-muted mt-1 max-w-140 leading-relaxed">
+              {/* A cota do teste é menor que a do tier. Sem dizer isso aqui, o card do
+                  plano logo abaixo anuncia outro número e a tela se contradiz. */}
+              Cota do teste:{" "}
+              <strong style={{ color: "var(--ink)" }}>{int(sub.quotaMinutes)} minutos</strong> — a
+              cota cheia do plano vale quando a assinatura for paga.
+              {sub.trialEndsAt && (
+                <>
+                  {" "}
+                  O teste termina em {day(sub.trialEndsAt)}; sem método de pagamento até lá, a
+                  assinatura é cancelada e o acesso fica somente leitura.
+                </>
+              )}
             </div>
           )}
         </div>
@@ -189,23 +240,64 @@ function SharedSlotsNote() {
 
 // ── Planos ────────────────────────────────────────────────────────────────
 
-function PlanGrid({ data, sub }: { data: BillingPlans; sub: Subscription | null }) {
+function PlanGrid({
+  data,
+  sub,
+  onRequested,
+}: {
+  data: BillingPlans
+  sub: Subscription | null
+  onRequested: (r: PendingProjection) => void
+}) {
   const { start, change } = useSubscriptionMutations()
   const pending = start.isPending || change.isPending
   const [busySlug, setBusySlug] = useState<string | null>(null)
 
-  const act = (plan: PlanOption) => {
+  const [trialUsedFor, setTrialUsedFor] = useState<PlanOption | null>(null)
+  // Erro que precisa aparecer DENTRO do diálogo: toast atrás de um overlay é um botão
+  // que não faz nada do ponto de vista de quem clicou.
+  const [dialogError, setDialogError] = useState<string | null>(null)
+
+  // Assinatura cancelada EXISTE mas não é alterável: o provedor recusa update nela, e
+  // o caminho certo é abrir uma nova. Decidir por "tem linha" em vez de "está ativa"
+  // mandava a reativação para o endpoint de troca e devolvia erro cru do provedor.
+  const reativando = Boolean(sub?.readOnly)
+
+  const act = (plan: PlanOption, withTrial = true) => {
     setBusySlug(plan.slug)
-    const input = { planSlug: plan.slug, extraBrandSlots: data.currentExtraBrandSlots }
-    const mutation = data.currentPlanSlug ? change : start
-    const verb = data.currentPlanSlug ? "Troca" : "Assinatura"
+    const trocando = Boolean(data.currentPlanSlug) && !reativando
+    const input = trocando
+      ? { planSlug: plan.slug, extraBrandSlots: data.currentExtraBrandSlots }
+      : { planSlug: plan.slug, extraBrandSlots: data.currentExtraBrandSlots, withTrial }
+    const mutation = trocando ? change : start
+    const verb = trocando ? "Troca" : "Assinatura"
 
     mutation.mutate(input, {
       // A resposta é o Stripe confirmando o pedido; quem escreve a projeção é o
       // webhook. Por isso a mensagem fala em "solicitada", não em "concluída".
-      onSuccess: () => toast.success(`${verb} solicitada. O plano reflete aqui em instantes.`),
-      onError: (e) =>
-        toast.error(e instanceof ApiError ? e.message : `Não foi possível concluir a ${verb.toLowerCase()}.`),
+      onSuccess: () => {
+        setTrialUsedFor(null)
+        setDialogError(null)
+        onRequested({ planSlug: plan.slug, since: Date.now() })
+        toast.success(`${verb} solicitada. Aguardando a confirmação do provedor.`)
+      },
+      onError: (e) => {
+        // O trial já usado não é falha: é uma escolha que o cliente ainda pode fazer,
+        // então vira pergunta em vez de toast vermelho e beco sem saída.
+        if (e instanceof ApiError && e.problem?.code === TRIAL_ALREADY_USED) {
+          setDialogError(null)
+          setTrialUsedFor(plan)
+          return
+        }
+
+        const message =
+          e instanceof ApiError ? e.message : `Não foi possível concluir a ${verb.toLowerCase()}.`
+
+        // Com o diálogo aberto o toast fica atrás do overlay: o erro tem que ir para
+        // dentro dele, senão o botão parece simplesmente não responder.
+        if (trialUsedFor) setDialogError(message)
+        else toast.error(message)
+      },
       onSettled: () => setBusySlug(null),
     })
   }
@@ -218,11 +310,98 @@ function PlanGrid({ data, sub }: { data: BillingPlans; sub: Subscription | null 
           plan={plan}
           data={data}
           sub={sub}
+          reativando={reativando}
           busy={busySlug === plan.slug}
           disabled={pending || !data.billingEnabled}
           onAct={() => act(plan)}
         />
       ))}
+
+      {trialUsedFor && (
+        <TrialUsedDialog
+          plan={trialUsedFor}
+          currency={data.currency}
+          pending={pending}
+          error={dialogError}
+          onClose={() => {
+            setTrialUsedFor(null)
+            setDialogError(null)
+          }}
+          onConfirm={() => act(trialUsedFor, false)}
+        />
+      )}
+    </div>
+  )
+}
+
+/**
+ * O período de teste é um por pessoa (D8). Quem já usou não fica sem caminho: a
+ * alternativa é assinar pagando desde já, e ela é oferecida aqui em vez de o cliente
+ * receber um erro e ter que adivinhar o que fazer.
+ */
+function TrialUsedDialog({
+  plan,
+  currency,
+  pending,
+  error,
+  onClose,
+  onConfirm,
+}: {
+  plan: PlanOption
+  currency: string | null
+  pending: boolean
+  error: string | null
+  onClose: () => void
+  onConfirm: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div
+        className="relative w-full max-w-[480px] rounded-[14px] border border-border-soft px-6 py-6 shadow-xl"
+        style={{ background: "var(--surface)" }}
+      >
+        <div className="eyebrow">Período de teste</div>
+        <h2 className="font-display mt-2 mb-0" style={{ fontSize: 20, color: "var(--ink)" }}>
+          Você já usou seu teste gratuito
+        </h2>
+        <p className="text-[13.5px] text-ink-muted mt-3 leading-relaxed">
+          O período de teste é um por pessoa, mesmo em workspaces diferentes. Você ainda pode
+          assinar o {PLAN_NAMES[plan.slug] ?? plan.slug}
+          {plan.priceCents != null && <> por {money(plan.priceCents, currency)}/mês</>}, com
+          cobrança desde já.
+        </p>
+
+        {error && (
+          <div
+            className="flex items-start gap-3 rounded-[12px] border px-4 py-3 mt-4"
+            style={{ background: "#FEF2F2", borderColor: "rgba(220,38,38,.32)" }}
+          >
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "var(--color-neg)" }} />
+            <span className="text-[13px] leading-relaxed" style={{ color: "var(--ink-2)" }}>
+              {error}
+            </span>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between mt-6">
+          <button
+            onClick={onClose}
+            className="h-9 px-4 rounded-lg text-[13px] font-medium text-ink-muted hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={pending}
+            className="h-9 px-4 inline-flex items-center gap-1.5 rounded-lg text-[13px] font-medium text-white transition-colors disabled:opacity-50"
+            style={{ background: "var(--color-teal-500)" }}
+          >
+            {pending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            Assinar sem teste
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -230,7 +409,7 @@ function PlanGrid({ data, sub }: { data: BillingPlans; sub: Subscription | null 
 function PlanCard({
   plan,
   data,
-  sub,
+  reativando,
   busy,
   disabled,
   onAct,
@@ -238,6 +417,7 @@ function PlanCard({
   plan: PlanOption
   data: BillingPlans
   sub: Subscription | null
+  reativando: boolean
   busy: boolean
   disabled: boolean
   onAct: () => void
@@ -246,8 +426,14 @@ function PlanCard({
   const current = plan.isCurrent
 
   const action = useMemo(() => {
-    if (current) return { label: "Plano atual", kind: "disabled" as const }
     if (isEnterprise) return { label: "Falar com vendas", kind: "sales" as const }
+
+    // Cancelada: todo card volta a ser assinável, inclusive o do plano anterior.
+    // Desabilitar aquele card prenderia o cliente fora do plano que ele já tinha.
+    if (reativando)
+      return { label: current ? "Reativar" : "Assinar", kind: "primary" as const }
+
+    if (current) return { label: "Plano atual", kind: "disabled" as const }
     if (!data.currentPlanSlug) return { label: "Assinar", kind: "primary" as const }
 
     const from = LADDER.indexOf(data.currentPlanSlug)
@@ -257,22 +443,26 @@ function PlanCard({
     return to > from
       ? { label: "Fazer upgrade", kind: "primary" as const }
       : { label: "Fazer downgrade", kind: "ghost" as const }
-  }, [current, isEnterprise, data.currentPlanSlug, plan.slug])
+  }, [current, isEnterprise, reativando, data.currentPlanSlug, plan.slug])
 
   return (
     <div
       className="rounded-[14px] border px-5 py-5 flex flex-col"
       style={{
         background: "var(--surface)",
-        borderColor: current ? "var(--color-teal-500)" : "var(--border-soft)",
+        borderColor: current && !reativando ? "var(--color-teal-500)" : "var(--border-soft)",
       }}
     >
       {current && (
         <span
           className="self-start text-[10px] font-semibold rounded-full px-2 py-0.5 mb-2"
-          style={{ background: "var(--color-teal-50)", color: "var(--color-teal-500)" }}
+          style={
+            reativando
+              ? { background: "#F3F4F6", color: "#6B7280" }
+              : { background: "var(--color-teal-50)", color: "var(--color-teal-500)" }
+          }
         >
-          Plano atual
+          {reativando ? "Plano anterior" : "Plano atual"}
         </span>
       )}
 
@@ -338,7 +528,7 @@ function PlanCard({
             {action.label}
           </button>
         )}
-        {sub?.readOnly && action.kind !== "disabled" && (
+        {reativando && (
           <div className="text-[11.5px] text-ink-muted mt-2 text-center">Reativa o acesso</div>
         )}
       </div>
@@ -359,7 +549,13 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 
 // ── Marca extra ───────────────────────────────────────────────────────────
 
-function ExtraBrandCard({ data }: { data: BillingPlans }) {
+function ExtraBrandCard({
+  data,
+  onRequested,
+}: {
+  data: BillingPlans
+  onRequested: (r: PendingProjection) => void
+}) {
   const [confirming, setConfirming] = useState(false)
   const current = data.plans.find((p) => p.isCurrent)
 
@@ -404,7 +600,13 @@ function ExtraBrandCard({ data }: { data: BillingPlans }) {
         </button>
       </div>
 
-      {confirming && <ExtraBrandDialog data={data} onClose={() => setConfirming(false)} />}
+      {confirming && (
+        <ExtraBrandDialog
+          data={data}
+          onRequested={onRequested}
+          onClose={() => setConfirming(false)}
+        />
+      )}
     </>
   )
 }
@@ -414,7 +616,15 @@ function ExtraBrandCard({ data }: { data: BillingPlans }) {
  * soa como "mais capacidade", e marca extra não traz um minuto sequer. Quem está com
  * a cota apertada resolve com upgrade, não com slot.
  */
-function ExtraBrandDialog({ data, onClose }: { data: BillingPlans; onClose: () => void }) {
+function ExtraBrandDialog({
+  data,
+  onRequested,
+  onClose,
+}: {
+  data: BillingPlans
+  onRequested: (r: PendingProjection) => void
+  onClose: () => void
+}) {
   const [ack, setAck] = useState(false)
   const { change } = useSubscriptionMutations()
   const current = data.plans.find((p) => p.isCurrent)!
@@ -424,7 +634,8 @@ function ExtraBrandDialog({ data, onClose }: { data: BillingPlans; onClose: () =
       { planSlug: current.slug, extraBrandSlots: data.currentExtraBrandSlots + 1 },
       {
         onSuccess: () => {
-          toast.success("Marca extra solicitada. O slot reflete aqui em instantes.")
+          onRequested({ planSlug: current.slug, since: Date.now() })
+          toast.success("Marca extra solicitada. Aguardando a confirmação do provedor.")
           onClose()
         },
         onError: (e) =>
