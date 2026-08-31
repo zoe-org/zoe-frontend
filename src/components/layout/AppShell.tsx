@@ -222,6 +222,7 @@ export function AppShell() {
                   {hasIntelligence && <SubNavItem to="/brands">Marcas</SubNavItem>}
                   {hasReports && <SubNavItem to="/reports">Relatórios</SubNavItem>}
                   <SubNavItem to="/users">Usuários</SubNavItem>
+                  <SubNavItem to="/usage">Consumo</SubNavItem>
                 </div>
               )}
             </>

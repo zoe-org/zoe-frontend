@@ -1,11 +1,9 @@
 import { useMemo, useState } from "react"
-import { Sparkles, Check, Loader2, Plus, Sun, Moon, Monitor } from "lucide-react"
+import { Sparkles, Check, Sun, Moon, Monitor } from "lucide-react"
 import { useTheme } from "next-themes"
-import { toast } from "sonner"
 import { useAuth } from "@/features/auth/context"
-import { ApiError } from "@/lib/api"
 import { EmptyBlock } from "@/components/ui/empty-block"
-import { useFeatureCatalog, useFeatureMutations, type FeatureCatalog } from "@/lib/api/features"
+import { useFeatureCatalog } from "@/lib/api/features"
 
 type Tab = "perfil" | "addons" | "aparencia"
 
@@ -137,26 +135,11 @@ function Row({ label, value }: { label: string; value: string }) {
 
 function AddOnsTab({ isAdmin, hasFeature }: { isAdmin: boolean; hasFeature: (code: string) => boolean }) {
   const catalog = useFeatureCatalog()
-  const { activate, deactivate } = useFeatureMutations()
 
   const addons = useMemo(
-    () => (catalog.data ?? []).filter((f) => f.isAddOn),
+    () => (catalog.data ?? []).filter((f) => f.kind === "SubscriptionAddOn"),
     [catalog.data],
   )
-
-  const busyCode = activate.isPending
-    ? activate.variables
-    : deactivate.isPending
-      ? deactivate.variables
-      : null
-
-  const toggle = (f: FeatureCatalog, active: boolean) => {
-    const m = active ? deactivate : activate
-    m.mutate(f.code, {
-      onSuccess: () => toast.success(active ? `${f.name} removido.` : `${f.name} adicionado.`),
-      onError: (e) => toast.error(e instanceof ApiError ? e.message : "Não foi possível atualizar o add-on."),
-    })
-  }
 
   return (
     <div className="max-w-4xl">
@@ -166,7 +149,8 @@ function AddOnsTab({ isAdmin, hasFeature }: { isAdmin: boolean; hasFeature: (cod
           Add-ons do workspace
         </h2>
         <p className="text-[13.5px] text-ink-muted mt-1.5 max-w-xl">
-          Ative capacidades extras para este workspace. Refletem no acesso da equipe assim que ativados.
+          O que está ativo vem do seu plano. Para incluir ou remover um add-on, mude a
+          assinatura — a alteração reflete aqui em seguida.
         </p>
       </div>
 
@@ -180,7 +164,6 @@ function AddOnsTab({ isAdmin, hasFeature }: { isAdmin: boolean; hasFeature: (cod
         <div className="rounded-[14px] border border-border-soft overflow-hidden" style={{ background: "var(--surface)" }}>
           {addons.map((f, i) => {
             const active = hasFeature(f.code)
-            const busy = busyCode === f.code
             return (
               <div
                 key={f.code}
@@ -199,38 +182,16 @@ function AddOnsTab({ isAdmin, hasFeature }: { isAdmin: boolean; hasFeature: (cod
                   </div>
                   <div className="text-[12.5px] text-ink-muted mt-0.5">{f.description}</div>
                 </div>
-                {isAdmin ? (
-                  active ? (
-                    <button
-                      onClick={() => toggle(f, true)}
-                      disabled={busy}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-medium border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors disabled:opacity-50"
-                      style={{ color: "var(--color-neg)" }}
-                    >
-                      {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Remover
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => toggle(f, false)}
-                      disabled={busy}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-medium text-white transition-colors disabled:opacity-50"
-                      style={{ background: "var(--color-teal-500)" }}
-                    >
-                      {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} Adicionar
-                    </button>
-                  )
-                ) : (
-                  <span className="text-[12px] text-ink-muted-2">{active ? "ativo" : "inativo"}</span>
-                )}
+                <span className="text-[12px] text-ink-muted-2">{active ? "no plano" : "fora do plano"}</span>
               </div>
             )
           })}
         </div>
       )}
 
-      {!isAdmin && (
+      {isAdmin && (
         <p className="text-[12px] text-ink-muted mt-3">
-          Só Owner ou Admin do workspace podem gerenciar add-ons.
+          Alterações de plano são feitas na cobrança do workspace.
         </p>
       )}
     </div>

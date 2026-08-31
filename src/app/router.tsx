@@ -18,6 +18,7 @@ import AlertsPage from "@/pages/Alerts"
 import ReportsPage from "@/pages/Reports"
 import ReportViewPage from "@/pages/ReportView"
 import UsersPage from "@/pages/Users"
+import UsagePage from "@/pages/Usage"
 import SettingsPage from "@/pages/Settings"
 import AdminBrandsPage from "@/pages/admin/AdminBrands"
 
@@ -56,6 +57,9 @@ export const router = createBrowserRouter([
       { path: "/alerts", element: <AlertsPage /> },
       { path: "/reports", element: <ReportsPage /> },
       { path: "/users", element: <UsersPage /> },
+      // Consumo: sem gate de feature, igual ao backend — ver o próprio gasto não é
+      // funcionalidade paga, e gatear esconderia justamente de quem está em apuros.
+      { path: "/usage", element: <UsagePage /> },
       { path: "/settings", element: <SettingsPage /> },
       // Curadoria admin (ADR-021). O gate visual é o `isZoeAdmin`; a autoridade
       // real é a policy ZoeAdmin no backend (403 em /api/admin/*).
