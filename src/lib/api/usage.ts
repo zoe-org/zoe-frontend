@@ -25,6 +25,12 @@ export type BrandUsage = {
   videoCount: number
   averageMinutes: number
   longestVideoMinutes: number
+  /** Vínculo tenant-marca, para gravar o teto. */
+  tenantBrandId: string | null
+  /** Null = sem teto; a marca divide a cota do tenant. */
+  monthlyMinuteBudget: number | null
+  /** Teto estourado: a coleta desta marca está parada. */
+  budgetExhausted: boolean
 }
 
 /**
@@ -121,5 +127,16 @@ export function useSaveUsagePreferences() {
       qc.setQueryData(["usage-preferences", activeTenantId], saved)
       qc.invalidateQueries({ queryKey: ["usage-meter", activeTenantId] })
     },
+  })
+}
+
+/** Teto de minutos por marca. Owner apenas — a API recusa os demais com `owner_only`. */
+export function useSetBrandBudget() {
+  const { activeTenantId } = useAuth()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ tenantBrandId, minutes }: { tenantBrandId: string; minutes: number | null }) =>
+      apiClient.put(`/api/me/brands/${tenantBrandId}/budget`, { monthlyMinuteBudget: minutes }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["usage-meter", activeTenantId] }),
   })
 }

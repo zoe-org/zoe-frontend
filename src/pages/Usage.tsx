@@ -4,9 +4,11 @@ import { AlertCircle, Loader2, ShieldCheck } from "lucide-react"
 import { toast } from "sonner"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { ApiError } from "@/lib/api"
+import { useAuth } from "@/features/auth/context"
 import { useSubscription } from "@/lib/api/billing"
 import {
   useSaveUsagePreferences,
+  useSetBrandBudget,
   useUsageMeter,
   useUsagePreferences,
   type BrandUsage,
@@ -93,6 +95,8 @@ export default function UsagePage() {
       <StateBanner data={data} paused={paused} hasQuota={hasQuota} />
 
       <div className="px-8 py-7 space-y-4">
+        <BlockedBrandsBanner rows={data.byBrand} />
+
         <MeterCard
           data={data}
           tone={tone}
@@ -493,6 +497,37 @@ function projectionText(p: UsageProjection, hasQuota: boolean) {
 
 // ── Causa do consumo ──────────────────────────────────────────────────────
 
+/**
+ * Cerca que para a coleta em silêncio é indistinguível de "não há vídeo novo". Se
+ * alguma marca está bloqueada pelo teto, isso aparece antes de qualquer número.
+ */
+function BlockedBrandsBanner({ rows }: { rows: BrandUsage[] }) {
+  const blocked = rows.filter((b) => b.budgetExhausted)
+  if (blocked.length === 0) return null
+
+  return (
+    <div
+      className="flex items-start gap-3 rounded-[14px] border px-4 py-3.5"
+      style={{ background: "#FEF2F2", borderColor: "rgba(220,38,38,.32)" }}
+    >
+      <AlertCircle className="w-[17px] h-[17px] shrink-0 mt-0.5" style={{ color: "var(--color-neg)" }} />
+      <div>
+        <div className="text-[14px] font-semibold" style={{ color: "var(--color-neg)" }}>
+          {blocked.length === 1
+            ? `Coleta pausada em ${blocked[0].brandName}`
+            : `Coleta pausada em ${blocked.length} marcas`}
+        </div>
+        <div className="text-[13px] mt-1 leading-relaxed" style={{ color: "var(--ink-2)" }}>
+          {blocked.map((b) => b.brandName).join(", ")} —{" "}
+          {blocked.length === 1 ? "atingiu" : "atingiram"} o teto de minutos definido. Eleve
+          o teto na tabela abaixo para voltar a coletar. O histórico já coletado continua
+          acessível.
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function BrandTable({ rows, billedMinutes }: { rows: BrandUsage[]; billedMinutes: number }) {
   return (
     <div className="rounded-[14px] border border-border-soft overflow-hidden" style={{ background: "var(--surface)" }}>
@@ -518,6 +553,7 @@ function BrandTable({ rows, billedMinutes }: { rows: BrandUsage[]; billedMinutes
                 <th className="text-right font-medium text-ink-muted px-3 py-2.5">Vídeos</th>
                 <th className="text-right font-medium text-ink-muted px-3 py-2.5">Duração média</th>
                 <th className="text-right font-medium text-ink-muted px-3 py-2.5">Vídeo mais longo</th>
+                <th className="text-right font-medium text-ink-muted px-3 py-2.5">Teto mensal</th>
                 <th className="text-left font-medium text-ink-muted px-6 py-2.5 w-[150px]">Participação</th>
               </tr>
             </thead>
@@ -537,6 +573,9 @@ function BrandTable({ rows, billedMinutes }: { rows: BrandUsage[]; billedMinutes
                     <td className="text-right px-3 py-3 font-mono-zoe">{int(b.videoCount)}</td>
                     <td className="text-right px-3 py-3 font-mono-zoe">{dec(b.averageMinutes)} min</td>
                     <td className="text-right px-3 py-3 font-mono-zoe">{duration(b.longestVideoMinutes)}</td>
+                    <td className="text-right px-3 py-3">
+                      <BrandBudgetCell row={b} />
+                    </td>
                     <td className="px-6 py-3">
                       <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--border-soft)" }}>
                         <div className="h-full rounded-full" style={{ width: `${share}%`, background: color }} />
@@ -548,6 +587,99 @@ function BrandTable({ rows, billedMinutes }: { rows: BrandUsage[]; billedMinutes
             </tbody>
           </table>
         </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Teto da marca: leitura para todos, escrita só para o Owner. Null significa sem teto —
+ * a marca divide a cota do tenant, que é o padrão.
+ */
+function BrandBudgetCell({ row }: { row: BrandUsage }) {
+  const { role } = useAuth()
+  const save = useSetBrandBudget()
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState("")
+
+  const isOwner = role === "Owner"
+  const canEdit = isOwner && row.tenantBrandId !== null
+
+  const commit = (minutes: number | null) => {
+    if (!row.tenantBrandId) return
+    save.mutate(
+      { tenantBrandId: row.tenantBrandId, minutes },
+      {
+        onSuccess: () => {
+          setEditing(false)
+          toast.success(minutes === null ? "Teto removido." : "Teto atualizado.")
+        },
+        onError: (e) =>
+          toast.error(e instanceof ApiError ? e.message : "Não foi possível salvar o teto."),
+      },
+    )
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center justify-end gap-1.5">
+        <input
+          autoFocus
+          type="number"
+          min="1"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit(Number(draft) || null)
+            if (e.key === "Escape") setEditing(false)
+          }}
+          className="w-20 h-7 px-2 text-[12.5px] text-right rounded-md border border-border-soft bg-transparent outline-none font-mono-zoe"
+          style={{ color: "var(--ink)" }}
+        />
+        <button
+          onClick={() => commit(Number(draft) || null)}
+          disabled={save.isPending}
+          className="text-[11.5px] px-2 h-7 rounded-md text-white disabled:opacity-50"
+          style={{ background: "var(--color-teal-500)" }}
+        >
+          ok
+        </button>
+        <button
+          onClick={() => setEditing(false)}
+          className="text-[11.5px] px-1.5 h-7 rounded-md text-ink-muted"
+        >
+          ✕
+        </button>
+      </div>
+    )
+  }
+
+  if (row.monthlyMinuteBudget === null) {
+    return canEdit ? (
+      <button
+        onClick={() => { setDraft(""); setEditing(true) }}
+        className="text-[12px] text-ink-muted-2 hover:underline"
+      >
+        definir
+      </button>
+    ) : (
+      <span className="text-[12px] text-ink-muted-2">sem teto</span>
+    )
+  }
+
+  return (
+    <div className="flex items-center justify-end gap-2">
+      {row.budgetExhausted && <span className="chip chip-neg text-[10px]">pausada</span>}
+      <span className="font-mono-zoe" style={{ color: row.budgetExhausted ? "var(--color-neg)" : "var(--ink)" }}>
+        {int(row.monthlyMinuteBudget)}
+      </span>
+      {canEdit && (
+        <button
+          onClick={() => { setDraft(String(row.monthlyMinuteBudget)); setEditing(true) }}
+          className="text-[11px] text-ink-muted-2 hover:underline"
+        >
+          editar
+        </button>
       )}
     </div>
   )
