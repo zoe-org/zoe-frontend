@@ -20,6 +20,8 @@ import {
 // Consumo do período (ADR-041/043). Toda a tela sai de `/api/usage/meter` e
 // `/api/usage/preferences` — nada é derivado de outra fonte, porque contestação de
 // fatura se responde com a mesma trilha que gerou o número.
+//
+// Painel, não página: título, descrição e rolagem são do diálogo de configurações.
 
 const WARNING_THRESHOLD = 0.8
 
@@ -58,7 +60,7 @@ function brandColor(id: string): string {
   return `hsl(${Math.abs(h) % 360}, 55%, 55%)`
 }
 
-export default function UsagePage() {
+export function UsagePanel() {
   const meter = useUsageMeter()
   // A assinatura entra só pelo nome do plano: todo número do medidor vem do medidor.
   const subscription = useSubscription()
@@ -68,11 +70,7 @@ export default function UsagePage() {
   if (meter.error) {
     const message =
       meter.error instanceof ApiError ? meter.error.message : "Não foi possível carregar o consumo."
-    return (
-      <div className="p-8">
-        <EmptyBlock message={message} />
-      </div>
-    )
+    return <EmptyBlock message={message} />
   }
 
   const data = meter.data!
@@ -85,8 +83,8 @@ export default function UsagePage() {
       : "normal"
 
   return (
-    <div className="-m-6 border-t border-border-soft" style={{ background: "var(--surface)", color: "var(--ink)" }}>
-      <Hero
+    <div className="@container space-y-4">
+      <PeriodStrip
         data={data}
         planSlug={subscription.data?.planSlug ?? null}
         trialEndsAt={subscription.data?.status === "Trialing" ? subscription.data.trialEndsAt : null}
@@ -94,7 +92,7 @@ export default function UsagePage() {
 
       <StateBanner data={data} paused={paused} hasQuota={hasQuota} />
 
-      <div className="px-8 py-7 space-y-4">
+      <div className="space-y-4">
         <BlockedBrandsBanner rows={data.byBrand} />
 
         <MeterCard
@@ -123,9 +121,14 @@ export default function UsagePage() {
   )
 }
 
-// ── Cabeçalho ─────────────────────────────────────────────────────────────
+// ── Período ───────────────────────────────────────────────────────────────
 
-function Hero({
+/**
+ * O que era o hero da página. O título saiu (é do diálogo agora), mas a linha de
+ * período ficou: ela é o recorte de TODO número abaixo — sem ela o medidor mostra
+ * um consumo sem dizer de quando.
+ */
+function PeriodStrip({
   data,
   planSlug,
   trialEndsAt,
@@ -136,21 +139,12 @@ function Hero({
   trialEndsAt: string | null
 }) {
   return (
-    <section className="px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
-      <div className="eyebrow mb-2.5">Gestão · Consumo</div>
-      <h1 className="font-display m-0" style={{ fontSize: 34, lineHeight: 1.1, color: "var(--ink)" }}>
-        Vídeo-minutos
-      </h1>
-      <div className="text-[14px] text-ink-muted mt-1.5 max-w-160">
-        O que foi processado neste período de cobrança, de onde veio e quanto ainda cabe na cota.
-      </div>
-      <div className="text-[12.5px] text-ink-muted-2 mt-3">
-        {dayMonth(data.periodStart)} a {dayMonth(data.periodEnd)} · {data.daysRemaining}{" "}
-        {data.daysRemaining === 1 ? "dia restante" : "dias restantes"}
-        {planSlug && <> · plano {planSlug}</>}
-        {trialEndsAt && <> · teste até {dayMonth(trialEndsAt)}</>}
-      </div>
-    </section>
+    <div className="text-[12.5px] text-ink-muted">
+      {dayMonth(data.periodStart)} a {dayMonth(data.periodEnd)} · {data.daysRemaining}{" "}
+      {data.daysRemaining === 1 ? "dia restante" : "dias restantes"}
+      {planSlug && <> · plano {planSlug}</>}
+      {trialEndsAt && <> · teste até {dayMonth(trialEndsAt)}</>}
+    </div>
   )
 }
 
@@ -164,7 +158,7 @@ function StateBanner(p: BannerProps) {
 
   const t = TONE[banner.tone]
   return (
-    <section className="px-8 pt-6">
+    <section>
       <div
         className="flex items-start gap-3 rounded-[14px] border px-4 py-3.5"
         style={{ background: t.bg, borderColor: t.border }}
@@ -384,7 +378,7 @@ function TwoQuantities({
   owned: number
 }) {
   return (
-    <div className="grid sm:grid-cols-2 border-t border-border-soft">
+    <div className="grid @md:grid-cols-2 border-t border-border-soft">
       <div className="px-6 py-5 sm:border-r border-border-soft">
         <div className="eyebrow">Minutos cobrados</div>
         <div className="font-display mt-1.5" style={{ fontSize: 26, color: "var(--ink)" }}>
@@ -732,7 +726,7 @@ function SpendCapCard({
 
   return (
     <div className="rounded-[14px] border border-border-soft px-6 py-6" style={{ background: "var(--surface)" }}>
-      <div className="grid lg:grid-cols-[1fr_300px] gap-8 items-start">
+      <div className="grid @3xl:grid-cols-[1fr_300px] gap-8 items-start">
         <div>
           <div className="eyebrow">Teto de gasto</div>
           <h2 className="font-display mt-2 mb-0" style={{ fontSize: 18, color: "var(--ink)" }}>
@@ -808,12 +802,9 @@ function SpendCapCard({
 
 function SkeletonScreen() {
   return (
-    <div className="-m-6 border-t border-border-soft" style={{ background: "var(--surface)" }}>
-      <div className="px-8 py-8 space-y-4 animate-pulse">
-        <div className="h-9 w-64 rounded-md bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
-        <div className="h-40 rounded-[14px] bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
-        <div className="h-56 rounded-[14px] bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
-      </div>
+    <div className="space-y-4 animate-pulse">
+      <div className="h-40 rounded-[14px] bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+      <div className="h-56 rounded-[14px] bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
     </div>
   )
 }

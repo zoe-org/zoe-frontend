@@ -24,6 +24,10 @@ import {
 // Plano e faturamento (WS-F1). Nenhum valor em reais mora aqui: preço vem de
 // /api/billing/plans, que o lê do Stripe. Cravar número nesta tela criaria uma
 // terceira fonte de verdade — e é esta que fala com o cliente.
+//
+// Painel, não página: quem dá título, descrição e rolagem é o diálogo de
+// configurações. Por isso as larguras respondem ao CONTÊINER (@container), não à
+// janela — dentro do modal a viewport diz 1440px e a coluna tem 800.
 
 const PLAN_NAMES: Record<string, string> = {
   starter: "Starter",
@@ -67,7 +71,7 @@ const day = (iso: string) =>
 const shortDay = (iso: string) =>
   new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
 
-export default function PlanPage() {
+export function PlanPanel() {
   // O que foi PEDIDO ao provedor e ainda não virou projeção. Quem decide parar o
   // repique é o callback do react-query, fora do render — relógio em render é impuro.
   const [awaiting, setAwaiting] = useState<PendingProjection | null>(null)
@@ -96,29 +100,14 @@ export default function PlanPage() {
   if (plans.error) {
     const message =
       plans.error instanceof ApiError ? plans.error.message : "Não foi possível carregar os planos."
-    return (
-      <div className="p-8">
-        <EmptyBlock message={message} />
-      </div>
-    )
+    return <EmptyBlock message={message} />
   }
 
   const data = plans.data!
 
   return (
-    <div className="-m-6 border-t border-border-soft" style={{ background: "var(--surface)", color: "var(--ink)" }}>
-      <section className="px-8 pt-7 pb-6 border-b border-border-soft">
-        <div className="eyebrow mb-2.5">Gestão · Assinatura</div>
-        <h1 className="font-display m-0" style={{ fontSize: 34, lineHeight: 1.1, color: "var(--ink)" }}>
-          Plano e faturamento
-        </h1>
-        <div className="text-[14px] text-ink-muted mt-1.5 max-w-160">
-          Cada plano dá uma cota de vídeo-minutos por mês. Trocas entram com proração na
-          próxima fatura.
-        </div>
-      </section>
-
-      <div className="px-8 py-7 space-y-4">
+    <div className="@container">
+      <div className="space-y-4">
         {!data.billingEnabled && <ProviderOffBanner />}
         {voltandoDoCheckout && !sub && <ProjectionBanner phase="waiting" />}
         {awaiting && !arrived && (
@@ -277,8 +266,10 @@ function ProviderOffBanner() {
 function usePortal() {
   const { portal } = useSubscriptionMutations()
 
+  // Volta para a própria seção de Plano, não para a rota antiga: o `?checkout=portal`
+  // é o gatilho da sincronização no retorno, e ele precisa sobreviver à navegação.
   const open = () =>
-    portal.mutate(`${window.location.origin}/plan?checkout=portal`, {
+    portal.mutate(`${window.location.origin}/dashboard?settings=plano&checkout=portal`, {
       onSuccess: ({ url }) => window.location.assign(url),
       onError: (e) =>
         toast.error(e instanceof ApiError ? e.message : "Não foi possível abrir o portal."),
@@ -520,7 +511,7 @@ function PlanGrid({
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-4 sm:grid-cols-2">
+    <div className="grid gap-4 @md:grid-cols-2 @4xl:grid-cols-4">
       {data.plans.map((plan) => (
         <PlanCard
           key={plan.slug}
@@ -1018,15 +1009,12 @@ function BillingSection({
 
 function SkeletonScreen() {
   return (
-    <div className="-m-6 border-t border-border-soft" style={{ background: "var(--surface)" }}>
-      <div className="px-8 py-8 space-y-4 animate-pulse">
-        <div className="h-9 w-72 rounded-md bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
-        <div className="h-24 rounded-[14px] bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
-        <div className="grid gap-4 lg:grid-cols-4 sm:grid-cols-2">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-72 rounded-[14px] bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
-          ))}
-        </div>
+    <div className="@container space-y-4 animate-pulse">
+      <div className="h-24 rounded-[14px] bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+      <div className="grid gap-4 @md:grid-cols-2 @4xl:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="h-72 rounded-[14px] bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+        ))}
       </div>
     </div>
   )

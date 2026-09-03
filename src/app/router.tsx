@@ -1,4 +1,5 @@
 import { createBrowserRouter, Navigate } from "react-router-dom"
+import { LegacyRedirect } from "@/components/settings/LegacyRedirect"
 import { AppShell } from "@/components/layout/AppShell"
 import { ProtectedRoute } from "@/features/auth/ProtectedRoute"
 import LoginPage from "@/pages/Login"
@@ -17,9 +18,6 @@ import AlertsPage from "@/pages/Alerts"
 import ReportsPage from "@/pages/Reports"
 import ReportViewPage from "@/pages/ReportView"
 import UsersPage from "@/pages/Users"
-import UsagePage from "@/pages/Usage"
-import PlanPage from "@/pages/Plan"
-import SettingsPage from "@/pages/Settings"
 import AdminBrandsPage from "@/pages/admin/AdminBrands"
 
 export const router = createBrowserRouter([
@@ -58,13 +56,13 @@ export const router = createBrowserRouter([
       { path: "/alerts", element: <AlertsPage /> },
       { path: "/reports", element: <ReportsPage /> },
       { path: "/users", element: <UsersPage /> },
-      // Consumo: sem gate de feature, igual ao backend — ver o próprio gasto não é
-      // funcionalidade paga, e gatear esconderia justamente de quem está em apuros.
-      { path: "/usage", element: <UsagePage /> },
-      // Plano e faturamento: leitura para qualquer membro, troca gated por Admin/Owner
-      // no backend — quem avalia a compra nem sempre é quem assina.
-      { path: "/plan", element: <PlanPage /> },
-      { path: "/settings", element: <SettingsPage /> },
+      // Consumo, Plano e Configurações viraram seções de um diálogo (`?settings=`),
+      // aberto por cima da tela atual. As rotas antigas continuam válidas — link salvo
+      // não vira 404 — e o redirecionamento PRESERVA a query: é por ela que chega o
+      // `?checkout=success` do provedor, que dispara a sincronização no retorno.
+      { path: "/usage", element: <LegacyRedirect section="consumo" /> },
+      { path: "/plan", element: <LegacyRedirect section="plano" /> },
+      { path: "/settings", element: <LegacyRedirect section="perfil" /> },
       // Curadoria admin (ADR-021). O gate visual é o `isZoeAdmin`; a autoridade
       // real é a policy ZoeAdmin no backend (403 em /api/admin/*).
       { path: "/admin/brands", element: <AdminBrandsPage /> },

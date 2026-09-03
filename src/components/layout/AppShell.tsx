@@ -15,6 +15,8 @@ import { useSubscription } from "@/lib/api/billing"
 import { useRealtimeConnection } from "@/lib/realtime"
 import { Breadcrumb } from "@/components/ui/breadcrumb"
 import { BrandSwitcher } from "@/components/layout/BrandSwitcher"
+import { SettingsDialog } from "@/components/settings/SettingsDialog"
+import { useOpenSettings } from "@/components/settings/useSettings"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
@@ -101,6 +103,7 @@ export function AppShell() {
   const userContext = [planLabel, role].filter(Boolean).join(" · ")
   const location = useLocation()
   const navigate = useNavigate()
+  const openSettings = useOpenSettings()
   const { resolvedTheme, setTheme } = useTheme()
   const isDark = resolvedTheme === "dark"
 
@@ -221,9 +224,9 @@ export function AppShell() {
                 <div className="ml-[21px] border-l-2 border-[#E5E7EB] dark:border-[#1C1F2E] flex flex-col mt-0 mb-2">
                   {hasIntelligence && <SubNavItem to="/brands">Marcas</SubNavItem>}
                   {hasReports && <SubNavItem to="/reports">Relatórios</SubNavItem>}
+                  {/* Consumo e Plano saíram daqui: contrato e fatura não são trabalho
+                      do dia, e agora vivem no diálogo de configurações. */}
                   <SubNavItem to="/users">Usuários</SubNavItem>
-                  <SubNavItem to="/usage">Consumo</SubNavItem>
-                  <SubNavItem to="/plan">Plano</SubNavItem>
                 </div>
               )}
             </>
@@ -310,10 +313,11 @@ export function AppShell() {
                 </>
               )}
 
-              <DropdownMenuItem asChild>
-                <Link to="/settings" className="flex items-center gap-2 text-sm cursor-pointer">
-                  <Settings className="w-4 h-4" /> Configurações
-                </Link>
+              <DropdownMenuItem
+                className="flex items-center gap-2 text-sm cursor-pointer"
+                onSelect={() => openSettings()}
+              >
+                <Settings className="w-4 h-4" /> Configurações
               </DropdownMenuItem>
               <DropdownMenuSeparator />
 
@@ -366,6 +370,10 @@ export function AppShell() {
           <Outlet />
         </main>
       </div>
+
+      {/* Fora do <main>: o diálogo é da aplicação, não da rota — e é o que permite
+          abrir Plano por cima de qualquer tela sem perder o lugar. */}
+      <SettingsDialog />
     </div>
   )
 }
@@ -387,23 +395,25 @@ function useTrialDaysLeft(): number | null {
 
 function TrialBadge() {
   const days = useTrialDaysLeft()
+  const openSettings = useOpenSettings()
   if (days === null) return null
 
   return (
-    <Link
-      to="/plan"
-      className="mx-3 mb-1 flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-[12px] transition-colors hover:opacity-80"
+    <button
+      onClick={() => openSettings("plano")}
+      className="mx-3 mb-1 flex w-[calc(100%-1.5rem)] items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-[12px] transition-colors hover:opacity-80"
       style={{ background: "var(--color-teal-50)", color: "var(--color-teal-700)" }}
     >
       <span className="font-medium">Período de teste</span>
       <span className="font-mono-zoe">{days === 1 ? "1 dia" : `${days} dias`}</span>
-    </Link>
+    </button>
   )
 }
 
 /** Só nos últimos dias: faixa permanente vira ruído e para de ser lida. */
 function TrialBanner() {
   const days = useTrialDaysLeft()
+  const openSettings = useOpenSettings()
   if (days === null || days > 3) return null
 
   return (
@@ -423,13 +433,13 @@ function TrialBanner() {
           leitura. Nenhum dado é apagado.
         </div>
       </div>
-      <Link
-        to="/plan"
+      <button
+        onClick={() => openSettings("plano")}
         className="shrink-0 h-8 px-3 inline-flex items-center rounded-lg text-[12.5px] font-medium text-white"
         style={{ background: "var(--color-teal-500)" }}
       >
         Escolher plano
-      </Link>
+      </button>
     </div>
   )
 }
