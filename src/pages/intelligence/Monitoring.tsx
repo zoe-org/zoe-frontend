@@ -6,6 +6,7 @@ import { ptBR } from "date-fns/locale"
 import { MentionDrawer } from "@/components/features/MentionDrawer"
 import { EmptyState } from "@/components/ui/empty-state"
 import { ConfidenceBadge } from "@/components/ui/confidence-badge"
+import { coverageSaysOwnedContent } from "@/components/ui/coverage-labels"
 import { VideoThumb } from "@/components/ui/video-thumb"
 import { SelectFilterChip } from "@/components/ui/select-filter-chip"
 import { useActiveBrand } from "@/features/brands/context"
@@ -454,7 +455,13 @@ export default function MonitoringPage() {
                     confidence={m.confidence}
                     selfMeasured={hasSelfMeasuredScore(m)}
                   />
-                  {m.channelRelation === "Owned" && <OwnedTag />}
+                  {/* Dois selos, duas perguntas: cobertura ("como foi analisado") e
+                      origem ("de quem é o canal"). Em vídeo owned os dois caíam no
+                      mesmo texto e a etiqueta aparecia repetida — quem cede é a
+                      origem, porque o de cobertura carrega o tooltip. */}
+                  {m.channelRelation === "Owned"
+                    && !coverageSaysOwnedContent(m.pipelinePath, hasSelfMeasuredScore(m))
+                    && <OwnedTag />}
                 </div>
                 <div>
                   {m.classificacao && (

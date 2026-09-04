@@ -36,6 +36,9 @@ const dictionaries: Record<string, LocaleDictionaries> = {
     pipelinePath: {
       Full: "Análise completa",
       VideoCaption: "Análise completa",
+      // ADR-046: áudio-only é o caminho PADRÃO, não uma degradação. Sem esta
+      // entrada a coluna "Cobertura" do CSV exportava a string crua "AudioOnly".
+      AudioOnly: "Análise completa",
       CaptionFallback: "Legenda + comentários",
       CommentsOnly: "Apenas comentários",
       // ADR-035. Rótulos escolhidos pra não colidir com os degradados acima:
