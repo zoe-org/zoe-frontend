@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { SelectFilterChip } from "@/components/ui/select-filter-chip"
 import { useActiveBrand } from "@/features/brands/context"
+import { brandVoice } from "@/features/brands/voice"
 import {
   useSentimentEvolution, useTopKeywords, useImpactEvents, useTopicSentiments,
 } from "@/lib/api/dashboard"
@@ -371,11 +372,14 @@ function PageSkeleton() {
  * para desligá-la nesta página.
  */
 function EarnedOnlyNote() {
+  // A regra é a mesma para marca própria e concorrente; só o sujeito muda.
+  const voice = brandVoice(useActiveBrand().active)
+
   return (
     <p className="text-[11.5px] text-ink-muted-2 mt-2 leading-snug max-w-140">
-      Considera apenas conteúdo de terceiros. Vídeos publicados no seu próprio canal
-      ficam de fora por definição — o roteiro é seu, então medi-los seria medir a
-      própria marca.{" "}
+      Considera apenas conteúdo de terceiros. Vídeos publicados em {voice.oCanalProprio}
+      {" "}ficam de fora por definição — o roteiro é de quem publica, então medi-los
+      seria medir {voice.aMarca} falando de si.{" "}
       <a href="/intelligence/monitoring?rel=owned" className="underline hover:text-ink-muted">
         Ver conteúdo próprio
       </a>

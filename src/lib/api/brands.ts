@@ -33,6 +33,28 @@ export type KeywordItem = {
 }
 export type ListKeywordsResponse = { items: KeywordItem[] }
 
+/** Aresta do conjunto competitivo de uma marca própria (ADR-044). */
+export type BrandCompetitor = {
+  brandId: string
+  /** Assinatura do concorrente — é o id que a adição usa. */
+  tenantBrandId: string
+  name: string
+  color: string | null
+  addedAt: string
+}
+
+/**
+ * `availableToAdd` vem junto de propósito: a tela de montagem precisa das duas
+ * listas ao mesmo tempo, e duas chamadas abririam janela para oferecer como
+ * disponível algo que acabou de ser adicionado.
+ */
+export type ListBrandCompetitorsResponse = {
+  ownBrandId: string
+  ownBrandName: string
+  competitors: BrandCompetitor[]
+  availableToAdd: BrandCompetitor[]
+}
+
 export type BrandCandidate = {
   brandId: string
   name: string
@@ -75,6 +97,15 @@ export const brandsApi = {
   removeKeyword: (tenantBrandId: string, keywordId: string) =>
     apiClient.delete(`/api/me/brands/${tenantBrandId}/keywords/${keywordId}`),
 
+  competitors: (tenantBrandId: string, opts?: { signal?: AbortSignal }) =>
+    apiClient.get<ListBrandCompetitorsResponse>(
+      `/api/me/brands/${tenantBrandId}/competitors`, { signal: opts?.signal }),
+  addCompetitor: (tenantBrandId: string, competitorTenantBrandId: string) =>
+    apiClient.post(`/api/me/brands/${tenantBrandId}/competitors`, { competitorTenantBrandId }),
+  // Por brandId, não pela assinatura: a aresta é entre MARCAS, e a tela já tem esse id.
+  removeCompetitor: (tenantBrandId: string, competitorBrandId: string) =>
+    apiClient.delete(`/api/me/brands/${tenantBrandId}/competitors/${competitorBrandId}`),
+
   update: (tenantBrandId: string, body: { displayName?: string | null; relationship?: string; status?: string; color?: string }) =>
     apiClient.put(`/api/me/brands/${tenantBrandId}`, body),
   unsubscribe: (tenantBrandId: string) =>
@@ -94,9 +125,18 @@ export const brandsApi = {
   resolveChannel: (input: string) =>
     apiClient.post<ResolveChannelResponse>("/api/me/brands/resolve-channel", { input }),
   link: (brandId: string, body?: SubscribePayload) =>
-    apiClient.post("/api/me/brands/link", { brandId, ...body }),
+    apiClient.post<SubscribeResult>("/api/me/brands/link", { brandId, ...body }),
   create: (name: string, body?: SubscribePayload) =>
-    apiClient.post("/api/me/brands", { name, ...body }),
+    apiClient.post<SubscribeResult>("/api/me/brands", { name, ...body }),
+}
+
+/** Resposta de link/create. O `tenantBrandId` é o que a montagem do conjunto usa. */
+export type SubscribeResult = {
+  brandId: string
+  tenantBrandId: string
+  linked: boolean
+  created: boolean
+  brandStatus: string
 }
 
 export type SubscribePayload = {
@@ -128,6 +168,46 @@ export function useBrandKeywords(tenantBrandId: string | null) {
     enabled: Boolean(activeTenantId && tenantBrandId),
     staleTime: 60_000,
   })
+}
+
+/** Conjunto competitivo de UMA marca própria. Só busca quando há marca escolhida. */
+export function useBrandCompetitors(tenantBrandId: string | null) {
+  const { activeTenantId } = useAuth()
+  return useQuery({
+    queryKey: ["brand-competitors", activeTenantId, tenantBrandId],
+    queryFn: ({ signal }) => brandsApi.competitors(tenantBrandId!, { signal }),
+    enabled: Boolean(activeTenantId && tenantBrandId),
+    staleTime: 60_000,
+  })
+}
+
+/**
+ * Montar e desmontar o conjunto. Invalida o SoV junto: o conjunto É o denominador
+ * dele, e deixar o número velho na tela depois de mexer no conjunto faria a
+ * mudança parecer não ter pegado.
+ */
+export function useCompetitorMutations(tenantBrandId: string | null) {
+  const { activeTenantId } = useAuth()
+  const qc = useQueryClient()
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["brand-competitors", activeTenantId, tenantBrandId] })
+    qc.invalidateQueries({ queryKey: ["dashboard-sov", activeTenantId] })
+    qc.invalidateQueries({ queryKey: ["dashboard-sov-trend", activeTenantId] })
+    qc.invalidateQueries({ queryKey: ["dashboard-sov-topics", activeTenantId] })
+  }
+
+  return {
+    add: useMutation({
+      mutationFn: (competitorTenantBrandId: string) =>
+        brandsApi.addCompetitor(tenantBrandId!, competitorTenantBrandId),
+      onSuccess: invalidate,
+    }),
+    remove: useMutation({
+      mutationFn: (competitorBrandId: string) =>
+        brandsApi.removeCompetitor(tenantBrandId!, competitorBrandId),
+      onSuccess: invalidate,
+    }),
+  }
 }
 
 /** Mutações da assinatura — invalidam as queries afetadas ao concluir. */

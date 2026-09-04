@@ -16,6 +16,7 @@ import { useRealtimeConnection } from "@/lib/realtime"
 import { Breadcrumb } from "@/components/ui/breadcrumb"
 import { BrandSwitcher } from "@/components/layout/BrandSwitcher"
 import { SettingsDialog } from "@/components/settings/SettingsDialog"
+import { UpgradeDialog } from "@/components/UpgradeDialog"
 import { useOpenSettings } from "@/components/settings/useSettings"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -366,6 +367,7 @@ export function AppShell() {
 
         {/* Content */}
         <main className="flex-1 p-6 overflow-y-auto">
+          <BillingStateBanner />
           <TrialBanner />
           <Outlet />
         </main>
@@ -374,6 +376,7 @@ export function AppShell() {
       {/* Fora do <main>: o diálogo é da aplicação, não da rota — e é o que permite
           abrir Plano por cima de qualquer tela sem perder o lugar. */}
       <SettingsDialog />
+      <UpgradeDialog />
     </div>
   )
 }
@@ -407,6 +410,69 @@ function TrialBadge() {
       <span className="font-medium">Período de teste</span>
       <span className="font-mono-zoe">{days === 1 ? "1 dia" : `${days} dias`}</span>
     </button>
+  )
+}
+
+/**
+ * Cobrança em estado ruim: pagamento pendente ou acesso já degradado (RN-I-012).
+ *
+ * <p><b>Permanente de propósito</b>, ao contrário do aviso de teste. Ali o prazo faz
+ * o trabalho e faixa fixa viraria ruído; aqui não há prazo — o estado só sai quando
+ * o cliente age, e escondê-lo faria o produto degradar sem explicar por quê.</p>
+ *
+ * <p>O texto diz explicitamente que <b>o histórico continua acessível e exportável</b>.
+ * Cliente que acha que perdeu o dado não volta, e é justamente nesse momento que ele
+ * decide se paga ou vai embora.</p>
+ */
+function BillingStateBanner() {
+  const { data } = useSubscription()
+  const openSettings = useOpenSettings()
+
+  if (!data) return null
+  const pendente = data.status === "PastDue"
+  if (!pendente && !data.readOnly) return null
+
+  const tom = pendente
+    ? { bg: "#FFFBEB", border: "rgba(217,119,6,.32)", color: "var(--color-warn)" }
+    : { bg: "#FEF2F2", border: "rgba(220,38,38,.32)", color: "var(--color-neg)" }
+
+  return (
+    <div
+      className="mb-5 flex items-start gap-3 rounded-[14px] border px-4 py-3.5"
+      style={{ background: tom.bg, borderColor: tom.border }}
+    >
+      <AlertCircle className="w-[17px] h-[17px] shrink-0 mt-0.5" style={{ color: tom.color }} />
+      <div className="flex-1">
+        <div className="text-[14px] font-semibold" style={{ color: tom.color }}>
+          {pendente
+            ? "Pagamento pendente"
+            : "Assinatura encerrada — acesso somente leitura"}
+        </div>
+        <div className="text-[13px] mt-1 leading-relaxed" style={{ color: "var(--ink-2)" }}>
+          {pendente ? (
+            <>
+              A última cobrança não foi concluída. O acesso segue completo enquanto o
+              provedor tenta de novo; se as tentativas se esgotarem, o workspace fica
+              somente leitura.
+            </>
+          ) : (
+            <>
+              A coleta de vídeos novos está pausada.{" "}
+              <strong>Nenhum dado foi apagado</strong> — marcas, análises, histórico e
+              relatórios continuam acessíveis e exportáveis, e voltam a receber coleta
+              assim que a assinatura for reativada.
+            </>
+          )}
+        </div>
+      </div>
+      <button
+        onClick={() => openSettings("plano")}
+        className="shrink-0 h-8 px-3 inline-flex items-center rounded-lg text-[12.5px] font-medium text-white"
+        style={{ background: "var(--color-teal-500)" }}
+      >
+        {pendente ? "Revisar cobrança" : "Reativar assinatura"}
+      </button>
+    </div>
   )
 }
 

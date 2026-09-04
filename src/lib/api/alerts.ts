@@ -54,8 +54,13 @@ export type AlertEvent = {
 }
 
 /**
- * `unreadCount` é o total do TENANT, não o da página nem o do filtro — é o número
- * do badge, e ele não pode mudar só porque o usuário filtrou por marca.
+ * `unreadCount` é o que VOCÊ ainda não leu (ADR-036), não o total de disparos do
+ * workspace — leitura é por usuário desde o `alert_event_reads`. Também não é o
+ * total da página nem do filtro: é o número do badge, e ele não pode mudar só
+ * porque o usuário filtrou por marca.
+ *
+ * São dois números diferentes e a tela nunca deve mostrá-los sem rótulo: "3 não
+ * lidos" e "3 disparos" significam coisas distintas para quem divide o workspace.
  */
 export type AlertEventPage = {
   items: AlertEvent[]

@@ -23,12 +23,17 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
 
   // Re-resolve quando o tenant muda ou a lista de marcas chega/muda:
   // preferência salva → senão a 1ª assinada. Marca salva que sumiu (unsubscribe)
-  // cai na 1ª. Sem tenant/lista ainda → null.
+  // cai no padrão. Sem tenant/lista ainda → null.
+  //
+  // O padrão NUNCA é um concorrente (WS-F4): o dashboard fala "sua marca", e abrir
+  // num concorrente só porque ele foi assinado primeiro enquadra o dado errado. A
+  // superfície de concorrente é o drill-down competitivo (ADR-035 D6).
   useEffect(() => {
     if (!activeTenantId) { setBrandId(null); return }
     if (list.length === 0) { setBrandId(null); return }
     const stored = readStored(activeTenantId)
-    const valid = stored && list.some((b) => b.brandId === stored) ? stored : list[0].brandId
+    const padrao = list.find((b) => b.relationship !== "Competitor") ?? list[0]
+    const valid = stored && list.some((b) => b.brandId === stored) ? stored : padrao.brandId
     setBrandId(valid)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTenantId, idsKey])

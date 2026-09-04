@@ -189,9 +189,12 @@ export default function AlertsPage() {
             tone: "accent",
           },
           {
-            label: "Disparos não lidos",
+            // Rótulo explícito: leitura é por usuário (ADR-036), e "no workspace
+            // inteiro" — o que este hint dizia antes — virou mentira. Um colega ler
+            // não abaixa este número.
+            label: "Não lidos por você",
             value: unreadCount,
-            hint: unreadCount === 0 ? "tudo em dia" : "no workspace inteiro",
+            hint: unreadCount === 0 ? "tudo em dia" : "só a sua leitura conta",
           },
           {
             label: "Marcas monitoradas",
@@ -226,7 +229,7 @@ export default function AlertsPage() {
                 color: unreadOnly ? "var(--color-teal-500)" : "var(--ink-muted)",
               }}
             >
-              <Bell className="w-3.5 h-3.5" /> Só não lidos
+              <Bell className="w-3.5 h-3.5" /> Só não lidos por mim
             </button>
             <MarkAllButton unreadCount={unreadCount} />
           </div>
@@ -287,6 +290,7 @@ function MarkAllButton({ unreadCount }: { unreadCount: number }) {
         onError: (e) => toast.error(e instanceof ApiError ? e.message : "Não foi possível marcar."),
       })}
       disabled={unreadCount === 0 || markAll.isPending}
+      title="Marca como lido só para você. O badge dos colegas não muda."
       className="h-8 px-3 rounded-md border border-border-soft text-[12.5px] font-medium text-ink-muted hover:text-ink transition-colors cursor-pointer disabled:opacity-50"
     >
       Marcar todos como lidos

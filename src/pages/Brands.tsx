@@ -8,9 +8,12 @@ import { EmptyState } from "@/components/ui/empty-state"
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
+import { useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 import {
   useTenantBrands, useBrandKeywords, useBrandMutations, useSubscribeFlow,
-  resolveOutcome, brandsApi, type TenantBrandSummary,
+  useBrandCompetitors, useCompetitorMutations,
+  resolveOutcome, brandsApi, type TenantBrandSummary, type SubscribeResult,
 } from "@/lib/api/brands"
 import { useDashboardSummary } from "@/lib/api/dashboard"
 import { useActiveBrand } from "@/features/brands/context"
@@ -235,7 +238,18 @@ export default function BrandsPage() {
             key={selected.tenantBrandId}
             brand={selected}
             canManage={canManage}
-            onOpenDashboard={() => { setBrand(selected.brandId); navigate("/dashboard") }}
+            // Concorrente vai para o drill-down competitivo, não para o dashboard
+            // (ADR-035 D6). Torná-lo a marca ATIVA mostraria "sua marca" para uma
+            // marca que não é dele — e, desde o WS-F4, o switcher nem o lista, então
+            // o usuário ficaria sem caminho de volta.
+            onOpenDashboard={() => {
+              if (selected.relationship === "Competitor") {
+                navigate(`/intelligence/competitive/${selected.brandId}`)
+                return
+              }
+              setBrand(selected.brandId)
+              navigate("/dashboard")
+            }}
             onUnsubscribed={() => setSelectedId(null)}
           />
         )}
@@ -303,7 +317,8 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
           onClick={onOpenDashboard}
           className="inline-flex items-center gap-1.5 h-8 px-3 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors shrink-0"
         >
-          Ver no dashboard <ExternalLink className="w-3.5 h-3.5" />
+          {brand.relationship === "Competitor" ? "Ver análise competitiva" : "Ver no dashboard"}
+          <ExternalLink className="w-3.5 h-3.5" />
         </button>
       </div>
 
@@ -435,6 +450,116 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
           )}
         </div>
       </div>
+
+      {/* Conjunto competitivo (ADR-044) — só de marca própria. */}
+      {brand.relationship === "OwnBrand" && (
+        <CompetitiveSetCard brand={brand} canManage={canManage} />
+      )}
+    </div>
+  )
+}
+
+/**
+ * Concorrentes DESTA marca própria (ADR-044).
+ *
+ * Antes o conjunto era implícito e por tenant: quem fosse `Competitor` disputava
+ * share com todas as marcas próprias ao mesmo tempo. Num tenant com duas marcas de
+ * categorias diferentes isso dava SoV errado nos dois sentidos — e o cliente não
+ * tinha onde corrigir, porque não havia o que declarar.
+ */
+function CompetitiveSetCard({ brand, canManage }: {
+  brand: TenantBrandSummary
+  canManage: boolean
+}) {
+  const set = useBrandCompetitors(brand.tenantBrandId)
+  const m = useCompetitorMutations(brand.tenantBrandId)
+  const [picking, setPicking] = useState("")
+
+  const data = set.data
+  const competitors = data?.competitors ?? []
+  const available = data?.availableToAdd ?? []
+
+  const add = (competitorTenantBrandId: string) => {
+    setPicking("")
+    m.add.mutate(competitorTenantBrandId)
+  }
+
+  return (
+    <div className="border border-border-soft rounded-xl p-5 mt-5">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <div className="eyebrow mb-1.5">Conjunto competitivo</div>
+          <p className="text-[12.5px] text-ink-muted max-w-140 leading-relaxed">
+            Contra quem o Share of Voice desta marca é calculado. Cada marca própria tem
+            o seu — a mesma concorrente pode estar em mais de um.
+          </p>
+        </div>
+        {canManage && available.length > 0 && (
+          <Select value={picking} onValueChange={add}>
+            <SelectTrigger className="h-8 text-[12.5px] w-56">
+              <SelectValue placeholder="adicionar concorrente…" />
+            </SelectTrigger>
+            <SelectContent>
+              {available.map((b) => (
+                <SelectItem key={b.tenantBrandId} value={b.tenantBrandId}>{b.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+
+      <div className="mt-4">
+        {set.isLoading ? (
+          <div className="h-8 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D] animate-pulse" />
+        ) : competitors.length === 0 ? (
+          // RN-I-064 por conjunto: sem concorrente declarado o SoV não tem denominador,
+          // e mostrar 100% seria pior que dizer que falta montar.
+          <div className="text-[13px] text-ink-muted leading-relaxed max-w-140">
+            Nenhum concorrente no conjunto ainda. Sem pelo menos um, o Share of Voice
+            desta marca não tem com o que comparar.
+            {available.length === 0 && (
+              <> Assine uma marca como concorrente para poder incluí-la aqui.</>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {competitors.map((c) => (
+              <span
+                key={c.brandId}
+                className="inline-flex items-center gap-2 pl-2 pr-2.5 py-1.5 rounded-md text-[12.5px] bg-[#F3F4F6] dark:bg-[#1A1D2D]"
+                style={{ color: "var(--ink-2)" }}
+              >
+                <span
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{ background: c.color ?? "var(--ink-muted-2)" }}
+                />
+                {c.name}
+                {canManage && (
+                  <button
+                    onClick={() => m.remove.mutate(c.brandId)}
+                    aria-label={`Tirar ${c.name} do conjunto`}
+                    className="text-ink-muted hover:text-neg transition-colors"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {(m.add.isError || m.remove.isError) && (
+        <p className="text-[12px] text-neg mt-3">Não foi possível alterar o conjunto. Tente de novo.</p>
+      )}
+
+      {competitors.length > 0 && canManage && (
+        // A confusão previsível: tirar do conjunto parece "parar de monitorar".
+        <p className="text-[11.5px] text-ink-muted-2 mt-3">
+          Tirar do conjunto não cancela a assinatura da marca — ela continua sendo
+          monitorada e o histórico dela permanece.
+        </p>
+      )}
     </div>
   )
 }
@@ -449,9 +574,19 @@ const STEPS = ["Identidade", "Vincular", "Palavras-chave"] as const
 
 function BrandModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const flow = useSubscribeFlow()
+  const qc = useQueryClient()
+  const minhas = useTenantBrands()
+  const ownBrands = (minhas.data?.items ?? []).filter(
+    (b) => b.relationship === "OwnBrand" && b.status === "Active",
+  )
   const [step, setStep] = useState(0)
   const [name, setName] = useState("")
   const [relationship, setRelationship] = useState("OwnBrand")
+  // Marca própria de quem este concorrente é rival (ADR-044). Perguntado AQUI porque
+  // é aqui que a intenção existe: quem acabou de marcar "Concorrente" sabe de quem.
+  // Deixar para depois transforma o conjunto competitivo numa segunda tarefa que
+  // ninguém lembra de fazer — e sem ele o SoV não sai do lugar.
+  const [competeWith, setCompeteWith] = useState("")
   const [category, setCategory] = useState("")
   const [color, setColor] = useState(PALETTE[0])
   const [channels, setChannels] = useState<string[]>([])
@@ -478,6 +613,7 @@ function BrandModal({ open, onClose }: { open: boolean; onClose: () => void }) {
     setCategory(""); setColor(PALETTE[0]); setChannels([]); setChannelDraft(""); setChannelError(null)
     setChannelTitles({}); setResolvingChannel(false)
     setKeywords([]); setDraft("")
+    setCompeteWith("")
     flow.resolve.reset(); flow.link.reset(); flow.create.reset()
     onClose()
   }, [flow, onClose])
@@ -547,14 +683,36 @@ function BrandModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const submitting = flow.link.isPending || flow.create.isPending
   const isLast = step === STEPS.length - 1
 
+  /**
+   * A aresta é escrita DEPOIS da assinatura, e a falha dela não desfaz a assinatura:
+   * a marca passou a ser monitorada de verdade, e reverter isso por causa do conjunto
+   * competitivo perderia o trabalho principal por causa do acessório. Se falhar, a
+   * marca fica assinada sem conjunto — estado que a tela de Marcas sinaliza e resolve.
+   */
+  const concluir = async (res: SubscribeResult) => {
+    if (relationship === "Competitor" && competeWith) {
+      try {
+        await brandsApi.addCompetitor(competeWith, res.tenantBrandId)
+        qc.invalidateQueries({ queryKey: ["brand-competitors"] })
+        qc.invalidateQueries({ queryKey: ["dashboard-sov"] })
+      } catch {
+        toast.warning(
+          "Marca assinada, mas não deu para incluí-la no conjunto competitivo. " +
+          "Você pode adicioná-la em Marcas.",
+        )
+      }
+    }
+    close()
+  }
+
   const finish = () => {
     const payload = { relationship, monitoredKeywords: keywords, color }
     // `category` só no create: no link a brand global já existe e seu segmento
     // é verdade compartilhada — quem assina não redefine.
-    if (pick && pick !== "new") flow.link.mutate({ brandId: pick, ...payload }, { onSuccess: close })
+    if (pick && pick !== "new") flow.link.mutate({ brandId: pick, ...payload }, { onSuccess: concluir })
     else flow.create.mutate(
       { name: name.trim(), ...payload, category: category || undefined, officialChannelIds: channels },
-      { onSuccess: close })
+      { onSuccess: concluir })
   }
 
   const canAdvance =
@@ -672,6 +830,36 @@ function BrandModal({ open, onClose }: { open: boolean; onClose: () => void }) {
                         Concorrentes entram no Share of Voice; marcas próprias, no seu painel principal.
                       </p>
                     </Field>
+
+                    {relationship === "Competitor" && (
+                      <Field label="Concorrente de qual marca sua?">
+                        {ownBrands.length === 0 ? (
+                          <p className="text-[12px] text-ink-muted leading-relaxed">
+                            Você ainda não tem marca própria assinada. Assine a sua primeiro —
+                            é dela que o conjunto competitivo é.
+                          </p>
+                        ) : (
+                          <>
+                            <Select value={competeWith} onValueChange={setCompeteWith}>
+                              <SelectTrigger className="h-10 w-full text-[14px]">
+                                <SelectValue placeholder="Escolha a marca própria" />
+                              </SelectTrigger>
+                              <SelectContent className={SELECT_IN_MODAL_Z}>
+                                {ownBrands.map((b) => (
+                                  <SelectItem key={b.tenantBrandId} value={b.tenantBrandId}>
+                                    {b.displayName ?? b.brandName}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <p className="text-[11.5px] text-ink-muted mt-1.5">
+                              O Share of Voice é calculado dentro do conjunto de cada marca própria.
+                              Dá para incluir em outras depois, em Marcas.
+                            </p>
+                          </>
+                        )}
+                      </Field>
+                    )}
                     <Field label="Categoria">
                       <Select value={category || "none"} onValueChange={(v) => setCategory(v === "none" ? "" : v)}>
                         <SelectTrigger className="h-10 w-full text-[14px]">
