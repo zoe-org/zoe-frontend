@@ -4,12 +4,16 @@ import { AlertCircle, ArrowUp, ArrowDown } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { useAuth } from "@/features/auth/context"
-import { AreaLine, Sparkline } from "@/components/ui/charts"
+import { AreaLine, Heatmap, Sparkline } from "@/components/ui/charts"
 import { EmptyState } from "@/components/ui/empty-state"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { ConfidenceBadge } from "@/components/ui/confidence-badge"
 import { useActiveBrand } from "@/features/brands/context"
-import { useDashboardSummary, useSentimentEvolution } from "@/lib/api/dashboard"
+import {
+  useDashboardSummary, useInfluencers, useMentionActivity, useSentimentEvolution,
+  type Influencer, type MentionActivity,
+} from "@/lib/api/dashboard"
+import { useAlertEvents } from "@/lib/api/alerts"
 import { useVideosFeed } from "@/lib/api/videos"
 import { tEnum } from "@/i18n/enums"
 
@@ -48,6 +52,11 @@ export default function DashboardPage() {
   const summary = useDashboardSummary(brand.brandId)
   const evolution = useSentimentEvolution(brand.brandId)
   const feed = useVideosFeed(brand.brandId ? { brandId: brand.brandId, limit: 6 } : null)
+  const activity = useMentionActivity(brand.brandId)
+  const influencers = useInfluencers(brand.brandId)
+  const alerts = useAlertEvents({ brandId: brand.brandId, unreadOnly: true })
+  // Três é o teto: a seção é uma chamada para ação, não um segundo histórico.
+  const pendingAlerts = (alerts.data?.pages[0]?.items ?? []).slice(0, 3)
 
   const points = useMemo(() => evolution.data?.points ?? [], [evolution.data])
   const dist = useMemo(() => {
@@ -229,6 +238,227 @@ export default function DashboardPage() {
           ))
         )}
       </section>
+
+      {/* Quando falam da marca + quem fala. Os dois respondem à mesma pergunta
+          operacional por ângulos diferentes — quando estar de plantão e com quem
+          falar —, então dividem a linha. */}
+      <section className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] border-t border-border-soft">
+        <div className="lg:border-r border-b lg:border-b-0 border-border-soft p-7">
+          <ActivityHeatmap data={activity.data} loading={activity.isLoading} />
+        </div>
+        <div className="p-7">
+          <TopInfluencers rows={influencers.data?.items ?? []} loading={influencers.isLoading} />
+        </div>
+      </section>
+
+      {/* Alertas fecham a página: é a única seção acionável, e ela some quando não
+          há nada pendente, em vez de mostrar um vazio decorativo. */}
+      {pendingAlerts.length > 0 && (
+        <section className="border-t border-border-soft p-7">
+          <PendingAlerts
+            items={pendingAlerts}
+            total={alerts.data?.pages[0]?.unreadCount ?? 0}
+            onOpen={() => navigate("/alerts")}
+          />
+        </section>
+      )}
+    </div>
+  )
+}
+
+// ── Quando falam da marca ───────────────────────────────────────────────
+
+/**
+ * Mapa dia × hora.
+ *
+ * A normalização é feita AQUI e não no servidor: a API devolve contagem crua para
+ * que o rodapé possa dizer quantas menções a célula mais quente tem. Intensidade
+ * sozinha não responde "quantas?".
+ *
+ * A escala é sobre o máximo da PRÓPRIA grade, não sobre um teto absoluto — o mapa
+ * responde "quando, comparado comigo mesmo", e uma marca de volume baixo ficaria
+ * com o mapa inteiro apagado se a régua fosse global.
+ */
+function ActivityHeatmap({ data, loading }: { data?: MentionActivity; loading: boolean }) {
+  const normalized = useMemo(() => {
+    if (!data || data.maxCount === 0) return null
+    return data.cells.map((row) => row.map((v) => v / data.maxCount))
+  }, [data])
+
+  return (
+    <div>
+      <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
+        <div>
+          <div className="eyebrow">Quando falam da marca</div>
+          <div className="text-[12px] text-ink-muted mt-1">
+            Dia da semana × hora · últimos 30 dias
+            {data && <> · {data.timeZone.replace("_", " ")}</>}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 text-[11px] text-ink-muted">
+          <span>menos</span>
+          <div className="flex gap-0.5">
+            {["#F0FDFB", "#CCFBF4", "#5DE0D4", "#00A799", "#006B60"].map((c) => (
+              <div key={c} className="w-3 h-2.5 rounded-xs" style={{ background: c }} />
+            ))}
+          </div>
+          <span>mais</span>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="h-36 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D] animate-pulse" />
+      ) : !normalized || !data ? (
+        <EmptyBlock
+          className="py-10"
+          message="Sem menções no período"
+          hint="O mapa aparece quando houver conteúdo de terceiros analisado."
+        />
+      ) : (
+        <>
+          <Heatmap data={normalized} />
+          {/* Owned fica de fora por definição: o mapa responde quando FALAM da
+              marca, e vídeo do canal próprio é quando a marca fala. */}
+          <div className="text-[11.5px] text-ink-muted-2 mt-2">
+            {data.total} menções de terceiros · a célula mais quente tem {data.maxCount}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ── Quem mais fala ──────────────────────────────────────────────────────
+
+function TopInfluencers({ rows, loading }: { rows: Influencer[]; loading: boolean }) {
+  const top = rows.slice(0, 5)
+
+  return (
+    <div>
+      <div className="eyebrow">Quem mais fala</div>
+      <div className="text-[12px] text-ink-muted mt-1 mb-4">Top 5 canais por alcance · 30 dias</div>
+
+      {loading ? (
+        <div className="space-y-3 animate-pulse">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="h-9 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+          ))}
+        </div>
+      ) : top.length === 0 ? (
+        <EmptyBlock className="py-10" message="Nenhum canal identificado ainda" />
+      ) : (
+        <div className="flex flex-col">
+          {top.map((inf, i) => (
+            <div
+              key={inf.channelId}
+              className={`flex items-center gap-3 py-2.5 ${i > 0 ? "border-t border-border-soft" : ""}`}
+            >
+              <span className="font-mono-zoe text-[11px] text-ink-muted-2 w-5 shrink-0">
+                {String(i + 1).padStart(2, "0")}
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] font-medium truncate" style={{ color: "var(--ink)" }}>
+                  {inf.name}
+                </div>
+                <div className="font-mono-zoe text-[10.5px] text-ink-muted">
+                  {compact(inf.reach)} de alcance · {inf.mentions}{" "}
+                  {inf.mentions === 1 ? "menção" : "menções"}
+                </div>
+              </div>
+              <span
+                className="font-mono-zoe text-[12px] shrink-0"
+                style={{ color: scoreColor(inf.avgScore) }}
+              >
+                {inf.avgScore.toFixed(2)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** A escala do domínio é [0,1] — o neutro é 0,5, não zero. */
+function scoreColor(score: number): string {
+  if (score >= 0.6) return "var(--color-pos)"
+  if (score <= 0.4) return "var(--color-neg)"
+  return "var(--ink-muted)"
+}
+
+function compact(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`
+  return String(n)
+}
+
+// ── Alertas pendentes ───────────────────────────────────────────────────
+
+type PendingAlert = {
+  id: string
+  ruleName: string
+  brandName: string
+  severity: string
+  triggeredAt: string
+}
+
+function PendingAlerts({
+  items,
+  total,
+  onOpen,
+}: {
+  items: PendingAlert[]
+  total: number
+  onOpen: () => void
+}) {
+  const tom = (sev: string) =>
+    sev === "Critical"
+      ? { color: "var(--color-neg)", bg: "var(--neg-bg)" }
+      : sev === "Warning"
+        ? { color: "var(--color-warn)", bg: "var(--warn-bg)" }
+        : { color: "var(--color-teal-500)", bg: "var(--color-teal-50)" }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <div className="eyebrow">Alertas não lidos</div>
+          <div className="text-[12px] text-ink-muted mt-1">
+            {total} {total === 1 ? "disparo aguardando você" : "disparos aguardando você"}
+          </div>
+        </div>
+        <button
+          onClick={onOpen}
+          className="text-[13px] text-teal-700 dark:text-teal-300 hover:text-teal-500 font-medium"
+        >
+          Ver todos →
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {items.map((a) => {
+          const t = tom(a.severity)
+          return (
+            <button
+              key={a.id}
+              onClick={onOpen}
+              className="text-left rounded-[12px] px-4 py-3 transition-opacity hover:opacity-85"
+              style={{ background: t.bg }}
+            >
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: t.color }} />
+                <span className="text-[13px] font-semibold truncate" style={{ color: "var(--ink)" }}>
+                  {a.ruleName}
+                </span>
+              </div>
+              <div className="text-[12px] text-ink-muted truncate">
+                {a.brandName} ·{" "}
+                {formatDistanceToNow(new Date(a.triggeredAt), { addSuffix: true, locale: ptBR })}
+              </div>
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

@@ -66,6 +66,19 @@ export type SovTopicShare = {
 export type SovTopic = { topic: string; volume: number; shares: SovTopicShare[] }
 export type SovByTopic = { topics: SovTopic[] }
 
+/**
+ * Mapa dia-da-semana × hora das menções. `cells[dia][hora]` é CONTAGEM crua — a
+ * normalização é de apresentação e fica aqui, para o tooltip poder mostrar o número
+ * real. Linha 0 = segunda; coluna 0 = 0h, no fuso que `timeZone` declara.
+ */
+export type MentionActivity = {
+  cells: number[][]
+  maxCount: number
+  total: number
+  timeZone: string
+  asOf: string
+}
+
 export type TopVideo = {
   analysisId: string
   youtubeVideoId: string
@@ -165,6 +178,10 @@ export const dashboardApi = {
     apiClient.get(
       `/api/dashboard/sov/trend?weeks=${weeks}${ownBrandId ? `&ownBrandId=${ownBrandId}` : ""}`,
       { signal: opts?.signal }),
+  activity: (brandId: string, days?: number, opts?: Opts): Promise<MentionActivity> =>
+    apiClient.get(
+      `/api/dashboard/activity?brandId=${brandId}${days != null ? `&days=${days}` : ""}`,
+      { signal: opts?.signal }),
   sovTopics: (_tenantId: string, days?: number, ownBrandId?: string | null, opts?: Opts): Promise<SovByTopic> =>
     apiClient.get(`/api/dashboard/sov/topics?${sovQuery(days, ownBrandId)}`, { signal: opts?.signal }),
 }
@@ -228,6 +245,16 @@ export function useTopicSentiments(brandId: string | null, days?: number) {
     queryFn: ({ signal }) => dashboardApi.topicSentiments(brandId!, days, { signal }),
     enabled: Boolean(activeTenantId && brandId),
     staleTime: 60_000,
+  })
+}
+
+export function useMentionActivity(brandId: string | null, days?: number) {
+  const { activeTenantId } = useAuth()
+  return useQuery({
+    queryKey: ["dashboard-activity", activeTenantId, brandId, days ?? null],
+    queryFn: ({ signal }) => dashboardApi.activity(brandId!, days, { signal }),
+    enabled: Boolean(activeTenantId && brandId),
+    staleTime: 5 * 60_000,
   })
 }
 
