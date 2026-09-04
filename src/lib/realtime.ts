@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { apiClient } from "@/lib/api"
+import { ApiError, apiClient } from "@/lib/api"
 import { useAuth } from "@/features/auth/context"
 
 // Transporte real-time (WS-F3, ADR-034). Troca o ticket de 60s (POST
@@ -9,11 +9,10 @@ import { useAuth } from "@/features/auth/context"
 // RealtimeEnvelope quando um alerta dispara. Contrato .NET↔TS — os tipos
 // abaixo espelham Zoe.Application.Common.Realtime.RealtimeEnvelope no zoe-api.
 //
-// Silencioso por design, mesmo padrão do resto do transporte: se o backend
-// estiver com o WebSocket desligado (Realtime:ManagementEndpoint vazio no
-// Render), o ticket volta com webSocketUrl vazio e este hook simplesmente não
-// conecta — nenhum erro visível, o produto segue funcionando igual (alerta
-// continua no histórico e no e-mail).
+// Silencioso por design, mesmo padrão do resto do transporte: com o WebSocket
+// desligado (Realtime:ManagementEndpoint vazio no Render), o ticket volta 503 ou
+// com webSocketUrl vazio — nos dois casos este hook desiste sem erro visível, e o
+// produto segue igual (alerta continua no histórico e no e-mail).
 
 type IssueTicketResponse = {
   ticket: string
@@ -79,9 +78,14 @@ export function useRealtimeConnection() {
       let ticket: IssueTicketResponse
       try {
         ticket = await apiClient.post<IssueTicketResponse>("/api/realtime/ticket")
-      } catch {
-        // 503 (transporte desligado) ou qualquer outro erro de rede — não é
-        // problema do usuário, só tenta de novo com backoff.
+      } catch (e) {
+        // 503 é config, não falha: o transporte NÃO EXISTE neste ambiente e não
+        // vai passar a existir enquanto a página estiver aberta. Reconectar aqui
+        // era um loop eterno com backoff — o servidor documentava essa distinção
+        // (DisabledRealtimeTicketIssuer) e o cliente nunca a honrou.
+        if (e instanceof ApiError && e.status === 503) return
+
+        // Rede, 500, sessão renovando: pode voltar. Tenta de novo com backoff.
         scheduleReconnect()
         return
       }

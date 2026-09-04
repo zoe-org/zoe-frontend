@@ -8,8 +8,8 @@ export type FeatureCatalog = {
   name: string
   description: string
   pricingUnit: string
-  /** Add-on gerenciável (aba Add-ons) vs. módulo base (intelligence/operations). */
-  isAddOn: boolean
+  /** `BaseModule` | `SubscriptionAddOn` | `InternalFlag` — quem manda no estado. */
+  kind: string
 }
 
 export const featuresApi = {
@@ -29,9 +29,9 @@ export function useFeatureCatalog() {
 }
 
 /**
- * Ativar/remover add-on. Em caso de sucesso chama `refresh()` do AuthContext, que
- * relê o contexto do tenant (as features vêm do backend, cache invalidado no
- * handler) — o gate por feature reflete na hora, sem reload.
+ * Ativar/remover feature à mão. Vale só para `InternalFlag`: add-on vem da assinatura
+ * e a API recusa com `managed_by_subscription`. Em caso de sucesso chama `refresh()`
+ * do AuthContext, e o gate por feature reflete na hora.
  */
 export function useFeatureMutations() {
   const { activeTenantId, refresh } = useAuth()

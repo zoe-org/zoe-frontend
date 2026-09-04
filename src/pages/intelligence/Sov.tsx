@@ -4,7 +4,11 @@ import { Lock, AlertCircle, Sparkles, Download, ArrowUp, ArrowDown, ChevronRight
 import { MultiLine } from "@/components/ui/charts"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { SelectFilterChip } from "@/components/ui/select-filter-chip"
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select"
 import { useFeature } from "@/features/auth/useFeature"
+import { useActiveBrand } from "@/features/brands/context"
 import {
   useShareOfVoice, useSovTrend, useSovByTopic,
   type SovTopicShare,
@@ -34,12 +38,32 @@ export default function SovPage() {
   const days = period === "" ? 0 : Number(period)
   const periodLabel = period === "" ? "Todo o período" : `Últimos ${period} dias`
 
-  const sov = useShareOfVoice(hasSov, days)
-  const trend = useSovTrend(hasSov, 12)
-  const topics = useSovByTopic(hasSov, days)
+  // O recorte segue o brand switcher global quando a marca ativa é própria: quem
+  // acabou de escolher "Itaú" lá em cima não deve ter que escolher de novo aqui.
+  const brand = useActiveBrand()
+  const marcaAtivaPropria =
+    brand.active?.relationship === "OwnBrand" ? brand.active.brandId : null
+
+  // Escolha local carimbada com a marca ativa do momento. Trocar no switcher global
+  // descarta o override sozinho — sem efeito de reset, que dispararia render em
+  // cascata e o lint recusa.
+  const [override, setOverride] = useState<{ para: string | null; ownBrandId: string } | null>(null)
+  const ownBrandId =
+    override && override.para === marcaAtivaPropria ? override.ownBrandId : marcaAtivaPropria
+  const setOwnBrandId = (id: string) => setOverride({ para: marcaAtivaPropria, ownBrandId: id })
+
+  const sov = useShareOfVoice(hasSov, days, ownBrandId)
+  const trend = useSovTrend(hasSov, 12, ownBrandId)
+  const topics = useSovByTopic(hasSov, days, ownBrandId)
 
   const brands = useMemo(() => sov.data?.brands ?? [], [sov.data])
   const competitors = brands.filter((b) => !b.isYou).length
+
+  const ownBrands = sov.data?.ownBrands ?? []
+  const selectedOwn = sov.data?.selectedOwnBrandId ?? null
+  // Mais de uma marca própria e nenhuma escolhida: a API devolve vazio de propósito
+  // em vez de chutar a primeira (ADR-044). A tela pergunta.
+  const precisaEscolher = ownBrands.length > 1 && selectedOwn === null
 
   // Sem a feature → upsell. O backend também retorna 403 (defesa: a UI não depende
   // só de si), caindo no mesmo upsell.
@@ -75,7 +99,9 @@ export default function SovPage() {
               Share of Voice
             </h1>
             <div className="text-[14px] text-ink-muted mt-1.5 max-w-140">
-              Sua participação nas conversas do setor frente aos concorrentes monitorados, em vídeo.
+              A participação de{" "}
+              {sov.data?.brands.find((b) => b.isYou)?.brandName ?? "cada marca própria"} nas
+              conversas do setor, frente ao conjunto competitivo declarado para ela.
             </div>
           </div>
           <button
@@ -87,10 +113,38 @@ export default function SovPage() {
           </button>
         </div>
         <div className="flex flex-wrap items-center gap-2 mt-5">
+          {/* O SoV é POR marca própria (ADR-044). Com mais de uma, o seletor é a
+              primeira coisa a decidir — o período vem depois.
+
+              `Select` direto e não `SelectFilterChip`: aquele reserva a chave vazia
+              para a opção neutra ("todas"), e aqui não existe estado neutro — o
+              recorte é obrigatório. Passar "" para ele deixava a pill em branco. */}
+          {ownBrands.length > 1 && (
+            <Select value={selectedOwn ?? ""} onValueChange={(v) => setOwnBrandId(v)}>
+              <SelectTrigger
+                aria-label="Marca própria do recorte"
+                className={`h-8 rounded-full px-3.5 text-[13px] font-medium border transition-colors ${
+                  selectedOwn
+                    ? "border-teal-500 text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-900/25"
+                    : "border-warn text-warn"
+                }`}
+                style={selectedOwn ? undefined : { borderColor: "var(--color-warn)", color: "var(--color-warn)" }}
+              >
+                <SelectValue placeholder="Escolha a marca própria" />
+              </SelectTrigger>
+              <SelectContent>
+                {ownBrands.map((b) => (
+                  <SelectItem key={b.brandId} value={b.brandId}>{b.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <SelectFilterChip value={period} onChange={setPeriod} options={PERIOD_OPTIONS} placeholder="Todo o período" />
-          <span className="chip text-[12px]">
-            <span className="font-mono-zoe">{competitors}</span> {competitors === 1 ? "concorrente" : "concorrentes"}
-          </span>
+          {!precisaEscolher && (
+            <span className="chip text-[12px]">
+              <span className="font-mono-zoe">{competitors}</span> {competitors === 1 ? "concorrente" : "concorrentes"}
+            </span>
+          )}
         </div>
       </section>
 
@@ -98,8 +152,22 @@ export default function SovPage() {
         <ErrorState onRetry={() => sov.refetch()} />
       ) : sov.isLoading ? (
         <BarsSkeleton />
+      ) : precisaEscolher ? (
+        <EmptyBlock
+          className="py-20"
+          message="Escolha a marca própria"
+          hint="Cada marca própria tem o seu conjunto competitivo, e o share é calculado dentro dele. Somar todas num número só compararia marcas de mercados diferentes."
+        />
+      ) : competitors === 0 && brands.length > 0 ? (
+        // Sem concorrente declarado não há denominador: a marca marcaria 100%, que é
+        // um número correto para uma pergunta que ninguém fez.
+        <EmptyBlock
+          className="py-20"
+          message="Nenhum concorrente no conjunto desta marca"
+          hint="Monte o conjunto competitivo dela em Gestão · Marcas para comparar o share."
+        />
       ) : brands.length === 0 ? (
-        <EmptyBlock className="py-20" message="Ainda não há dados de share of voice" hint="Assine marcas concorrentes e aguarde o pipeline analisar menções para comparar." />
+        <EmptyBlock className="py-20" message="Ainda não há dados de share of voice" hint="Assine marcas concorrentes, monte o conjunto competitivo da sua marca e aguarde o pipeline analisar menções." />
       ) : (
         <>
           {/* Leaderboard: Ranking atual + Sua posição */}
@@ -181,7 +249,8 @@ export default function SovPage() {
                 </>
               ) : (
                 <p className="text-[13px] text-ink-muted">
-                  Nenhuma marca própria (OwnBrand) assinada. Marque uma das suas marcas como "própria" para ver sua posição.
+                  Nenhuma marca própria assinada. Marque uma das suas marcas como "própria"
+                  para ver sua posição.
                 </p>
               )}
             </div>

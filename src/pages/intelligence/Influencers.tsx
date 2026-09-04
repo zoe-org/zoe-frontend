@@ -12,6 +12,7 @@ import {
 import { EmptyState } from "@/components/ui/empty-state"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { useActiveBrand } from "@/features/brands/context"
+import { brandVoice } from "@/features/brands/voice"
 import { useInfluencers, type Influencer } from "@/lib/api/dashboard"
 import { toCsv, downloadCsv } from "@/lib/csv"
 
@@ -83,6 +84,7 @@ const SORTS: { key: SortKey; label: string }[] = [
 export default function InfluencersPage() {
   const navigate = useNavigate()
   const brand = useActiveBrand()
+  const voice = brandVoice(brand.active)
   const inf = useInfluencers(brand.brandId)
 
   const [sortKey, setSortKey] = useState<SortKey>("reach")
@@ -182,7 +184,7 @@ export default function InfluencersPage() {
               Influenciadores
             </h1>
             <div className="text-[14px] text-ink-muted mt-1.5 max-w-140">
-              Criadores que mencionaram sua marca nos últimos 30 dias.{" "}
+              Criadores que mencionaram {voice.aMarca} nos últimos 30 dias.{" "}
               <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>
                 {influencers.length} {influencers.length === 1 ? "perfil" : "perfis"}
               </span>{" "}
@@ -193,8 +195,8 @@ export default function InfluencersPage() {
                 que era exatamente o sintoma que a ADR corrigiu. Não há controle
                 para incluir: seria mudar a definição da métrica, não filtrá-la. */}
             <p className="text-[11.5px] text-ink-muted-2 mt-2 leading-snug max-w-140">
-              Apenas canais de terceiros. O seu próprio canal não entra neste mapa — ele
-              não é um influenciador sobre a sua marca.
+              Apenas canais de terceiros. {voice.isOwn ? "O seu próprio canal" : `O canal da ${voice.name}`}
+              {" "}não entra neste mapa — ele não é um influenciador sobre {voice.aMarca}.
             </p>
           </div>
           <div className="flex items-center gap-2">
