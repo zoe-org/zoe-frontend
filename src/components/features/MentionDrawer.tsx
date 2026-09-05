@@ -1,8 +1,14 @@
+import { useState } from "react"
 import { ExternalLink, Sparkles, X } from "lucide-react"
+import { formatDistanceToNow } from "date-fns"
+import { ptBR } from "date-fns/locale"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { ConfidenceBadge } from "@/components/ui/confidence-badge"
+import { PersonAvatar } from "@/components/ui/person-avatar"
 import { VideoThumb } from "@/components/ui/video-thumb"
+import { CommentsModal, TranscriptModal } from "@/components/features/mention-modals"
 import { useAnalysisComments, useAnalysisDetail } from "@/lib/api/analyses"
-import { useVideoDetail, type VideoListItem } from "@/lib/api/videos"
+import { hasSelfMeasuredScore, useVideoDetail, type VideoListItem } from "@/lib/api/videos"
 import { tEnum } from "@/i18n/enums"
 import { classificationChip } from "@/lib/chip"
 
@@ -27,22 +33,6 @@ function scoreColor(cls: string | null): string {
   return "var(--ink-muted)"
 }
 
-/** Borda + fundo do bloco de citação, por sentimento do comentário. */
-function quoteStyle(sentiment: string): { border: string; bg: string } {
-  if (sentiment === "Positive") return { border: "var(--color-pos)", bg: "var(--pos-bg)" }
-  if (sentiment === "Negative") return { border: "var(--color-neg)", bg: "var(--neg-bg)" }
-  // Translúcido pra ler bem no claro E no escuro (mesmo truque dos *-bg do dark).
-  return { border: "#9AA1AE", bg: "rgba(148,161,174,0.10)" }
-}
-
-/** Gradiente estável por canal para o avatar — evita o mesmo verde pra todos. */
-function avatarGradient(seed: string): string {
-  let h = 0
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0
-  const hue = h % 360
-  return `linear-gradient(135deg, hsl(${hue} 62% 62%), hsl(${(hue + 40) % 360} 58% 45%))`
-}
-
 export function MentionDrawer({
   item,
   brandId,
@@ -55,6 +45,9 @@ export function MentionDrawer({
   open: boolean
   onClose: () => void
 }) {
+  const [transcriptOpen, setTranscriptOpen] = useState(false)
+  const [commentsOpen, setCommentsOpen] = useState(false)
+
   const analysisId = item?.analysisId ?? null
   const detail = useAnalysisDetail(open ? analysisId : null)
   const comments = useAnalysisComments(open ? analysisId : null)
@@ -65,8 +58,6 @@ export function MentionDrawer({
   const d = detail.data
   const youtubeUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(item.youtubeVideoId)}`
   const shortId = item.analysisId.replace(/-/g, "").slice(0, 6).toUpperCase()
-  const initial = (item.channelName || "?").trim().charAt(0).toUpperCase()
-  const coverageLabel = tEnum("pipelinePath", item.pipelinePath)
 
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose() }}>
@@ -122,12 +113,7 @@ export function MentionDrawer({
           {/* Meta: canal + views + tempo */}
           <div className="flex items-center gap-3 flex-wrap text-[12.5px]" style={{ color: "var(--ink-2)" }}>
             <div className="flex items-center gap-2">
-              <div
-                className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[12px] font-semibold shrink-0"
-                style={{ background: avatarGradient(item.channelName) }}
-              >
-                {initial}
-              </div>
+              <PersonAvatar name={item.channelName} size={28} />
               <span className="font-medium">{item.channelName}</span>
             </div>
             {item.views != null && (
@@ -137,8 +123,10 @@ export function MentionDrawer({
               </>
             )}
             <span className="w-px h-4 bg-border-soft" />
-            <span className="text-ink-muted">
-              {new Date(item.publishedAt).toLocaleDateString("pt-BR")}
+            {/* Tempo relativo, como na lista: "há 3 dias" responde a pergunta que
+                se faz aqui (isso é recente?) sem obrigar a fazer conta. */}
+            <span className="text-ink-muted" title={new Date(item.publishedAt).toLocaleDateString("pt-BR")}>
+              {formatDistanceToNow(new Date(item.publishedAt), { addSuffix: true, locale: ptBR })}
             </span>
             <a
               href={youtubeUrl}
@@ -178,44 +166,20 @@ export function MentionDrawer({
                 </span>
               </PanelCell>
               <PanelCell label="Cobertura">
-                <span className="inline-flex items-center px-2 py-0.5 mt-1 rounded text-[11px] font-medium bg-[#F3F4F6] dark:bg-[#1A1D2D] text-ink-2">
-                  {coverageLabel}
-                </span>
+                {/* O mesmo selo da lista, e não um texto solto: ele carrega o
+                    tooltip e a ressalva de score auto-medido (vídeo do canal da
+                    própria marca), que aqui — onde o número aparece grande — é
+                    justamente onde não pode faltar. */}
+                <div className="mt-1">
+                  <ConfidenceBadge
+                    pipelinePath={item.pipelinePath}
+                    confidence={item.confidence}
+                    selfMeasured={hasSelfMeasuredScore(item)}
+                  />
+                </div>
               </PanelCell>
             </div>
           </div>
-
-          {/* Transcrição — texto real do Whisper/legenda (já truncado no
-              backend). Fora do gate do detalhe (`d`): depende só da query do
-              vídeo. Não temos trechos com timestamp+sentimento como o mock, então
-              exibimos o texto; as palavras-chave fazem o papel de "sinais". */}
-          {video.data?.transcript?.text && (
-            <Section
-              title="Transcrição"
-              aside={
-                <a
-                  href={youtubeUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[12px] text-teal-600 dark:text-teal-300 hover:underline"
-                >
-                  Ver no YouTube →
-                </a>
-              }
-            >
-              <div
-                className="max-h-56 overflow-y-auto rounded-lg border border-border-soft p-3.5 text-[13px] leading-relaxed whitespace-pre-wrap bg-[#FAFBFC] dark:bg-[#181B28]"
-                style={{ color: "var(--ink-2)" }}
-              >
-                {video.data.transcript.text}
-                {video.data.transcript.truncated && (
-                  <span className="block mt-2 text-[11.5px] italic text-ink-muted">
-                    Transcrição resumida — trecho inicial do vídeo.
-                  </span>
-                )}
-              </div>
-            </Section>
-          )}
 
           {detail.isLoading && <DrawerSkeleton />}
           {detail.isError && (
@@ -245,43 +209,88 @@ export function MentionDrawer({
                 </Section>
               )}
 
-              {/* Comentários em destaque (blocos de citação, estilo do design) */}
+              {/* Transcrição. Vem DEPOIS da composição do score de propósito: a
+                  composição explica o número que está logo acima, e a transcrição é
+                  a evidência crua — quem quer o detalhe desce, quem quer a leitura
+                  clica. Aqui só a prévia do banco (300 caracteres); o texto inteiro
+                  mora no S3 e vai pro modal. */}
+              {video.data?.transcript?.text && (
+                <Section
+                  title="Transcrição"
+                  aside={
+                    <button
+                      type="button"
+                      onClick={() => setTranscriptOpen(true)}
+                      className="text-[12px] text-teal-600 dark:text-teal-300 hover:underline cursor-pointer"
+                    >
+                      Ver transcrição completa →
+                    </button>
+                  }
+                >
+                  <button
+                    type="button"
+                    onClick={() => setTranscriptOpen(true)}
+                    className="w-full text-left relative rounded-lg border border-border-soft p-3.5 bg-[#FAFBFC] dark:bg-[#181B28] hover:border-teal-500 transition-colors cursor-pointer"
+                  >
+                    <p
+                      className="text-[13px] leading-relaxed line-clamp-4"
+                      style={{ color: "var(--ink-2)" }}
+                    >
+                      {video.data.transcript.text}
+                    </p>
+                    <span className="mt-2 inline-flex items-center gap-2 text-[11px] text-ink-muted">
+                      <span className="chip">{tEnum("transcriptionSource", video.data.transcript.source)}</span>
+                      {/* "prévia" e não uma contagem de palavras: este texto é o começo
+                          da fala, e um número aqui pareceria o tamanho da transcrição. */}
+                      <span>prévia — clique para ler tudo</span>
+                    </span>
+                  </button>
+                </Section>
+              )}
+
+              {/* Comentários — os três mais curtidos, com o resto no modal. Os
+                  chips de contagem vêm do agregado da análise (todos os
+                  comentários), não da amostra exibida. */}
               {d.commentAggregate && d.commentAggregate.totalComments > 0 && (
                 <Section
                   title={`Comentários (${d.commentAggregate.totalComments})`}
                   aside={
-                    <div className="flex gap-1.5 text-[11px]">
-                      <span className="chip chip-pos">{d.commentAggregate.positivesCount}</span>
-                      <span className="chip">{d.commentAggregate.neutralsCount}</span>
-                      <span className="chip chip-neg">{d.commentAggregate.negativesCount}</span>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCommentsOpen(true)}
+                      className="text-[12px] text-teal-600 dark:text-teal-300 hover:underline cursor-pointer"
+                    >
+                      Ver todos →
+                    </button>
                   }
                 >
+                  <div className="flex gap-1.5 mb-3 text-[10.5px]">
+                    <span className="chip chip-pos">{d.commentAggregate.positivesCount} positivos</span>
+                    <span className="chip">{d.commentAggregate.neutralsCount} neutros</span>
+                    <span className="chip chip-neg">{d.commentAggregate.negativesCount} negativos</span>
+                  </div>
+
                   {comments.data && comments.data.items.length > 0 && (
-                    <div className="flex flex-col gap-2.5">
-                      {comments.data.items.slice(0, 6).map((c) => {
-                        const qs = quoteStyle(c.sentiment)
-                        return (
-                          <div
-                            key={c.commentId}
-                            className="px-3.5 py-3 rounded-r-lg"
-                            style={{ borderLeft: `3px solid ${qs.border}`, background: qs.bg }}
-                          >
-                            <div className="flex items-center justify-between gap-2 mb-1">
-                              {/* Autor: texto React puro (escape default) — input hostil do YouTube. */}
-                              <span className="text-[11.5px] font-medium truncate" style={{ color: "var(--ink-2)" }}>
+                    <div className="flex flex-col gap-3.5">
+                      {comments.data.items.slice(0, 3).map((c) => (
+                        <div key={c.commentId} className="flex gap-2.5 items-start">
+                          <PersonAvatar name={c.author} size={26} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              {/* Autor e texto: texto React puro (escape default) — input hostil do YouTube. */}
+                              <span className="text-[12px] font-semibold truncate" style={{ color: "var(--ink)" }}>
                                 {c.author}
                               </span>
-                              <span className="font-mono-zoe text-[10.5px] text-ink-muted shrink-0">
-                                {c.score.toFixed(2)}
+                              <span className={`${classificationChip(c.sentiment)} text-[9.5px] shrink-0`}>
+                                {tEnum("sentiment", c.sentiment)}
                               </span>
                             </div>
-                            <p className="text-[13px] italic leading-relaxed" style={{ color: "var(--ink-2)" }}>
-                              "{c.text}"
+                            <p className="text-[12.5px] leading-relaxed line-clamp-3" style={{ color: "var(--ink-2)" }}>
+                              {c.text}
                             </p>
                           </div>
-                        )
-                      })}
+                        </div>
+                      ))}
                     </div>
                   )}
                 </Section>
@@ -335,6 +344,26 @@ export function MentionDrawer({
             <ExternalLink className="w-4 h-4" /> Abrir no YouTube
           </a>
         </div>
+
+        {/* Leitura longa fora do drawer: o Sheet continua aberto atrás. */}
+        {video.data?.transcript && (
+          <TranscriptModal
+            videoId={item.videoId}
+            brandId={brandId}
+            youtubeVideoId={item.youtubeVideoId}
+            title={item.title}
+            preview={video.data.transcript}
+            open={transcriptOpen}
+            onClose={() => setTranscriptOpen(false)}
+          />
+        )}
+        <CommentsModal
+          analysisId={item.analysisId}
+          title={item.title}
+          aggregate={d?.commentAggregate ?? null}
+          open={commentsOpen}
+          onClose={() => setCommentsOpen(false)}
+        />
       </SheetContent>
     </Sheet>
   )

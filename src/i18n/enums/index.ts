@@ -9,6 +9,7 @@ export type EnumKind =
   | "nerMode"
   | "pipelinePath"
   | "channelRelation"
+  | "transcriptionSource"
 
 type LocaleDictionaries = Record<EnumKind, Record<string, string>>
 
@@ -50,6 +51,11 @@ const dictionaries: Record<string, LocaleDictionaries> = {
     channelRelation: {
       Owned: "Conteúdo próprio",
       ThirdParty: "Terceiros",
+    },
+    // De onde veio o texto da transcrição (ADR-027: áudio-first, legenda é fallback).
+    transcriptionSource: {
+      Whisper: "Áudio",
+      Caption: "Legenda",
     },
   },
 }

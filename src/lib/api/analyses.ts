@@ -66,11 +66,19 @@ export type ListCommentsResponse = { items: CommentItem[] }
 export const analysesApi = {
   detail: (analysisId: string, opts?: { signal?: AbortSignal }) =>
     apiClient.get<AnalysisDetail>(`/api/analyses/${analysisId}`, { signal: opts?.signal }),
-  comments: (analysisId: string, sentiment?: string, opts?: { signal?: AbortSignal }) =>
-    apiClient.get<ListCommentsResponse>(
-      `/api/analyses/${analysisId}/comments${sentiment ? `?sentiment=${encodeURIComponent(sentiment)}` : ""}`,
+  comments: (
+    analysisId: string,
+    opts?: { sentiment?: string; limit?: number; signal?: AbortSignal },
+  ) => {
+    const p = new URLSearchParams()
+    if (opts?.sentiment) p.set("sentiment", opts.sentiment)
+    if (opts?.limit) p.set("limit", String(opts.limit))
+    const qs = p.toString()
+    return apiClient.get<ListCommentsResponse>(
+      `/api/analyses/${analysisId}/comments${qs ? `?${qs}` : ""}`,
       { signal: opts?.signal },
-    ),
+    )
+  },
 }
 
 /** Detalhe da análise (componentes, mentions, keyword scores). Desabilitado sem id. */
@@ -84,12 +92,21 @@ export function useAnalysisDetail(analysisId: string | null) {
   })
 }
 
-/** Comentários notáveis da análise, com filtro opcional de sentiment. */
-export function useAnalysisComments(analysisId: string | null, sentiment?: string) {
+/**
+ * Comentários notáveis da análise (top-N por likes), com filtro opcional de
+ * sentiment. `limit` entra na key: o drawer pede o default (50) e o modal "ver
+ * todos" pede o teto (200) — sem isso o segundo receberia o cache do primeiro e
+ * mostraria 50 dizendo que são todos.
+ */
+export function useAnalysisComments(
+  analysisId: string | null,
+  opts?: { sentiment?: string; limit?: number },
+) {
   const { activeTenantId } = useAuth()
+  const { sentiment, limit } = opts ?? {}
   return useQuery({
-    queryKey: ["analysis-comments", activeTenantId, analysisId, sentiment ?? null],
-    queryFn: ({ signal }) => analysesApi.comments(analysisId!, sentiment, { signal }),
+    queryKey: ["analysis-comments", activeTenantId, analysisId, sentiment ?? null, limit ?? null],
+    queryFn: ({ signal }) => analysesApi.comments(analysisId!, { sentiment, limit, signal }),
     enabled: Boolean(activeTenantId && analysisId),
     staleTime: 60_000,
   })
