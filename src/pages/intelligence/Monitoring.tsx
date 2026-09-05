@@ -193,6 +193,7 @@ export default function MonitoringPage() {
       { header: "Canal", value: (m) => m.channelName },
       { header: "Publicado em", value: (m) => new Date(m.publishedAt).toLocaleDateString("pt-BR") },
       { header: "Views", value: (m) => m.views ?? "" },
+      { header: "Comentários analisados", value: (m) => m.commentsCount ?? "" },
       { header: "Classificação", value: (m) => (m.classificacao ? tEnum("classification", m.classificacao) : "") },
       // Score vazio em owned pelo path pesado, pelo mesmo motivo da tela: o número
       // não mede audiência, e numa planilha ele perde o badge que explicava isso.
@@ -397,6 +398,14 @@ export default function MonitoringPage() {
                           <span className="font-mono-zoe shrink-0">{compactNumber(m.views)} views</span>
                         </>
                       )}
+                      {/* Comentários ANALISADOS. Sem agregado (ou zero) não mostra
+                          nada: "0 comentários" é ruído, não informação. */}
+                      {m.commentsCount != null && m.commentsCount > 0 && (
+                        <>
+                          <span>·</span>
+                          <span className="font-mono-zoe shrink-0">{compactNumber(m.commentsCount)} coment.</span>
+                        </>
+                      )}
                       <span>·</span>
                       <span className="shrink-0">
                         {formatDistanceToNow(new Date(m.publishedAt), { addSuffix: true, locale: ptBR })}
@@ -439,6 +448,14 @@ export default function MonitoringPage() {
                       <>
                         <span>·</span>
                         <span className="font-mono-zoe">{compactNumber(m.views)} views</span>
+                      </>
+                    )}
+                    {m.commentsCount != null && m.commentsCount > 0 && (
+                      <>
+                        <span>·</span>
+                        <span className="font-mono-zoe">
+                          {compactNumber(m.commentsCount)} {m.commentsCount === 1 ? "comentário" : "comentários"}
+                        </span>
                       </>
                     )}
                     <span>·</span>

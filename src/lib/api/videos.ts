@@ -22,6 +22,12 @@ export type VideoListItem = {
   views: number | null
   /** ADR-035: "Owned" (canal oficial da marca) ou "ThirdParty". */
   channelRelation: ChannelRelation
+  /**
+   * Comentários ANALISADOS (roll-up da análise), não o contador do YouTube — o
+   * snapshot de metadados grava 0 na ingestão. É o mesmo número do drawer.
+   * null = análise sem agregado; a lista não mostra nada nesse caso.
+   */
+  commentsCount: number | null
 }
 
 /** Serializado pelo nome do enum C# (PascalCase), como os demais enums do read-API. */
@@ -153,6 +159,27 @@ export type VideoDetail = {
   transcript: TranscriptPreview | null
 }
 
+/**
+ * Transcrição completa (`GET /api/videos/{id}/transcript`). Vem do S3, não do
+ * Postgres: o `transcript` do detalhe é a prévia de 300 caracteres que o pipeline
+ * grava no banco. `complete: false` significa que o arquivo não pôde ser lido e o
+ * que voltou é a prévia — a UI TEM que dizer isso em vez de chamar de "completa".
+ */
+export type TranscriptSegment = {
+  startSeconds: number
+  endSeconds: number
+  text: string
+}
+export type TranscriptFull = {
+  source: string
+  language: string
+  text: string
+  truncated: boolean
+  complete: boolean
+  /** Vazio quando a fonte não tem timestamp por frase (ver o handler). */
+  segments: TranscriptSegment[]
+}
+
 export const videosApi = {
   list: (f: VideoFilters, cursor?: string, opts?: { signal?: AbortSignal }) =>
     apiClient.get<ListVideosResponse>(`/api/videos?${buildQuery(f, cursor)}`, { signal: opts?.signal }),
@@ -161,6 +188,10 @@ export const videosApi = {
   detail: (videoId: string, brandId: string, opts?: { signal?: AbortSignal }) =>
     apiClient.get<VideoDetail>(
       `/api/videos/${videoId}?brandId=${encodeURIComponent(brandId)}`, { signal: opts?.signal }),
+  transcript: (videoId: string, brandId: string, opts?: { signal?: AbortSignal }) =>
+    apiClient.get<TranscriptFull>(
+      `/api/videos/${videoId}/transcript?brandId=${encodeURIComponent(brandId)}`,
+      { signal: opts?.signal }),
 }
 
 /**
@@ -192,6 +223,21 @@ export function useVideoDetail(videoId: string | null, brandId: string | null) {
     queryFn: ({ signal }) => videosApi.detail(videoId!, brandId!, { signal }),
     enabled: Boolean(activeTenantId && videoId && brandId),
     staleTime: 60_000,
+  })
+}
+
+/**
+ * Transcrição completa, só quando o modal abre. Fica FORA do `useVideoDetail` de
+ * propósito: é uma leitura de S3 por chamada, e a maioria dos cliques no drawer
+ * nunca abre a transcrição.
+ */
+export function useVideoTranscript(videoId: string | null, brandId: string | null) {
+  const { activeTenantId } = useAuth()
+  return useQuery({
+    queryKey: ["video-transcript", activeTenantId, videoId, brandId],
+    queryFn: ({ signal }) => videosApi.transcript(videoId!, brandId!, { signal }),
+    enabled: Boolean(activeTenantId && videoId && brandId),
+    staleTime: 5 * 60_000,
   })
 }
 
