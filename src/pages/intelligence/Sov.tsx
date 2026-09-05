@@ -11,7 +11,7 @@ import { useFeature } from "@/features/auth/useFeature"
 import { useActiveBrand } from "@/features/brands/context"
 import {
   useShareOfVoice, useSovTrend, useSovByTopic,
-  type SovTopicShare,
+  type SovBrand, type SovTopic, type SovTopicShare,
 } from "@/lib/api/dashboard"
 import { ApiError } from "@/lib/api"
 import { toCsv, downloadCsv } from "@/lib/csv"
@@ -83,6 +83,7 @@ export default function SovPage() {
       { header: "Você", value: (b) => (b.isYou ? "sim" : "") },
       { header: "Menções", value: (b) => b.mentions },
       { header: "Share (%)", value: (b) => b.sharePct },
+      { header: "Sentimento", value: (b) => (b.avgScore != null ? b.avgScore.toFixed(2) : "") },
       { header: "Delta (pp)", value: (b) => b.deltaPp },
     ])
     downloadCsv(`zoe-share-of-voice-${new Date().toISOString().slice(0, 10)}.csv`, csv)
@@ -256,6 +257,11 @@ export default function SovPage() {
             </div>
           </section>
 
+          {/* Volume não é reputação (design: sov-insights). É a leitura que o
+              ranking sozinho não dá — e a que muda a conversa de "quem fala mais"
+              para "quem fala bem". */}
+          <QualitySection brands={brands} />
+
           {/* Evolução do SoV */}
           <section className="px-7 py-6 border-b border-border-soft">
             <div className="flex items-start justify-between mb-4 flex-wrap gap-3">
@@ -288,6 +294,14 @@ export default function SovPage() {
               />
             )}
           </section>
+
+          {/* Espaços não ocupados (design: sov-insights). Deriva de sov/topics —
+              nenhuma chamada nova. */}
+          <WhitespaceSection
+            topics={topics.data?.topics ?? []}
+            loading={topics.isLoading}
+            yourShare={you?.sharePct ?? 0}
+          />
 
           {/* SoV por tópico (por plataforma fica de fora: só temos YouTube) */}
           <section className="px-7 py-6">
@@ -356,11 +370,203 @@ function DeltaPp({ value, suffix, big }: { value: number; suffix?: string; big?:
 
 // ── Upsell (estado premium, não erro) ─────────────────────────────────────
 
+// ── Volume não é reputação ──────────────────────────────────────────────
+
+/** Cor do sentimento na escala do domínio, onde o neutro é 0,5 — não zero. */
+function sentimentColor(score: number | null): string {
+  if (score == null) return "var(--ink-muted-2)"
+  if (score >= 0.6) return "var(--color-pos)"
+  if (score <= 0.4) return "var(--color-neg)"
+  return "var(--color-warn)"
+}
+
+/**
+ * Share cruzado com sentimento.
+ *
+ * <p>O ranking sozinho responde "quem fala mais", que é meia pergunta: share alto
+ * com sentimento baixo é <b>exposição</b>, não vantagem. Por isso os dois números
+ * aparecem na mesma linha, e não em seções separadas onde o leitor teria que
+ * cruzá-los de cabeça.</p>
+ *
+ * <p>Sem quadrante desenhado: com o conjunto competitivo típico — uma marca e dois
+ * ou três concorrentes — os pontos se sobrepõem e a tabela lê melhor que o gráfico.</p>
+ */
+function QualitySection({ brands }: { brands: SovBrand[] }) {
+  // Sem nenhum score não há o que cruzar, e uma tabela de traços não informa.
+  if (brands.every((b) => b.avgScore == null)) return null
+
+  return (
+    <section className="px-8 py-7 border-b border-border-soft">
+      <div className="flex items-baseline justify-between gap-4 flex-wrap mb-1">
+        <div className="eyebrow">Volume não é reputação</div>
+        <span className="text-[12px] text-ink-muted">
+          Share cruzado com o sentimento médio do período
+        </span>
+      </div>
+      <p className="text-[13px] text-ink-muted mb-5 max-w-160 leading-relaxed">
+        Share alto com sentimento baixo é exposição, não vantagem. A leitura útil é a
+        das duas colunas juntas.
+      </p>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-[13px] min-w-140">
+          <thead>
+            <tr className="text-ink-muted">
+              <th className="text-left font-medium pb-2">Marca</th>
+              <th className="text-right font-medium pb-2">Share</th>
+              <th className="text-right font-medium pb-2">Sentimento</th>
+              <th className="text-right font-medium pb-2">Menções</th>
+              <th className="text-right font-medium pb-2">Variação</th>
+            </tr>
+          </thead>
+          <tbody>
+            {brands.map((b) => (
+              <tr key={b.brandId} className="border-t border-border-soft">
+                <td className="py-2.5">
+                  <span className="flex items-center gap-2">
+                    <span
+                      className="w-2 h-2 rounded-sm shrink-0"
+                      style={{ background: brandColor(b.brandId, b.color) }}
+                    />
+                    <span style={{ color: "var(--ink)", fontWeight: b.isYou ? 700 : 400 }}>
+                      {b.brandName}
+                    </span>
+                    {b.isYou && <span className="chip chip-primary text-[9.5px]">VOCÊ</span>}
+                  </span>
+                </td>
+                <td className="text-right font-mono-zoe" style={{ color: "var(--ink)" }}>
+                  {b.sharePct}%
+                </td>
+                <td
+                  className="text-right font-mono-zoe"
+                  style={{ color: sentimentColor(b.avgScore) }}
+                >
+                  {b.avgScore != null ? b.avgScore.toFixed(2) : "—"}
+                </td>
+                <td className="text-right font-mono-zoe text-ink-muted">{b.mentions}</td>
+                <td className="text-right font-mono-zoe">
+                  <span className={b.deltaPp === 0 ? "text-ink-muted" : undefined}
+                    style={b.deltaPp > 0
+                      ? { color: "var(--color-pos)" }
+                      : b.deltaPp < 0 ? { color: "var(--color-neg)" } : undefined}
+                  >
+                    {b.deltaPp > 0 ? "+" : ""}{b.deltaPp}pp
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
+
+// ── Espaços não ocupados ────────────────────────────────────────────────
+
+/**
+ * Tópicos com conversa relevante e share seu ABAIXO da sua média.
+ *
+ * <p>É a pergunta que o SoV total não responde: onde o setor conversa e você quase
+ * não aparece. Deriva inteiramente de `sov/topics` — a mesma resposta que já
+ * alimenta a seção seguinte, sem chamada nova.</p>
+ *
+ * <p>O corte é a sua própria média, não um número fixo: "share baixo" só significa
+ * algo em relação ao quanto você costuma ocupar.</p>
+ */
+function WhitespaceSection({
+  topics,
+  loading,
+  yourShare,
+}: {
+  topics: SovTopic[]
+  loading: boolean
+  yourShare: number
+}) {
+  const gaps = useMemo(() => {
+    return topics
+      .map((t) => {
+        const mine = t.shares.find((s) => s.isYou)
+        const leader = t.shares.reduce<SovTopicShare | null>(
+          (a, s) => (a && a.sharePct >= s.sharePct ? a : s), null,
+        )
+        return { topic: t, mine: mine?.sharePct ?? 0, leader }
+      })
+      // Só onde alguém MAIS lidera: tópico que você já lidera não é espaço vago.
+      .filter((g) => g.mine < yourShare && g.leader != null && !g.leader.isYou)
+      .sort((a, b) => b.topic.volume - a.topic.volume)
+      .slice(0, 4)
+  }, [topics, yourShare])
+
+  if (loading) {
+    return (
+      <section className="px-8 py-7 border-b border-border-soft">
+        <div className="eyebrow mb-4">Espaços não ocupados</div>
+        <div className="space-y-3 animate-pulse">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-12 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+          ))}
+        </div>
+      </section>
+    )
+  }
+
+  if (gaps.length === 0) return null
+
+  return (
+    <section className="px-8 py-7 border-b border-border-soft">
+      <div className="eyebrow mb-1">Espaços não ocupados</div>
+      <p className="text-[13px] text-ink-muted mb-5 max-w-160 leading-relaxed">
+        Tópicos com conversa no setor em que seu share está abaixo dos seus{" "}
+        <span className="font-mono-zoe">{yourShare}%</span> gerais — e onde outra marca lidera.
+      </p>
+
+      <div className="flex flex-col gap-4 max-w-3xl">
+        {gaps.map(({ topic, mine, leader }) => (
+          <div key={topic.topic} className="border-t border-border-soft pt-3.5">
+            <div className="flex items-baseline justify-between gap-3 mb-2">
+              <span className="text-[14px] font-semibold" style={{ color: "var(--ink)" }}>
+                {topic.topic}
+              </span>
+              <span className="font-mono-zoe text-[11.5px] text-ink-muted shrink-0">
+                {topic.volume} {topic.volume === 1 ? "menção" : "menções"} no setor
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between text-[11.5px] text-ink-muted mb-1.5">
+              <span>seu share <span className="font-mono-zoe">{mine}%</span></span>
+              <span>
+                {leader!.brandName} <span className="font-mono-zoe">{leader!.sharePct}%</span>
+              </span>
+            </div>
+
+            {/* Duas barras sobre o mesmo trilho: a comparação é entre você e o líder,
+                e um empilhado com todos diluiria justamente esse contraste. */}
+            <div className="relative h-2.5 rounded-sm overflow-hidden bg-[#F3F4F6] dark:bg-[#1C1F2E]">
+              <div
+                className="absolute inset-y-0 left-0 opacity-40"
+                style={{
+                  width: `${leader!.sharePct}%`,
+                  background: brandColor(leader!.brandId, leader!.color),
+                }}
+              />
+              <div
+                className="absolute inset-y-0 left-0"
+                style={{ width: `${mine}%`, background: "var(--color-teal-500)" }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 function UpsellScreen() {
   return (
     <div className="-m-6 border-t border-border-soft" style={{ background: "var(--surface)", color: "var(--ink)" }}>
       <div className="flex flex-col items-center justify-center text-center px-6 py-24 max-w-lg mx-auto">
-        <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5" style={{ background: "var(--color-teal-50)" }}>
+        <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5" style={{ background: "var(--teal-bg)" }}>
           <Lock className="w-6 h-6" style={{ color: "var(--color-teal-500)" }} />
         </div>
         <div className="eyebrow mb-3">Recurso premium</div>
@@ -401,7 +607,7 @@ function BarsSkeleton() {
 function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <AlertCircle className="w-10 h-10 text-[#DC2626] mb-3" />
+      <AlertCircle className="w-10 h-10 text-neg mb-3" />
       <h3 className="text-lg font-semibold text-midnight dark:text-[#E6E8EF] mb-1">Não foi possível carregar</h3>
       <p className="text-sm text-[#6B7280] mb-4">Tente novamente em instantes.</p>
       <button onClick={onRetry} className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors">

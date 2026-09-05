@@ -32,6 +32,14 @@ export type SovBrand = {
   deltaPp: number
   /** Cor escolhida pelo tenant (hex) ou null → o front deriva do id. */
   color: string | null
+  /**
+   * Sentimento médio no período, escala [0,1] — neutro é 0,5. Null quando nenhuma
+   * análise do recorte trouxe score.
+   *
+   * Vem junto do share porque ler os dois separados engana: share alto com
+   * sentimento baixo é exposição, não vantagem.
+   */
+  avgScore: number | null
 }
 export type SovOwnBrand = { brandId: string; name: string }
 

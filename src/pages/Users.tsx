@@ -164,7 +164,7 @@ export default function UsersPage() {
   ]
 
   return (
-    <div className="-m-6 border-t border-border-soft" style={{ color: "var(--ink)" }}>
+    <div className="-m-6 min-h-[calc(100dvh-3.75rem)] flex flex-col border-t border-border-soft" style={{ color: "var(--ink)" }}>
       {/* Hero */}
       <section className="px-8 pt-7 pb-5 border-b border-border-soft" style={{ background: "var(--surface)" }}>
         <div className="flex items-start justify-between gap-6 flex-wrap">
@@ -302,7 +302,7 @@ export default function UsersPage() {
       )}
 
       {tab === "papeis" && (
-        <section className="p-7 bg-[#F9FAFB] dark:bg-[#0B0D18]">
+        <section className="flex-1 p-7 bg-[#F9FAFB] dark:bg-[#0B0D18]">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {ROLE_ORDER.map((r) => {
               const meta = ROLE_META[r]

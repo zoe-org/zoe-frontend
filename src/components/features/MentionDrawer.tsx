@@ -4,6 +4,7 @@ import { VideoThumb } from "@/components/ui/video-thumb"
 import { useAnalysisComments, useAnalysisDetail } from "@/lib/api/analyses"
 import { useVideoDetail, type VideoListItem } from "@/lib/api/videos"
 import { tEnum } from "@/i18n/enums"
+import { classificationChip } from "@/lib/chip"
 
 // Rótulos das fontes de componente do score 360 (não são enums do domínio — o
 // source é string livre "audio_text"/"visual"/etc.).
@@ -18,11 +19,6 @@ function compactNumber(n: number): string {
   return new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 }).format(n)
 }
 
-function classificationClass(cls: string | null): string {
-  if (cls === "Positive") return "text-[#16A34A] bg-[#F0FDF4]"
-  if (cls === "Negative") return "text-[#DC2626] bg-[#FEF2F2]"
-  return "text-[#6B7280] bg-[#F3F4F6]"
-}
 
 /** Cor do score grande, pelo sentimento — leitura imediata no painel. */
 function scoreColor(cls: string | null): string {
@@ -170,7 +166,7 @@ export function MentionDrawer({
                   </span>
                 </div>
                 {item.classificacao && (
-                  <span className={`inline-flex items-center px-2 py-0.5 mt-1.5 rounded text-[11px] font-medium ${classificationClass(item.classificacao)}`}>
+                  <span className={`mt-1.5 ${classificationChip(item.classificacao)}`}>
                     {tEnum("classification", item.classificacao)}
                   </span>
                 )}
@@ -223,7 +219,7 @@ export function MentionDrawer({
 
           {detail.isLoading && <DrawerSkeleton />}
           {detail.isError && (
-            <p className="text-sm text-[#DC2626]">Não foi possível carregar o detalhe.</p>
+            <p className="text-sm text-neg">Não foi possível carregar o detalhe.</p>
           )}
 
           {d && (

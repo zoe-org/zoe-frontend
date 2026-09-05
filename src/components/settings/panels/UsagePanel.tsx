@@ -27,7 +27,7 @@ const WARNING_THRESHOLD = 0.8
 
 // Cores por tom, não por estado: dois estados param a coleta e ambos são `neg`.
 const TONE = {
-  normal: { color: "var(--color-teal-500)", bg: "var(--color-teal-50)", border: "rgba(0,167,153,.28)" },
+  normal: { color: "var(--color-teal-500)", bg: "var(--teal-bg)", border: "rgba(0,167,153,.28)" },
   warn: { color: "var(--color-warn)", bg: "#FFFBEB", border: "rgba(217,119,6,.32)" },
   neg: { color: "var(--color-neg)", bg: "#FEF2F2", border: "rgba(220,38,38,.32)" },
 } as const

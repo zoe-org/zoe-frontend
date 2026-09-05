@@ -1,4 +1,6 @@
 import { useRef, useState } from "react"
+import { useTheme } from "next-themes"
+import { heatmapRamp } from "@/lib/heatmap-ramp"
 
 type SparklineProps = {
   data: number[]
@@ -316,15 +318,14 @@ export function Heatmap({ data, width = 560 }: HeatmapProps) {
   const cellW = (width - labelW) / cols - cellGap
   const cellH = 18
   const days = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
-  const ramp = [
-    "#F0FDFB",
-    "#CCFBF4",
-    "#99F2E8",
-    "#5DE0D4",
-    "#2EC48A",
-    "#00A799",
-    "#006B60",
-  ]
+
+  // A rampa clara SOBE a partir do branco: no fundo escuro, a célula vazia — que é
+  // a maioria — virava um bloco branco, e o mapa lia como um tabuleiro aceso onde
+  // não há nada. No escuro ela sobe a partir da própria superfície, então ausência
+  // parece ausência e a intensidade cresce em direção ao teal.
+  const { resolvedTheme } = useTheme()
+  const ramp = heatmapRamp(resolvedTheme === "dark")
+
   const color = (v: number) =>
     ramp[Math.min(ramp.length - 1, Math.floor(v * ramp.length))]
   const [hover, setHover] = useState<{ ri: number; ci: number; v: number } | null>(null)

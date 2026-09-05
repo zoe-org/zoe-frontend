@@ -216,7 +216,7 @@ function ProjectionBanner({
   return (
     <div
       className="flex items-start gap-3 rounded-[14px] border px-4 py-3.5"
-      style={{ background: "var(--color-teal-50)", borderColor: "rgba(0,167,153,.28)" }}
+      style={{ background: "var(--teal-bg)", borderColor: "rgba(0,167,153,.28)" }}
     >
       <Loader2
         className="w-[17px] h-[17px] shrink-0 mt-0.5 animate-spin"
@@ -288,7 +288,7 @@ function CurrentSubscription({ sub }: { sub: Subscription }) {
 
   const tone = degraded
     ? { color: "var(--color-neg)", bg: "#FEF2F2" }
-    : { color: "var(--color-teal-500)", bg: "var(--color-teal-50)" }
+    : { color: "var(--color-teal-500)", bg: "var(--teal-bg)" }
 
   return (
     <div className="rounded-[14px] border border-border-soft px-6 py-5" style={{ background: "var(--surface)" }}>
@@ -667,7 +667,7 @@ function PlanCard({
           style={
             reativando
               ? { background: "#F3F4F6", color: "#6B7280" }
-              : { background: "var(--color-teal-50)", color: "var(--color-teal-500)" }
+              : { background: "var(--teal-bg)", color: "var(--color-teal-500)" }
           }
         >
           {reativando ? "Plano anterior" : "Plano atual"}

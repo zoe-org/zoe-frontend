@@ -22,6 +22,7 @@ import {
   type VideoSort,
 } from "@/lib/api/videos"
 import { tEnum } from "@/i18n/enums"
+import { classificationChip } from "@/lib/chip"
 
 /** 1234 → "1,2 mil"; 1_234_567 → "1,2 mi". Compacto pt-BR para views. */
 function compactNumber(n: number): string {
@@ -87,18 +88,13 @@ function OwnedTag() {
   return (
     <span
       className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium"
-      style={{ color: "var(--color-teal-700, #0F766E)", background: "var(--color-teal-50, #F0FDFA)" }}
+      style={{ color: "var(--teal-fg)", background: "var(--teal-bg)" }}
     >
       Conteúdo próprio
     </span>
   )
 }
 
-function classificationClass(cls: string | null): string {
-  if (cls === "Positive") return "text-[#16A34A] bg-[#F0FDF4]"
-  if (cls === "Negative") return "text-[#DC2626] bg-[#FEF2F2]"
-  return "text-[#6B7280] bg-[#F3F4F6]"
-}
 
 export default function MonitoringPage() {
   const navigate = useNavigate()
@@ -384,7 +380,7 @@ export default function MonitoringPage() {
                       playSize={34}
                     />
                     {m.classificacao && (
-                      <span className={`absolute top-2 left-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${classificationClass(m.classificacao)}`}>
+                      <span className={`absolute top-2 left-2 ${classificationChip(m.classificacao)}`}>
                         {tEnum("classification", m.classificacao)}
                       </span>
                     )}
@@ -465,7 +461,7 @@ export default function MonitoringPage() {
                 </div>
                 <div>
                   {m.classificacao && (
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${classificationClass(m.classificacao)}`}>
+                    <span className={classificationChip(m.classificacao)}>
                       {tEnum("classification", m.classificacao)}
                     </span>
                   )}
@@ -534,7 +530,7 @@ function FeedSkeleton() {
 function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <AlertCircle className="w-10 h-10 text-[#DC2626] mb-3" />
+      <AlertCircle className="w-10 h-10 text-neg mb-3" />
       <h3 className="text-lg font-semibold text-midnight dark:text-[#E6E8EF] mb-1">Não foi possível carregar</h3>
       <p className="text-sm text-[#6B7280] mb-4">Tente novamente em instantes.</p>
       <button onClick={onRetry} className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors">

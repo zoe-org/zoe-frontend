@@ -102,7 +102,7 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="-m-6 border-t border-border-soft" style={{ color: "var(--ink)" }}>
+    <div className="-m-6 min-h-[calc(100dvh-3.75rem)] flex flex-col border-t border-border-soft" style={{ color: "var(--ink)" }}>
       {/* Hero */}
       <section
         className="px-8 pt-7 pb-5 border-b border-border-soft"
@@ -163,7 +163,7 @@ export default function ReportsPage() {
                 >
                   <div
                     className="w-8 h-8 rounded-lg flex items-center justify-center mb-3"
-                    style={{ background: "var(--color-teal-50)" }}
+                    style={{ background: "var(--teal-bg)" }}
                   >
                     <Icon className="w-4 h-4" style={{ color: "var(--color-teal-500)" }} />
                   </div>
@@ -226,7 +226,7 @@ export default function ReportsPage() {
       </section>
 
       {/* Biblioteca */}
-      <section className="p-7 bg-[#F9FAFB] dark:bg-[#0B0D18] min-h-[320px]">
+      <section className="flex-1 p-7 bg-[#F9FAFB] dark:bg-[#0B0D18]">
         {list.isError && !forbidden ? (
           <ErrorState onRetry={() => list.refetch()} />
         ) : list.isLoading ? (
@@ -391,7 +391,7 @@ function UpsellScreen() {
       <div className="flex flex-col items-center justify-center text-center px-6 py-24 max-w-lg mx-auto">
         <div
           className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5"
-          style={{ background: "var(--color-teal-50)" }}
+          style={{ background: "var(--teal-bg)" }}
         >
           <Lock className="w-6 h-6" style={{ color: "var(--color-teal-500)" }} />
         </div>
@@ -418,7 +418,7 @@ function UpsellScreen() {
 function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <AlertCircle className="w-10 h-10 text-[#DC2626] mb-3" />
+      <AlertCircle className="w-10 h-10 text-neg mb-3" />
       <h3 className="text-lg font-semibold text-midnight dark:text-[#E6E8EF] mb-1">Não foi possível carregar</h3>
       <p className="text-sm text-[#6B7280] mb-4">Tente novamente em instantes.</p>
       <button

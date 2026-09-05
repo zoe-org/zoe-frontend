@@ -207,7 +207,7 @@ export default function BrandsPage() {
                   onClick={() => setSelectedId(b.tenantBrandId)}
                   className="block w-full text-left px-4 py-3.5 border-b border-border-soft transition-colors hover:bg-[#FAFBFC] dark:hover:bg-[#181B28]"
                   style={{
-                    background: active ? "var(--color-teal-50)" : "transparent",
+                    background: active ? "var(--teal-bg)" : "transparent",
                     borderLeft: `3px solid ${active ? "var(--color-teal-500)" : "transparent"}`,
                   }}
                 >

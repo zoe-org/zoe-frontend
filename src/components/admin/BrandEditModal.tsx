@@ -191,8 +191,8 @@ function IdentityStep({
 }) {
   return (
     <>
-      <div className="flex gap-2.5 rounded-lg px-3.5 py-3 mb-5" style={{ background: "var(--color-teal-50)" }}>
-        <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "var(--color-teal-600)" }} />
+      <div className="flex gap-2.5 rounded-lg px-3.5 py-3 mb-5" style={{ background: "var(--teal-bg)" }}>
+        <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "var(--teal-fg)" }} />
         <div className="text-[12.5px] leading-relaxed" style={{ color: "var(--ink-2)" }}>
           {brand.verifiedAt && (
             <>Verificada {formatDistanceToNow(new Date(brand.verifiedAt), { addSuffix: true, locale: ptBR })} · </>
@@ -432,8 +432,8 @@ function ImpactStep({
       {/* Canal e alias têm consequências DIFERENTES, e confundir as duas é o erro
           caro aqui: canal reclassifica sozinho e de graça; alias não. */}
       {channelsChanged && (
-        <div className="flex gap-2.5 rounded-lg px-3.5 py-3 mb-3" style={{ background: "var(--color-teal-50)" }}>
-          <Check className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "var(--color-teal-600)" }} />
+        <div className="flex gap-2.5 rounded-lg px-3.5 py-3 mb-3" style={{ background: "var(--teal-bg)" }}>
+          <Check className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "var(--teal-fg)" }} />
           <div className="text-[12.5px] leading-relaxed" style={{ color: "var(--ink-2)" }}>
             A mudança de canais reclassifica owned/earned de todas as análises da marca automaticamente ao salvar,
             sem custo de reanálise.
@@ -487,7 +487,7 @@ function ImpactStep({
               className="flex items-start gap-3 p-3.5 rounded-lg border mb-2 cursor-pointer transition-colors"
               style={{
                 borderColor: reprocess === o.on ? "var(--color-teal-500)" : "var(--border-soft)",
-                background: reprocess === o.on ? "var(--color-teal-50)" : "transparent",
+                background: reprocess === o.on ? "var(--teal-bg)" : "transparent",
               }}
             >
               <input

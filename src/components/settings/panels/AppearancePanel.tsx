@@ -29,7 +29,7 @@ export function AppearancePanel() {
               className="p-4 rounded-xl text-left transition-colors"
               style={{
                 border: `1.5px solid ${active ? "var(--color-teal-500)" : "var(--border-soft)"}`,
-                background: active ? "var(--color-teal-50)" : "var(--surface)",
+                background: active ? "var(--teal-bg)" : "var(--surface)",
               }}
             >
               <div className="flex items-center justify-between mb-3">

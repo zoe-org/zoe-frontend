@@ -350,7 +350,7 @@ export function SignalGaps({
         >
           <MessageSquareOff
             className="w-3.5 h-3.5 mt-0.5 shrink-0"
-            style={{ color: "var(--color-amber-700, #B45309)" }}
+            style={{ color: "var(--color-warn)" }}
             aria-hidden
           />
           <div className="text-[12px] leading-snug" style={{ color: "var(--color-amber-900, #78350F)" }}>

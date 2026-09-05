@@ -211,7 +211,7 @@ function Rail({
                   className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13.5px] font-medium text-left transition-colors ${
                     active ? "" : "text-ink-muted hover:text-ink hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D]"
                   }`}
-                  style={active ? { background: "var(--color-teal-50)", color: "var(--color-teal-600)" } : undefined}
+                  style={active ? { background: "var(--teal-bg)", color: "var(--teal-fg)" } : undefined}
                 >
                   <Icon className="w-[15px] h-[15px] shrink-0" />
                   <span className="truncate">{label}</span>
@@ -246,7 +246,7 @@ function TabStrip({
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium whitespace-nowrap transition-colors ${
                 active ? "" : "text-ink-muted"
               }`}
-              style={active ? { background: "var(--color-teal-50)", color: "var(--color-teal-600)" } : undefined}
+              style={active ? { background: "var(--teal-bg)", color: "var(--teal-fg)" } : undefined}
             >
               <Icon className="w-[14px] h-[14px] shrink-0" />
               {label}

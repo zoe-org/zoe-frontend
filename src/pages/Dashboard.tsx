@@ -5,6 +5,8 @@ import { formatDistanceToNow } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { useAuth } from "@/features/auth/context"
 import { AreaLine, Heatmap, Sparkline } from "@/components/ui/charts"
+import { heatmapRamp } from "@/lib/heatmap-ramp"
+import { useTheme } from "next-themes"
 import { EmptyState } from "@/components/ui/empty-state"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { ConfidenceBadge } from "@/components/ui/confidence-badge"
@@ -16,6 +18,7 @@ import {
 import { useAlertEvents } from "@/lib/api/alerts"
 import { useVideosFeed } from "@/lib/api/videos"
 import { tEnum } from "@/i18n/enums"
+import { classificationChip } from "@/lib/chip"
 
 function getGreeting(): string {
   const h = new Date().getHours()
@@ -37,11 +40,6 @@ function getTodayLabel(now: Date = new Date()): string {
   return `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)}, ${dayMonth}`
 }
 
-function classificationClass(cls: string | null): string {
-  if (cls === "Positive") return "text-[#16A34A] bg-[#F0FDF4]"
-  if (cls === "Negative") return "text-[#DC2626] bg-[#FEF2F2]"
-  return "text-[#6B7280] bg-[#F3F4F6]"
-}
 
 export default function DashboardPage() {
   const { user } = useAuth()
@@ -108,12 +106,7 @@ export default function DashboardPage() {
                 deck passa os números do rival como se fossem do cliente. */}
             {brand.active?.relationship === "Competitor" && (
               <div className="mt-2.5 inline-flex items-center gap-1.5 text-[12px] font-medium">
-                <span
-                  className="rounded-full px-2 py-0.5"
-                  style={{ background: "#FFFBEB", color: "var(--color-warn)" }}
-                >
-                  Marca concorrente
-                </span>
+                <span className="chip chip-warn">Marca concorrente</span>
                 <span className="text-ink-muted">
                   os números abaixo são dela, não do seu workspace
                 </span>
@@ -226,7 +219,7 @@ export default function DashboardPage() {
               <div><ConfidenceBadge pipelinePath={m.pipelinePath} confidence={m.confidence} /></div>
               <div>
                 {m.classificacao && (
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${classificationClass(m.classificacao)}`}>
+                  <span className={classificationChip(m.classificacao)}>
                     {tEnum("classification", m.classificacao)}
                   </span>
                 )}
@@ -280,6 +273,10 @@ export default function DashboardPage() {
  * com o mapa inteiro apagado se a régua fosse global.
  */
 function ActivityHeatmap({ data, loading }: { data?: MentionActivity; loading: boolean }) {
+  const { resolvedTheme } = useTheme()
+  // Um degrau sim, um não: cinco quadradinhos comunicam a escala sem virar régua.
+  const legenda = heatmapRamp(resolvedTheme === "dark").filter((_, i) => i % 2 === 0 || i === 3)
+
   const normalized = useMemo(() => {
     if (!data || data.maxCount === 0) return null
     return data.cells.map((row) => row.map((v) => v / data.maxCount))
@@ -298,7 +295,7 @@ function ActivityHeatmap({ data, loading }: { data?: MentionActivity; loading: b
         <div className="flex items-center gap-2 text-[11px] text-ink-muted">
           <span>menos</span>
           <div className="flex gap-0.5">
-            {["#F0FDFB", "#CCFBF4", "#5DE0D4", "#00A799", "#006B60"].map((c) => (
+            {legenda.map((c) => (
               <div key={c} className="w-3 h-2.5 rounded-xs" style={{ background: c }} />
             ))}
           </div>
@@ -416,7 +413,7 @@ function PendingAlerts({
       ? { color: "var(--color-neg)", bg: "var(--neg-bg)" }
       : sev === "Warning"
         ? { color: "var(--color-warn)", bg: "var(--warn-bg)" }
-        : { color: "var(--color-teal-500)", bg: "var(--color-teal-50)" }
+        : { color: "var(--color-teal-500)", bg: "var(--teal-bg)" }
 
   return (
     <div>
@@ -537,7 +534,7 @@ function RecentSkeleton() {
 function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <AlertCircle className="w-10 h-10 text-[#DC2626] mb-3" />
+      <AlertCircle className="w-10 h-10 text-neg mb-3" />
       <h3 className="text-lg font-semibold text-midnight dark:text-[#E6E8EF] mb-1">Não foi possível carregar</h3>
       <p className="text-sm text-[#6B7280] mb-4">Tente novamente em instantes.</p>
       <button onClick={onRetry} className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors">Tentar de novo</button>

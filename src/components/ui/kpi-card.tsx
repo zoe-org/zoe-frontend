@@ -18,13 +18,13 @@ const barColors = {
 
 export function KpiCard({ label, value, meta, progress, barColor = "teal", sublabel, valueColor }: KpiCardProps) {
   return (
-    <div className="bg-white rounded-lg border p-4 flex flex-col gap-2">
+    <div className="bg-surface rounded-lg border border-border-soft p-4 flex flex-col gap-2">
       <span className="text-xs text-[#6B7280] font-medium uppercase tracking-wide">{label}</span>
       <span className={cn("text-2xl font-bold", valueColor)}>{value}</span>
       {sublabel && <span className="text-xs text-[#6B7280]">{sublabel}</span>}
       {meta && <span className="text-xs text-[#6B7280]">{meta}</span>}
       {progress !== undefined && (
-        <div className="h-1.5 bg-[#E5E7EB] rounded-full overflow-hidden">
+        <div className="h-1.5 bg-[#E5E7EB] dark:bg-[#262A3A] rounded-full overflow-hidden">
           <div
             className={cn("h-full rounded-full transition-all", barColors[barColor])}
             style={{ width: `${Math.min(progress, 100)}%` }}

@@ -164,7 +164,7 @@ function QueueRow({ brand, active, onClick }: { brand: PendingBrand; active: boo
       onClick={onClick}
       className="w-full text-left px-4 py-3.5 border-b border-border-soft transition-colors cursor-pointer"
       style={{
-        background: active ? "var(--color-teal-50)" : "transparent",
+        background: active ? "var(--teal-bg)" : "transparent",
         // A barra à esquerda é o que marca a seleção sem depender só do fundo,
         // que quase some no tema escuro.
         borderLeft: `3px solid ${active ? "var(--color-teal-500)" : "transparent"}`,

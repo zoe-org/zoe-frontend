@@ -2,7 +2,7 @@ import { useState, useEffect } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { NavLink, Link, Outlet, useLocation, useNavigate } from "react-router-dom"
 import {
-  House, Brain, Settings, Bell,
+  House, Brain, Settings,
   ChevronDown, ChevronUp, Search, PanelLeftClose, PanelLeftOpen, ChevronsUpDown,
   Sun, Moon, LogOut, Check, Plus, ShieldCheck, AlertCircle,
 } from "lucide-react"
@@ -15,6 +15,7 @@ import { useSubscription } from "@/lib/api/billing"
 import { useRealtimeConnection } from "@/lib/realtime"
 import { Breadcrumb } from "@/components/ui/breadcrumb"
 import { BrandSwitcher } from "@/components/layout/BrandSwitcher"
+import { NotificationBell } from "@/components/layout/NotificationBell"
 import { SettingsDialog } from "@/components/settings/SettingsDialog"
 import { UpgradeDialog } from "@/components/UpgradeDialog"
 import { useOpenSettings } from "@/components/settings/useSettings"
@@ -357,12 +358,7 @@ export function AppShell() {
           >
             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
-          <button className=" text-[#6B7280] p-2 rounded-md hover:text-ink hover:bg-muted dark:hover:text-[#E6E8EF] transition-colors cursor-pointer">
-            <div className="relative">
-              <span className="absolute -top-1 -right-0.5 w-1.5 h-1.5 bg-[#DC2626] rounded-full" />
-            </div>
-            <Bell className="w-4 h-4" />
-          </button>
+          <NotificationBell />
         </header>
 
         {/* Content */}
@@ -405,7 +401,7 @@ function TrialBadge() {
     <button
       onClick={() => openSettings("plano")}
       className="mx-3 mb-1 flex w-[calc(100%-1.5rem)] items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-[12px] transition-colors hover:opacity-80"
-      style={{ background: "var(--color-teal-50)", color: "var(--color-teal-700)" }}
+      style={{ background: "var(--teal-bg)", color: "var(--teal-fg)" }}
     >
       <span className="font-medium">Período de teste</span>
       <span className="font-mono-zoe">{days === 1 ? "1 dia" : `${days} dias`}</span>

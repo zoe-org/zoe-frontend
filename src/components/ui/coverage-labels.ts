@@ -5,9 +5,11 @@
 
 export type CoverageConfig = { label: string; className: string; tip?: string }
 
-const TEAL = "text-[#0F766E] bg-[#F0FDFA]"
-const CINZA = "text-[#6B7280] bg-[#F3F4F6]"
-const AMBAR = "text-[#B45309] bg-[#FFFBEB]"
+// As classes `.chip-*` do design system: o tema entra por token, e não por hex
+// fixo. Com hex o selo continuava um adesivo claro sobre a superfície escura.
+const TEAL = "chip chip-primary"
+const CINZA = "chip"
+const AMBAR = "chip chip-warn"
 
 /** Chaves em PascalCase = o que o read-API devolve (enum .ToString()). */
 export const COVERAGE_BY_PATH: Record<string, CoverageConfig> = {

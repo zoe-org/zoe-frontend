@@ -10,6 +10,7 @@ import { brandVoice } from "@/features/brands/voice"
 import {
   useSentimentEvolution, useTopKeywords, useImpactEvents, useTopicSentiments,
 } from "@/lib/api/dashboard"
+import { deltaChip } from "@/lib/chip"
 
 function keywordColor(sentiment: string): string {
   if (sentiment === "Positive") return "var(--color-pos)"
@@ -71,9 +72,9 @@ export default function SentimentPage() {
   }, [points])
 
   const series = useMemo(() => [
-    { name: "Positivo", color: "#16A34A", data: points.map((p) => p.positive) },
+    { name: "Positivo", color: "var(--color-pos)", data: points.map((p) => p.positive) },
     { name: "Neutro", color: "#9AA1AE", data: points.map((p) => p.neutral) },
-    { name: "Negativo", color: "#DC2626", data: points.map((p) => p.negative) },
+    { name: "Negativo", color: "var(--color-neg)", data: points.map((p) => p.negative) },
   ], [points])
 
   const labels = useMemo(
@@ -147,7 +148,7 @@ export default function SentimentPage() {
                 {!evolution.isLoading && points.length >= 4 && (
                   <span
                     className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11.5px] font-medium ${
-                      stats.delta >= 0 ? "text-[#16A34A] bg-[#F0FDF4]" : "text-[#DC2626] bg-[#FEF2F2]"
+                      deltaChip(stats.delta)
                     }`}
                   >
                     {stats.delta >= 0 ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
@@ -253,7 +254,7 @@ export default function SentimentPage() {
                       </span>
                       <span
                         className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium font-mono-zoe ${
-                          ev.delta >= 0 ? "text-[#16A34A] bg-[#F0FDF4]" : "text-[#DC2626] bg-[#FEF2F2]"
+                          deltaChip(ev.delta)
                         }`}
                       >
                         {ev.delta >= 0 ? <ArrowUp className="w-2.5 h-2.5" /> : <ArrowDown className="w-2.5 h-2.5" />}
@@ -391,7 +392,7 @@ function EarnedOnlyNote() {
 function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <AlertCircle className="w-10 h-10 text-[#DC2626] mb-3" />
+      <AlertCircle className="w-10 h-10 text-neg mb-3" />
       <h3 className="text-lg font-semibold text-midnight dark:text-[#E6E8EF] mb-1">Não foi possível carregar</h3>
       <p className="text-sm text-[#6B7280] mb-4">Tente novamente em instantes.</p>
       <button onClick={onRetry} className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors">

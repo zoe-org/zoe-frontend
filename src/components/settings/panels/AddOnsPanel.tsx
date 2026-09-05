@@ -43,7 +43,7 @@ export function AddOnsPanel({ onGoToPlan }: { onGoToPlan: () => void }) {
             >
               <div
                 className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
-                style={{ background: active ? "var(--color-teal-50)" : "#F3F4F6" }}
+                style={{ background: active ? "var(--teal-bg)" : "#F3F4F6" }}
               >
                 <Sparkles className="w-4 h-4" style={{ color: active ? "var(--color-teal-500)" : "#9AA1AE" }} />
               </div>
