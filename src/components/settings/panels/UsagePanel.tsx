@@ -708,6 +708,17 @@ function SpendCapCard({
     [capCents, overageCentsPerMinute],
   )
 
+  // Um teto em R$ é cego ao plano: R$ 300 são ~88% da cota do Starter e ~6% da do
+  // Max — o mesmo número dizendo coisas opostas. Derivar da própria cota faz a
+  // sugestão significar a mesma coisa em qualquer tier.
+  const suggestions = useMemo(() => {
+    if (quotaMinutes <= 0 || overageCentsPerMinute <= 0) return []
+    return [0.1, 0.25, 0.5].map((share) => ({
+      share,
+      cents: Math.round((quotaMinutes * share * overageCentsPerMinute) / 1000) * 1000,
+    }))
+  }, [quotaMinutes, overageCentsPerMinute])
+
   const onSave = () => {
     if (!prefs.data) return
     save.mutate(
@@ -782,6 +793,28 @@ function SpendCapCard({
               </span>
             )}
           </div>
+
+          {suggestions.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-3">
+              {suggestions.map((s) => (
+                <button
+                  key={s.share}
+                  type="button"
+                  onClick={() => setDraft(String(s.cents / 100))}
+                  disabled={prefs.isLoading || save.isPending}
+                  aria-pressed={capCents === s.cents}
+                  title={`+${Math.round(s.share * 100)}% da sua cota`}
+                  className="h-7 px-2.5 rounded-md border text-[12px] font-mono-zoe transition-colors disabled:opacity-50"
+                  style={{
+                    borderColor: capCents === s.cents ? "var(--color-teal-500)" : "var(--border-soft)",
+                    color: capCents === s.cents ? "var(--color-teal-500)" : "var(--ink-muted)",
+                  }}
+                >
+                  {brl(s.cents)}
+                </button>
+              ))}
+            </div>
+          )}
 
           <button
             onClick={onSave}
