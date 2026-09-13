@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react"
 import { Bell, BellOff, Check, ChevronRight, Download, Pencil, Plus, Trash2, X } from "lucide-react"
-import { toast } from "sonner"
+import { notifyError, notifySuccess } from "@/lib/feedback"
+import { useConfirm } from "@/features/confirm/context"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { AlertEventDrawer } from "@/components/features/AlertEventDrawer"
 import { StatBand } from "@/components/ui/stat-band"
@@ -263,7 +264,7 @@ export default function AlertsPage() {
         onClose={() => setSelectedEvent(null)}
         onMarkRead={(id) => markReadFromDrawer.mutate(id, {
           onSuccess: () => setSelectedEvent((e) => (e ? { ...e, isRead: true } : e)),
-          onError: (e) => toast.error(e instanceof ApiError ? e.message : "Não foi possível marcar como lido."),
+          onError: (e) => notifyError(e, "Não foi possível marcar como lido."),
         })}
         isMarking={markReadFromDrawer.isPending}
       />
@@ -286,8 +287,8 @@ function MarkAllButton({ unreadCount }: { unreadCount: number }) {
     <button
       onClick={() => markAll.mutate(undefined, {
         onSuccess: (r) =>
-          toast.success(r.markedCount > 0 ? `${r.markedCount} alerta(s) marcado(s) como lido.` : "Nada a marcar."),
-        onError: (e) => toast.error(e instanceof ApiError ? e.message : "Não foi possível marcar."),
+          notifySuccess(r.markedCount > 0 ? `${r.markedCount} alerta(s) marcado(s) como lido.` : "Nada a marcar."),
+        onError: (e) => notifyError(e, "Não foi possível marcar."),
       })}
       disabled={unreadCount === 0 || markAll.isPending}
       title="Marca como lido só para você. O badge dos colegas não muda."
@@ -409,7 +410,7 @@ function HistoryList({
               {!event.isRead && (
                 <button
                   onClick={() => markRead.mutate(event.id, {
-                    onError: (e) => toast.error(e instanceof ApiError ? e.message : "Não foi possível marcar como lido."),
+                    onError: (e) => notifyError(e, "Não foi possível marcar como lido."),
                   })}
                   disabled={markRead.isPending}
                   className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D] cursor-pointer disabled:opacity-50"
@@ -454,23 +455,30 @@ function RulesList({
 }: { rules: AlertRule[]; isLoading: boolean; error: unknown; onEdit: (r: AlertRule) => void }) {
   const remove = useDeleteAlertRule()
   const update = useUpdateAlertRule()
+  const confirm = useConfirm()
 
   const toggleEnabled = (rule: AlertRule) => {
     update.mutate(
       { ruleId: rule.id, input: { ...toUpdatePayload(ruleToForm(rule)), isEnabled: !rule.isEnabled } },
       {
-        onSuccess: () => toast.success(rule.isEnabled ? "Regra pausada." : "Regra reativada."),
-        onError: (e) => toast.error(e instanceof ApiError ? e.message : "Não foi possível alterar a regra."),
+        onSuccess: () => notifySuccess(rule.isEnabled ? "Regra pausada." : "Regra reativada."),
+        onError: (e) => notifyError(e, "Não foi possível alterar a regra."),
       },
     )
   }
 
-  const confirmRemove = (rule: AlertRule) => {
+  const confirmRemove = async (rule: AlertRule) => {
     // O backend apaga o histórico de disparos junto — vale avisar antes.
-    if (!window.confirm(`Excluir “${rule.name}”? O histórico de disparos dela também será removido.`)) return
+    const ok = await confirm({
+      title: `Excluir “${rule.name}”?`,
+      description: "O histórico de disparos dela também será removido.",
+      confirmLabel: "Excluir",
+      tone: "danger",
+    })
+    if (!ok) return
     remove.mutate(rule.id, {
-      onSuccess: () => toast.success("Regra excluída."),
-      onError: (e) => toast.error(e instanceof ApiError ? e.message : "Não foi possível excluir."),
+      onSuccess: () => notifySuccess("Regra excluída."),
+      onError: (e) => notifyError(e, "Não foi possível excluir."),
     })
   }
 
@@ -591,16 +599,16 @@ function RuleModal({
     if (Object.keys(errors).length > 0) return
 
     const onError = (e: unknown) =>
-      toast.error(e instanceof ApiError ? e.message : "Não foi possível salvar a regra.")
+      notifyError(e, "Não foi possível salvar a regra.")
 
     if (rule) {
       update.mutate({ ruleId: rule.id, input: toUpdatePayload(form) }, {
-        onSuccess: () => { toast.success("Regra atualizada."); onClose() },
+        onSuccess: () => { notifySuccess("Regra atualizada."); onClose() },
         onError,
       })
     } else {
       create.mutate(toCreatePayload(form), {
-        onSuccess: () => { toast.success("Regra criada."); onClose() },
+        onSuccess: () => { notifySuccess("Regra criada."); onClose() },
         onError,
       })
     }

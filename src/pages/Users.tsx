@@ -1,14 +1,15 @@
 import { useMemo, useState } from "react"
 import { Plus, Trash2, Copy, X, Mail, AlertCircle, Loader2, Check, Tag, Send } from "lucide-react"
-import { toast } from "sonner"
+import { notifyError, notifySuccess } from "@/lib/feedback"
+import { useConfirm } from "@/features/confirm/context"
 import { useAuth } from "@/features/auth/context"
-import { ApiError } from "@/lib/api"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import {
   useMembers, useInvites, useTeamMutations,
   type TenantRole, type TenantMember, type PendingInvite, type EmailDeliveryStatus,
 } from "@/lib/api/tenants"
 import { useTenantBrands } from "@/lib/api/brands"
+import { monitoredBrands } from "@/lib/brands"
 
 type Tab = "pessoas" | "papeis" | "convites"
 
@@ -103,6 +104,7 @@ export default function UsersPage() {
   // Só é preenchido quando o reenvio NÃO conseguiu mandar o e-mail — aí o link
   // volta a ser o caminho principal e precisa aparecer pra ser copiado.
   const [resentLink, setResentLink] = useState<string | null>(null)
+  const confirm = useConfirm()
 
   const memberList = useMemo(() => members.data ?? [], [members.data])
   const inviteList = useMemo(() => invites.data ?? [], [invites.data])
@@ -113,47 +115,61 @@ export default function UsersPage() {
     return c
   }, [memberList])
 
-  const handleRemove = (m: TenantMember) => {
-    if (!window.confirm(`Remover ${m.name || m.email} do workspace?`)) return
+  const handleRemove = async (m: TenantMember) => {
+    const ok = await confirm({
+      title: `Remover ${m.name || m.email} do workspace?`,
+      description: "A pessoa perde o acesso a este workspace. Para voltar, precisa de um convite novo.",
+      confirmLabel: "Remover",
+      tone: "danger",
+    })
+    if (!ok) return
     removeMember.mutate(m.userId, {
-      onSuccess: () => toast.success("Membro removido."),
-      onError: (e) => toast.error(e instanceof ApiError ? e.message : "Não foi possível remover."),
+      onSuccess: () => notifySuccess("Membro removido."),
+      onError: (e) => notifyError(e, "Não foi possível remover."),
     })
   }
 
-  const handleRoleChange = (m: TenantMember, nextRole: TenantRole) => {
+  const handleRoleChange = async (m: TenantMember, nextRole: TenantRole) => {
     if (nextRole === m.role) return
     const who = m.name || m.email
-    if (!window.confirm(`Alterar o papel de ${who} para ${nextRole}?`)) return
+    const ok = await confirm({
+      title: `Alterar o papel de ${who}?`,
+      description: `${who} passa de ${m.role} para ${nextRole}. ${ROLE_META[nextRole].desc}`,
+      confirmLabel: "Alterar papel",
+    })
+    if (!ok) return
     changeMemberRole.mutate(
       { userId: m.userId, role: nextRole },
       {
-        onSuccess: () => toast.success("Papel atualizado."),
-        onError: (e) => toast.error(e instanceof ApiError ? e.message : "Não foi possível alterar o papel."),
+        onSuccess: () => notifySuccess("Papel atualizado."),
+        onError: (e) => notifyError(e, "Não foi possível alterar o papel."),
       },
     )
   }
 
   const handleRevoke = (inv: PendingInvite) => {
     revokeInvite.mutate(inv.id, {
-      onSuccess: () => toast.success("Convite revogado."),
-      onError: (e) => toast.error(e instanceof ApiError ? e.message : "Não foi possível revogar."),
+      onSuccess: () => notifySuccess("Convite revogado."),
+      onError: (e) => notifyError(e, "Não foi possível revogar."),
     })
   }
 
-  const handleResend = (inv: PendingInvite) => {
+  const handleResend = async (inv: PendingInvite) => {
     // O reenvio invalida o link anterior — quem já compartilhou o antigo à mão
     // precisa saber disso antes, não depois.
-    if (!window.confirm(
-      `Reenviar o convite para ${inv.email}?\n\nUm link novo será gerado e o anterior deixará de funcionar.`
-    )) return
+    const ok = await confirm({
+      title: `Reenviar o convite para ${inv.email}?`,
+      description: "Um link novo será gerado e o anterior deixará de funcionar.",
+      confirmLabel: "Reenviar",
+    })
+    if (!ok) return
 
     resendInvite.mutate(inv.id, {
       onSuccess: (res) => {
-        if (res.emailDelivery === "Sent") toast.success(`Convite reenviado para ${res.email}.`)
+        if (res.emailDelivery === "Sent") notifySuccess(`Convite reenviado para ${res.email}.`)
         else setResentLink(`${window.location.origin}/invite/${res.token}`)
       },
-      onError: (e) => toast.error(e instanceof ApiError ? e.message : "Não foi possível reenviar."),
+      onError: (e) => notifyError(e, "Não foi possível reenviar."),
     })
   }
 
@@ -423,7 +439,7 @@ function BrandsCell({ member, canEdit, onEdit }: { member: TenantMember; canEdit
 function AssignBrandsModal({ member, onClose }: { member: TenantMember; onClose: () => void }) {
   const brandsQuery = useTenantBrands()
   const { setMemberBrands } = useTeamMutations()
-  const brands = useMemo(() => brandsQuery.data?.items ?? [], [brandsQuery.data])
+  const brands = useMemo(() => monitoredBrands(brandsQuery.data?.items ?? []), [brandsQuery.data])
 
   const [selected, setSelected] = useState<Set<string>>(
     () => new Set((member.brands ?? []).map((b) => b.brandId)),
@@ -439,14 +455,15 @@ function AssignBrandsModal({ member, onClose }: { member: TenantMember; onClose:
 
   const save = () => {
     setMemberBrands.mutate(
-      { userId: member.userId, brandIds: [...selected] },
+      // Atribuição antiga a marca arquivada faria a API recusar o conjunto todo.
+      { userId: member.userId, brandIds: [...selected].filter((id) => brands.some((b) => b.brandId === id)) },
       {
         onSuccess: () => {
-          toast.success("Marcas atualizadas.")
+          notifySuccess("Marcas atualizadas.")
           onClose()
         },
         onError: (e) =>
-          toast.error(e instanceof ApiError ? e.message : "Não foi possível salvar."),
+          notifyError(e, "Não foi possível salvar."),
       },
     )
   }
@@ -561,7 +578,7 @@ const BASE_INVITE_ROLES: TenantRole[] = ["Admin", "Manager", "Viewer"]
 function InviteModal({ isOwner, onClose }: { isOwner: boolean; onClose: () => void }) {
   const { createInvite } = useTeamMutations()
   const brandsQuery = useTenantBrands()
-  const brands = useMemo(() => brandsQuery.data?.items ?? [], [brandsQuery.data])
+  const brands = useMemo(() => monitoredBrands(brandsQuery.data?.items ?? []), [brandsQuery.data])
 
   const inviteRoles = useMemo<TenantRole[]>(
     () => (isOwner ? ["Owner", ...BASE_INVITE_ROLES] : BASE_INVITE_ROLES),
@@ -602,10 +619,10 @@ function InviteModal({ isOwner, onClose }: { isOwner: boolean; onClose: () => vo
           // O escopo de marcas/mensagem foi persistido e é aplicado no aceite.
           setLink(`${window.location.origin}/invite/${res.token}`)
           setDelivery(res.emailDelivery)
-          toast.success(res.emailDelivery === "Sent" ? "Convite enviado." : "Convite criado.")
+          notifySuccess(res.emailDelivery === "Sent" ? "Convite enviado." : "Convite criado.")
         },
         onError: (e) =>
-          toast.error(e instanceof ApiError ? e.message : "Não foi possível criar o convite."),
+          notifyError(e, "Não foi possível criar o convite."),
       },
     )
   }
@@ -617,7 +634,7 @@ function InviteModal({ isOwner, onClose }: { isOwner: boolean; onClose: () => vo
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     } catch {
-      toast.error("Não foi possível copiar.")
+      notifyError(null, "Não foi possível copiar.")
     }
   }
 
@@ -830,7 +847,7 @@ function ResentLinkModal({ link, onClose }: { link: string; onClose: () => void 
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     } catch {
-      toast.error("Não foi possível copiar.")
+      notifyError(null, "Não foi possível copiar.")
     }
   }
 

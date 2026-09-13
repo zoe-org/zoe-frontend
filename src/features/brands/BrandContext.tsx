@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useAuth } from "@/features/auth/context"
 import { useTenantBrands } from "@/lib/api/brands"
+import { monitoredBrands } from "@/lib/brands"
 import { BrandContext, type BrandContextValue } from "@/features/brands/context"
 
 const LS_PREFIX = "zoe_active_brand:"
@@ -14,7 +15,8 @@ function writeStored(tenantId: string, brandId: string) {
 export function BrandProvider({ children }: { children: React.ReactNode }) {
   const { activeTenantId } = useAuth()
   const query = useTenantBrands()
-  const list = useMemo(() => query.data?.items ?? [], [query.data])
+  // Arquivada sai do seletor: a API não mostra dado de marca que não é mais monitorada.
+  const list = useMemo(() => monitoredBrands(query.data?.items ?? []), [query.data])
 
   // Chave estável pro efeito não re-rodar a cada render (list é novo array sempre).
   const idsKey = useMemo(() => list.map((b) => b.brandId).join(","), [list])

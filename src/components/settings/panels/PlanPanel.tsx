@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useSearchParams } from "react-router-dom"
 import { AlertCircle, Check, ExternalLink, Loader2, RotateCcw, ShieldCheck, Sparkles } from "lucide-react"
-import { toast } from "sonner"
+import { notifyError, notifySuccess } from "@/lib/feedback"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { ApiError } from "@/lib/api"
 import { useAuth } from "@/features/auth/context"
@@ -272,7 +272,7 @@ function usePortal() {
     portal.mutate(`${window.location.origin}/dashboard?settings=plano&checkout=portal`, {
       onSuccess: ({ url }) => window.location.assign(url),
       onError: (e) =>
-        toast.error(e instanceof ApiError ? e.message : "Não foi possível abrir o portal."),
+        notifyError(e, "Não foi possível abrir o portal."),
     })
 
   return { open, pending: portal.isPending }
@@ -417,8 +417,7 @@ function PlanGrid({
   const [busySlug, setBusySlug] = useState<string | null>(null)
 
   const [trialUsedFor, setTrialUsedFor] = useState<PlanOption | null>(null)
-  // Erro que precisa aparecer DENTRO do diálogo: toast atrás de um overlay é um botão
-  // que não faz nada do ponto de vista de quem clicou.
+  // Erro com o diálogo aberto vai para dentro dele: é onde o olho de quem clicou está.
   const [dialogError, setDialogError] = useState<string | null>(null)
 
   // Assinatura cancelada EXISTE mas não é alterável: o provedor recusa update nela, e
@@ -441,8 +440,7 @@ function PlanGrid({
       {
         onSuccess: ({ url }) => window.location.assign(url),
         onError: (e) => {
-          toast.error(
-            e instanceof ApiError ? e.message : "Não foi possível abrir a tela de pagamento.")
+          notifyError(e, "Não foi possível abrir a tela de pagamento.", { terminal: true })
           setBusySlug(null)
         },
       },
@@ -478,7 +476,7 @@ function PlanGrid({
           extraBrandSlots: data.currentExtraBrandSlots,
           since: Date.now(),
         })
-        toast.success(`${verb} solicitada. Aguardando a confirmação do provedor.`)
+        notifySuccess(`${verb} solicitada. Aguardando a confirmação do provedor.`)
       },
       onError: (e) => {
         // O trial já usado não é falha: é uma escolha que o cliente ainda pode fazer,
@@ -501,10 +499,8 @@ function PlanGrid({
           return
         }
 
-        // Com o diálogo aberto o toast fica atrás do overlay: o erro tem que ir para
-        // dentro dele, senão o botão parece simplesmente não responder.
         if (trialUsedFor) setDialogError(message)
-        else toast.error(message)
+        else notifyError(e, `Não foi possível concluir a ${verb.toLowerCase()}.`, { terminal: true })
       },
       onSettled: () => setBusySlug(null),
     })
@@ -849,11 +845,11 @@ function ExtraBrandDialog({
             extraBrandSlots: data.currentExtraBrandSlots + 1,
             since: Date.now(),
           })
-          toast.success("Marca extra solicitada. Aguardando a confirmação do provedor.")
+          notifySuccess("Marca extra solicitada. Aguardando a confirmação do provedor.")
           onClose()
         },
         onError: (e) =>
-          toast.error(e instanceof ApiError ? e.message : "Não foi possível adicionar a marca."),
+          notifyError(e, "Não foi possível adicionar a marca.", { terminal: true }),
       },
     )
   }
