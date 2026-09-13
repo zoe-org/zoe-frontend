@@ -4,7 +4,7 @@ import {
   Lock, Sparkles, Calendar, FileText, TrendingUp, Users, ArrowRight,
   Search, ExternalLink, Download, AlertCircle, Trash2, Loader2,
 } from "lucide-react"
-import { toast } from "sonner"
+import { notifyError, notifySuccess } from "@/lib/feedback"
 import { useFeature } from "@/features/auth/useFeature"
 import { useActiveBrand } from "@/features/brands/context"
 import { ApiError } from "@/lib/api"
@@ -63,8 +63,8 @@ export default function ReportsPage() {
   const handleDelete = (r: Report) => {
     if (!window.confirm(`Apagar "${titleOf(r)}"? Esta ação não pode ser desfeita.`)) return
     del.mutate(r.id, {
-      onSuccess: () => toast.success("Relatório apagado."),
-      onError: (e) => toast.error(e instanceof ApiError ? e.message : "Não foi possível apagar."),
+      onSuccess: () => notifySuccess("Relatório apagado."),
+      onError: (e) => notifyError(e, "Não foi possível apagar."),
     })
   }
 
@@ -92,11 +92,11 @@ export default function ReportsPage() {
       { template: tpl.code, ...periodFor(tpl.code), brandId: brand.brandId },
       {
         onSuccess: (res) => {
-          toast.success(`${tpl.name} gerado.`)
+          notifySuccess(`${tpl.name} gerado.`)
           navigate(`/reports/${res.report.id}`)
         },
         onError: (e) =>
-          toast.error(e instanceof ApiError ? e.message : "Não foi possível gerar o relatório."),
+          notifyError(e, "Não foi possível gerar o relatório."),
       },
     )
   }

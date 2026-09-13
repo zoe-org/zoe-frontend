@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { AlertCircle, Loader2, ShieldCheck } from "lucide-react"
-import { toast } from "sonner"
+import { notifyError, notifySuccess } from "@/lib/feedback"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { ApiError } from "@/lib/api"
 import { useAuth } from "@/features/auth/context"
@@ -606,10 +606,11 @@ function BrandBudgetCell({ row }: { row: BrandUsage }) {
       {
         onSuccess: () => {
           setEditing(false)
-          toast.success(minutes === null ? "Teto removido." : "Teto atualizado.")
+          notifySuccess(minutes === null ? "Teto da marca removido." : "Teto da marca atualizado.")
         },
+        // Teto é autorização de gasto: a falha fica até ser lida.
         onError: (e) =>
-          toast.error(e instanceof ApiError ? e.message : "Não foi possível salvar o teto."),
+          notifyError(e, "Não foi possível salvar o teto da marca.", { terminal: true }),
       },
     )
   }
@@ -727,10 +728,10 @@ function SpendCapCard({
         // Volta a seguir o servidor: o rascunho já virou o valor salvo.
         onSuccess: () => {
           setDraft(null)
-          toast.success("Teto de gasto atualizado.")
+          notifySuccess("Teto de gasto atualizado.")
         },
         onError: (e) =>
-          toast.error(e instanceof ApiError ? e.message : "Não foi possível salvar o teto."),
+          notifyError(e, "Não foi possível salvar o teto de gasto.", { terminal: true }),
       },
     )
   }

@@ -6,6 +6,7 @@ import { ptBR } from "date-fns/locale"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useAlertEvents, useMarkAlertRead, useMarkAllAlertsRead, type AlertEvent } from "@/lib/api/alerts"
 import { describeAlertEvent } from "@/lib/alerts"
+import { notifyError } from "@/lib/feedback"
 
 /**
  * Sino do topbar.
@@ -43,7 +44,10 @@ export function NotificationBell() {
   const recent = (page?.items ?? []).slice(0, 5)
 
   const abrir = (e: AlertEvent) => {
-    if (!e.isRead) markRead.mutate(e.id)
+    if (!e.isRead)
+      markRead.mutate(e.id, {
+        onError: (err) => notifyError(err, "Não foi possível marcar o alerta como lido."),
+      })
     setOpen(false)
     navigate("/alerts")
   }
@@ -87,7 +91,9 @@ export function NotificationBell() {
             )}
           </div>
           <button
-            onClick={() => markAll.mutate()}
+            onClick={() => markAll.mutate(undefined, {
+              onError: (err) => notifyError(err, "Não foi possível marcar os alertas como lidos."),
+            })}
             disabled={unread === 0 || markAll.isPending}
             title="Marca como lido só para você. O badge dos colegas não muda."
             className="text-[11.5px] font-semibold text-teal-700 dark:text-teal-300 hover:text-teal-500 transition-colors disabled:opacity-40"

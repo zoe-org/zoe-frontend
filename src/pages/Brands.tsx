@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/select"
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
+import { notifyError, notifySuccess } from "@/lib/feedback"
 import {
   useTenantBrands, useBrandKeywords, useBrandMutations, useSubscribeFlow,
   useBrandCompetitors, useCompetitorMutations,
@@ -288,6 +289,18 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
     m.addKeyword.mutate(k, { onSuccess: () => setNewKeyword("") })
   }
 
+  const removeKeyword = (id: string, keyword: string) =>
+    m.removeKeyword.mutate(id, {
+      onSuccess: () => notifySuccess(`“${keyword}” saiu das palavras-chave.`),
+      onError: (e) => notifyError(e, "Não foi possível remover a palavra-chave."),
+    })
+
+  const updateSubscription = (input: Parameters<typeof m.update.mutate>[0], what: string) =>
+    m.update.mutate(input, {
+      onSuccess: () => notifySuccess(what),
+      onError: (e) => notifyError(e, "Não foi possível atualizar a assinatura."),
+    })
+
   return (
     <div className="p-8 overflow-y-auto">
       {/* Cabeçalho */}
@@ -357,9 +370,10 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
                   {k.isNegative && <span className="chip chip-neg text-[9.5px]">neg</span>}
                   {canManage && (
                     <button
-                      onClick={() => m.removeKeyword.mutate(k.id)}
+                      onClick={() => removeKeyword(k.id, k.keyword)}
+                      disabled={m.removeKeyword.isPending}
                       aria-label={`Remover ${k.keyword}`}
-                      className="text-ink-muted hover:text-neg transition-colors"
+                      className="text-ink-muted hover:text-neg transition-colors disabled:opacity-50"
                     >
                       <X className="w-3 h-3" />
                     </button>
@@ -390,7 +404,9 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
             </form>
           )}
           {m.addKeyword.isError && (
-            <p className="text-[12px] text-neg mt-2">Não foi possível adicionar. Tente outro termo.</p>
+            <p className="text-[12px] text-neg mt-2">
+              {apiMessage(m.addKeyword.error, "Não foi possível adicionar a palavra-chave.")}
+            </p>
           )}
         </div>
 
@@ -401,8 +417,8 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
             <Field label="Relacionamento">
               <Select
                 value={brand.relationship}
-                disabled={!canManage}
-                onValueChange={(v) => m.update.mutate({ relationship: v })}
+                disabled={!canManage || m.update.isPending}
+                onValueChange={(v) => updateSubscription({ relationship: v }, "Relacionamento atualizado.")}
               >
                 <SelectTrigger className="h-8 text-[12.5px] w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -413,8 +429,8 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
             <Field label="Status">
               <Select
                 value={brand.status}
-                disabled={!canManage}
-                onValueChange={(v) => m.update.mutate({ status: v })}
+                disabled={!canManage || m.update.isPending}
+                onValueChange={(v) => updateSubscription({ status: v }, "Status atualizado.")}
               >
                 <SelectTrigger className="h-8 text-[12.5px] w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -425,8 +441,8 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
             <Field label="Cor de identificação">
               <ColorSwatches
                 value={brandColor(brand)}
-                onChange={(c) => m.update.mutate({ color: c })}
-                disabled={!canManage}
+                onChange={(c) => updateSubscription({ color: c }, "Cor atualizada.")}
+                disabled={!canManage || m.update.isPending}
                 size={24}
               />
             </Field>
@@ -438,7 +454,13 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
               <button
                 onClick={() => {
                   if (confirm(`Deixar de monitorar "${brand.displayName ?? brand.brandName}"?`)) {
-                    m.unsubscribe.mutate(undefined, { onSuccess: onUnsubscribed })
+                    m.unsubscribe.mutate(undefined, {
+                      onSuccess: () => {
+                        notifySuccess(`${brand.displayName ?? brand.brandName} saiu do monitoramento.`)
+                        onUnsubscribed()
+                      },
+                      onError: (e) => notifyError(e, "Não foi possível deixar de monitorar a marca."),
+                    })
                   }
                 }}
                 disabled={m.unsubscribe.isPending}
@@ -481,7 +503,11 @@ function CompetitiveSetCard({ brand, canManage }: {
 
   const add = (competitorTenantBrandId: string) => {
     setPicking("")
-    m.add.mutate(competitorTenantBrandId)
+    const name = available.find((b) => b.tenantBrandId === competitorTenantBrandId)?.name ?? "O concorrente"
+    m.add.mutate(competitorTenantBrandId, {
+      onSuccess: () => notifySuccess(`${name} entrou no conjunto competitivo.`),
+      onError: (e) => notifyError(e, "Não foi possível incluir o concorrente."),
+    })
   }
 
   return (
@@ -495,7 +521,7 @@ function CompetitiveSetCard({ brand, canManage }: {
           </p>
         </div>
         {canManage && available.length > 0 && (
-          <Select value={picking} onValueChange={add}>
+          <Select value={picking} onValueChange={add} disabled={m.add.isPending}>
             <SelectTrigger className="h-8 text-[12.5px] w-56">
               <SelectValue placeholder="adicionar concorrente…" />
             </SelectTrigger>
@@ -536,9 +562,13 @@ function CompetitiveSetCard({ brand, canManage }: {
                 {c.name}
                 {canManage && (
                   <button
-                    onClick={() => m.remove.mutate(c.brandId)}
+                    onClick={() => m.remove.mutate(c.brandId, {
+                      onSuccess: () => notifySuccess(`${c.name} saiu do conjunto competitivo.`),
+                      onError: (e) => notifyError(e, "Não foi possível tirar o concorrente."),
+                    })}
+                    disabled={m.remove.isPending}
                     aria-label={`Tirar ${c.name} do conjunto`}
-                    className="text-ink-muted hover:text-neg transition-colors"
+                    className="text-ink-muted hover:text-neg transition-colors disabled:opacity-50"
                   >
                     <X className="w-3 h-3" />
                   </button>
