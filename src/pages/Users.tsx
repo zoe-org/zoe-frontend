@@ -8,6 +8,7 @@ import {
   type TenantRole, type TenantMember, type PendingInvite, type EmailDeliveryStatus,
 } from "@/lib/api/tenants"
 import { useTenantBrands } from "@/lib/api/brands"
+import { assignableBrands } from "@/lib/brands"
 
 type Tab = "pessoas" | "papeis" | "convites"
 
@@ -422,7 +423,7 @@ function BrandsCell({ member, canEdit, onEdit }: { member: TenantMember; canEdit
 function AssignBrandsModal({ member, onClose }: { member: TenantMember; onClose: () => void }) {
   const brandsQuery = useTenantBrands()
   const { setMemberBrands } = useTeamMutations()
-  const brands = useMemo(() => brandsQuery.data?.items ?? [], [brandsQuery.data])
+  const brands = useMemo(() => assignableBrands(brandsQuery.data?.items ?? []), [brandsQuery.data])
 
   const [selected, setSelected] = useState<Set<string>>(
     () => new Set((member.brands ?? []).map((b) => b.brandId)),
@@ -438,7 +439,8 @@ function AssignBrandsModal({ member, onClose }: { member: TenantMember; onClose:
 
   const save = () => {
     setMemberBrands.mutate(
-      { userId: member.userId, brandIds: [...selected] },
+      // Atribuição antiga a marca pausada ou arquivada faria a API recusar o conjunto todo.
+      { userId: member.userId, brandIds: [...selected].filter((id) => brands.some((b) => b.brandId === id)) },
       {
         onSuccess: () => {
           notifySuccess("Marcas atualizadas.")
@@ -560,7 +562,7 @@ const BASE_INVITE_ROLES: TenantRole[] = ["Admin", "Manager", "Viewer"]
 function InviteModal({ isOwner, onClose }: { isOwner: boolean; onClose: () => void }) {
   const { createInvite } = useTeamMutations()
   const brandsQuery = useTenantBrands()
-  const brands = useMemo(() => brandsQuery.data?.items ?? [], [brandsQuery.data])
+  const brands = useMemo(() => assignableBrands(brandsQuery.data?.items ?? []), [brandsQuery.data])
 
   const inviteRoles = useMemo<TenantRole[]>(
     () => (isOwner ? ["Owner", ...BASE_INVITE_ROLES] : BASE_INVITE_ROLES),

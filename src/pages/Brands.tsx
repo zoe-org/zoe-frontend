@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { Search, Plus, X, Check, AlertCircle, ExternalLink, ShieldCheck, Clock, Loader2 } from "lucide-react"
+import {
+  Search, Plus, X, Check, AlertCircle, ExternalLink, ShieldCheck, Clock, Loader2, ChevronDown, Archive, RotateCcw,
+} from "lucide-react"
 import { useAuth } from "@/features/auth/context"
 import { ApiError } from "@/lib/api"
 import { apiMessage } from "@/lib/api-error"
@@ -16,6 +18,7 @@ import {
   useBrandCompetitors, useCompetitorMutations,
   resolveOutcome, brandsApi, type TenantBrandSummary, type SubscribeResult,
 } from "@/lib/api/brands"
+import { isArchived, partitionBrands } from "@/lib/brands"
 import { useDashboardSummary } from "@/lib/api/dashboard"
 import { useActiveBrand } from "@/features/brands/context"
 
@@ -112,6 +115,10 @@ const RELATIONSHIPS = [
   { value: "Competitor", label: "Concorrente" },
   { value: "Partner", label: "Parceira" },
 ]
+const relationshipLabel = (value: string) =>
+  RELATIONSHIPS.find((r) => r.value === value)?.label ?? value
+
+// Sem "Archived": arquivar é o "deixar de monitorar", e a arquivada tem painel próprio.
 const STATUSES = [
   { value: "Active", label: "Ativa" },
   { value: "Paused", label: "Pausada" },
@@ -129,15 +136,22 @@ export default function BrandsPage() {
   const [query, setQuery] = useState("")
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [newOpen, setNewOpen] = useState(false)
+  // Arquivadas começam recolhidas: são histórico, não o trabalho do dia.
+  const [showArchived, setShowArchived] = useState(false)
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    if (!q) return items
-    return items.filter((b) => (b.displayName ?? b.brandName).toLowerCase().includes(q))
-  }, [items, query])
+  const { monitored, archived } = useMemo(() => partitionBrands(items, query), [items, query])
+  const monitoredCount = items.filter((b) => !isArchived(b)).length
 
-  const selected = items.find((b) => b.tenantBrandId === selectedId) ?? filtered[0] ?? items[0] ?? null
+  const selected = items.find((b) => b.tenantBrandId === selectedId) ?? monitored[0] ?? archived[0] ?? null
   const totalVideos = items.reduce((a, b) => a + b.videoCount30d, 0)
+
+  // A selecionada nunca fica escondida numa seção recolhida.
+  const selectedArchived = selected != null && isArchived(selected)
+  const archivedOpen = showArchived || selectedArchived
+  const toggleArchived = () => {
+    if (archivedOpen && selectedArchived) setSelectedId(null)
+    setShowArchived(!archivedOpen)
+  }
 
   if (brands.isLoading) return <PageSkeleton />
   if (brands.isError) return <ErrorState onRetry={() => brands.refetch()} />
@@ -168,7 +182,7 @@ export default function BrandsPage() {
             <div className="eyebrow mb-2.5">Gestão · Workspace</div>
             <h1 className="font-display m-0" style={{ fontSize: 34, lineHeight: 1.1, color: "var(--ink)" }}>Marcas</h1>
             <div className="text-[14px] text-ink-muted mt-1.5 max-w-140">
-              {items.length} {items.length === 1 ? "marca monitorada" : "marcas monitoradas"} ·{" "}
+              {monitoredCount} {monitoredCount === 1 ? "marca monitorada" : "marcas monitoradas"} ·{" "}
               <span className="font-mono-zoe">{totalVideos}</span> vídeos analisados nos últimos 30 dias.
             </div>
           </div>
@@ -197,44 +211,54 @@ export default function BrandsPage() {
             </div>
           </div>
 
-          {filtered.length === 0 ? (
+          {monitored.length === 0 && archived.length === 0 ? (
             <div className="px-4 py-10 text-center text-[13px] text-ink-muted">Nenhuma marca encontrada.</div>
           ) : (
-            filtered.map((b) => {
-              const active = selected?.tenantBrandId === b.tenantBrandId
-              return (
-                <button
+            <>
+              {monitored.map((b) => (
+                <BrandRow
                   key={b.tenantBrandId}
-                  onClick={() => setSelectedId(b.tenantBrandId)}
-                  className="block w-full text-left px-4 py-3.5 border-b border-border-soft transition-colors hover:bg-[#FAFBFC] dark:hover:bg-[#181B28]"
-                  style={{
-                    background: active ? "var(--teal-bg)" : "transparent",
-                    borderLeft: `3px solid ${active ? "var(--color-teal-500)" : "transparent"}`,
-                  }}
-                >
-                  <div className="flex items-center gap-3">
-                    <Avatar name={b.brandName} slug={b.brandSlug} color={b.color} size={36} radius={8} font={14} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[13.5px] font-semibold truncate" style={{ color: "var(--ink)" }}>
-                          {b.displayName ?? b.brandName}
-                        </span>
-                        {b.status !== "Active" && <span className="chip chip-warn text-[10px]">pausada</span>}
-                      </div>
-                      <div className="flex items-center gap-2 text-[11.5px] text-ink-muted mt-0.5">
-                        <span className="font-mono-zoe">{b.videoCount30d} vídeos</span>
-                        {!b.brandVerified && <span className="chip text-[10px]">em verificação</span>}
-                      </div>
-                    </div>
-                  </div>
-                </button>
-              )
-            })
+                  brand={b}
+                  active={selected?.tenantBrandId === b.tenantBrandId}
+                  onSelect={() => setSelectedId(b.tenantBrandId)}
+                />
+              ))}
+              {monitored.length === 0 && (
+                <div className="px-4 py-6 text-center text-[13px] text-ink-muted">
+                  {query.trim() ? "Nenhuma marca monitorada com esse nome." : "Nenhuma marca monitorada no momento."}
+                </div>
+              )}
+
+              {archived.length > 0 && (
+                <>
+                  <button
+                    onClick={toggleArchived}
+                    aria-expanded={archivedOpen}
+                    className="flex w-full items-center justify-between px-4 py-2.5 border-b border-border-soft text-left bg-[#FAFBFC] dark:bg-[#151824] hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D] transition-colors"
+                  >
+                    <span className="eyebrow">Arquivadas · {archived.length}</span>
+                    <ChevronDown
+                      className={`w-3.5 h-3.5 text-ink-muted transition-transform ${archivedOpen ? "rotate-180" : ""}`}
+                    />
+                  </button>
+                  {archivedOpen && archived.map((b) => (
+                    <BrandRow
+                      key={b.tenantBrandId}
+                      brand={b}
+                      active={selected?.tenantBrandId === b.tenantBrandId}
+                      onSelect={() => setSelectedId(b.tenantBrandId)}
+                    />
+                  ))}
+                </>
+              )}
+            </>
           )}
         </div>
 
         {/* Detalhe */}
-        {selected && (
+        {selected && (selectedArchived ? (
+          <ArchivedBrandDetail key={selected.tenantBrandId} brand={selected} canManage={canManage} />
+        ) : (
           <BrandDetail
             key={selected.tenantBrandId}
             brand={selected}
@@ -251,12 +275,122 @@ export default function BrandsPage() {
               setBrand(selected.brandId)
               navigate("/dashboard")
             }}
-            onUnsubscribed={() => setSelectedId(null)}
+            // Fica selecionada: o painel vira o de arquivada, que é a confirmação visível
+            // do que aconteceu e o caminho de volta.
+            onUnsubscribed={() => { setSelectedId(selected.tenantBrandId); setShowArchived(true) }}
           />
-        )}
+        ))}
       </div>
 
       <BrandModal open={newOpen} onClose={() => setNewOpen(false)} />
+    </div>
+  )
+}
+
+// ── Linha da lista ──────────────────────────────────────────────────────
+
+function BrandRow({ brand: b, active, onSelect }: {
+  brand: TenantBrandSummary
+  active: boolean
+  onSelect: () => void
+}) {
+  const archived = isArchived(b)
+  return (
+    <button
+      onClick={onSelect}
+      className="block w-full text-left px-4 py-3.5 border-b border-border-soft transition-colors hover:bg-[#FAFBFC] dark:hover:bg-[#181B28]"
+      style={{
+        background: active ? "var(--teal-bg)" : "transparent",
+        borderLeft: `3px solid ${active ? "var(--color-teal-500)" : "transparent"}`,
+      }}
+    >
+      <div className={`flex items-center gap-3 ${archived ? "opacity-60" : ""}`}>
+        <Avatar name={b.brandName} slug={b.brandSlug} color={b.color} size={36} radius={8} font={14} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[13.5px] font-semibold truncate" style={{ color: "var(--ink)" }}>
+              {b.displayName ?? b.brandName}
+            </span>
+            {b.status === "Paused" && <span className="chip chip-warn text-[10px]">pausada</span>}
+          </div>
+          <div className="flex items-center gap-2 text-[11.5px] text-ink-muted mt-0.5">
+            {archived ? (
+              <span>{relationshipLabel(b.relationship)}</span>
+            ) : (
+              <>
+                <span className="font-mono-zoe">{b.videoCount30d} vídeos</span>
+                {!b.brandVerified && <span className="chip text-[10px]">em verificação</span>}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </button>
+  )
+}
+
+// ── Marca arquivada ─────────────────────────────────────────────────────
+
+/**
+ * "Deixar de monitorar" arquiva. Voltar usa o mesmo link da assinatura: a API
+ * recadastra na mesma linha e confere a vaga do plano antes.
+ */
+function ArchivedBrandDetail({ brand, canManage }: { brand: TenantBrandSummary; canManage: boolean }) {
+  const flow = useSubscribeFlow()
+  const name = brand.displayName ?? brand.brandName
+
+  const reativar = () =>
+    flow.link.mutate(
+      { brandId: brand.brandId, relationship: brand.relationship },
+      {
+        onSuccess: () => notifySuccess(`${name} voltou a ser monitorada.`),
+        onError: (e) => notifyError(e, "Não foi possível voltar a monitorar a marca."),
+      },
+    )
+
+  return (
+    <div className="p-8 overflow-y-auto">
+      <div className="flex items-center gap-4 mb-7">
+        <div className="opacity-60">
+          <Avatar name={brand.brandName} slug={brand.brandSlug} color={brand.color} size={64} radius={14} font={26} />
+        </div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <h2 className="font-display m-0" style={{ fontSize: 28, lineHeight: 1, color: "var(--ink)" }}>{name}</h2>
+            <span className="chip">{relationshipLabel(brand.relationship)}</span>
+            <span className="chip"><Archive className="w-3 h-3" /> arquivada</span>
+          </div>
+          <div className="text-[13px] text-ink-muted">{brand.brandSlug}</div>
+        </div>
+      </div>
+
+      <div className="border border-border-soft rounded-xl p-5 max-w-160">
+        <div className="eyebrow mb-2">Fora do monitoramento</div>
+        <p className="text-[13px] text-ink-muted leading-relaxed">
+          A Zoe não analisa mais os vídeos desta marca para o seu workspace, e ela não ocupa
+          vaga do plano. As análises de antes saíram dos painéis, mas nada foi apagado:
+          elas voltam junto com as palavras-chave, a cor e o teto se você voltar a monitorar.
+        </p>
+        {canManage ? (
+          <>
+            <button
+              onClick={reativar}
+              disabled={flow.link.isPending}
+              className="mt-4 inline-flex items-center gap-1.5 h-9 px-4 text-[13px] font-medium rounded-md text-white bg-teal-500 hover:bg-teal-600 transition-colors disabled:opacity-50"
+            >
+              {flow.link.isPending
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <RotateCcw className="w-3.5 h-3.5" />}
+              {flow.link.isPending ? "Reativando..." : "Voltar a monitorar"}
+            </button>
+            <p className="text-[11.5px] text-ink-muted-2 mt-2">Ela volta a ocupar uma vaga do plano.</p>
+          </>
+        ) : (
+          <p className="text-[12px] text-ink-muted-2 mt-3">
+            Só Owner ou Admin do workspace podem voltar a monitorar esta marca.
+          </p>
+        )}
+      </div>
     </div>
   )
 }
@@ -453,7 +587,11 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
               <div className="h-px bg-border-soft my-4" />
               <button
                 onClick={() => {
-                  if (confirm(`Deixar de monitorar "${brand.displayName ?? brand.brandName}"?`)) {
+                  if (confirm(
+                    `Deixar de monitorar "${brand.displayName ?? brand.brandName}"?\n\n` +
+                    "A Zoe para de analisar os vídeos dela e a vaga do plano fica livre. " +
+                    "A marca vai para Arquivadas, e dá para voltar a monitorar depois.",
+                  )) {
                     m.unsubscribe.mutate(undefined, {
                       onSuccess: () => {
                         notifySuccess(`${brand.displayName ?? brand.brandName} saiu do monitoramento.`)
@@ -466,7 +604,7 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
                 disabled={m.unsubscribe.isPending}
                 className="text-[12.5px] text-neg hover:underline disabled:opacity-50"
               >
-                {m.unsubscribe.isPending ? "Removendo..." : "Deixar de monitorar esta marca"}
+                {m.unsubscribe.isPending ? "Arquivando..." : "Deixar de monitorar esta marca"}
               </button>
             </>
           )}
