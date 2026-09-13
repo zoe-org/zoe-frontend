@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { assignableBrands, isArchived, monitoredBrands, partitionBrands } from "@/lib/brands"
+import { isArchived, monitoredBrands, partitionBrands } from "@/lib/brands"
 
 const row = (brandName: string, status: string, displayName: string | null = null) =>
   ({ brandName, displayName, status })
@@ -18,13 +18,9 @@ describe("isArchived", () => {
   })
 })
 
-describe("monitoredBrands / assignableBrands", () => {
-  it("o seletor mostra ativas e pausadas", () => {
+describe("monitoredBrands", () => {
+  it("seletor e atribuição mostram ativas e pausadas, nunca arquivadas", () => {
     expect(monitoredBrands(items).map((b) => b.brandName)).toEqual(["Nubank", "Itaú"])
-  })
-
-  it("atribuição e convite só aceitam ativas", () => {
-    expect(assignableBrands(items).map((b) => b.brandName)).toEqual(["Nubank"])
   })
 })
 

@@ -13,6 +13,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { notifyError, notifySuccess } from "@/lib/feedback"
+import { useConfirm } from "@/features/confirm/context"
 import {
   useTenantBrands, useBrandKeywords, useBrandMutations, useSubscribeFlow,
   useBrandCompetitors, useCompetitorMutations,
@@ -406,6 +407,7 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
   const summary = useDashboardSummary(brand.brandId)
   const keywords = useBrandKeywords(brand.tenantBrandId)
   const m = useBrandMutations(brand.tenantBrandId)
+  const confirm = useConfirm()
   const [newKeyword, setNewKeyword] = useState("")
 
   const s = summary.data
@@ -571,6 +573,12 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
                   {STATUSES.map((st) => <SelectItem key={st.value} value={st.value}>{st.label}</SelectItem>)}
                 </SelectContent>
               </Select>
+              {brand.status === "Paused" && (
+                <p className="text-[11.5px] text-ink-muted mt-1.5">
+                  Sem coleta de vídeos novos. O histórico continua nos painéis, e a marca segue
+                  ocupando a vaga do plano.
+                </p>
+              )}
             </Field>
             <Field label="Cor de identificação">
               <ColorSwatches
@@ -586,20 +594,25 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
             <>
               <div className="h-px bg-border-soft my-4" />
               <button
-                onClick={() => {
-                  if (confirm(
-                    `Deixar de monitorar "${brand.displayName ?? brand.brandName}"?\n\n` +
-                    "A Zoe para de analisar os vídeos dela e a vaga do plano fica livre. " +
-                    "A marca vai para Arquivadas, e dá para voltar a monitorar depois.",
-                  )) {
-                    m.unsubscribe.mutate(undefined, {
-                      onSuccess: () => {
-                        notifySuccess(`${brand.displayName ?? brand.brandName} saiu do monitoramento.`)
-                        onUnsubscribed()
-                      },
-                      onError: (e) => notifyError(e, "Não foi possível deixar de monitorar a marca."),
-                    })
-                  }
+                onClick={async () => {
+                  const name = brand.displayName ?? brand.brandName
+                  const ok = await confirm({
+                    title: `Deixar de monitorar ${name}?`,
+                    description:
+                      "A Zoe para de analisar os vídeos dela, o histórico sai dos painéis e a vaga do " +
+                      "plano fica livre. A marca vai para Arquivadas, e dá para voltar a monitorar depois. " +
+                      "Para só parar a coleta e manter o histórico, pause a marca.",
+                    confirmLabel: "Deixar de monitorar",
+                    tone: "danger",
+                  })
+                  if (!ok) return
+                  m.unsubscribe.mutate(undefined, {
+                    onSuccess: () => {
+                      notifySuccess(`${name} saiu do monitoramento.`)
+                      onUnsubscribed()
+                    },
+                    onError: (e) => notifyError(e, "Não foi possível deixar de monitorar a marca."),
+                  })
                 }}
                 disabled={m.unsubscribe.isPending}
                 className="text-[12.5px] text-neg hover:underline disabled:opacity-50"

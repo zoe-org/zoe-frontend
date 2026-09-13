@@ -7,14 +7,9 @@ export function isArchived(b: BrandStatusRow): boolean {
   return b.status === "Archived"
 }
 
-/** Ativas e pausadas: as que ocupam vaga e aparecem no seletor. */
+/** Ativas e pausadas: ocupam vaga, mantêm o histórico e entram no seletor e na atribuição. */
 export function monitoredBrands<T extends BrandStatusRow>(items: T[]): T[] {
   return items.filter((b) => !isArchived(b))
-}
-
-/** Só ativas: é o que a API aceita em atribuição de membro e convite. */
-export function assignableBrands<T extends BrandStatusRow>(items: T[]): T[] {
-  return items.filter((b) => b.status === "Active")
 }
 
 /** Lista da tela de Marcas: a busca vale para as duas seções. */

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react"
 import { Bell, BellOff, Check, ChevronRight, Download, Pencil, Plus, Trash2, X } from "lucide-react"
 import { notifyError, notifySuccess } from "@/lib/feedback"
+import { useConfirm } from "@/features/confirm/context"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { AlertEventDrawer } from "@/components/features/AlertEventDrawer"
 import { StatBand } from "@/components/ui/stat-band"
@@ -454,6 +455,7 @@ function RulesList({
 }: { rules: AlertRule[]; isLoading: boolean; error: unknown; onEdit: (r: AlertRule) => void }) {
   const remove = useDeleteAlertRule()
   const update = useUpdateAlertRule()
+  const confirm = useConfirm()
 
   const toggleEnabled = (rule: AlertRule) => {
     update.mutate(
@@ -465,9 +467,15 @@ function RulesList({
     )
   }
 
-  const confirmRemove = (rule: AlertRule) => {
+  const confirmRemove = async (rule: AlertRule) => {
     // O backend apaga o histórico de disparos junto — vale avisar antes.
-    if (!window.confirm(`Excluir “${rule.name}”? O histórico de disparos dela também será removido.`)) return
+    const ok = await confirm({
+      title: `Excluir “${rule.name}”?`,
+      description: "O histórico de disparos dela também será removido.",
+      confirmLabel: "Excluir",
+      tone: "danger",
+    })
+    if (!ok) return
     remove.mutate(rule.id, {
       onSuccess: () => notifySuccess("Regra excluída."),
       onError: (e) => notifyError(e, "Não foi possível excluir."),

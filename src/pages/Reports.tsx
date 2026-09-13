@@ -5,6 +5,7 @@ import {
   Search, ExternalLink, Download, AlertCircle, Trash2, Loader2,
 } from "lucide-react"
 import { notifyError, notifySuccess } from "@/lib/feedback"
+import { useConfirm } from "@/features/confirm/context"
 import { useFeature } from "@/features/auth/useFeature"
 import { useActiveBrand } from "@/features/brands/context"
 import { ApiError } from "@/lib/api"
@@ -59,9 +60,16 @@ export default function ReportsPage() {
   const templates = useReportTemplates(hasReports)
   const create = useCreateReport()
   const del = useDeleteReport()
+  const confirm = useConfirm()
 
-  const handleDelete = (r: Report) => {
-    if (!window.confirm(`Apagar "${titleOf(r)}"? Esta ação não pode ser desfeita.`)) return
+  const handleDelete = async (r: Report) => {
+    const ok = await confirm({
+      title: `Apagar “${titleOf(r)}”?`,
+      description: "Esta ação não pode ser desfeita.",
+      confirmLabel: "Apagar",
+      tone: "danger",
+    })
+    if (!ok) return
     del.mutate(r.id, {
       onSuccess: () => notifySuccess("Relatório apagado."),
       onError: (e) => notifyError(e, "Não foi possível apagar."),
