@@ -2,6 +2,7 @@ import { useState } from "react"
 import { Link } from "react-router-dom"
 import {
   Loader2, LogOut, Upload, Wallet, ExternalLink, AlertCircle, Play, FileText, Megaphone,
+  UserRoundPen,
 } from "lucide-react"
 import { toast } from "sonner"
 import { ApiError } from "@/lib/api"
@@ -12,7 +13,7 @@ import { tEnum } from "@/i18n/enums"
 import { fmtDate, initials } from "@/pages/operations/format"
 import { fmtCents, youtubeThumb, youtubeWatch } from "@/lib/api/operations"
 import {
-  useCreatorWorkspace, useCreatorMutations, useSetCreatorTaxId,
+  useCreatorWorkspace, useCreatorMutations, useSetCreatorTaxId, trabalhoLabel,
   type CreatorEngagement, type CreatorDelivery,
 } from "@/lib/api/creator"
 import { CreatorContractPanel } from "@/pages/creator/CreatorContractPanel"
@@ -213,6 +214,31 @@ export default function CreatorHomePage() {
                 sai sem identificar a parte contratada. */}
             <TaxIdCard current={d.taxId} />
 
+            {/* Cadastro incompleto não bloqueia a área — ele já pode ver contrato e mandar
+                entrega. É a marca que fica sem o que precisa para montar a proposta, e é
+                isso que o card diz, em vez de tratar a pessoa como pendência. */}
+            {!d.profile.complete && (
+              <Link
+                to="/criador/cadastro"
+                className="rounded-xl border p-4 mb-4 flex items-start gap-3 transition-colors"
+                style={{ background: "var(--surface)", borderColor: "var(--color-teal-500)" }}
+              >
+                <UserRoundPen
+                  className="w-4 h-4 mt-0.5 shrink-0"
+                  style={{ color: "var(--color-teal-500)" }}
+                />
+                <div>
+                  <div className="text-[13.5px] font-semibold" style={{ color: "var(--ink)" }}>
+                    Complete seu cadastro
+                  </div>
+                  <p className="text-[12.5px] text-ink-muted m-0 mt-0.5">
+                    Suas redes, área de atuação e temas. É por eles que as marcas te acham
+                    para as propostas certas — leva poucos minutos.
+                  </p>
+                </div>
+              </Link>
+            )}
+
             {tab === "campanhas" ? (
               <div className="flex flex-col gap-4">
                 {d.engagements.map((e) => (
@@ -276,7 +302,7 @@ function EngagementCard({ e }: { e: CreatorEngagement }) {
         <div>
           <div className="eyebrow mb-1">{e.brandName}</div>
           <h2 className="font-display m-0" style={{ fontSize: 19, color: "var(--ink)" }}>
-            {e.campaignName}
+            {trabalhoLabel(e.campaignName)}
           </h2>
           <div className="text-[12.5px] text-ink-muted mt-1">
             {tEnum("contractModality", e.modality)}

@@ -47,6 +47,14 @@ export default function CreatorPayoutPage() {
     synced.current = true
 
     sync.mutate(undefined, {
+      // Sem isto a falha era MUDA: a sincronização roda sozinha, e quando ela quebrava a
+      // tela seguia mostrando um estado desatualizado sem ninguém saber por quê.
+      onError: (e) => {
+        toast.error(
+          e instanceof ApiError
+            ? `Não foi possível checar sua conta de recebimento: ${e.message}`
+            : "Não foi possível checar sua conta de recebimento agora.")
+      },
       // Limpa a query string quando veio pelo retorno: recarregar a página não deve
       // reexibir "seu link venceu" de uma tentativa que já passou.
       onSettled: () => { if (returned) setParams({}, { replace: true }) },
@@ -71,6 +79,34 @@ export default function CreatorPayoutPage() {
   }
 
   const verified = d?.canReceivePayout ?? false
+
+  // Antes a tela só distinguia verificado de não-verificado, e quem acabara de criar a
+  // conta continuava vendo "cadastro pendente" como se nada tivesse acontecido. O estado
+  // existe no dado — a tela é que não o lia.
+  const kyc = d?.kycStatus ?? "NotStarted"
+  const semConta = kyc === "NotStarted"
+  const emVerificacao = kyc === "Pending"
+  const recusado = kyc === "Rejected"
+
+  const titulo = verified
+    ? "Recebimento liberado"
+    : emVerificacao ? "Conta criada — em verificação"
+    : recusado ? "O provedor pediu mais dados"
+    : "Conta de recebimento não conectada"
+
+  const explicacao = verified
+    ? "Sua conta está verificada. Entregas aprovadas caem aqui com o desconto da taxa."
+    : emVerificacao
+      ? "Sua conta foi criada e está sendo verificada pelo provedor. Isso leva de alguns "
+        + "minutos a alguns dias. Você pode assinar contrato e gravar normalmente — só o "
+        + "repasse espera."
+      : recusado
+        ? (d?.payoutBlockedReason
+           ?? "Faltou alguma informação no cadastro. Continue de onde parou para completar.")
+        : "Conecte uma conta para receber. Você pode assinar contrato e gravar antes "
+          + "disso — o bloqueio é só no pagamento."
+
+  const rotuloBotao = semConta ? "Conectar conta" : "Continuar cadastro"
   const busy = start.isPending || sync.isPending
 
   return (
@@ -133,15 +169,18 @@ export default function CreatorPayoutPage() {
               className="rounded-xl border p-5 mb-5"
               style={{
                 background: "var(--surface)",
-                borderColor: verified ? "var(--color-teal-500)" : "var(--border-soft)",
+                borderColor: verified || emVerificacao
+                  ? "var(--color-teal-500)" : "var(--border-soft)",
               }}
             >
               <div className="flex items-start gap-3">
                 <div
                   className="w-9 h-9 rounded-lg grid place-items-center shrink-0"
-                  style={{ background: verified ? "#00A79915" : "#D9770615" }}
+                  style={{ background: verified || emVerificacao ? "#00A79915" : "#D9770615" }}
                 >
-                  {verified
+                  {/* Em verificação usa o tom de progresso, não o de alerta: a pessoa fez
+                      a parte dela, quem está devendo resposta é o provedor. */}
+                  {verified || emVerificacao
                     ? <ShieldCheck className="w-4.5 h-4.5" style={{ color: "var(--color-teal-500)" }} />
                     : <Wallet className="w-4.5 h-4.5" style={{ color: "#D97706" }} />}
                 </div>
@@ -149,16 +188,13 @@ export default function CreatorPayoutPage() {
                 <div className="min-w-0 flex-1">
                   <div
                     className="text-[14px] font-medium mb-1"
-                    style={{ color: verified ? "var(--color-teal-500)" : "#D97706" }}
+                    style={{ color: verified || emVerificacao ? "var(--color-teal-500)" : "#D97706" }}
                   >
-                    {verified ? "Recebimento liberado" : "Cadastro pendente"}
+                    {titulo}
                   </div>
 
                   <p className="text-[13px] text-ink-2 m-0 leading-relaxed">
-                    {verified
-                      ? "Sua conta está verificada. Os pagamentos aprovados são transferidos automaticamente."
-                      : d?.payoutBlockedReason
-                        ?? "Falta concluir o cadastro no provedor para poder receber."}
+                    {explicacao}
                   </p>
 
                   {!verified && (
@@ -178,7 +214,7 @@ export default function CreatorPayoutPage() {
                         {start.isPending
                           ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                           : <ExternalLink className="w-3.5 h-3.5" />}
-                        Continuar cadastro
+                        {rotuloBotao}
                       </button>
                     </>
                   )}

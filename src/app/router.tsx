@@ -7,6 +7,7 @@ import ForgotPasswordPage from "@/pages/ForgotPassword"
 import AcceptInvitePage from "@/pages/AcceptInvite"
 import InfluencerInvitePage from "@/pages/InfluencerInvite"
 import CreatorHomePage from "@/pages/creator/CreatorHome"
+import CreatorOnboardingPage from "@/pages/creator/CreatorOnboarding"
 import CreatorPayoutPage from "@/pages/creator/CreatorPayout"
 import OnboardingTenantPage from "@/pages/OnboardingTenant"
 import DashboardPage from "@/pages/Dashboard"
@@ -21,6 +22,7 @@ import ReportViewPage from "@/pages/ReportView"
 import OperationsCampaignsPage from "@/pages/operations/Campaigns"
 import OperationsContractDetailPage from "@/pages/operations/ContractDetail"
 import OperationsContractsPage from "@/pages/operations/Contracts"
+import OperationsDashboardPage from "@/pages/operations/Dashboard"
 import OperationsDeliveriesPage from "@/pages/operations/Deliveries"
 import OperationsEscrowPage from "@/pages/operations/Escrow"
 import OperationsRosterPage from "@/pages/operations/Roster"
@@ -42,6 +44,12 @@ export const router = createBrowserRouter([
   {
     path: "/criador",
     element: <ProtectedRoute><CreatorHomePage /></ProtectedRoute>,
+  },
+  {
+    // Cadastro em três passos. Fora do AppShell e com layout próprio: quem chega aqui
+    // acabou de aceitar um convite e ainda não tem nada para navegar.
+    path: "/criador/cadastro",
+    element: <ProtectedRoute><CreatorOnboardingPage /></ProtectedRoute>,
   },
   {
     // Fora do AppShell pelo mesmo motivo da home do criador: não há workspace para o
@@ -74,6 +82,7 @@ export const router = createBrowserRouter([
       { path: "/mentions", element: <Navigate to="/intelligence/monitoring" replace /> },
       // Operations: rota sempre montada. O gate real é o [RequiresFeature] do
       // backend (403); o item no menu é que some sem a feature.
+      { path: "/operations", element: <OperationsDashboardPage /> },
       { path: "/operations/campaigns", element: <OperationsCampaignsPage /> },
       { path: "/operations/influencers", element: <OperationsRosterPage /> },
       { path: "/operations/contracts", element: <OperationsContractsPage /> },

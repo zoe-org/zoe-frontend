@@ -32,9 +32,12 @@ function getInitialOpenState(key: string): boolean {
 }
 
 
-const SubNavItem = ({ to, children, badge }: { to: string, children: React.ReactNode, badge?: React.ReactNode }) => (
+const SubNavItem = ({ to, children, badge, end }: { to: string, children: React.ReactNode, badge?: React.ReactNode, end?: boolean }) => (
   <NavLink
     to={to}
+    // O painel e a raiz da secao: sem `end`, ele ficaria marcado como ativo em toda
+    // subpagina de Operations e dois itens do menu apareceriam selecionados ao mesmo tempo.
+    end={end}
     className={({ isActive }) =>
       `relative flex items-center font-medium justify-between py-1.5 pl-4 text-[13.5px] transition-colors ${isActive
         ? "text-teal-500 dark:text-teal-300"
@@ -206,6 +209,7 @@ export function AppShell() {
                 <div className="ml-[21px] border-l-2 border-[#E5E7EB] dark:border-[#1C1F2E] flex flex-col mt-0 mb-2">
                   {/* A ordem do menu é a ordem do fluxo: campanha → elenco →
                       contrato → entrega → custódia. */}
+                  <SubNavItem to="/operations" end>Painel</SubNavItem>
                   <SubNavItem to="/operations/campaigns">Campanhas</SubNavItem>
                   <SubNavItem to="/operations/influencers">Elenco</SubNavItem>
                   <SubNavItem to="/operations/contracts">Contratos</SubNavItem>

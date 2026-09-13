@@ -6,8 +6,10 @@ import { ApiError } from "@/lib/api"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { RoleGate } from "@/features/auth/RoleGate"
 import { tEnum } from "@/i18n/enums"
-import { fmtDate } from "@/pages/operations/format"
-import { TableSkeleton, ErrorState } from "@/pages/operations/shared"
+import { fmtDate, matches, campanhaLabel } from "@/pages/operations/format"
+import {
+  TableSkeleton, ErrorState, SearchBox, NoResults,
+} from "@/pages/operations/shared"
 import {
   useEscrowAccounts, useEscrowMutations, fmtCents,
   ESCROW_STATES, ESCROW_ACTION_TRIGGER,
@@ -15,15 +17,21 @@ import {
 } from "@/lib/api/operations"
 
 /**
- * Quadro da custódia. Layout do protótipo (`src-ops/escrow.jsx`): KPIs em faixa e kanban
- * por estado.
+ * Quadro da custódia: KPIs em faixa, trilha de estados e lista.
  *
- * **A divergência principal: nove colunas, não seis.** O protótipo desenha
- * `aguardando depósito → depositado → em produção → em revisão → liberável → liberado`.
- * A máquina implementada tem três estados que ele omite: `Delivered` (entregue, revisão
- * ainda não aberta), `Disputed` e `Refunded`. Esconder disputa e devolução de uma tela de
- * dinheiro é o pior lugar possível para simplificar — some justamente com os casos que o
- * operador precisa achar rápido.
+ * <p><b>O kanban do protótipo saiu.</b> Ele custa nove colunas de largura fixa — rolagem
+ * horizontal garantida — para mostrar, quase sempre, oito colunas vazias e um cartão
+ * empurrado para fora da tela. Kanban se paga quando as colunas estão povoadas e o
+ * trabalho é arrastar entre elas; aqui a transição é ação com regra, e o volume de uma
+ * marca cabe numa lista.</p>
+ *
+ * <p>A trilha de estados continua existindo, comprimida numa faixa que <b>filtra</b> em
+ * vez de conter. O panorama sobrevive; a rolagem, não.</p>
+ *
+ * <p><b>Os nove estados continuam visíveis</b>, incluindo os três que o protótipo omitia:
+ * <c>Delivered</c>, <c>Disputed</c> e <c>Refunded</c>. Esconder disputa e devolução de uma
+ * tela de dinheiro é o pior lugar possível para simplificar — some justamente com os casos
+ * que o operador precisa achar rápido.</p>
  */
 const COLUMN_COLOR: Record<string, string> = {
   PendingDeposit: "#9CA3AF",
@@ -45,14 +53,34 @@ export default function OperationsEscrowPage() {
 
   const items = escrow.data?.items ?? NO_ITEMS
   const totals = escrow.data?.totals
+  const [filtro, setFiltro] = useState<string | null>(null)
+  const [busca, setBusca] = useState("")
 
-  const columns = useMemo(
-    () => ESCROW_STATES.map((s) => ({
-      state: s,
-      items: items.filter((e) => e.state === s),
-    })),
-    [items],
-  )
+  const contagem = useMemo(() => {
+    const c: Record<string, number> = {}
+    for (const s of ESCROW_STATES) c[s] = 0
+    for (const e of items) c[e.state] = (c[e.state] ?? 0) + 1
+    return c
+  }, [items])
+
+  // Ordena por URGENCIA, nao por data: numa tela de dinheiro o que precisa de alguem tem
+  // de vir primeiro. Reserva caida e' o pior caso — o valor deixou de estar separado.
+  const lista = useMemo(() => {
+    const peso = (e: EscrowSummary) =>
+      e.authorizationLapsedAt ? 0
+      : e.isAuthorizationExpired ? 1
+      : e.payoutAccountMissing && !e.isTerminal ? 2
+      : e.state === "Disputed" ? 3
+      : e.allowedTriggers.length > 0 && !e.hasPendingCommand ? 4
+      : e.isTerminal ? 6
+      : 5
+
+    return items
+      .filter((e) => (filtro ? e.state === filtro : true))
+      .filter((e) => matches(busca, e.influencerName, e.campaignName))
+      .slice()
+      .sort((a, b) => peso(a) - peso(b) || b.amountCents - a.amountCents)
+  }, [items, filtro, busca])
 
   const current = items.find((e) => e.escrowAccountId === selected) ?? null
 
@@ -122,36 +150,55 @@ export default function OperationsEscrowPage() {
       ) : items.length === 0 ? (
         <EmptyBlock message="Nenhuma custódia ainda. Ela nasce quando um contrato assinado tem valor a reservar." />
       ) : (
-        <div className="overflow-x-auto pb-2">
-          <div className="grid gap-3.5" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(210px, 1fr))` }}>
-            {columns.map((col) => (
-              <div key={col.state}>
-                <div className="flex items-center justify-between mb-2.5 px-1">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <span
-                      className="w-2 h-2 rounded-full shrink-0"
-                      style={{ background: COLUMN_COLOR[col.state] }}
-                    />
-                    <span className="text-[12.5px] font-semibold truncate" style={{ color: "var(--ink)" }}>
-                      {tEnum("escrowState", col.state)}
-                    </span>
-                  </div>
-                  <span className="font-mono-zoe text-[11px] text-ink-muted">{col.items.length}</span>
-                </div>
-                <div className="flex flex-col gap-2 min-h-[40px]">
-                  {col.items.map((e) => (
-                    <EscrowCard
-                      key={e.escrowAccountId}
-                      e={e}
-                      color={COLUMN_COLOR[e.state]}
-                      onOpen={() => setSelected(e.escrowAccountId)}
-                    />
-                  ))}
-                </div>
-              </div>
+        <>
+          <div className="flex justify-end">
+            <SearchBox value={busca} onChange={setBusca} placeholder="Buscar por criador, campanha…" />
+          </div>
+
+          {/* Trilha de estados: o panorama do kanban sem a largura dele. Quebra em varias
+              linhas em vez de rolar, e serve de filtro. */}
+          <div className="flex flex-wrap gap-1.5">
+            <TrilhaChip
+              rotulo="Todas"
+              n={items.length}
+              cor="var(--ink-muted)"
+              ativo={filtro === null}
+              onClick={() => setFiltro(null)}
+            />
+            {ESCROW_STATES.map((st) => (
+              <TrilhaChip
+                key={st}
+                rotulo={tEnum("escrowState", st)}
+                n={contagem[st]}
+                cor={COLUMN_COLOR[st]}
+                ativo={filtro === st}
+                // Estado vazio nao vira botao morto: continua visivel para o panorama,
+                // mas nao convida a um clique que leva a lugar nenhum.
+                onClick={contagem[st] ? () => setFiltro(st) : undefined}
+              />
             ))}
           </div>
-        </div>
+
+          {lista.length === 0 && busca ? (
+            <NoResults query={busca} onClear={() => setBusca("")} />
+          ) : lista.length === 0 ? (
+            <EmptyBlock message="Nenhuma custódia neste estado." />
+          ) : (
+            <div
+              className="rounded-xl border border-border-soft overflow-hidden"
+              style={{ background: "var(--surface)" }}
+            >
+              {lista.map((e, i) => (
+                <EscrowRow
+                  key={e.escrowAccountId}
+                  e={e}
+                  primeira={i === 0}
+                  onOpen={() => setSelected(e.escrowAccountId)}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {current && <EscrowDrawer e={current} onClose={() => setSelected(null)} />}
@@ -159,55 +206,113 @@ export default function OperationsEscrowPage() {
   )
 }
 
-function EscrowCard({
-  e, color, onOpen,
+function TrilhaChip({
+  rotulo, n, cor, ativo, onClick,
+}: {
+  rotulo: string
+  n: number
+  cor: string
+  ativo: boolean
+  onClick?: () => void
+}) {
+  const vazio = n === 0
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={!onClick}
+      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] border transition-colors disabled:cursor-default"
+      style={{
+        background: ativo ? "var(--ink)" : "var(--surface)",
+        color: ativo ? "var(--surface)" : vazio ? "var(--ink-muted-2)" : "var(--ink-2)",
+        borderColor: ativo ? "var(--ink)" : "var(--border-soft)",
+        opacity: vazio && !ativo ? 0.55 : 1,
+      }}
+    >
+      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: cor }} />
+      {rotulo}
+      <span className="font-mono-zoe text-[11px] tabular-nums">{n}</span>
+    </button>
+  )
+}
+
+/**
+ * Uma custódia por linha.
+ *
+ * <p>O que decide a ordem e' urgencia, nao data — e o motivo do alerta aparece na propria
+ * linha. Escondê-lo na gaveta obrigaria a abrir uma a uma para descobrir qual esta' com
+ * problema, que e' exatamente o trabalho que a tela deveria poupar.</p>
+ */
+function EscrowRow({
+  e, primeira, onOpen,
 }: {
   e: EscrowSummary
-  color: string
+  primeira: boolean
   onOpen: () => void
 }) {
+  // Caduca e' pior que vencida: vencida e' a data ter passado, caduca e' a renovacao ter
+  // falhado — o dinheiro NAO esta' mais reservado e a liberacao vai recusar.
+  const alerta =
+    e.authorizationLapsedAt
+      ? { icone: AlertTriangle, texto: "reserva caiu — refinanciar", cor: "#DC2626", forte: true }
+      : e.isAuthorizationExpired
+        ? { icone: Clock, texto: "autorização vencida", cor: "#D97706", forte: false }
+        : e.payoutAccountMissing && !e.isTerminal
+          ? { icone: Wallet, texto: "criador sem conta de recebimento", cor: "#D97706", forte: false }
+          : null
+
+  const Icone = alerta?.icone
+
   return (
     <button
       onClick={onOpen}
-      className="text-left rounded-lg border border-border-soft p-3.5 hover:opacity-90 transition-opacity"
-      style={{ background: "var(--surface)", borderTop: `3px solid ${color}` }}
+      className="w-full text-left px-4 py-3.5 flex items-center gap-4 hover:bg-[var(--surface-2,#FAFBFC)] transition-colors"
+      style={{ borderTop: primeira ? undefined : "1px solid var(--border-soft)" }}
     >
-      <div className="text-[12.5px] font-semibold mb-0.5 truncate" style={{ color: "var(--ink)" }}>
-        {e.influencerName}
+      <span
+        className="w-1 self-stretch rounded-full shrink-0"
+        style={{ background: COLUMN_COLOR[e.state], minHeight: 34 }}
+      />
+
+      <div className="min-w-0 flex-1">
+        <div className="text-[13.5px] font-medium truncate" style={{ color: "var(--ink)" }}>
+          {e.influencerName}
+        </div>
+        <div className="text-[12px] text-ink-muted truncate">{campanhaLabel(e.campaignName)}</div>
+
+        {alerta && Icone && (
+          <div
+            className="flex items-center gap-1 text-[11.5px] mt-1"
+            style={{ color: alerta.cor, fontWeight: alerta.forte ? 600 : 400 }}
+          >
+            <Icone className="w-3 h-3 shrink-0" /> {alerta.texto}
+          </div>
+        )}
       </div>
-      <div className="text-[11px] text-ink-muted mb-2 truncate">{e.campaignName}</div>
-      <div className="flex items-center justify-between gap-2">
-        <span className="font-mono-zoe text-[13px] font-semibold" style={{ color: "var(--ink)" }}>
-          {fmtCents(e.amountCents)}
-        </span>
-        <span className="font-mono-zoe text-[10.5px] text-ink-muted">
-          {(e.takeRateBps / 100).toFixed(0)}% take
+
+      <div className="hidden sm:block shrink-0">
+        <span
+          className="text-[11.5px] px-2 py-1 rounded-md whitespace-nowrap"
+          style={{ background: `${COLUMN_COLOR[e.state]}18`, color: COLUMN_COLOR[e.state] }}
+        >
+          {tEnum("escrowState", e.state)}
         </span>
       </div>
 
-      {/* Três sinais que mudam o que o operador deve fazer, e por isso vivem no card e
-          não escondidos na gaveta. */}
-      {e.hasPendingCommand && (
-        <div className="flex items-center gap-1 text-[10.5px] mt-2" style={{ color: "#2563EB" }}>
-          <Loader2 className="w-2.5 h-2.5 animate-spin" /> em processamento
+      <div className="shrink-0 text-right">
+        <div className="font-mono-zoe text-[13.5px] font-semibold tabular-nums" style={{ color: "var(--ink)" }}>
+          {fmtCents(e.amountCents)}
         </div>
-      )}
-      {e.payoutAccountMissing && !e.isTerminal && (
-        <div className="flex items-center gap-1 text-[10.5px] mt-2" style={{ color: "#D97706" }}>
-          <Wallet className="w-2.5 h-2.5" /> sem conta de recebimento
-        </div>
-      )}
-      {/* Caduca é pior que vencida: vencida é a data ter passado, caduca é a renovação
-          ter falhado — o dinheiro NÃO está mais reservado e a liberação vai recusar. */}
-      {e.authorizationLapsedAt ? (
-        <div className="flex items-center gap-1 text-[10.5px] mt-2 font-semibold" style={{ color: "#DC2626" }}>
-          <AlertTriangle className="w-2.5 h-2.5" /> reserva caiu — refinanciar
-        </div>
-      ) : e.isAuthorizationExpired && (
-        <div className="flex items-center gap-1 text-[10.5px] mt-2" style={{ color: "#D97706" }}>
-          <Clock className="w-2.5 h-2.5" /> autorização vencida
-        </div>
-      )}
+        {e.hasPendingCommand ? (
+          <div className="flex items-center justify-end gap-1 text-[11px] mt-0.5" style={{ color: "#2563EB" }}>
+            <Loader2 className="w-2.5 h-2.5 animate-spin" /> processando
+          </div>
+        ) : (
+          <div className="font-mono-zoe text-[10.5px] text-ink-muted mt-0.5">
+            {(e.takeRateBps / 100).toFixed(0)}% take
+          </div>
+        )}
+      </div>
     </button>
   )
 }
@@ -264,7 +369,7 @@ function EscrowDrawer({ e, onClose }: { e: EscrowSummary; onClose: () => void })
             {e.influencerName}
           </h2>
           <div className="text-[12.5px] text-ink-muted">
-            {e.campaignName} · aberta em {fmtDate(e.createdAt)}
+            {campanhaLabel(e.campaignName)} · aberta em {fmtDate(e.createdAt)}
           </div>
 
           <div className="rounded-lg border border-border-soft mt-5">

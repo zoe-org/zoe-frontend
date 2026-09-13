@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { fetchAuthSession, signOut as amplifySignOut } from "aws-amplify/auth"
 import { meApi, type Me, type Membership, type MeTenant } from "@/lib/api/me"
 import { ApiError, getActiveTenantId, setActiveTenantId } from "@/lib/api"
@@ -73,6 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>(initialState)
   /** Travessas concorrentes: protege contra um refresh tardio sobrescrever um signOut recente. */
   const generationRef = useRef(0)
+  const qc = useQueryClient()
 
   const applyTenant = useCallback((memberships: Membership[]): string | null => {
     const stored = getActiveTenantId()
@@ -167,8 +169,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setActiveTenantId(null)
     clearPendingInviteToken()
+    // O cache sai junto com a sessão. As chaves de Operations levam o tenant, mas as da
+    // área do criador não levam identidade nenhuma — o endpoint é escopado por quem chama.
+    // Sem isto, a próxima pessoa a entrar na mesma aba via o workspace da anterior até o
+    // refetch terminar.
+    qc.clear()
     setState({ ...initialState, isLoading: false })
-  }, [])
+  }, [qc])
 
   const devLogin = useCallback(() => {
     generationRef.current++

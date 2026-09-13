@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react"
 import { Link, useParams } from "react-router-dom"
-import { ArrowLeft, Loader2, AlertCircle, Lock, Send, Save, PenLine } from "lucide-react"
+import {
+  ArrowLeft, Loader2, AlertCircle, Lock, Send, Save, PenLine, ChevronRight,
+} from "lucide-react"
 import { toast } from "sonner"
 import { ApiError } from "@/lib/api"
 import { Input } from "@/components/ui/input"
@@ -12,8 +14,9 @@ import {
   useContract, useContractDetailMutations, useEscrowMutations, useCustomClauseMutations,
   CUSTOM_CONTRACTS_UPGRADE_CODE,
   fieldInputKind, contractProgress,
-  type ContractField, type ContractDetail,
+  type ContractField, type ContractDetail, type ContractClause,
 } from "@/lib/api/operations"
+
 
 /** Lê `details.missing` de um Problem Details sem confiar no formato. */
 function missingFromProblem(err: unknown): string[] {
@@ -147,15 +150,19 @@ export default function ContractDetailPage() {
             </p>
           )}
 
-          <div className="flex flex-col gap-4">
+          {/* Duas colunas para o que e' curto. Um campo de data ocupando 1300px de
+              largura nao ajuda ninguem a ler nem a preencher, e empurrava o formulario
+              para uma rolagem que nao precisava existir. Texto longo continua inteiro. */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-4">
             {fields.map((f) => (
-              <FieldRow
-                key={f.placeholder}
-                field={f}
-                readOnly={!isDraft}
-                isMissing={missing.has(f.placeholder)}
-                onChange={(v) => setValue(f.placeholder, v)}
-              />
+              <div key={f.placeholder} className={campoLargo(f) ? "md:col-span-2" : undefined}>
+                <FieldRow
+                  field={f}
+                  readOnly={!isDraft || f.isSystemManaged}
+                  isMissing={missing.has(f.placeholder)}
+                  onChange={(v) => setValue(f.placeholder, v)}
+                />
+              </div>
             ))}
           </div>
         </div>
@@ -223,6 +230,12 @@ function Header({
   )
 }
 
+/** Campos que pedem a linha inteira: texto corrido nao cabe em meia largura. */
+function campoLargo(f: ContractField) {
+  return f.dataType === "LongText"
+    || f.dataType === "Text" && (f.helpText?.length ?? 0) > 40
+}
+
 function FieldRow({
   field, readOnly, isMissing, onChange,
 }: {
@@ -238,8 +251,17 @@ function FieldRow({
     <label className="flex flex-col gap-1.5">
       <span className="text-[12.5px] font-medium flex items-center gap-1.5" style={{ color: "var(--ink)" }}>
         {field.label}
-        {field.isRequired && <span style={{ color: "#DC2626" }}>*</span>}
-        {field.kind === "MachineActionable" && (
+        {/* Campo que o sistema preenche nunca falta — o asterisco ali seria cobrança de
+            algo que ninguém tem como digitar. */}
+        {field.isRequired && !field.isSystemManaged && <span style={{ color: "#DC2626" }}>*</span>}
+        {field.isSystemManaged ? (
+          <span
+            className="chip text-[10px]"
+            title="Identidade do registro. Vem do próprio contrato ou da campanha — não se digita."
+          >
+            <Lock className="w-2.5 h-2.5" /> do registro
+          </span>
+        ) : field.kind === "MachineActionable" && (
           <span
             className="chip text-[10px]"
             title="Campo que o sistema usa — alimenta auditoria, prazos ou valores. Não é só texto do documento."
@@ -259,18 +281,25 @@ function FieldRow({
         />
       ) : (
         <Input
-          type={kind}
+          type={field.isSystemManaged ? "text" : kind}
           value={value}
           disabled={readOnly}
+          readOnly={field.isSystemManaged}
+          // Fonte monoespaçada no identificador: é para conferir caractere a caractere
+          // contra o rodapé do PDF, não para ler como frase.
+          className={field.isSystemManaged ? "font-mono-zoe text-[12px]" : undefined}
           step={field.dataType === "Currency" ? "0.01" : undefined}
           onChange={(e) => onChange(e.target.value)}
           aria-invalid={isMissing || undefined}
-          style={isMissing ? { borderColor: "#DC2626" } : undefined}
+          // Pendencia nao e' erro. Antes todo campo obrigatorio vazio nascia com borda
+          // vermelha e a frase "obrigatorio e ainda vazio" embaixo — a tela abria como um
+          // alarme por algo que a pessoa simplesmente ainda nao fez. Agora e' uma marca
+          // ambar discreta na lateral; o vermelho fica para quando o envio for tentado.
+          style={isMissing ? { borderLeft: "3px solid #D97706" } : undefined}
         />
       )}
 
       {field.helpText && <span className="text-[11.5px] text-ink-muted">{field.helpText}</span>}
-      {isMissing && <span className="text-[11.5px]" style={{ color: "#DC2626" }}>Obrigatório e ainda vazio.</span>}
     </label>
   )
 }
@@ -412,6 +441,49 @@ function OpenEscrowPanel({ contractId }: { contractId: string }) {
  * <p>Sem o add-on, a resposta do backend traz <code>custom_contracts_required</code> e a
  * tela abre o convite de upgrade. Esconder o recurso converteria zero.</p>
  */
+/**
+ * Uma cláusula que abre no lugar.
+ *
+ * <p>O texto é o mesmo que vai para o PDF e para a tela do criador — a mesma composição
+ * alimenta os três. Ler aqui e assinar outra coisa seria a divergência que o desenho do
+ * contrato existe para impedir.</p>
+ */
+function ClausulaItem({ c }: { c: ContractClause }) {
+  const [aberta, setAberta] = useState(false)
+
+  return (
+    <li className="border-b border-border-soft last:border-b-0">
+      <button
+        onClick={() => setAberta((v) => !v)}
+        className="w-full text-left py-2 flex items-start gap-1.5 text-[12.5px]"
+      >
+        <ChevronRight
+          className="w-3 h-3 mt-0.5 shrink-0 transition-transform"
+          style={{
+            color: "var(--ink-muted)",
+            transform: aberta ? "rotate(90deg)" : undefined,
+          }}
+        />
+        {c.isSystem && (
+          <Lock className="w-3 h-3 mt-0.5 shrink-0" style={{ color: "var(--color-teal-500)" }} />
+        )}
+        <span className="flex-1" style={{ color: c.isSystem ? "var(--ink)" : "var(--ink-muted)" }}>
+          {c.title}
+        </span>
+      </button>
+
+      {aberta && (
+        <p className="text-[12px] text-ink-2 leading-relaxed whitespace-pre-line pl-[18px] pb-3 m-0">
+          {c.body?.trim()
+            ? c.body
+            : "Esta cláusula ainda não tem texto — ela é composta quando os campos do "
+              + "contrato forem preenchidos."}
+        </p>
+      )}
+    </li>
+  )
+}
+
 function ClausesPanel({ contract }: { contract: ContractDetail }) {
   const clauses = contract.clauses
   const isDraft = contract.status === "Draft"
@@ -540,17 +612,11 @@ function ClausesPanel({ contract }: { contract: ContractDetail }) {
         </div>
       )}
 
-      <ol className="flex flex-col gap-2 m-0 p-0 list-none">
+      {/* O corpo ja' vinha na resposta e a tela mostrava so' o titulo — quem quisesse ler
+          o que esta' assinando tinha de baixar o PDF. Agora abre no lugar. */}
+      <ol className="flex flex-col m-0 p-0 list-none">
         {clauses.map((c) => (
-          <li key={c.order} className="text-[12.5px] flex items-start gap-1.5">
-            {c.isSystem && (
-              <Lock
-                className="w-3 h-3 mt-0.5 shrink-0"
-                style={{ color: "var(--color-teal-500)" }}
-              />
-            )}
-            <span style={{ color: c.isSystem ? "var(--ink)" : "var(--ink-muted)" }}>{c.title}</span>
-          </li>
+          <ClausulaItem key={c.order} c={c} />
         ))}
       </ol>
       <p className="text-[11px] text-ink-muted mt-3">

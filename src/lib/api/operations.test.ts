@@ -8,7 +8,7 @@ import {
 
 const field = (over: Partial<ContractField>): ContractField => ({
   placeholder: "x", label: "X", dataType: "FreeText", kind: "Legal",
-  isRequired: false, helpText: null, value: null, ...over,
+  isRequired: false, helpText: null, value: null, isSystemManaged: false, ...over,
 })
 
 // O KYC trava o RECEBIMENTO, não a produção (RN-O-012). Estes testes fixam essa

@@ -1,5 +1,7 @@
 import { useRef, useState } from "react"
-import { Loader2, Upload, Check, AlertCircle, RotateCcw, Clock } from "lucide-react"
+import {
+  Loader2, Upload, Check, AlertCircle, RotateCcw, Clock, FileVideo,
+} from "lucide-react"
 import { toast } from "sonner"
 import { Input } from "@/components/ui/input"
 import { fmtDate } from "@/pages/operations/format"
@@ -22,6 +24,8 @@ export function CreatorDraftUpload({ engagement }: { engagement: CreatorEngageme
   const inputRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [notes, setNotes] = useState("")
+  const [arrastando, setArrastando] = useState(false)
+  const [progresso, setProgresso] = useState(0)
 
   const draft = engagement.draft
   const changesRequested = draft?.status === "ChangesRequested"
@@ -31,9 +35,16 @@ export function CreatorDraftUpload({ engagement }: { engagement: CreatorEngageme
   const send = async () => {
     if (!file) return
     try {
-      await upload.mutateAsync({ contractId: engagement.contractId, file, notes })
+      setProgresso(0)
+      await upload.mutateAsync({
+        contractId: engagement.contractId,
+        file,
+        notes,
+        onProgress: setProgresso,
+      })
       setFile(null)
       setNotes("")
+      setProgresso(0)
       if (inputRef.current) inputRef.current.value = ""
       toast.success("Corte enviado. A marca vai revisar antes de você publicar.")
     } catch (e) {
@@ -114,26 +125,77 @@ export function CreatorDraftUpload({ engagement }: { engagement: CreatorEngageme
 
           {!approved && !awaiting && (
             <div className="mt-3 flex flex-col gap-2.5">
+              {/* O input nativo ficava a' mostra com `file:text-white` e SEM cor de fundo:
+                  botao branco sobre branco. So' se via "Nenhum arquivo escolhido", sem
+                  nada indicando onde clicar. Agora ele fica escondido e a area inteira e'
+                  o alvo — que e' o gesto esperado para video, incluindo arrastar. */}
               <input
                 ref={inputRef}
                 type="file"
                 accept="video/mp4,video/quicktime,video/x-matroska,video/webm"
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                className="text-[12.5px] file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:text-[12.5px] file:font-medium file:text-white file:cursor-pointer"
-                style={{ color: "var(--ink-muted)" }}
+                className="hidden"
               />
+
+              {!file ? (
+                <button
+                  type="button"
+                  onClick={() => inputRef.current?.click()}
+                  onDragOver={(e) => { e.preventDefault(); setArrastando(true) }}
+                  onDragLeave={() => setArrastando(false)}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    setArrastando(false)
+                    const f = e.dataTransfer.files?.[0]
+                    if (f) setFile(f)
+                  }}
+                  className="rounded-lg border-2 border-dashed px-4 py-6 text-center transition-colors"
+                  style={{
+                    borderColor: arrastando ? "var(--color-teal-500)" : "var(--border-soft)",
+                    background: arrastando ? "#00A79908" : undefined,
+                  }}
+                >
+                  <Upload
+                    className="w-5 h-5 mx-auto mb-2"
+                    style={{ color: arrastando ? "var(--color-teal-500)" : "var(--ink-muted)" }}
+                  />
+                  <div className="text-[13px] font-medium" style={{ color: "var(--ink)" }}>
+                    Arraste o vídeo aqui ou clique para escolher
+                  </div>
+                  <div className="text-[11.5px] text-ink-muted mt-1">
+                    MP4, MOV, MKV ou WebM
+                  </div>
+                </button>
+              ) : (
+                <div
+                  className="rounded-lg border border-border-soft px-3.5 py-3 flex items-center gap-3"
+                  style={{ background: "var(--surface-2, #FAFBFC)" }}
+                >
+                  <FileVideo className="w-4 h-4 shrink-0" style={{ color: "var(--color-teal-500)" }} />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[12.5px] truncate" style={{ color: "var(--ink)" }}>
+                      {file.name}
+                    </div>
+                    <div className="text-[11px] text-ink-muted font-mono-zoe">
+                      {(file.size / 1024 / 1024).toFixed(1)} MB
+                    </div>
+                  </div>
+                  {!upload.isPending && (
+                    <button
+                      onClick={() => { setFile(null); if (inputRef.current) inputRef.current.value = "" }}
+                      className="text-[11.5px] text-ink-muted hover:text-[#DC2626] shrink-0"
+                    >
+                      trocar
+                    </button>
+                  )}
+                </div>
+              )}
 
               <Input
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Quer dizer algo sobre este corte? (opcional)"
               />
-
-              {file && (
-                <p className="text-[11.5px] text-ink-muted m-0">
-                  {file.name} · {(file.size / 1024 / 1024).toFixed(1)} MB
-                </p>
-              )}
 
               <button
                 onClick={send}
@@ -149,10 +211,29 @@ export function CreatorDraftUpload({ engagement }: { engagement: CreatorEngageme
                   : changesRequested ? "Enviar nova versão" : "Enviar para revisão"}
               </button>
 
+              {/* Barra de progresso REAL, nao um girador. Video sobe por minutos numa
+                  conexao domestica, e um botao parado em "enviando" e' indistinguivel de
+                  travado — a pessoa cancela e recomeça, que e' o pior desfecho. */}
               {upload.isPending && (
-                <p className="text-[11.5px] text-ink-muted m-0">
-                  Vídeo é arquivo grande — não feche esta aba.
-                </p>
+                <div className="flex flex-col gap-1.5">
+                  <div
+                    className="h-1.5 rounded-full overflow-hidden"
+                    style={{ background: "var(--border-soft)" }}
+                  >
+                    <div
+                      className="h-full rounded-full transition-[width] duration-200"
+                      style={{
+                        width: `${Math.round(progresso * 100)}%`,
+                        background: "var(--color-teal-500)",
+                      }}
+                    />
+                  </div>
+                  <p className="text-[11.5px] text-ink-muted m-0">
+                    {progresso >= 1
+                      ? "Finalizando…"
+                      : `${Math.round(progresso * 100)}% enviado — não feche esta aba.`}
+                  </p>
+                </div>
               )}
             </div>
           )}

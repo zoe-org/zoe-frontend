@@ -87,7 +87,7 @@ export default function InfluencerInvitePage() {
         ) : preview.isError ? (
           <Invalid />
         ) : accepted ? (
-          <Done campaignName={accepted} onGo={() => navigate("/criador", { replace: true })} />
+          <Done campaignName={accepted} onGo={() => navigate("/criador/cadastro", { replace: true })} />
         ) : (
           <Preview
             data={preview.data!}
@@ -217,15 +217,15 @@ function Done({ campaignName, onGo }: { campaignName: string; onGo: () => void }
         Tudo certo
       </h1>
       <p className="text-[13.5px] text-ink-muted mb-5">
-        Você entrou em {campaignName}. O contrato aparece aqui quando a marca emitir — e o
-        pagamento fica reservado antes de você começar a gravar.
+        Você entrou em {campaignName}. Falta completar seu cadastro — leva poucos minutos e
+        é o que permite à marca montar a proposta.
       </p>
       <button
         onClick={onGo}
         className="w-full px-4 py-2.5 rounded-lg text-[14px] font-medium text-white"
         style={{ background: "var(--color-teal-500)" }}
       >
-        Continuar
+        Completar cadastro
       </button>
     </div>
   )

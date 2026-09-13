@@ -1,4 +1,4 @@
-import { AlertCircle } from "lucide-react"
+import { AlertCircle, Search, X } from "lucide-react"
 
 /**
  * Componentes repetidos pelas telas de Operations. Estavam copiados em quatro
@@ -60,6 +60,73 @@ export function ErrorState({ onRetry }: { onRetry: () => void }) {
         className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors"
       >
         Tentar de novo
+      </button>
+    </div>
+  )
+}
+
+/**
+ * Busca das listagens do módulo.
+ *
+ * <p>Filtra no cliente de propósito: as listagens de Operations devolvem o conjunto
+ * inteiro do tenant, sem paginação, então o dado a filtrar já está na memória. Mandar a
+ * busca para o servidor obrigaria a paginar cinco endpoints para responder mais devagar a
+ * mesma pergunta.</p>
+ *
+ * <p>Quando o filtro esconde tudo, quem chama mostra "nenhum resultado para X" — some da
+ * tela é o que faz a pessoa achar que perdeu o dado.</p>
+ */
+export function SearchBox({
+  value, onChange, placeholder, className,
+}: {
+  value: string
+  onChange: (v: string) => void
+  placeholder: string
+  className?: string
+}) {
+  return (
+    <div className={`relative ${className ?? "w-full sm:max-w-[260px]"}`}>
+      <Search
+        className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none"
+        style={{ color: "var(--ink-muted)" }}
+      />
+      <input
+        type="search"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        aria-label={placeholder}
+        className="h-8 w-full rounded-lg border border-input bg-transparent pl-8 pr-7 text-[13px] outline-none transition-colors focus-visible:border-ring"
+        style={{ color: "var(--ink)" }}
+      />
+      {value && (
+        <button
+          type="button"
+          onClick={() => onChange("")}
+          aria-label="Limpar busca"
+          className="absolute right-2 top-1/2 -translate-y-1/2 hover:opacity-60"
+          style={{ color: "var(--ink-muted)" }}
+        >
+          <X className="w-3 h-3" />
+        </button>
+      )}
+    </div>
+  )
+}
+
+/** Vazio por causa do filtro — diferente de vazio porque não há dado. */
+export function NoResults({ query, onClear }: { query: string; onClear: () => void }) {
+  return (
+    <div className="text-center py-10">
+      <p className="text-[13px] text-ink-muted m-0">
+        Nada encontrado para <span style={{ color: "var(--ink)" }}>“{query}”</span>.
+      </p>
+      <button
+        onClick={onClear}
+        className="text-[12.5px] underline mt-1.5"
+        style={{ color: "var(--color-teal-500)" }}
+      >
+        Limpar busca
       </button>
     </div>
   )

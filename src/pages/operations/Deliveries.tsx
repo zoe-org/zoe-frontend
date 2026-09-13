@@ -8,10 +8,13 @@ import { toast } from "sonner"
 import { ApiError } from "@/lib/api"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { StatusChip } from "@/components/ui/status-chip"
+import { ConfidenceBadge } from "@/components/ui/confidence-badge"
 import { RoleGate } from "@/features/auth/RoleGate"
 import { tEnum } from "@/i18n/enums"
-import { fmtDate } from "@/pages/operations/format"
-import { TableSkeleton, ErrorState } from "@/pages/operations/shared"
+import { fmtDate, matches, campanhaLabel } from "@/pages/operations/format"
+import {
+  TableSkeleton, ErrorState, SearchBox, NoResults,
+} from "@/pages/operations/shared"
 import {
   useDeliveries, useDeliveryMutations, fmtCents, youtubeThumb, youtubeWatch,
   type DeliverySummary, type DeliveryDecision, type DeliveryAudit,
@@ -51,6 +54,7 @@ export default function OperationsDeliveriesPage() {
   // publicados. Numa lista só, a distinção some e alguém aprova o que não pretendia.
   const [gate, setGate] = useState<"drafts" | "published">("published")
   const [selected, setSelected] = useState<string | null>(null)
+  const [busca, setBusca] = useState("")
   const deliveries = useDeliveries()
 
   // Referência estável: um `?? []` inline nasce novo a cada render e invalidaria o
@@ -66,7 +70,14 @@ export default function OperationsDeliveriesPage() {
     Rejected: items.filter((d) => d.status === "Rejected").length,
   }), [items])
 
-  const filtered = tab === "all" ? items : items.filter((d) => d.status === tab)
+  const porAba = tab === "all" ? items : items.filter((d) => d.status === tab)
+
+  // A busca vem DEPOIS da aba: a aba diz em que fase olhar, a busca diz de quem. Inverter
+  // faria a contagem das abas mudar conforme se digita, que e' o oposto de um indice.
+  const filtered = useMemo(
+    () => porAba.filter((d) => matches(busca, d.influencerName, d.campaignName, d.submittedUrl)),
+    [porAba, busca],
+  )
 
   // A seleção é derivada da lista para o card não ficar apontando para uma entrega que
   // já mudou de estado depois de uma decisão.
@@ -107,7 +118,8 @@ export default function OperationsDeliveriesPage() {
         </p>
       </div>
 
-      <div className="flex gap-1 flex-wrap">
+      <div className="flex gap-2 flex-wrap items-center justify-between">
+        <div className="flex gap-1 flex-wrap">
         {tabs.map(([k, label]) => (
           <button
             key={k}
@@ -123,12 +135,18 @@ export default function OperationsDeliveriesPage() {
             </span>
           </button>
         ))}
+        </div>
+        {items.length > 0 && (
+          <SearchBox value={busca} onChange={setBusca} placeholder="Buscar por criador, campanha…" />
+        )}
       </div>
 
       {deliveries.isLoading ? (
         <TableSkeleton rows={3} />
       ) : deliveries.isError ? (
         <ErrorState onRetry={() => deliveries.refetch()} />
+      ) : filtered.length === 0 && busca ? (
+        <NoResults query={busca} onClear={() => setBusca("")} />
       ) : filtered.length === 0 ? (
         <EmptyBlock
           message={tab === "all"
@@ -165,24 +183,45 @@ function DeliveryCard({ d, onOpen }: { d: DeliverySummary; onOpen: () => void })
           className="absolute inset-0 w-full h-full object-cover"
           onError={(e) => { e.currentTarget.style.visibility = "hidden" }}
         />
+        {/* Escurece so' a faixa superior, onde vivem a etiqueta e a nota. Escurecer a
+            capa inteira esconderia o video, que e' o conteudo. */}
+        <div
+          className="absolute inset-x-0 top-0 h-14 pointer-events-none"
+          style={{ background: "linear-gradient(to bottom, rgba(0,0,0,.45), transparent)" }}
+        />
         <div className="absolute inset-0 flex items-center justify-center">
-          <Play className="w-8 h-8" style={{ color: "rgba(255,255,255,.9)" }} />
+          <Play className="w-8 h-8" style={{ color: "rgba(255,255,255,.9)", filter: "drop-shadow(0 1px 3px rgba(0,0,0,.5))" }} />
         </div>
-        <span className="absolute top-2.5 left-2.5">
+        {/* Sobre a capa, a etiqueta disputava com a imagem: um video claro apagava o
+            "Aprovada", um escuro apagava o resto. Fundo proprio e sombra dao a ela um
+            plano so' seu, independente do que houver embaixo. */}
+        <span
+          className="absolute top-2.5 left-2.5 rounded-md px-1 py-0.5"
+          style={{
+            background: "rgba(10,12,20,.72)",
+            backdropFilter: "blur(4px)",
+            boxShadow: "0 1px 4px rgba(0,0,0,.35)",
+          }}
+        >
           <DeliveryChip status={d.status} small />
         </span>
         {/* A nota ocupa o canto que o protótipo reservou. Só aparece quando existe —
             entrega em revisão manual não tem nota, e inventar um número aqui seria pior
             que o espaço vazio. */}
         {d.audit && (
-          <span
-            className="absolute top-2.5 right-2.5 font-mono-zoe text-[11px] font-semibold px-1.5 py-0.5 rounded"
-            style={{
-              background: "rgba(0,0,0,.7)",
-              color: d.audit.isApprovable ? "#34D399" : "#FCA5A5",
-            }}
-          >
-            {d.audit.score}
+          // A nota nunca aparece sem o badge (RN-O-061): o mesmo 82 vale menos quando só
+          // houve comentários para analisar, e aqui ele decide pagamento.
+          <span className="absolute top-2.5 right-2.5 flex flex-col items-end gap-1">
+            <span
+              className="font-mono-zoe text-[11px] font-semibold px-1.5 py-0.5 rounded"
+              style={{
+                background: "rgba(0,0,0,.7)",
+                color: d.audit.isApprovable ? "#34D399" : "#FCA5A5",
+              }}
+            >
+              {d.audit.score}
+            </span>
+            <ConfidenceBadge pipelinePath={d.audit.pipelinePath} className="shadow-sm" />
           </span>
         )}
         {d.isReviewOverdue && (
@@ -196,7 +235,7 @@ function DeliveryCard({ d, onOpen }: { d: DeliverySummary; onOpen: () => void })
       </div>
       <div className="p-3.5">
         <div className="text-[13.5px] font-medium mb-1.5 truncate" style={{ color: "var(--ink)" }}>
-          {d.campaignName}
+          {campanhaLabel(d.campaignName)}
         </div>
         <div className="flex items-center justify-between text-[11.5px] text-ink-muted gap-2">
           <span className="truncate">{d.influencerName}</span>
@@ -264,6 +303,7 @@ function AuditCard({ audit }: { audit: DeliveryAudit | null }) {
         <span className="text-[12.5px] text-ink-muted">
           / 100 · mínimo {audit.appliedThreshold}
         </span>
+        <ConfidenceBadge pipelinePath={audit.pipelinePath} className="ml-auto self-center" />
       </div>
 
       {/* RN-O-061: pipeline degradado num contexto que decide pagamento tem de aparecer. */}
@@ -387,7 +427,7 @@ function ReviewDrawer({ d, onClose }: { d: DeliverySummary; onClose: () => void 
           </div>
 
           <h2 className="font-display m-0 mt-2 mb-1.5" style={{ fontSize: 19, color: "var(--ink)" }}>
-            {d.campaignName}
+            {campanhaLabel(d.campaignName)}
           </h2>
           <div className="text-[12.5px] text-ink-muted mb-1">
             {d.influencerName} · enviada em {fmtDate(d.submittedAt)}

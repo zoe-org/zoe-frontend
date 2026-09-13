@@ -1,4 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import {
+  keepPreviousData, useMutation, useQuery, useQueryClient,
+} from "@tanstack/react-query"
 import { apiClient } from "@/lib/api"
 import { useAuth } from "@/features/auth/context"
 
@@ -367,6 +369,12 @@ export type ContractSummary = {
   contractId: string
   influencerId: string
   influencerName: string
+  /**
+   * O que distingue dois contratos do mesmo criador. Nulo no contrato avulso — o
+   * trabalho pontual que não pertence a campanha nenhuma.
+   */
+  campaignId: string | null
+  campaignName: string | null
   modality: string
   /** Código do híbrido (H01–H11) quando o contrato combina modalidades. */
   hybridCode: string | null
@@ -386,10 +394,15 @@ export type ContractSummary = {
 export type ListContractsResponse = { items: ContractSummary[] }
 
 export type CreateContractBody = {
-  /** Contrato não existe fora de campanha; a modalidade vem dela. */
-  campaignId: string
+  /**
+   * Campanha do contrato. Nula cria o contrato avulso — e aí `modality` é obrigatória,
+   * porque é ela que resolve o template.
+   */
+  campaignId: string | null
   influencerId: string
   usesEscrow: boolean
+  /** Só no avulso. Com campanha, a modalidade vem dela e este campo é ignorado. */
+  modality?: string
   reviewSlaDays?: number
   maxResubmissions?: number
   autoReleaseOnTimeout?: boolean
@@ -397,7 +410,7 @@ export type CreateContractBody = {
 
 export type CreateContractResponse = {
   contractId: string
-  campaignId: string
+  campaignId: string | null
   modality: string
   status: string
   templateId: string
@@ -419,6 +432,11 @@ export type ContractField = {
   isRequired: boolean
   helpText: string | null
   value: string | null
+  /**
+   * Valor de que o sistema é dono — id do contrato, nome da campanha. Vem preenchido e a
+   * tela mostra sem permitir edição: é identidade do registro, não texto a digitar.
+   */
+  isSystemManaged: boolean
 }
 
 export type ContractClause = { order: number; title: string; isSystem: boolean; body: string }
@@ -486,7 +504,9 @@ export function fieldInputKind(dataType: string): "text" | "date" | "number" | "
 
 /** Quantos obrigatórios já estão preenchidos. Alimenta a barra de progresso. */
 export function contractProgress(fields: ContractField[]): { required: number; filled: number } {
-  const required = fields.filter((f) => f.isRequired)
+  // Campo que o sistema preenche fica de fora dos dois lados da conta: contá-lo como
+  // exigido e preenchido inflaria o progresso com trabalho que ninguém fez.
+  const required = fields.filter((f) => f.isRequired && !f.isSystemManaged)
   return {
     required: required.length,
     filled: required.filter((f) => (f.value ?? "").trim() !== "").length,
@@ -613,6 +633,10 @@ export const operationsApi = {
       `/api/operations/contracts/${contractId}/send-for-signature`,
     ),
 
+  /** Só rascunho — o backend recusa o resto com motivo legível. */
+  deleteContract: (contractId: string) =>
+    apiClient.delete<void>(`/api/operations/contracts/${contractId}`),
+
   markContractSigned: (contractId: string) =>
     apiClient.post<MarkSignedResponse>(`/api/operations/contracts/${contractId}/mark-signed`),
 }
@@ -699,6 +723,16 @@ export function useContractMutations() {
         qc.invalidateQueries({ queryKey: ["operations-roster", activeTenantId] })
       },
     }),
+
+    remove: useMutation({
+      mutationFn: (contractId: string) => operationsApi.deleteContract(contractId),
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: ["operations-contracts", activeTenantId] })
+        qc.invalidateQueries({ queryKey: ["operations-roster", activeTenantId] })
+        // A campanha conta contratos no cabeçalho dela.
+        qc.invalidateQueries({ queryKey: ["operations-campaign", activeTenantId] })
+      },
+    }),
   }
 }
 
@@ -764,8 +798,8 @@ export type DeliveryStatus = (typeof DELIVERY_STATUSES)[number]
 export type DeliverySummary = {
   deliveryId: string
   contractId: string
-  campaignId: string
-  campaignName: string
+  campaignId: string | null
+  campaignName: string | null
   influencerName: string
   submittedUrl: string
   youtubeVideoId: string
@@ -833,6 +867,10 @@ export function useDeliveries(status?: string) {
     queryFn: ({ signal }) => operationsApi.listDeliveries(status, { signal }),
     enabled: Boolean(activeTenantId),
     staleTime: 30_000,
+    // Segura o conteudo anterior enquanto revalida. Sem isto a tela esvazia a cada
+    // volta ao modulo e a pessoa ve um vazio que nao e' verdade — parece que nao ha'
+    // entregas quando so' esta' buscando de novo.
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -868,8 +906,8 @@ export function useDeliveryMutations() {
 export type EscrowSummary = {
   escrowAccountId: string
   contractId: string
-  campaignId: string
-  campaignName: string
+  campaignId: string | null
+  campaignName: string | null
   influencerId: string
   influencerName: string
   state: EscrowState
@@ -918,8 +956,8 @@ export const ESCROW_ACTION_TRIGGER: Record<EscrowAction, string> = {
 export type DeliveryDraftItem = {
   draftId: string
   contractId: string
-  campaignId: string
-  campaignName: string
+  campaignId: string | null
+  campaignName: string | null
   influencerName: string
   /** AwaitingReview | Approved | ChangesRequested */
   status: string
@@ -944,7 +982,8 @@ export function useDeliveryDrafts(status?: string) {
       ),
     enabled: Boolean(activeTenantId),
     // Curto: o previewUrl assinado vence, e servir um vencido do cache mostraria um
-    // player quebrado sem explicação.
+    // player quebrado sem explicação. Pelo mesmo motivo esta consulta NAO guarda o
+    // conteudo anterior enquanto revalida — melhor um vazio breve que um video morto.
     staleTime: 10_000,
   })
 }
@@ -979,6 +1018,7 @@ export function useEscrowAccounts(state?: string) {
     queryFn: ({ signal }) => operationsApi.listEscrow(state, { signal }),
     enabled: Boolean(activeTenantId),
     staleTime: 15_000,
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -1046,4 +1086,57 @@ export function useRosterMutations() {
       },
     }),
   }
+}
+
+// ————————————————————————————— Painel —————————————————————————————
+
+/**
+ * Espelha OperationsDashboardResponse do zoe-api.
+ *
+ * <p>Os números são somados no servidor de propósito: somar dinheiro no cliente seria
+ * uma segunda resposta para a mesma pergunta, e a que diverge é sempre descoberta tarde.</p>
+ */
+export type OperationsDashboard = {
+  money: {
+    pendingDepositCents: number
+    inCustodyCents: number
+    releasedCents: number
+    refundedCents: number
+    disputedCents: number
+    platformFeeOnReleasedCents: number
+    netReleasedToCreatorsCents: number
+  }
+  pending: {
+    contractDrafts: number
+    contractsAwaitingSignature: number
+    escrowsAwaitingDeposit: number
+    draftsAwaitingReview: number
+    deliveriesAwaitingReview: number
+    escrowsReleasable: number
+  }
+  volume: {
+    activeCampaigns: number
+    totalCampaigns: number
+    creators: number
+    signedContracts: number
+    approvedDeliveries: number
+  }
+  risks: {
+    stuckFinancialCommands: number
+    creatorsWithoutPayoutAccount: number
+    contractsBlockedByLegalReview: number
+  }
+  escrowByState: { state: EscrowState; count: number; amountCents: number }[]
+}
+
+export function useOperationsDashboard() {
+  const { activeTenantId } = useAuth()
+  return useQuery({
+    queryKey: ["operations-dashboard", activeTenantId],
+    queryFn: ({ signal }) =>
+      apiClient.get<OperationsDashboard>("/api/operations/dashboard", { signal }),
+    enabled: Boolean(activeTenantId),
+    staleTime: 15_000,
+    placeholderData: keepPreviousData,
+  })
 }

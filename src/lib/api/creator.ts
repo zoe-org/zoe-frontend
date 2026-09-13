@@ -33,8 +33,8 @@ export type CreatorDraft = {
 
 export type CreatorEngagement = {
   contractId: string
-  campaignId: string
-  campaignName: string
+  campaignId: string | null
+  campaignName: string | null
   brandName: string
   modality: string
   contractStatus: string
@@ -59,7 +59,133 @@ export type CreatorWorkspace = {
   payoutBlockedReason: string | null
   /** Já com máscara, vindo do backend. Nulo enquanto ele não informar. */
   taxId: string | null
+  profile: CreatorProfile
   engagements: CreatorEngagement[]
+}
+
+/** O cadastro declarado pelo criador — o que a marca lê para decidir o convite. */
+export type CreatorProfile = {
+  /**
+   * Se ele já concluiu o cadastro. Distingue "não preencheu" de "preencheu e deixou os
+   * opcionais em branco" — sem isso o segundo caso voltaria ao formulário para sempre.
+   */
+  complete: boolean
+  primaryArea: string | null
+  audienceSize: AudienceSize | null
+  topics: string[]
+  bio: string | null
+  portfolioUrl: string | null
+  countryCode: string | null
+  /** Arroba por plataforma: YouTube | Instagram | TikTok. */
+  handles: Partial<Record<ChannelPlatform, string>>
+}
+
+export type ChannelPlatform = "YouTube" | "Instagram" | "TikTok"
+
+export const CHANNEL_PLATFORMS: ChannelPlatform[] = ["YouTube", "TikTok", "Instagram"]
+
+export type AudienceSize =
+  | "Under10k" | "From10kTo50k" | "From50kTo200k" | "From200kTo1m" | "Over1m"
+
+/**
+ * Faixas, não número exato. O número muda toda semana e ficaria errado no dia seguinte ao
+ * cadastro; a faixa é o que a marca usa para filtrar e continua verdadeira por meses.
+ */
+export const AUDIENCE_SIZES: { value: AudienceSize; label: string }[] = [
+  { value: "Under10k", label: "Até 10 mil" },
+  { value: "From10kTo50k", label: "10 mil a 50 mil" },
+  { value: "From50kTo200k", label: "50 mil a 200 mil" },
+  { value: "From200kTo1m", label: "200 mil a 1 milhão" },
+  { value: "Over1m", label: "Mais de 1 milhão" },
+]
+
+/**
+ * Áreas oferecidas na tela. Curadas aqui e não no domínio: vertical de conteúdo nasce e
+ * morre com o mercado, e cada uma nova não deve custar uma migration.
+ */
+export const CREATOR_AREAS = [
+  "Finanças", "Tecnologia", "Games", "Beleza", "Moda", "Saúde e bem-estar",
+  "Gastronomia", "Viagem", "Educação", "Esportes", "Casa e decoração",
+  "Maternidade", "Humor e entretenimento", "Negócios", "Outra",
+] as const
+
+/**
+ * Temas sugeridos por área. São sugestão, não catálogo fechado — o criador escreve o
+ * próprio se o dele não estiver ali, e é isso que impede a lista de envelhecer.
+ */
+export const TOPICS_BY_AREA: Record<string, string[]> = {
+  "Finanças": [
+    "Bancos digitais", "Cartões", "Investimentos", "Cripto",
+    "Empreendedorismo", "Economia doméstica", "Reviews de produto",
+  ],
+  "Tecnologia": [
+    "Smartphones", "Notebooks", "Inteligência artificial", "Apps e serviços",
+    "Setup e periféricos", "Programação", "Reviews de produto",
+  ],
+  "Games": [
+    "Gameplay", "Reviews de jogos", "eSports", "Hardware gamer",
+    "Lives", "Speedrun", "Mobile games",
+  ],
+  "Beleza": [
+    "Skincare", "Maquiagem", "Cabelo", "Perfumaria",
+    "Unhas", "Rotina", "Reviews de produto",
+  ],
+  "Moda": [
+    "Looks do dia", "Moda sustentável", "Achados", "Alfaiataria",
+    "Streetwear", "Acessórios", "Reviews de produto",
+  ],
+  "Saúde e bem-estar": [
+    "Treino", "Nutrição", "Saúde mental", "Suplementação",
+    "Rotina saudável", "Yoga e meditação", "Reviews de produto",
+  ],
+  "Gastronomia": [
+    "Receitas", "Restaurantes", "Confeitaria", "Bebidas",
+    "Comida saudável", "Utensílios", "Reviews de produto",
+  ],
+  "Viagem": [
+    "Roteiros", "Hotéis", "Viagem econômica", "Destinos internacionais",
+    "Aventura", "Milhas e passagens", "Reviews de produto",
+  ],
+  "Educação": [
+    "Idiomas", "Concursos", "Vestibular", "Produtividade",
+    "Carreira", "Cursos online", "Reviews de produto",
+  ],
+  "Esportes": [
+    "Futebol", "Corrida", "Ciclismo", "Musculação",
+    "Lutas", "Esportes radicais", "Reviews de produto",
+  ],
+  "Casa e decoração": [
+    "Reforma", "Organização", "Jardinagem", "Móveis",
+    "Eletrodomésticos", "DIY", "Reviews de produto",
+  ],
+  "Maternidade": [
+    "Gestação", "Primeira infância", "Rotina com filhos", "Enxoval",
+    "Educação parental", "Reviews de produto",
+  ],
+  "Humor e entretenimento": [
+    "Esquetes", "Comentário de cultura pop", "Reação", "Podcast",
+    "Música", "Cinema e séries",
+  ],
+  "Negócios": [
+    "Empreendedorismo", "Marketing", "Vendas", "Gestão",
+    "Startups", "Carreira", "Reviews de produto",
+  ],
+}
+
+/** Teto de temas: quem marca tudo não está dizendo nada. Espelha `Influencer.MaxTopics`. */
+export const MAX_TOPICS = 8
+
+export type UpdateCreatorProfileBody = {
+  fullName?: string
+  taxId?: string
+  countryCode?: string
+  primaryArea?: string
+  audienceSize?: AudienceSize
+  topics?: string[]
+  bio?: string
+  portfolioUrl?: string
+  /** Arroba vazio remove o canal declarado — é como ele corrige o que digitou errado. */
+  handles?: Partial<Record<ChannelPlatform, string>>
 }
 
 /**
@@ -69,8 +195,8 @@ export type CreatorWorkspace = {
  */
 export type CreatorContract = {
   contractId: string
-  campaignId: string
-  campaignName: string
+  campaignId: string | null
+  campaignName: string | null
   brandName: string
   modalityLabel: string
   status: string
@@ -152,6 +278,10 @@ export const creatorApi = {
     apiClient.put<{ taxId: string; formatted: string }>(
       "/api/creator/tax-id", { taxId }, { noTenant: true }),
 
+  updateProfile: (body: UpdateCreatorProfileBody) =>
+    apiClient.put<{ influencerId: string; profileComplete: boolean }>(
+      "/api/creator/profile", body, { noTenant: true }),
+
   startPayoutOnboarding: () =>
     apiClient.post<StartPayoutOnboarding>("/api/creator/payout-account", {}, { noTenant: true }),
 
@@ -220,7 +350,13 @@ export function useDraftUpload() {
   const qc = useQueryClient()
 
   return useMutation({
-    mutationFn: async (v: { contractId: string; file: File; notes?: string }) => {
+    mutationFn: async (v: {
+      contractId: string
+      file: File
+      notes?: string
+      /** 0 a 1. Chamado durante a subida do arquivo. */
+      onProgress?: (fraction: number) => void
+    }) => {
       const contentType = v.file.type || "video/mp4"
 
       const auth = await creatorApi.requestDraftUpload({
@@ -229,19 +365,33 @@ export function useDraftUpload() {
         contentType,
       })
 
-      // O Content-Type tem de bater com o que foi assinado: o storage recusa a escrita
-      // se divergir, e a mensagem dele não diria que o problema é esse.
-      const upload = await fetch(auth.uploadUrl, {
-        method: "PUT",
-        headers: { "Content-Type": contentType },
-        body: v.file,
-      })
+      // XMLHttpRequest em vez de fetch por UM motivo: progresso. Vídeo de campanha sobe
+      // por minutos numa conexão doméstica, e um botão parado em "enviando…" durante
+      // cinco minutos é indistinguível de travado — a pessoa cancela e tenta de novo,
+      // que é o pior desfecho possível para um upload grande.
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        xhr.open("PUT", auth.uploadUrl)
 
-      if (!upload.ok) {
-        throw new Error(
-          "O arquivo não subiu. Verifique sua conexão e tente de novo — nada foi perdido.",
-        )
-      }
+        // O Content-Type tem de bater com o que foi assinado: o storage recusa a escrita
+        // se divergir, e a mensagem dele não diria que o problema é esse.
+        xhr.setRequestHeader("Content-Type", contentType)
+
+        xhr.upload.onprogress = (ev) => {
+          if (ev.lengthComputable) v.onProgress?.(ev.loaded / ev.total)
+        }
+
+        xhr.onload = () =>
+          xhr.status >= 200 && xhr.status < 300
+            ? resolve()
+            : reject(new Error(
+                "O arquivo não subiu. Verifique sua conexão e tente de novo — nada foi perdido."))
+
+        xhr.onerror = () => reject(new Error(
+          "O arquivo não subiu. Verifique sua conexão e tente de novo — nada foi perdido."))
+
+        xhr.send(v.file)
+      })
 
       return creatorApi.submitDraft({
         contractId: v.contractId,
@@ -258,6 +408,20 @@ export function useDraftUpload() {
 export function useResendSignature(contractId: string) {
   return useMutation({
     mutationFn: () => creatorApi.resendSignature(contractId),
+  })
+}
+
+/**
+ * Grava o cadastro inteiro de uma vez.
+ *
+ * <p>Invalida o workspace porque quase tudo na área do criador deriva dele: o nome no
+ * cabeçalho, o card de documento, o gate que manda para o formulário.</p>
+ */
+export function useUpdateCreatorProfile() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: UpdateCreatorProfileBody) => creatorApi.updateProfile(body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["creator-workspace"] }),
   })
 }
 
@@ -297,4 +461,15 @@ export function useCreatorMutations() {
       onSuccess: () => qc.invalidateQueries({ queryKey: ["creator-workspace"] }),
     }),
   }
+}
+
+/**
+ * Como o trabalho se chama na tela do criador.
+ *
+ * <p>"Sem campanha" é palavra de sistema: para quem foi contratado, o que existe é um
+ * trabalho, com ou sem uma campanha por trás. O rótulo do avulso diz isso, em vez de
+ * anunciar a ausência de um agrupamento que não é problema dele.</p>
+ */
+export function trabalhoLabel(campaignName: string | null | undefined): string {
+  return campaignName?.trim() ? campaignName : "Trabalho avulso"
 }

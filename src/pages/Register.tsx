@@ -355,18 +355,30 @@ function StepAccount({ onNext, defaultEmail = "", emailLocked = false }: { onNex
 }
 
 function StepVerification({
-  email, password, onBack,
+  email, password, onBack, codeSent = false,
 }: {
   email: string
   password: string | null
   onBack: () => void
+  /** A tela anterior já disparou um código novo. Dizer isso evita que a pessoa digite o antigo. */
+  codeSent?: boolean
 }) {
   const nav = useNavigate()
   const { refresh } = useAuth()
   const [code, setCode] = useState(Array(6).fill(""))
   const [error, setError] = useState("")
+  const [notice, setNotice] = useState(
+    codeSent ? "Enviamos um código novo agora — use o e-mail mais recente." : "")
   const [resendTimer, setResendTimer] = useState(30)
   const [submitting, setSubmitting] = useState(false)
+  /**
+   * Conta confirmada, mas o passo seguinte não fechou. Digitar o código de novo não
+   * resolve — o Cognito recusa confirmar duas vezes —, então a tela precisa parar de
+   * pedir código e oferecer o login.
+   */
+  const [confirmedOnly, setConfirmedOnly] = useState(false)
+
+  const typed = code.join("")
 
   useEffect(() => {
     if (resendTimer <= 0) return
@@ -387,6 +399,10 @@ function StepVerification({
     const next = [...code]
     next[index] = value
     setCode(next)
+
+    // O erro da tentativa anterior ficava na tela enquanto a pessoa corrigia os dígitos,
+    // e parecia recusa do que ela está digitando agora.
+    if (error) setError("")
 
     if (value && index < 5) {
       document.getElementById(`otp-${index + 1}`)?.focus()
@@ -417,11 +433,35 @@ function StepVerification({
   }
 
   const submitCode = async (fullCode: string) => {
-    try {
-      setSubmitting(true)
-      setError("")
-      await auth.confirm(email, fullCode)
+    setSubmitting(true)
+    setError("")
+    setNotice("")
 
+    // ── Fase 1: confirmar ────────────────────────────────────────────────────────────
+    // Só o que falha AQUI é problema do código. Antes as duas fases dividiam um try só,
+    // e uma falha no login depois de confirmar aparecia como código recusado — numa
+    // conta que o Cognito já tinha confirmado, onde nenhum código funcionaria mais.
+    try {
+      await auth.confirm(email, fullCode)
+    } catch (err) {
+      const name = (err as { name?: string })?.name
+
+      // "User cannot be confirmed. Current status is CONFIRMED" chega como
+      // NotAuthorizedException — que o tradutor mapeia para "e-mail ou senha incorretos",
+      // frase sem sentido numa tela que não pede senha. A conta está pronta: seguir.
+      if (name !== "NotAuthorizedException") {
+        const { message } = translateCognitoError(err)
+        setError(err instanceof ApiError ? err.message : message)
+        setSubmitting(false)
+        return
+      }
+    }
+
+    // ── Fase 2: entrar ───────────────────────────────────────────────────────────────
+    // A conta já está confirmada. O que falhar daqui em diante não se resolve digitando
+    // o código de novo, então o erro leva para o login em vez de prender a pessoa numa
+    // tela sem saída.
+    try {
       // Sem senha (veio do fluxo "UserNotConfirmed" no login): manda pro login.
       if (!password) {
         nav("/login", { replace: true, state: { email } })
@@ -470,16 +510,33 @@ function StepVerification({
       nav("/dashboard", { replace: true })
     } catch (err) {
       const { message } = translateCognitoError(err)
-      setError(err instanceof ApiError ? err.message : message)
+      setConfirmedOnly(true)
+      setError(
+        "Seu e-mail foi confirmado, mas não conseguimos entrar automaticamente: "
+        + (err instanceof ApiError ? err.message : message))
       setSubmitting(false)
     }
   }
 
   const handleResend = async () => {
+    setError("")
+    setNotice("")
     try {
       await auth.resendCode(email)
-    } catch { /* best-effort */ }
-    setResendTimer(30)
+      setResendTimer(30)
+      setNotice("Código reenviado. Use o do e-mail mais recente — o anterior deixa de valer.")
+    } catch (err) {
+      const name = (err as { name?: string })?.name
+      // O Cognito recusa reenviar para conta já confirmada. Engolir esse erro deixava a
+      // pessoa esperando um e-mail que nunca ia chegar.
+      if (name === "InvalidParameterException" || name === "NotAuthorizedException") {
+        setConfirmedOnly(true)
+        setError("Esta conta já está confirmada. Entre com seu e-mail e senha.")
+        return
+      }
+      setResendTimer(30)
+      setError(translateCognitoError(err).message)
+    }
   }
 
   return (
@@ -504,40 +561,66 @@ function StepVerification({
             id={`otp-${i}`}
             type="text"
             inputMode="numeric"
+            autoComplete="one-time-code"
             maxLength={1}
             value={digit}
             onChange={(e) => handleDigit(i, e.target.value)}
             onKeyDown={(e) => handleKeyDown(i, e)}
-            disabled={submitting}
+            disabled={submitting || confirmedOnly}
             className="w-12 h-14 text-center text-2xl font-bold border-2 border-[#E5E7EB] rounded-xl focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 outline-none transition-all disabled:opacity-50"
           />
         ))}
       </div>
-      {error && <p className="text-sm font-semibold text-red-500">{error}</p>}
 
-      <div className="space-y-3">
-        <p className="text-sm text-[#6B7280]">
-          {resendTimer > 0 ? (
-            `Reenviar código em ${resendTimer}s`
-          ) : (
-            <button onClick={handleResend} className="text-teal-500 font-bold hover:underline">
-              Reenviar código
+      {error && <p className="text-sm font-semibold text-red-500">{error}</p>}
+      {!error && notice && <p className="text-sm text-teal-600 font-medium">{notice}</p>}
+
+      {/* A confirmação só disparava ao digitar a última casa. Quem corrigia um dígito do
+          meio depois de errar ficava sem nenhuma forma de tentar de novo — a tela não
+          reagia, e o erro anterior continuava ali. */}
+      {confirmedOnly ? (
+        <Button
+          onClick={() => nav("/login", { replace: true, state: { email } })}
+          className="w-full bg-teal-500 hover:bg-teal-500/90 text-white font-bold py-5"
+        >
+          Ir para o login
+        </Button>
+      ) : (
+        <Button
+          onClick={() => submitCode(typed)}
+          disabled={typed.length !== 6 || submitting}
+          className="w-full bg-teal-500 hover:bg-teal-500/90 text-white font-bold py-5"
+        >
+          {submitting ? "Confirmando…" : "Confirmar"}
+        </Button>
+      )}
+
+      {!confirmedOnly && (
+        <div className="space-y-3">
+          <p className="text-sm text-[#6B7280]">
+            {resendTimer > 0 ? (
+              `Reenviar código em ${resendTimer}s`
+            ) : (
+              <button onClick={handleResend} className="text-teal-500 font-bold hover:underline">
+                Reenviar código
+              </button>
+            )}
+          </p>
+          <div className="pt-3 border-t border-gray-100">
+            <button onClick={onBack} className="text-sm text-[#6B7280] hover:text-midnight dark:hover:text-[#E6E8EF] hover:underline transition-colors">
+              Digitou o e-mail errado? Voltar
             </button>
-          )}
-        </p>
-        <div className="pt-3 border-t border-gray-100">
-          <button onClick={onBack} className="text-sm text-[#6B7280] hover:text-midnight dark:hover:text-[#E6E8EF] hover:underline transition-colors">
-            Digitou o e-mail errado? Voltar
-          </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
 
 export default function RegisterPage() {
   const location = useLocation()
-  const initial = (location.state ?? null) as { email?: string; step?: number; invite?: boolean } | null
+  const initial = (location.state ?? null) as
+    { email?: string; step?: number; invite?: boolean; codeSent?: boolean } | null
 
   // Modo convite: usuário chegou pelo link de convite (AcceptInvite) sem ter conta.
   // Pula a escolha de objetivo (não cria workspace), trava o e-mail e, ao final,
@@ -694,6 +777,7 @@ export default function RegisterPage() {
                   email={email}
                   password={password}
                   onBack={() => setStep(2)}
+                  codeSent={initial?.codeSent}
                 />
               </div>
             )}

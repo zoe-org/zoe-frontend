@@ -13,8 +13,10 @@ import { RoleGate } from "@/features/auth/RoleGate"
 import { useFeature } from "@/features/auth/useFeature"
 import { useTenantBrands } from "@/lib/api/brands"
 import { tEnum } from "@/i18n/enums"
-import { fmtDate } from "@/pages/operations/format"
-import { Field, Select, TableSkeleton, ErrorState } from "@/pages/operations/shared"
+import { fmtDate, matches } from "@/pages/operations/format"
+import {
+  Field, Select, TableSkeleton, ErrorState, SearchBox, NoResults,
+} from "@/pages/operations/shared"
 import {
   useCampaigns, useCampaign, useCampaignMutations,
   CAMPAIGN_MODALITIES, escrowRejectionReason, supportsEscrow, fmtCents,
@@ -41,7 +43,16 @@ export default function OperationsCampaignsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
 
-  const items = useMemo(() => campaigns.data?.items ?? [], [campaigns.data])
+  const [busca, setBusca] = useState("")
+
+  const todas = useMemo(() => campaigns.data?.items ?? [], [campaigns.data])
+
+  const items = useMemo(
+    () => todas.filter((c) => matches(
+      busca, c.name, c.brandName, tEnum("contractModality", c.modality),
+      tEnum("campaignStatus", c.status))),
+    [todas, busca],
+  )
 
   // A primeira da lista fica selecionada por padrão, como no protótipo. Derivado no
   // render em vez de setState em efeito — a mesma razão do AppShell: efeito que
@@ -58,9 +69,9 @@ export default function OperationsCampaignsPage() {
               Campanhas
             </h1>
             <div className="text-[14px] text-ink-muted mt-1.5 max-w-140">
-              <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>{items.length}</span>
-              {items.length === 1 ? " campanha" : " campanhas"} ·{" "}
-              <span className="font-mono-zoe">{items.filter((c) => c.status === "Active").length}</span>{" "}
+              <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>{todas.length}</span>
+              {todas.length === 1 ? " campanha" : " campanhas"} ·{" "}
+              <span className="font-mono-zoe">{todas.filter((c) => c.status === "Active").length}</span>{" "}
               ativas agora. A campanha é a porta de entrada: os contratos nascem dentro
               dela e herdam sua modalidade.
             </div>
@@ -83,7 +94,7 @@ export default function OperationsCampaignsPage() {
         <div style={{ background: "var(--surface)" }}>
           <ErrorState onRetry={() => campaigns.refetch()} />
         </div>
-      ) : items.length === 0 ? (
+      ) : todas.length === 0 ? (
         <div style={{ background: "var(--surface)" }}>
           <EmptyBlock
             className="py-16"
@@ -96,6 +107,17 @@ export default function OperationsCampaignsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] min-h-[calc(100vh-220px)]">
           {/* Lista */}
           <div className="border-r border-border-soft" style={{ background: "var(--surface)" }}>
+            <div className="px-4 py-3 border-b border-border-soft">
+              <SearchBox
+                value={busca}
+                onChange={setBusca}
+                placeholder="Buscar campanha…"
+                className="w-full"
+              />
+            </div>
+            {items.length === 0 && (
+              <NoResults query={busca} onClear={() => setBusca("")} />
+            )}
             {items.map((c) => (
               <button
                 key={c.campaignId}
@@ -513,19 +535,17 @@ function BriefingCard({ briefing: b }: { briefing: CampaignBriefing }) {
         ))}
       </div>
 
-      {b.isAuditable ? (
-        <p className="text-[11.5px] text-ink-muted mt-4 mb-0">
-          Com o combo Intelligence, a entrega é conferida contra estes critérios e recebe uma
-          nota. A liberação do pagamento continua sendo um clique seu — a auditoria nunca
-          paga sozinha.
-        </p>
-      ) : (
-        <div className="rounded-lg p-3 text-[11.5px] mt-4" style={{ background: "#D9770615", color: "#D97706" }}>
-          Preencha menções, hashtags ou exigência de logo para a conferência automática
-          poder acontecer. Sem nenhum critério, a revisão é sempre manual — o que continua
-          funcionando, só não é automático.
-        </div>
-      )}
+      {/* Antes isto era um bloco laranja de tres linhas ocupando a largura toda. Laranja
+          e' cor de pendencia, e nao ha' pendencia nenhuma: a auditoria automatica foi
+          ADIADA pelo time, e a revisao manual e' o funcionamento normal — nao um estado
+          degradado que alguem precisa corrigir. Virou uma nota discreta. */}
+      <p className="text-[11.5px] text-ink-muted mt-4 mb-0">
+        {b.isAuditable
+          ? "Estes critérios ficam prontos para a conferência automática, quando ela entrar. "
+            + "A liberação do pagamento é um clique seu de qualquer forma."
+          : "A revisão da entrega é feita por você. Preencher menções, hashtags ou exigência "
+            + "de logo deixa os critérios prontos para a conferência automática no futuro."}
+      </p>
     </div>
   )
 }

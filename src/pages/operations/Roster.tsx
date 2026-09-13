@@ -7,8 +7,10 @@ import { EmptyBlock } from "@/components/ui/empty-block"
 import { StatusChip } from "@/components/ui/status-chip"
 import { RoleGate } from "@/features/auth/RoleGate"
 import { tEnum } from "@/i18n/enums"
-import { fmtDate, initials } from "@/pages/operations/format"
-import { Field, Select, TableSkeleton, ErrorState } from "@/pages/operations/shared"
+import { fmtDate, initials, matches } from "@/pages/operations/format"
+import {
+  Field, Select, TableSkeleton, ErrorState, SearchBox, NoResults,
+} from "@/pages/operations/shared"
 import {
   useRoster, useRosterMutations, useCampaigns, payoutBlockReason, INFLUENCER_INVITE_PATH,
   useCampaign,
@@ -34,9 +36,15 @@ export default function OperationsRosterPage() {
   const all = useMemo(() => roster.data?.items ?? [], [roster.data])
   const [rel, setRel] = useState<string>("")
 
+  const [busca, setBusca] = useState("")
+
   const items = useMemo(
-    () => (rel ? all.filter((i) => i.relationshipStatus === rel) : all),
-    [all, rel],
+    () => (rel ? all.filter((i) => i.relationshipStatus === rel) : all)
+      // E-mail entra na busca porque e' o identificador que a pessoa tem em maos quando
+      // veio de fora — de uma conversa, de uma planilha — e nem sempre sabe o nome exato
+      // com que o criador foi cadastrado aqui.
+      .filter((i) => matches(busca, i.displayName, i.fullName, i.email)),
+    [all, rel, busca],
   )
 
   return (
@@ -53,12 +61,16 @@ export default function OperationsRosterPage() {
             </h1>
             <div className="text-[14px] text-ink-muted mt-1.5 max-w-140">
               <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>
-                {items.length} {items.length === 1 ? "criador" : "criadores"}
+                {all.length} {all.length === 1 ? "criador" : "criadores"}
               </span>{" "}
               no elenco deste workspace. A pessoa é única na plataforma — se ela já
               trabalha com outra marca, o cadastro só cria o vínculo com você.
             </div>
           </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {all.length > 0 && (
+              <SearchBox value={busca} onChange={setBusca} placeholder="Buscar por nome, e-mail…" />
+            )}
           <RoleGate minRole="Admin">
             {/* Convidar nao depende de campanha: a marca monta elenco antes de existir
                 acao, e o criador e da marca, nao do projeto. */}
@@ -76,6 +88,7 @@ export default function OperationsRosterPage() {
               <Plus className="w-3.5 h-3.5" /> Adicionar criador
             </button>
           </RoleGate>
+          </div>
         </div>
       </section>
 
@@ -85,6 +98,8 @@ export default function OperationsRosterPage() {
           <TableSkeleton />
         ) : roster.isError ? (
           <ErrorState onRetry={() => roster.refetch()} />
+        ) : items.length === 0 && busca ? (
+          <NoResults query={busca} onClear={() => setBusca("")} />
         ) : items.length === 0 ? (
           <EmptyBlock
             className="py-16"

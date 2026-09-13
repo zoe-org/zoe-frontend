@@ -1,11 +1,13 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { Loader2, Check, RotateCcw, Film, X } from "lucide-react"
 import { toast } from "sonner"
 import { ApiError } from "@/lib/api"
 import { Input } from "@/components/ui/input"
 import { EmptyBlock } from "@/components/ui/empty-block"
-import { fmtDate } from "@/pages/operations/format"
-import { ErrorState, TableSkeleton } from "@/pages/operations/shared"
+import { fmtDate, matches, campanhaLabel } from "@/pages/operations/format"
+import {
+  ErrorState, TableSkeleton, SearchBox, NoResults,
+} from "@/pages/operations/shared"
 import {
   useDeliveryDrafts, useDeliveryDraftMutations, type DeliveryDraftItem,
 } from "@/lib/api/operations"
@@ -31,18 +33,35 @@ const STATUS_COLOR: Record<string, string> = {
  */
 export function DeliveryDrafts() {
   const [filter, setFilter] = useState<string>("AwaitingReview")
-  const { data, isLoading, isError, refetch } = useDeliveryDrafts(filter || undefined)
+  const [busca, setBusca] = useState("")
 
-  const items = data?.items ?? []
+  // Busca SEM filtro e separa em memoria, como Entregas e Custodia ja' faziam. Mandar o
+  // filtro para a API punha a aba na chave do cache: cada troca era um cache diferente,
+  // uma ida ao servidor, e a tela em branco ate a resposta voltar.
+  const { data, isLoading, isError, refetch } = useDeliveryDrafts()
+
+  const todos = useMemo(() => data?.items ?? [], [data])
+  const porAba = filter ? todos.filter((d) => d.status === filter) : todos
+
+  const items = useMemo(
+    () => porAba.filter((d) => matches(busca, d.influencerName, d.campaignName, d.fileName)),
+    [porAba, busca],
+  )
+
+  const contagem = {
+    AwaitingReview: todos.filter((d) => d.status === "AwaitingReview").length,
+    todos: todos.length,
+  }
 
   return (
     <div>
-      <div className="flex gap-1 mb-5">
+      <div className="flex gap-2 mb-5 flex-wrap items-center justify-between">
+        <div className="flex gap-1">
         {([["AwaitingReview", "Aguardando"], ["", "Todos"]] as const).map(([id, label]) => (
           <button
             key={id || "todos"}
             onClick={() => setFilter(id)}
-            className="px-3 py-1.5 rounded-lg text-[12.5px] font-medium transition-colors"
+            className="px-3 py-1.5 rounded-lg text-[12.5px] font-medium transition-colors inline-flex items-center gap-1.5"
             style={
               filter === id
                 ? { background: "var(--color-teal-500)", color: "#fff" }
@@ -50,14 +69,30 @@ export function DeliveryDrafts() {
             }
           >
             {label}
+            {/* A contagem antes do clique: sem ela a pessoa precisa entrar na aba para
+                descobrir que ela esta' vazia. */}
+            <span
+              className="text-[11px] font-mono-zoe px-1.5 rounded"
+              style={filter === id
+                ? { background: "#ffffff28" }
+                : { background: "var(--border-soft)" }}
+            >
+              {id ? contagem.AwaitingReview : contagem.todos}
+            </span>
           </button>
         ))}
+        </div>
+        {todos.length > 0 && (
+          <SearchBox value={busca} onChange={setBusca} placeholder="Buscar por criador, campanha…" />
+        )}
       </div>
 
       {isLoading ? (
         <TableSkeleton />
       ) : isError ? (
         <ErrorState onRetry={() => refetch()} />
+      ) : items.length === 0 && busca ? (
+        <NoResults query={busca} onClear={() => setBusca("")} />
       ) : items.length === 0 ? (
         <EmptyBlock
           className="py-14"
@@ -112,7 +147,7 @@ function DraftCard({ draft }: { draft: DeliveryDraftItem }) {
             {draft.influencerName}
           </div>
           <div className="text-[12.5px] text-ink-muted">
-            {draft.campaignName}
+            {campanhaLabel(draft.campaignName)}
             {draft.revision > 1 && ` · revisão ${draft.revision}`}
           </div>
         </div>
