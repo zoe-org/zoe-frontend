@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react"
 import { Link } from "react-router-dom"
+import { useActiveBrand } from "@/features/brands/context"
 import { ChevronRight } from "lucide-react"
 import { MultiLine } from "@/components/ui/charts"
 import { EmptyBlock } from "@/components/ui/empty-block"
@@ -129,11 +130,14 @@ function RankingSection({ ranked, hasPreviousPeriod, ppHint }: {
   hasPreviousPeriod: boolean
   ppHint: string
 }) {
+  const { brands, setBrand } = useActiveBrand()
+  // Só vira link o que o tenant assina: marca fora da lista não pode ser a ativa.
+  const assinadas = new Set(brands.map((x) => x.brandId))
   return (
     <section className="px-8 py-7 border-b border-border-soft">
       <SectionHead
         title="Ranking do conjunto"
-        sub="Share e sentimento lado a lado: share alto com sentimento baixo é exposição, não vantagem. Clique num concorrente para ver o detalhe dele."
+        sub="Share e sentimento lado a lado: share alto com sentimento baixo é exposição, não vantagem. Clique num concorrente para abrir o Dashboard dele."
       />
       <div className="overflow-x-auto">
         <table className="w-full text-[13px] min-w-160">
@@ -168,14 +172,15 @@ function RankingSection({ ranked, hasPreviousPeriod, ppHint }: {
                   <td className="py-3 pr-3">
                     <span className="flex items-center gap-2 min-w-0">
                       <BrandSwatch color={c} />
-                      {/* ADR-035 D6: o SoV mantém o número limpo (earned puro) e o clique
-                          leva ao detalhe, onde earned e owned aparecem separados. Só
-                          concorrente — a própria marca tem a tela de canal próprio. */}
-                      {b.isYou ? (
-                        <span className="truncate font-bold" style={{ color: "var(--ink)" }}>{b.brandName}</span>
+                      {/* ADR-063: o concorrente se lê no Dashboard, com ele como marca
+                          ativa. O SoV continua só earned; a reação nos canais oficiais
+                          dele é um card à parte lá, nunca somada a este número. */}
+                      {b.isYou || !assinadas.has(b.brandId) ? (
+                        <span className="truncate" style={{ color: "var(--ink)", fontWeight: b.isYou ? 700 : 400 }}>{b.brandName}</span>
                       ) : (
                         <Link
-                          to={`/intelligence/competitive/${b.brandId}`}
+                          to="/dashboard"
+                          onClick={() => setBrand(b.brandId)}
                           className="truncate hover:underline inline-flex items-center gap-1 group"
                           style={{ color: "var(--ink)" }}
                         >

@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react"
 import { Link } from "react-router-dom"
+import { useActiveBrand } from "@/features/brands/context"
 import { ArrowRight } from "lucide-react"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { InfoHint } from "@/components/ui/info-hint"
@@ -25,6 +26,7 @@ export function CompareTab({ ranked, topics, topicsLoading, hasPreviousPeriod }:
   const you = ranked.find((b) => b.isYou) ?? null
   const rivals = ranked.filter((b) => !b.isYou)
   const [choice, setChoice] = useState<string | null>(null)
+  const { brands, setBrand } = useActiveBrand()
   // A escolha some sozinha se o concorrente sair do recorte (troca de marca própria).
   const rival = rivals.find((r) => r.brandId === choice) ?? nearestRival(ranked)
 
@@ -61,12 +63,15 @@ export function CompareTab({ ranked, topics, topicsLoading, hasPreviousPeriod }:
               ))}
             </SelectContent>
           </Select>
-          <Link
-            to={`/intelligence/competitive/${rival.brandId}`}
-            className="ml-auto inline-flex items-center gap-1 text-[12.5px] font-semibold text-teal-700 dark:text-teal-300 hover:underline"
-          >
-            Ver detalhe de {rival.brandName} <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
+          {brands.some((x) => x.brandId === rival.brandId) && (
+            <Link
+              to="/dashboard"
+              onClick={() => setBrand(rival.brandId)}
+              className="ml-auto inline-flex items-center gap-1 text-[12.5px] font-semibold text-teal-700 dark:text-teal-300 hover:underline"
+            >
+              Ver {rival.brandName} no dashboard <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          )}
         </div>
 
         <HeadToHead you={you} rival={rival} youColor={youColor} rivalColor={rivalColor} hasPreviousPeriod={hasPreviousPeriod} />

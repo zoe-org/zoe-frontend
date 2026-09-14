@@ -5,6 +5,7 @@ import { formatDistanceToNow } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { useAuth } from "@/features/auth/context"
 import { CoverageNotice } from "@/components/coverage/CoverageNotice"
+import { CompetitorChannelCard } from "@/components/owned/CompetitorChannelCard"
 import { AreaLine, Heatmap, Sparkline } from "@/components/ui/charts"
 import { heatmapRamp } from "@/lib/heatmap-ramp"
 import { useTheme } from "next-themes"
@@ -246,6 +247,16 @@ export default function DashboardPage() {
           <TopInfluencers rows={influencers.data?.items ?? []} loading={influencers.isLoading} />
         </div>
       </section>
+
+      {/* ADR-063: com um concorrente ativo, a reação nos canais oficiais dele entra
+          aqui — o único pedaço do antigo drill-down que o Dashboard não cobria. Fica
+          em seção própria: as métricas acima são sobre o que terceiros falam dele. */}
+      {brand.active?.relationship === "Competitor" && (
+        <CompetitorChannelCard
+          brandId={brand.active.brandId}
+          brandName={brand.active.displayName ?? brand.active.brandName}
+        />
+      )}
 
       {/* Alertas fecham a página: é a única seção acionável, e ela some quando não
           há nada pendente, em vez de mostrar um vazio decorativo. */}
