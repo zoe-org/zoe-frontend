@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { useRef, useState, type PointerEvent as ReactPointerEvent } from "react"
 import { useTheme } from "next-themes"
 import { heatmapRamp } from "@/lib/heatmap-ramp"
 
@@ -195,6 +195,18 @@ type MultiLineProps = {
   labels?: string[]
   width?: number
   height?: number
+  /** Liga o hover: guia vertical e os valores daquela coluna. Desligado, é o gráfico de sempre. */
+  interactive?: boolean
+  /** Série desenhada por cima e mais grossa; as outras recuam. */
+  emphasize?: string
+  /** Séries fora do desenho E da escala — isolar um concorrente é também dar zoom nele. */
+  hidden?: ReadonlySet<string>
+  formatValue?: (v: number) => string
+  /** Título da coluna no tooltip. Sem ele, o rótulo do eixo. */
+  columnLabel?: (i: number) => string
+  /** Coluna sem dado: o tooltip diz isso em vez de listar zeros que parecem medição. */
+  isEmptyColumn?: (i: number) => boolean
+  emptyLabel?: string
 }
 
 export function MultiLine({
@@ -202,11 +214,22 @@ export function MultiLine({
   labels,
   width = 600,
   height = 180,
+  interactive = false,
+  emphasize,
+  hidden,
+  formatValue = (v) => String(v),
+  columnLabel,
+  isEmptyColumn,
+  emptyLabel = "Sem dados neste ponto",
 }: MultiLineProps) {
+  const [hover, setHover] = useState<number | null>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
+
   const pad = { t: 12, r: 12, b: 20, l: 28 }
   const W = width - pad.l - pad.r
   const H = height - pad.t - pad.b
-  const all = series.flatMap((s) => s.data)
+  const visible = hidden ? series.filter((s) => !hidden.has(s.name)) : series
+  const all = visible.flatMap((s) => s.data)
   const vmax = Math.max(...all, 0)
   const vmin = 0
   const range = vmax - vmin || 1
@@ -239,12 +262,30 @@ export function MultiLine({
     return { v, y: yOf(v) }
   })
 
-  return (
+  // A destacada vai por último para ficar por cima nos cruzamentos.
+  const ordered = emphasize
+    ? [...visible.filter((s) => s.name !== emphasize), ...visible.filter((s) => s.name === emphasize)]
+    : visible
+
+  // Pointer, e não mouse: no toque o tooltip também aparece enquanto o dedo arrasta.
+  const onMove = (e: ReactPointerEvent<SVGSVGElement>) => {
+    const svg = svgRef.current
+    if (!svg || len === 0) return
+    const rect = svg.getBoundingClientRect()
+    const x = ((e.clientX - rect.left) / rect.width) * width
+    const i = len === 1 ? 0 : Math.round(((x - pad.l) / W) * (len - 1))
+    setHover(Math.max(0, Math.min(len - 1, i)))
+  }
+
+  const chart = (
     <svg
+      ref={svgRef}
       viewBox={`0 0 ${width} ${height}`}
       width="100%"
       height={height}
-      style={{ display: "block" }}
+      style={{ display: "block", touchAction: interactive ? "pan-y" : undefined }}
+      onPointerMove={interactive ? onMove : undefined}
+      onPointerLeave={interactive ? () => setHover(null) : undefined}
     >
       {grid.map((g, i) => (
         <g key={i}>
@@ -269,27 +310,40 @@ export function MultiLine({
           </text>
         </g>
       ))}
-      {series.map((s) => {
+      {interactive && hover != null && (
+        <line
+          x1={xOf(hover)}
+          x2={xOf(hover)}
+          y1={pad.t}
+          y2={pad.t + H}
+          stroke="currentColor"
+          strokeOpacity="0.25"
+          strokeDasharray="3 3"
+        />
+      )}
+      {ordered.map((s) => {
         const pts = s.data.map((v, i) => [xOf(i), yOf(v)] as const)
+        const strong = s.name === emphasize
+        const faded = emphasize != null && !strong
         return (
-          <g key={s.name}>
+          <g key={s.name} opacity={faded ? 0.5 : 1}>
             <path
               d={smoothPath(pts)}
               fill="none"
               stroke={s.color}
-              strokeWidth="2"
+              strokeWidth={strong ? 3 : 2}
               strokeLinecap="round"
               strokeLinejoin="round"
             />
             {pts.map(([x, y], i) => (
-              <circle key={i} cx={x} cy={y} r="2.5" fill={s.color} />
+              <circle key={i} cx={x} cy={y} r={hover === i ? 4 : strong ? 3 : 2.5} fill={s.color} />
             ))}
           </g>
         )
       })}
       {labels && labels.map((lb, i) => (
         <text
-          key={lb}
+          key={i}
           x={xOf(i)}
           y={height - 4}
           fontSize="10"
@@ -302,6 +356,55 @@ export function MultiLine({
         </text>
       ))}
     </svg>
+  )
+
+  if (!interactive) return chart
+
+  const leftPct = hover == null ? 0 : (xOf(hover) / width) * 100
+  const empty = hover != null && (isEmptyColumn?.(hover) ?? false)
+  const rows = hover == null
+    ? []
+    : visible
+        .map((s) => ({ name: s.name, color: s.color, v: s.data[hover] }))
+        .sort((a, b) => b.v - a.v)
+
+  return (
+    <div className="relative">
+      {chart}
+      {hover != null && (
+        <div
+          className="absolute top-1 pointer-events-none z-10 rounded-lg border border-border-soft px-3 py-2 text-[12px] shadow-sm min-w-44"
+          style={{
+            left: `${leftPct}%`,
+            // Depois da metade vira para a esquerda, senão sai do card.
+            transform: leftPct > 55 ? "translateX(calc(-100% - 12px))" : "translateX(12px)",
+            background: "var(--surface)",
+          }}
+        >
+          <div className="font-medium mb-1.5" style={{ color: "var(--ink)" }}>
+            {columnLabel?.(hover) ?? labels?.[hover] ?? ""}
+          </div>
+          {empty ? (
+            <div className="text-ink-muted">{emptyLabel}</div>
+          ) : (
+            rows.map((r) => (
+              <div key={r.name} className="flex items-center justify-between gap-4 py-px">
+                <span className="flex items-center gap-1.5 min-w-0">
+                  <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: r.color }} />
+                  <span
+                    className="truncate"
+                    style={{ color: "var(--ink)", fontWeight: r.name === emphasize ? 600 : 400 }}
+                  >
+                    {r.name}
+                  </span>
+                </span>
+                <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>{formatValue(r.v)}</span>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
   )
 }
 
