@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { AlertCircle, ExternalLink, Loader2, X } from "lucide-react"
+import { AlertCircle, ChevronLeft, ChevronRight, ExternalLink, Loader2, X } from "lucide-react"
 import { TabPill } from "@/components/ui/tab-pill"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { useAuth } from "@/features/auth/context"
@@ -29,6 +29,10 @@ const TABS: { key: LongVideoDecisionStatus; label: string }[] = [
   { key: "Dismissed", label: "Descartados" },
 ]
 
+// Oito linhas: a fila de um tenant com muitas lives passava de 40 itens e empurrava
+// o resto do painel de Consumo para fora da tela.
+const PAGE_SIZE = 8
+
 const RESULT_TONE = {
   partial: { color: "var(--color-warn)", bg: "#FFFBEB", border: "rgba(217,119,6,.32)" },
   failure: { color: "var(--color-neg)", bg: "#FEF2F2", border: "rgba(220,38,38,.32)" },
@@ -44,6 +48,7 @@ export function LongVideoQueue() {
   const [tab, setTab] = useState<LongVideoDecisionStatus>("Pending")
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [result, setResult] = useState<BatchResult | null>(null)
+  const [page, setPage] = useState(0)
 
   const pending = useLongVideoDecisions("Pending")
   const list = useLongVideoDecisions(tab)
@@ -62,11 +67,20 @@ export function LongVideoQueue() {
   )
   const totals = selectionTotals(items, effective)
   const impact = meter.data ? quotaImpact(meter.data, totals.minutes) : null
+
+  // Página corrigida na leitura, não por efeito: decidir o último item de uma página
+  // encurta a lista, e um setState em efeito renderizaria a página vazia antes.
+  const pageCount = Math.max(1, Math.ceil(items.length / PAGE_SIZE))
+  const currentPage = Math.min(page, pageCount - 1)
+  const pageItems = items.slice(currentPage * PAGE_SIZE, currentPage * PAGE_SIZE + PAGE_SIZE)
+
+  const pageSelected = pageItems.length > 0 && pageItems.every((i) => effective.has(i.id))
   const allSelected = items.length > 0 && effective.size === items.length
 
   const switchTab = (next: LongVideoDecisionStatus) => {
     setTab(next)
     setSelected(new Set())
+    setPage(0)
   }
 
   const toggle = (id: string) =>
@@ -165,15 +179,37 @@ export function LongVideoQueue() {
 
       <QueueBody
         tab={tab}
-        items={items}
+        items={pageItems}
         loading={list.isLoading}
         error={list.error}
         selectable={tab === "Pending" && canDecide}
         selected={effective}
-        allSelected={allSelected}
+        allSelected={pageSelected}
         onToggle={toggle}
-        onToggleAll={() => setSelected(allSelected ? new Set() : new Set(items.map((i) => i.id)))}
+        onToggleAll={() => setSelected((prev) => {
+          const next = new Set(prev)
+          // O cabeçalho é da PÁGINA; a fila inteira tem o atalho no rodapé.
+          for (const i of pageItems) {
+            if (pageSelected) next.delete(i.id)
+            else next.add(i.id)
+          }
+          return next
+        })}
       />
+
+      {items.length > PAGE_SIZE && (
+        <Pagination
+          page={currentPage}
+          pageCount={pageCount}
+          total={items.length}
+          shown={pageItems.length}
+          from={currentPage * PAGE_SIZE + 1}
+          onChange={setPage}
+          selectAll={tab === "Pending" && canDecide && pageSelected && !allSelected
+            ? () => setSelected(new Set(items.map((i) => i.id)))
+            : undefined}
+        />
+      )}
 
       {tab === "Pending" && canDecide && totals.count > 0 && (
         <div className="flex items-center gap-x-4 gap-y-2 flex-wrap px-6 py-3.5 border-t border-border-soft bg-[#FAFBFC] dark:bg-[#151824]">
@@ -215,6 +251,53 @@ export function LongVideoQueue() {
         </div>
       )}
     </section>
+  )
+}
+
+function Pagination({ page, pageCount, total, shown, from, onChange, selectAll }: {
+  page: number
+  pageCount: number
+  total: number
+  shown: number
+  from: number
+  onChange: (page: number) => void
+  /** Só aparece com a página inteira marcada e algo fora dela — o atalho do lote. */
+  selectAll?: () => void
+}) {
+  const botao = "h-7 w-7 inline-flex items-center justify-center rounded-md border border-border-soft " +
+    "hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+
+  return (
+    <div className="flex items-center gap-x-4 gap-y-2 flex-wrap px-6 py-2.5 border-t border-border-soft">
+      <div className="text-[12.5px] text-ink-muted">
+        <span className="font-mono-zoe">{from}–{from + shown - 1}</span> de{" "}
+        <span className="font-mono-zoe">{total}</span>
+      </div>
+      {selectAll && (
+        <button onClick={selectAll} className="text-[12.5px] font-semibold text-teal-700 dark:text-teal-300 hover:underline">
+          Selecionar todos os {total} da fila
+        </button>
+      )}
+      <div className="ml-auto flex items-center gap-2">
+        <button
+          onClick={() => onChange(page - 1)}
+          disabled={page === 0}
+          aria-label="Página anterior"
+          className={botao}
+        >
+          <ChevronLeft className="w-3.5 h-3.5" />
+        </button>
+        <span className="text-[12px] text-ink-muted-2">{page + 1}/{pageCount}</span>
+        <button
+          onClick={() => onChange(page + 1)}
+          disabled={page >= pageCount - 1}
+          aria-label="Próxima página"
+          className={botao}
+        >
+          <ChevronRight className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    </div>
   )
 }
 
