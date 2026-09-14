@@ -31,7 +31,7 @@ const TABS: { key: LongVideoDecisionStatus; label: string }[] = [
 
 // Oito linhas: a fila de um tenant com muitas lives passava de 40 itens e empurrava
 // o resto do painel de Consumo para fora da tela.
-const PAGE_SIZE = 8
+const PAGE_SIZE = 5
 
 const RESULT_TONE = {
   partial: { color: "var(--color-warn)", bg: "#FFFBEB", border: "rgba(217,119,6,.32)" },
