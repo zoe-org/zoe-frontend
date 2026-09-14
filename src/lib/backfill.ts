@@ -66,6 +66,37 @@ export function reachesPastRawRetention(windowStart: string | null, now: Date): 
   return now.getTime() - new Date(windowStart).getTime() > RAW_MEDIA_RETENTION_DAYS * DAY_MS
 }
 
+/** Uma marca na visão agregada do Consumo. */
+export type BrandBlocked = {
+  tenantBrandId: string
+  brandName: string
+  blockedCount: number
+}
+
+export type CoverageSummary = {
+  totalBlocked: number
+  /** Só as marcas com bloqueio, da maior para a menor. */
+  brands: BrandBlocked[]
+}
+
+/** O Consumo fala do tenant inteiro; a cobertura é por marca. Esta é a ponte. */
+export function summarizeCoverage(items: BrandBlocked[]): CoverageSummary {
+  const brands = items
+    .filter((b) => b.blockedCount > 0)
+    .sort((a, b) => b.blockedCount - a.blockedCount || a.brandName.localeCompare(b.brandName, "pt-BR"))
+  return { totalBlocked: brands.reduce((sum, b) => sum + b.blockedCount, 0), brands }
+}
+
+/** Com uma marca só, nomeá-la diz mais do que "1 marca". */
+export function describeCoverageSummary(s: CoverageSummary): string | null {
+  if (s.brands.length === 0) return null
+  const verb = s.totalBlocked === 1 ? "está" : "estão"
+  const scope = s.brands.length === 1
+    ? `de ${s.brands[0].brandName}`
+    : `de ${s.brands.length} marcas`
+  return `${videoCountLabel(s.totalBlocked)} ${scope} ${verb} fora da sua cobertura.`
+}
+
 export type CheckoutStep =
   | { kind: "redirect"; url: string }
   | { kind: "granted"; count: number }

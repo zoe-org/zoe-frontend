@@ -12,6 +12,7 @@ import {
 import { EmptyState } from "@/components/ui/empty-state"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { useActiveBrand } from "@/features/brands/context"
+import { CoverageNotice } from "@/components/coverage/CoverageNotice"
 import { brandVoice } from "@/features/brands/voice"
 import { useInfluencers, type Influencer } from "@/lib/api/dashboard"
 import { toCsv, downloadCsv } from "@/lib/csv"
@@ -222,6 +223,8 @@ export default function InfluencersPage() {
           </div>
         </div>
       </section>
+
+      <CoverageNotice tenantBrandIds={[brand.active?.tenantBrandId]} className="mx-8 mt-4" />
 
       {inf.isError ? (
         <ErrorState onRetry={() => inf.refetch()} />

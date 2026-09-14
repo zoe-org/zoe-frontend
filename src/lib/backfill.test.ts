@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest"
 import {
-  brl, describeBlocked, describeOfferUnavailable, describeSyncResult, nextCheckoutStep,
-  offerNotes, outsideOffer, parseBackfillReturn, reachesPastRawRetention,
+  brl, describeBlocked, describeCoverageSummary, describeOfferUnavailable, describeSyncResult,
+  nextCheckoutStep, offerNotes, outsideOffer, parseBackfillReturn, reachesPastRawRetention,
+  summarizeCoverage,
 } from "@/lib/backfill"
 
 describe("describeBlocked", () => {
@@ -114,5 +115,32 @@ describe("parseBackfillReturn", () => {
 describe("brl", () => {
   it("formata centavos em reais", () => {
     expect(brl(4900)).toContain("49,00")
+  })
+})
+
+describe("summarizeCoverage", () => {
+  const brand = (name: string, blockedCount: number) =>
+    ({ tenantBrandId: name, brandName: name, blockedCount })
+
+  it("soma o tenant inteiro e descarta quem não tem bloqueio", () => {
+    const s = summarizeCoverage([brand("Nike", 4), brand("Adidas", 0), brand("Puma", 7)])
+    expect(s.totalBlocked).toBe(11)
+    expect(s.brands.map((b) => b.brandName)).toEqual(["Puma", "Nike"])
+  })
+
+  it("sem bloqueio não há o que dizer", () => {
+    const s = summarizeCoverage([brand("Nike", 0)])
+    expect(s.totalBlocked).toBe(0)
+    expect(describeCoverageSummary(s)).toBeNull()
+  })
+
+  it("com uma marca só, nomeia a marca", () => {
+    const text = describeCoverageSummary(summarizeCoverage([brand("Nike", 1), brand("Puma", 0)]))
+    expect(text).toBe("1 vídeo de Nike está fora da sua cobertura.")
+  })
+
+  it("com várias, conta as marcas", () => {
+    const text = describeCoverageSummary(summarizeCoverage([brand("Nike", 2), brand("Puma", 3)]))
+    expect(text).toBe("5 vídeos de 2 marcas estão fora da sua cobertura.")
   })
 })

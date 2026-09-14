@@ -4,6 +4,8 @@ import { ArrowLeft, ExternalLink, Lock, MessageSquareOff, Users } from "lucide-r
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { SelectFilterChip } from "@/components/ui/select-filter-chip"
 import { ApiError } from "@/lib/api"
+import { useActiveBrand } from "@/features/brands/context"
+import { CoverageNotice } from "@/components/coverage/CoverageNotice"
 import { startOfToday, windowFrom } from "@/lib/date-window"
 import {
   useCompetitorDetail,
@@ -57,6 +59,9 @@ export default function CompetitorDetailPage() {
   }, [period, anchor])
 
   const detail = useCompetitorDetail(brandId ?? null, range)
+  // A marca da URL é uma assinatura do tenant; a cobertura é por assinatura.
+  const { brands } = useActiveBrand()
+  const tenantBrandId = brands.find((b) => b.brandId === brandId)?.tenantBrandId ?? null
 
   // Gate do add-on: o backend devolve 403 e a tela vira upsell — mesma decisão do SoV.
   if (detail.error instanceof ApiError && detail.error.status === 403) return <UpsellScreen />
@@ -89,6 +94,8 @@ export default function CompetitorDetailPage() {
             placeholder="Últimos 90 dias"
           />
         </div>
+
+        <CoverageNotice tenantBrandIds={[tenantBrandId]} className="mt-5" />
       </section>
 
       {detail.isLoading ? (
