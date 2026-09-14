@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/select"
 import { useFeature } from "@/features/auth/useFeature"
 import { useActiveBrand } from "@/features/brands/context"
+import { CoverageNotice } from "@/components/coverage/CoverageNotice"
 import {
   useShareOfVoice, useSovTrend, useSovByTopic,
   type SovBrand, type SovTopic, type SovTopicShare,
@@ -75,6 +76,12 @@ export default function SovPage() {
   const topGain = [...brands].sort((a, b) => b.deltaPp - a.deltaPp)[0]
   const topDrop = [...brands].sort((a, b) => a.deltaPp - b.deltaPp)[0]
   const maxPct = brands[0]?.sharePct ?? 100
+
+  // Bloqueio em QUALQUER marca do conjunto muda o share, não só na própria: o
+  // denominador é a soma das menções visíveis.
+  const setTenantBrandIds = brands
+    .map((b) => brand.brands.find((tb) => tb.brandId === b.brandId)?.tenantBrandId)
+    .filter((id): id is string => Boolean(id))
 
   const exportCsv = () => {
     if (brands.length === 0) return
@@ -148,6 +155,12 @@ export default function SovPage() {
           )}
         </div>
       </section>
+
+      <CoverageNotice
+        tenantBrandIds={setTenantBrandIds}
+        scopeLabel={setTenantBrandIds.length > 1 ? "deste conjunto competitivo" : "desta marca"}
+        className="mx-8 mt-4"
+      />
 
       {sov.isError && !forbidden ? (
         <ErrorState onRetry={() => sov.refetch()} />

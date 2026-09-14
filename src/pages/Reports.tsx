@@ -8,6 +8,7 @@ import { notifyError, notifySuccess } from "@/lib/feedback"
 import { useConfirm } from "@/features/confirm/context"
 import { useFeature } from "@/features/auth/useFeature"
 import { useActiveBrand } from "@/features/brands/context"
+import { CoverageNotice } from "@/components/coverage/CoverageNotice"
 import { ApiError } from "@/lib/api"
 import {
   useReports, useReportTemplates, useCreateReport, useDeleteReport,
@@ -138,6 +139,9 @@ export default function ReportsPage() {
           </div>
         </div>
       </section>
+
+      {/* O relatório sai com o que o tenant pode ver: dizer antes de gerar, não depois. */}
+      <CoverageNotice tenantBrandIds={[brand.active?.tenantBrandId]} className="mx-8 mt-4" />
 
       {/* Templates */}
       <section

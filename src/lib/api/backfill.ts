@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "@/lib/api"
 import { useAuth } from "@/features/auth/context"
 
@@ -77,6 +77,22 @@ export function useBrandCoverage(tenantBrandId: string | null) {
     queryFn: ({ signal }) => backfillApi.coverage(tenantBrandId!, { signal }),
     enabled: Boolean(activeTenantId && tenantBrandId),
     staleTime: 60_000,
+  })
+}
+
+/**
+ * Cobertura de várias marcas de uma vez, para o Consumo. Mesma chave do
+ * `useBrandCoverage`: quem já abriu a marca não paga uma segunda consulta.
+ */
+export function useBrandCoverages(tenantBrandIds: string[]) {
+  const { activeTenantId } = useAuth()
+  return useQueries({
+    queries: tenantBrandIds.map((tenantBrandId) => ({
+      queryKey: ["brand-coverage", activeTenantId, tenantBrandId],
+      queryFn: ({ signal }: { signal: AbortSignal }) => backfillApi.coverage(tenantBrandId, { signal }),
+      enabled: Boolean(activeTenantId),
+      staleTime: 60_000,
+    })),
   })
 }
 

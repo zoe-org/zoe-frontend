@@ -4,6 +4,7 @@ import { AlertCircle, ArrowUp, ArrowDown } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { useAuth } from "@/features/auth/context"
+import { CoverageNotice } from "@/components/coverage/CoverageNotice"
 import { AreaLine, Heatmap, Sparkline } from "@/components/ui/charts"
 import { heatmapRamp } from "@/lib/heatmap-ramp"
 import { useTheme } from "next-themes"
@@ -115,6 +116,8 @@ export default function DashboardPage() {
           </div>
         </div>
       </section>
+
+      <CoverageNotice tenantBrandIds={[brand.active?.tenantBrandId]} className="mx-8 mt-4" />
 
       {/* KPIs */}
       <section className="grid grid-cols-1 md:grid-cols-3 border-b border-border-soft">

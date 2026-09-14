@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { SelectFilterChip } from "@/components/ui/select-filter-chip"
 import { useActiveBrand } from "@/features/brands/context"
+import { CoverageNotice } from "@/components/coverage/CoverageNotice"
 import { brandVoice } from "@/features/brands/voice"
 import {
   useSentimentEvolution, useTopKeywords, useImpactEvents, useTopicSentiments,
@@ -132,6 +133,8 @@ export default function SentimentPage() {
           />
         </div>
       </section>
+
+      <CoverageNotice tenantBrandIds={[brand.active?.tenantBrandId]} className="mx-8 mt-4" />
 
       {evolution.isError ? (
         <ErrorState onRetry={() => evolution.refetch()} />

@@ -4,6 +4,7 @@ import { AlertCircle, Loader2, ShieldCheck } from "lucide-react"
 import { notifyError, notifySuccess } from "@/lib/feedback"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { LongVideoQueue } from "./LongVideoQueue"
+import { CoverageSummaryCard } from "@/components/coverage/CoverageSummaryCard"
 import { ApiError } from "@/lib/api"
 import { useAuth } from "@/features/auth/context"
 import { useSubscription } from "@/lib/api/billing"
@@ -111,6 +112,9 @@ export function UsagePanel() {
         <LongVideoQueue />
 
         <BrandTable rows={data.byBrand} billedMinutes={data.billedMinutes} />
+
+        {/* O que existe e não aparece (ADR-054): contagem aqui, compra em Marcas. */}
+        <CoverageSummaryCard />
 
         <SpendCapCard
           overageCentsPerMinute={data.overageCentsPerMinute}
