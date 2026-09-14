@@ -60,6 +60,13 @@ describe("rankBrands", () => {
     ])
     expect(ranked[0].brandName).toBe("B")
   })
+
+  it("mesmo share e mesmas menções dividem o lugar, e o próximo pula uma posição", () => {
+    const ranked = rankBrands([
+      brand("Nubank", 48, { mentions: 11 }), brand("Itaú", 48, { mentions: 11, isYou: true }), brand("PicPay", 4),
+    ])
+    expect(ranked.map((b) => b.rank)).toEqual([1, 1, 3])
+  })
 })
 
 describe("positionSummary", () => {
@@ -81,6 +88,27 @@ describe("positionSummary", () => {
       "Você está em 2º entre 3 marcas, com 24% de share, 10pp atrás de Nubank. " +
       "Perdeu 2pp em relação ao período anterior.",
     )
+  })
+
+  it("empate na liderança é dito como empate — não como '0pp atrás'", () => {
+    const text = positionSummary(rankBrands([
+      brand("Nubank", 48, { mentions: 11 }), brand("Itaú", 48, { mentions: 11, isYou: true }), brand("PicPay", 4),
+    ]))
+    expect(text).toBe("Você divide a liderança com Nubank, com 48% de share, 44pp à frente de PicPay.")
+  })
+
+  it("mesmo share com menos menções: diz o que separa, sem '0pp'", () => {
+    const text = positionSummary(rankBrands([
+      brand("Nubank", 50, { mentions: 12 }), brand("Itaú", 50, { mentions: 10, isYou: true }),
+    ]))
+    expect(text).toBe("Você está em 2º entre 2 marcas, com 50% de share, com o mesmo share de Nubank e menos menções.")
+  })
+
+  it("empate fora da liderança", () => {
+    const text = positionSummary(rankBrands([
+      brand("Nubank", 40), brand("Itaú", 30, { mentions: 5, isYou: true }), brand("Inter", 30, { mentions: 5 }),
+    ]))
+    expect(text).toBe("Você divide o 2º lugar com Inter, com 30% de share, 10pp atrás de Nubank.")
   })
 
   it("sem variação não inventa movimento", () => {
@@ -189,6 +217,13 @@ describe("nearestRival", () => {
   it("liderando: o segundo — é quem pode te passar", () => {
     const ranked = rankBrands([brand("Nubank", 34, { isYou: true }), brand("Itaú", 24), brand("Inter", 18)])
     expect(nearestRival(ranked)?.brandName).toBe("Itaú")
+  })
+
+  it("empatado na liderança: compara com quem divide o lugar", () => {
+    const ranked = rankBrands([
+      brand("Nubank", 48, { mentions: 11 }), brand("Itaú", 48, { mentions: 11, isYou: true }), brand("PicPay", 4),
+    ])
+    expect(nearestRival(ranked)?.brandName).toBe("Nubank")
   })
 
   it("sem marca própria, ou sozinha no conjunto, não há com quem comparar", () => {

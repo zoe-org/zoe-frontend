@@ -479,7 +479,7 @@ function Kpi({ label, value, spark, accent, loading, className }: {
         </span>
       )}
       {!loading && spark.length > 1 && (
-        <div className="mt-3"><Sparkline data={spark} width={200} height={28} color={accent ? "#00A799" : "#9AA1AE"} /></div>
+        <div className="mt-3"><Sparkline data={spark} height={28} color={accent ? "#00A799" : "#9AA1AE"} /></div>
       )}
     </div>
   )

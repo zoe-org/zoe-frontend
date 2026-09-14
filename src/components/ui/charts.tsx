@@ -1,6 +1,30 @@
-import { useRef, useState, type PointerEvent as ReactPointerEvent } from "react"
+import { useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react"
 import { useTheme } from "next-themes"
 import { heatmapRamp } from "@/lib/heatmap-ramp"
+import { monotonePath } from "@/lib/curve"
+
+/**
+ * Largura real do container, para o SVG ser desenhado no tamanho em que aparece.
+ *
+ * Com viewBox fixo e altura fixa, o navegador só escala proporcionalmente: numa tela
+ * larga o gráfico ficava com 600px, centralizado, com margem vazia dos dois lados.
+ * Esticar com preserveAspectRatio="none" deformaria texto e marcadores — medir não.
+ */
+function useContainerWidth<T extends HTMLElement>(fallback: number) {
+  const ref = useRef<T>(null)
+  const [width, setWidth] = useState<number | null>(null)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el || typeof ResizeObserver === "undefined") return
+    const ro = new ResizeObserver(([entry]) => {
+      const w = Math.round(entry.contentRect.width)
+      if (w > 0) setWidth(w)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  return [ref, width ?? fallback] as const
+}
 
 type SparklineProps = {
   data: number[]
@@ -12,11 +36,14 @@ type SparklineProps = {
 
 export function Sparkline({
   data,
-  width = 80,
+  width: widthProp,
   height = 24,
   color = "#00A799",
   fillOpacity = 0.12,
 }: SparklineProps) {
+  // Sem `width`, ocupa a largura do container.
+  const [boxRef, measured] = useContainerWidth<HTMLDivElement>(widthProp ?? 80)
+  const width = widthProp ?? measured
   const min = Math.min(...data)
   const max = Math.max(...data)
   const range = max - min || 1
@@ -27,19 +54,15 @@ export function Sparkline({
         (1 - (v - min) / range) * (height - 4) + 2,
       ] as const
   )
-  let d = `M ${pts[0][0]} ${pts[0][1]}`
-  for (let i = 1; i < pts.length; i++) {
-    const p0 = pts[i - 1]
-    const p1 = pts[i]
-    const midX = (p0[0] + p1[0]) / 2
-    d += ` Q ${midX} ${p0[1]}, ${midX} ${(p0[1] + p1[1]) / 2} T ${p1[0]} ${p1[1]}`
-  }
+  const d = monotonePath(pts)
   const area = d + ` L ${width} ${height} L 0 ${height} Z`
   return (
-    <svg width={width} height={height} style={{ display: "block" }}>
-      <path d={area} fill={color} fillOpacity={fillOpacity} />
-      <path d={d} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
+    <div ref={boxRef} style={{ width: widthProp ?? "100%" }}>
+      <svg width={width} height={height} style={{ display: "block" }}>
+        <path d={area} fill={color} fillOpacity={fillOpacity} />
+        <path d={d} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    </div>
   )
 }
 
@@ -53,11 +76,14 @@ type AreaLineProps = {
 
 export function AreaLine({
   data,
-  width = 600,
+  width: widthProp,
   height = 180,
   color = "#00A799",
   fillOpacity = 0.12,
 }: AreaLineProps) {
+  // Sem `width`, desenha na largura real do container (ver useContainerWidth).
+  const [boxRef, measured] = useContainerWidth<HTMLDivElement>(widthProp ?? 600)
+  const width = widthProp ?? measured
   const pad = { t: 12, r: 12, b: 6, l: 6 }
   const W = width - pad.l - pad.r
   const H = height - pad.t - pad.b
@@ -72,24 +98,7 @@ export function AreaLine({
     return [x, y] as const
   })
 
-  const smoothPath = (pts: readonly (readonly [number, number])[]) => {
-    if (pts.length < 2) return ""
-    let d = `M ${pts[0][0]} ${pts[0][1]}`
-    for (let i = 0; i < pts.length - 1; i++) {
-      const p0 = pts[i - 1] || pts[i]
-      const p1 = pts[i]
-      const p2 = pts[i + 1]
-      const p3 = pts[i + 2] || p2
-      const cp1x = p1[0] + (p2[0] - p0[0]) / 6
-      const cp1y = p1[1] + (p2[1] - p0[1]) / 6
-      const cp2x = p2[0] - (p3[0] - p1[0]) / 6
-      const cp2y = p2[1] - (p3[1] - p1[1]) / 6
-      d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2[0]} ${p2[1]}`
-    }
-    return d
-  }
-
-  const linePath = smoothPath(points)
+  const linePath = monotonePath(points)
   const areaPath =
     linePath +
     ` L ${points[points.length - 1][0]} ${pad.t + H} L ${points[0][0]} ${pad.t + H} Z`
@@ -113,7 +122,7 @@ export function AreaLine({
   }
 
   return (
-    <div style={{ position: "relative", width: "100%" }}>
+    <div ref={boxRef} style={{ position: "relative", width: "100%" }}>
       <svg
         ref={svgRef}
         viewBox={`0 0 ${width} ${height}`}
@@ -212,7 +221,7 @@ type MultiLineProps = {
 export function MultiLine({
   series,
   labels,
-  width = 600,
+  width: widthProp,
   height = 180,
   interactive = false,
   emphasize,
@@ -224,6 +233,9 @@ export function MultiLine({
 }: MultiLineProps) {
   const [hover, setHover] = useState<number | null>(null)
   const svgRef = useRef<SVGSVGElement>(null)
+  // Sem `width`, desenha na largura real do container (ver useContainerWidth).
+  const [boxRef, measured] = useContainerWidth<HTMLDivElement>(widthProp ?? 600)
+  const width = widthProp ?? measured
 
   const pad = { t: 12, r: 12, b: 20, l: 28 }
   const W = width - pad.l - pad.r
@@ -238,23 +250,6 @@ export function MultiLine({
   const xOf = (i: number) =>
     pad.l + (len === 1 ? W / 2 : (i / (len - 1)) * W)
   const yOf = (v: number) => pad.t + (1 - (v - vmin) / range) * H
-
-  const smoothPath = (pts: readonly (readonly [number, number])[]) => {
-    if (pts.length < 2) return ""
-    let d = `M ${pts[0][0]} ${pts[0][1]}`
-    for (let i = 0; i < pts.length - 1; i++) {
-      const p0 = pts[i - 1] || pts[i]
-      const p1 = pts[i]
-      const p2 = pts[i + 1]
-      const p3 = pts[i + 2] || p2
-      const cp1x = p1[0] + (p2[0] - p0[0]) / 6
-      const cp1y = p1[1] + (p2[1] - p0[1]) / 6
-      const cp2x = p2[0] - (p3[0] - p1[0]) / 6
-      const cp2y = p2[1] - (p3[1] - p1[1]) / 6
-      d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2[0]} ${p2[1]}`
-    }
-    return d
-  }
 
   const gridSteps = 4
   const grid = Array.from({ length: gridSteps + 1 }, (_, i) => {
@@ -328,7 +323,7 @@ export function MultiLine({
         return (
           <g key={s.name} opacity={faded ? 0.5 : 1}>
             <path
-              d={smoothPath(pts)}
+              d={monotonePath(pts)}
               fill="none"
               stroke={s.color}
               strokeWidth={strong ? 3 : 2}
@@ -358,7 +353,7 @@ export function MultiLine({
     </svg>
   )
 
-  if (!interactive) return chart
+  if (!interactive) return <div ref={boxRef}>{chart}</div>
 
   const leftPct = hover == null ? 0 : (xOf(hover) / width) * 100
   const empty = hover != null && (isEmptyColumn?.(hover) ?? false)
@@ -369,7 +364,7 @@ export function MultiLine({
         .sort((a, b) => b.v - a.v)
 
   return (
-    <div className="relative">
+    <div ref={boxRef} className="relative">
       {chart}
       {hover != null && (
         <div

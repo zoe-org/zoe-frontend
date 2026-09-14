@@ -53,9 +53,20 @@ export type RankedBrand = SovBrand & { rank: number }
  * frente seria um artefato do arredondamento.
  */
 export function rankBrands(brands: SovBrand[]): RankedBrand[] {
-  return [...brands]
-    .sort((a, b) => b.sharePct - a.sharePct || b.mentions - a.mentions)
-    .map((b, i) => ({ ...b, rank: i + 1 }))
+  const sorted = [...brands].sort((a, b) => b.sharePct - a.sharePct || b.mentions - a.mentions)
+  // Posição de competição (1, 1, 3): mesmo share E mesmas menções é empate de
+  // verdade, e as duas marcas dividem o lugar. Dar #2 a uma delas seria dizer que
+  // ela está atrás por causa da ordem em que a lista chegou.
+  return sorted.map((b) => ({
+    ...b,
+    rank: sorted.findIndex((o) => o.sharePct === b.sharePct && o.mentions === b.mentions) + 1,
+  }))
+}
+
+/** "Nubank", "Nubank e Inter", "Nubank, Inter e C6". */
+function listaNomes(nomes: string[]): string {
+  if (nomes.length <= 1) return nomes[0] ?? ""
+  return `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}`
 }
 
 /**
@@ -66,18 +77,38 @@ export function positionSummary(ranked: RankedBrand[]): string | null {
   const you = ranked.find((b) => b.isYou)
   if (!you) return null
 
-  const total = ranked.length
-  const lugar = you.rank === 1
-    ? `Você lidera as conversas do setor com ${you.sharePct}% de share`
-    : `Você está em ${you.rank}º entre ${total} marcas, com ${you.sharePct}% de share`
+  const empatados = ranked.filter((b) => !b.isYou && b.rank === you.rank)
+  const nomes = listaNomes(empatados.map((b) => b.brandName))
 
-  const lider = ranked[0]
-  const distancia = you.rank === 1
-    ? (() => {
-        const segundo = ranked[1]
-        return segundo ? `, ${you.sharePct - segundo.sharePct}pp à frente de ${segundo.brandName}` : ""
-      })()
-    : `, ${lider.sharePct - you.sharePct}pp atrás de ${lider.brandName}`
+  let lugar: string
+  if (empatados.length > 0) {
+    lugar = you.rank === 1
+      ? `Você divide a liderança com ${nomes}, com ${you.sharePct}% de share`
+      : `Você divide o ${you.rank}º lugar com ${nomes}, com ${you.sharePct}% de share`
+  } else {
+    lugar = you.rank === 1
+      ? `Você lidera as conversas do setor com ${you.sharePct}% de share`
+      : `Você está em ${you.rank}º entre ${ranked.length} marcas, com ${you.sharePct}% de share`
+  }
+
+  // Mesmo share com posições diferentes é desempate por menções — "0pp atrás" leria
+  // como erro, então a frase diz o que de fato separa as duas.
+  let distancia = ""
+  if (you.rank === 1) {
+    const proximo = ranked.find((b) => b.rank > 1)
+    if (proximo) {
+      const gap = you.sharePct - proximo.sharePct
+      distancia = gap === 0
+        ? `, com o mesmo share de ${proximo.brandName} e mais menções`
+        : `, ${gap}pp à frente de ${proximo.brandName}`
+    }
+  } else {
+    const lider = ranked[0]
+    const gap = lider.sharePct - you.sharePct
+    distancia = gap === 0
+      ? `, com o mesmo share de ${lider.brandName} e menos menções`
+      : `, ${gap}pp atrás de ${lider.brandName}`
+  }
 
   const movimento = you.deltaPp === 0
     ? ""
@@ -93,9 +124,10 @@ export function positionSummary(ranked: RankedBrand[]): string | null {
  * quem você precisa passar) ou, se você lidera, o segundo (é quem pode te passar).
  */
 export function nearestRival(ranked: RankedBrand[]): RankedBrand | null {
-  const you = ranked.find((b) => b.isYou)
-  if (!you) return null
-  const alvo = you.rank === 1 ? ranked[1] : ranked[you.rank - 2]
+  // Pelo índice, não pela posição: com empate, a posição deixa de ser índice + 1.
+  const i = ranked.findIndex((b) => b.isYou)
+  if (i < 0) return null
+  const alvo = i === 0 ? ranked[1] : ranked[i - 1]
   return alvo && !alvo.isYou ? alvo : null
 }
 
