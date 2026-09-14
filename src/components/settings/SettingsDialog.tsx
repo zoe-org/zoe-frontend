@@ -8,6 +8,7 @@ import { AppearancePanel } from "./panels/AppearancePanel"
 import { WorkspacePanel } from "./panels/WorkspacePanel"
 import { PlanPanel } from "./panels/PlanPanel"
 import { UsagePanel } from "./panels/UsagePanel"
+import { useLongVideoDecisions } from "@/lib/api/usage"
 
 /**
  * Configurações da conta e do workspace num diálogo só.
@@ -214,7 +215,8 @@ function Rail({
                   style={active ? { background: "var(--teal-bg)", color: "var(--teal-fg)" } : undefined}
                 >
                   <Icon className="w-[15px] h-[15px] shrink-0" />
-                  <span className="truncate">{label}</span>
+                  <span className="truncate flex-1">{label}</span>
+                  {key === "consumo" && <ConsumoBadge />}
                 </button>
               )
             })}
@@ -222,6 +224,24 @@ function Rail({
         </div>
       ))}
     </nav>
+  )
+}
+
+/**
+ * Vídeos longos esperando decisão. Só existe com o diálogo aberto (o rail mora no
+ * portal), então não consulta a fila em toda página.
+ */
+function ConsumoBadge() {
+  const pending = useLongVideoDecisions("Pending").data?.pendingCount ?? 0
+  if (pending === 0) return null
+  return (
+    <span
+      className="text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white"
+      style={{ background: "var(--color-ember)" }}
+      title={`${pending} ${pending === 1 ? "vídeo longo aguardando" : "vídeos longos aguardando"} decisão`}
+    >
+      {pending > 99 ? "99+" : pending}
+    </span>
   )
 }
 
@@ -250,6 +270,7 @@ function TabStrip({
             >
               <Icon className="w-[14px] h-[14px] shrink-0" />
               {label}
+              {key === "consumo" && <ConsumoBadge />}
             </button>
           )
         })}

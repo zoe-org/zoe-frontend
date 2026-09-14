@@ -130,6 +130,85 @@ export function useSaveUsagePreferences() {
   })
 }
 
+// ── Fila de vídeo longo (WS-6 da api, WS-F10) ─────────────────────────────
+
+export type LongVideoDecisionStatus = "Pending" | "Approved" | "Dismissed"
+export type LongVideoAction = "Approve" | "Dismiss"
+
+export type LongVideoDecision = {
+  id: string
+  brandId: string
+  brandName: string
+  youtubeVideoId: string
+  title: string
+  channelName: string
+  durationSeconds: number
+  /** O que aprovar debita, na mesma conta da ingestão. */
+  estimatedMinutes: number
+  /** O teto por vídeo que ele passou: é o "por quê" de estar na fila. */
+  maxVideoMinutes: number
+  status: LongVideoDecisionStatus
+  /** false = o collector recusou. Aprovado assim reserva o teto de gasto e é cobrado quando a análise chega. */
+  collected: boolean
+  createdAt: string
+  decidedAt: string | null
+}
+
+export type LongVideoDecisionsResponse = {
+  items: LongVideoDecision[]
+  /** Sempre dos pendentes, qualquer que seja o filtro: serve de badge. */
+  pendingCount: number
+  pendingMinutes: number
+}
+
+export type LongVideoDecisionOutcome = {
+  id: string
+  result: "approved" | "dismissed" | "skipped"
+  /**
+   * approved: `awaiting_collection` ou null. skipped: `exceeds_spend_cap`,
+   * `brand_budget_exhausted`, `already_decided` ou `not_found`.
+   */
+  reason: string | null
+}
+
+export type DecideLongVideosResponse = {
+  items: LongVideoDecisionOutcome[]
+  /** Só o cobrado agora; aprovado sem coleta debita na ingestão. */
+  debitedMinutes: number
+}
+
+export const longVideosApi = {
+  list: (status: LongVideoDecisionStatus, opts?: { signal?: AbortSignal }): Promise<LongVideoDecisionsResponse> =>
+    apiClient.get(`/api/usage/long-videos?status=${status}`, { signal: opts?.signal }),
+  /** Owner/Admin. No máximo 200 por lote. Tenant bloqueado recebe 400 `quota_blocked`. */
+  decide: (decisionIds: string[], action: LongVideoAction): Promise<DecideLongVideosResponse> =>
+    apiClient.post("/api/usage/long-videos/decisions", { decisionIds, action }),
+}
+
+export function useLongVideoDecisions(status: LongVideoDecisionStatus) {
+  const { activeTenantId } = useAuth()
+  return useQuery({
+    queryKey: ["long-videos", activeTenantId, status],
+    queryFn: ({ signal }) => longVideosApi.list(status, { signal }),
+    enabled: Boolean(activeTenantId),
+    staleTime: 30_000,
+  })
+}
+
+/** Aprovar é gasto: o medidor é invalidado junto, e as três abas, porque o item muda de aba. */
+export function useDecideLongVideos() {
+  const { activeTenantId } = useAuth()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ decisionIds, action }: { decisionIds: string[]; action: LongVideoAction }) =>
+      longVideosApi.decide(decisionIds, action),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["long-videos", activeTenantId] })
+      qc.invalidateQueries({ queryKey: ["usage-meter", activeTenantId] })
+    },
+  })
+}
+
 /** Teto de minutos por marca. Owner apenas — a API recusa os demais com `owner_only`. */
 export function useSetBrandBudget() {
   const { activeTenantId } = useAuth()

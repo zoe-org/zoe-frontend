@@ -3,6 +3,7 @@ import { Link } from "react-router-dom"
 import { AlertCircle, Loader2, ShieldCheck } from "lucide-react"
 import { notifyError, notifySuccess } from "@/lib/feedback"
 import { EmptyBlock } from "@/components/ui/empty-block"
+import { LongVideoQueue } from "./LongVideoQueue"
 import { ApiError } from "@/lib/api"
 import { useAuth } from "@/features/auth/context"
 import { useSubscription } from "@/lib/api/billing"
@@ -105,6 +106,9 @@ export function UsagePanel() {
         />
 
         <Projection projection={data.projection} paused={paused} hasQuota={hasQuota} />
+
+        {/* Aprovar é decisão de gasto: fica junto do medidor, onde o efeito aparece. */}
+        <LongVideoQueue />
 
         <BrandTable rows={data.byBrand} billedMinutes={data.billedMinutes} />
 
