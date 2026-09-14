@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import {
   Search, Plus, X, Check, AlertCircle, ExternalLink, ShieldCheck, Clock, Loader2, ChevronDown, Archive, RotateCcw,
 } from "lucide-react"
@@ -14,6 +14,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { notifyError, notifySuccess } from "@/lib/feedback"
 import { useConfirm } from "@/features/confirm/context"
+import { CoverageCard } from "@/components/coverage/CoverageCard"
 import {
   useTenantBrands, useBrandKeywords, useBrandMutations, useSubscribeFlow,
   useBrandCompetitors, useCompetitorMutations,
@@ -135,7 +136,9 @@ export default function BrandsPage() {
   const items = useMemo(() => brands.data?.items ?? [], [brands.data])
 
   const [query, setQuery] = useState("")
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  // `?marca=` chega do aviso de cobertura do Monitoramento: abre direto na marca.
+  const [params] = useSearchParams()
+  const [selectedId, setSelectedId] = useState<string | null>(() => params.get("marca"))
   const [newOpen, setNewOpen] = useState(false)
   // Arquivadas começam recolhidas: são histórico, não o trabalho do dia.
   const [showArchived, setShowArchived] = useState(false)
@@ -623,6 +626,12 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
           )}
         </div>
       </div>
+
+      <CoverageCard
+        tenantBrandId={brand.tenantBrandId}
+        brandName={brand.displayName ?? brand.brandName}
+        canManage={canManage}
+      />
 
       {/* Conjunto competitivo (ADR-044) — só de marca própria. */}
       {brand.relationship === "OwnBrand" && (

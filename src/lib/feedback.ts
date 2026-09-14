@@ -11,6 +11,11 @@ export function notifySuccess(message: string) {
   toast.success(message)
 }
 
+/** Nem sucesso nem erro, mas pede atenção (ex.: pagamento compensando). Fica mais tempo. */
+export function notifyInfo(message: string, description?: string) {
+  toast.info(message, { description, duration: 10_000 })
+}
+
 type ErrorOptions = {
   /** Caminho de dinheiro: o aviso fica até ser fechado, com o código de suporte. */
   terminal?: boolean
