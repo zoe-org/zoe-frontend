@@ -252,10 +252,12 @@ function EscrowRow({
 }) {
   // Caduca e' pior que vencida: vencida e' a data ter passado, caduca e' a renovacao ter
   // falhado — o dinheiro NAO esta' mais reservado e a liberacao vai recusar.
+  // Custódia encerrada (liberada, devolvida) não tem mais reserva a vencer: o alerta ali
+  // assustaria sobre um dinheiro que já foi pago.
   const alerta =
-    e.authorizationLapsedAt
+    e.authorizationLapsedAt && !e.isTerminal
       ? { icone: AlertTriangle, texto: "reserva caiu — refinanciar", cor: "#DC2626", forte: true }
-      : e.isAuthorizationExpired
+      : e.isAuthorizationExpired && !e.isTerminal
         ? { icone: Clock, texto: "autorização vencida", cor: "#D97706", forte: false }
         : e.payoutAccountMissing && !e.isTerminal
           ? { icone: Wallet, texto: "criador sem conta de recebimento", cor: "#D97706", forte: false }

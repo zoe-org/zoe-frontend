@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react"
 import { Link, useParams } from "react-router-dom"
 import {
-  ArrowLeft, Loader2, AlertCircle, Lock, Send, Save, PenLine, ChevronRight,
+  ArrowLeft, Loader2, AlertCircle, Lock, Send, Save, PenLine, ChevronRight, BookmarkPlus,
 } from "lucide-react"
 import { toast } from "sonner"
 import { ApiError } from "@/lib/api"
@@ -13,7 +13,7 @@ import { TableSkeleton } from "@/pages/operations/shared"
 import {
   useContract, useContractDetailMutations, useEscrowMutations, useCustomClauseMutations,
   CUSTOM_CONTRACTS_UPGRADE_CODE,
-  fieldInputKind, contractProgress,
+  fieldInputKind, contractProgress, FIELD_SOURCE_LABEL, useUpdateContractDefaults, useContractDefaults,
   type ContractField, type ContractDetail, type ContractClause,
 } from "@/lib/api/operations"
 
@@ -36,6 +36,14 @@ export default function ContractDetailPage() {
   const [edits, setEdits] = useState<Record<string, string>>({})
   /** Faltantes apontados pelo servidor na última tentativa de envio. */
   const [serverMissing, setServerMissing] = useState<string[]>([])
+  /**
+   * Mostra só os campos ainda vazios. Com o contrato nascendo quase todo preenchido, a
+   * pergunta de quem abre deixa de ser "o que tem aqui" e passa a ser "o que falta" — rolar
+   * quarenta campos cheios para achar os três vazios devolveria o trabalho que a herança tirou.
+   */
+  const [soVazios, setSoVazios] = useState(false)
+  const salvarPadrao = useUpdateContractDefaults()
+  const padroesMarca = useContractDefaults()
 
   const data = contract.data
   const fields = useMemo<ContractField[]>(
@@ -61,6 +69,27 @@ export default function ContractDetailPage() {
 
   const isDraft = data.status === "Draft"
   const missing = new Set([...data.missingRequiredFields, ...serverMissing])
+
+  // Vazio pelo valor SALVO, não pelo que está sendo digitado: senão o campo sumiria da lista
+  // na primeira tecla e levaria o foco junto. Ele sai do filtro depois de salvar.
+  const salvos = new Map(data.fields.map((f) => [f.placeholder, f.value]))
+  const vazio = (f: ContractField) => !f.isSystemManaged && !(salvos.get(f.placeholder) ?? "").trim()
+  const vazios = fields.filter(vazio)
+  // Obrigatório vazio primeiro: é ele que trava o envio.
+  const visiveis = soVazios
+    ? [...vazios].sort((a, b) => Number(missing.has(b.placeholder)) - Number(missing.has(a.placeholder)))
+    : fields
+
+  const padraoAtual = new Map((padroesMarca.data?.fields ?? []).map((c) => [c.placeholder, (c.value ?? "").trim()]))
+
+  const tornarPadrao = (f: ContractField) => {
+    const valor = (f.value ?? "").trim()
+    if (!valor) return
+    salvarPadrao.mutate({ [f.placeholder]: valor }, {
+      onSuccess: () => toast.success(`“${f.label}” virou padrão. Os próximos contratos já nascem com ele.`),
+      onError: (e) => toast.error(e instanceof ApiError ? e.message : "Não foi possível salvar o padrão."),
+    })
+  }
 
   const setValue = (placeholder: string, value: string) => {
     setEdits((e) => ({ ...e, [placeholder]: value }))
@@ -116,7 +145,19 @@ export default function ContractDetailPage() {
         {/* Campos */}
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-[15px] font-semibold m-0">Campos do contrato</h2>
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <h2 className="text-[15px] font-semibold m-0">Campos do contrato</h2>
+              <button
+                onClick={() => setSoVazios((v) => !v)}
+                aria-pressed={soVazios}
+                className="px-2.5 py-1 rounded-full text-[11.5px] font-medium border transition-colors"
+                style={soVazios
+                  ? { background: "var(--color-teal-500)", borderColor: "transparent", color: "#fff" }
+                  : { borderColor: "var(--border-soft)", color: "var(--ink-muted)" }}
+              >
+                Só os vazios ({vazios.length})
+              </button>
+            </div>
             <RoleGate minRole="Admin">
               <div className="flex items-center gap-2">
                 {isDraft && (
@@ -154,17 +195,27 @@ export default function ContractDetailPage() {
               largura nao ajuda ninguem a ler nem a preencher, e empurrava o formulario
               para uma rolagem que nao precisava existir. Texto longo continua inteiro. */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-4">
-            {fields.map((f) => (
+            {visiveis.map((f) => (
               <div key={f.placeholder} className={campoLargo(f) ? "md:col-span-2" : undefined}>
                 <FieldRow
                   field={f}
                   readOnly={!isDraft || f.isSystemManaged}
                   isMissing={missing.has(f.placeholder)}
+                  edited={f.placeholder in edits}
                   onChange={(v) => setValue(f.placeholder, v)}
+                  onMakeDefault={() => tornarPadrao(f)}
+                  alreadyDefault={Boolean((f.value ?? "").trim()) && padraoAtual.get(f.placeholder) === (f.value ?? "").trim()}
+                  savingDefault={salvarPadrao.isPending && salvarPadrao.variables?.[f.placeholder] !== undefined}
                 />
               </div>
             ))}
           </div>
+
+          {soVazios && vazios.length === 0 && (
+            <p className="text-[12.5px] text-ink-muted mt-2">
+              Nenhum campo vazio — tudo veio herdado ou já foi preenchido.
+            </p>
+          )}
         </div>
 
         {/* Coluna lateral */}
@@ -237,13 +288,27 @@ function campoLargo(f: ContractField) {
 }
 
 function FieldRow({
-  field, readOnly, isMissing, onChange,
+  field, readOnly, isMissing, edited, onChange, onMakeDefault, savingDefault, alreadyDefault,
 }: {
   field: ContractField
   readOnly: boolean
   isMissing: boolean
+  /** Alterado nesta tela e ainda não salvo: a origem herdada deixou de ser verdade. */
+  edited: boolean
   onChange: (v: string) => void
+  onMakeDefault: () => void
+  savingDefault: boolean
+  /** O valor do campo já é o padrão salvo da marca: salvar de novo não mudaria nada. */
+  alreadyDefault: boolean
 }) {
+  // Campo do registro já tem o cadeado "do registro": uma segunda etiqueta dizendo a mesma
+  // coisa com outras palavras só faz a linha parecer mais complicada do que é.
+  const origem = !edited && !field.isSystemManaged && field.source ? FIELD_SOURCE_LABEL[field.source] : null
+  // Compara com o padrão salvo, não com a origem: depois de um clique em "usar como padrão"
+  // o botão tem de sumir, mesmo com o campo ainda marcado como digitado neste contrato.
+  const podeVirarPadrao = field.defaultable
+    && Boolean((field.value ?? "").trim())
+    && !alreadyDefault
   const kind = fieldInputKind(field.dataType)
   const value = field.value ?? ""
 
@@ -254,6 +319,16 @@ function FieldRow({
         {/* Campo que o sistema preenche nunca falta — o asterisco ali seria cobrança de
             algo que ninguém tem como digitar. */}
         {field.isRequired && !field.isSystemManaged && <span style={{ color: "#DC2626" }}>*</span>}
+        {/* A origem diz de onde o valor veio sem obrigar a pessoa a reler tudo para confiar
+            nele. Some quando ela edita: a partir daí o valor é dela. */}
+        {origem && (
+          <span
+            className="text-[10px] font-medium px-1.5 py-0.5 rounded"
+            style={{ background: "#00A79914", color: "var(--color-teal-500)" }}
+          >
+            {origem}
+          </span>
+        )}
         {field.isSystemManaged ? (
           <span
             className="chip text-[10px]"
@@ -300,6 +375,22 @@ function FieldRow({
       )}
 
       {field.helpText && <span className="text-[11.5px] text-ink-muted">{field.helpText}</span>}
+
+      {podeVirarPadrao && (
+        <RoleGate minRole="Admin">
+          <button
+            type="button"
+            onClick={(e) => { e.preventDefault(); onMakeDefault() }}
+            disabled={savingDefault}
+            className="self-start inline-flex items-center gap-1 text-[11.5px] font-medium hover:opacity-70 disabled:opacity-50"
+            style={{ color: "var(--color-teal-500)" }}
+            title="Todo contrato novo desta marca passa a nascer com este valor."
+          >
+            {savingDefault ? <Loader2 className="w-3 h-3 animate-spin" /> : <BookmarkPlus className="w-3 h-3" />}
+            Usar como padrão da marca
+          </button>
+        </RoleGate>
+      )}
     </label>
   )
 }

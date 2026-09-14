@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react"
 import { Plus, X, Loader2, FileText, ShieldAlert, Trash2 } from "lucide-react"
 import { toast } from "sonner"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { ApiError } from "@/lib/api"
 import { Input } from "@/components/ui/input"
 import { EmptyBlock } from "@/components/ui/empty-block"
@@ -252,6 +252,7 @@ function CreateContractModal({ onClose }: { onClose: () => void }) {
   const roster = useRoster()
   const campaigns = useCampaigns()
   const { create } = useContractMutations()
+  const navigate = useNavigate()
 
   const [campaignId, setCampaignId] = useState("")
   /** Modalidade do avulso. Ignorada quando há campanha — lá ela é quem manda. */
@@ -311,6 +312,9 @@ function CreateContractModal({ onClose }: { onClose: () => void }) {
           `Rascunho criado a partir do template ${tEnum("contractModality", res.modality)} v${res.templateVersion}.`,
         )
         onClose()
+        // O trabalho que sobra está no detalhe: o rascunho já nasce com o que foi herdado, e
+        // voltar à lista obrigaria a pessoa a achar a linha nova para ver o que falta.
+        navigate(`/operations/contracts/${res.contractId}`)
       },
       onError: (e) => {
         // A matriz é revalidada no backend. Se cair aqui, a tela e o domínio

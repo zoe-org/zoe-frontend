@@ -24,7 +24,7 @@ import { fmtDate } from "@/pages/operations/format"
  */
 export default function InfluencerInvitePage() {
   const { token = "" } = useParams<{ token: string }>()
-  const { isAuthenticated, isLoading: authLoading } = useAuth()
+  const { isAuthenticated, isLoading: authLoading, refresh } = useAuth()
   const navigate = useNavigate()
   const [accepting, setAccepting] = useState(false)
   const [accepted, setAccepted] = useState<string | null>(null)
@@ -61,6 +61,12 @@ export default function InfluencerInvitePage() {
     try {
       const res = await operationsApi.acceptInfluencerInvite(token)
       clearPendingInfluencerInviteToken()
+      // O aceite muda o TIPO da conta no backend — ela vira criadora. Sem recarregar a
+      // sessão, o app continuava achando que era uma conta comum sem workspace: o botão
+      // seguinte levava a uma rota protegida, e a guarda mandava a pessoa criar um
+      // workspace, que o backend recusa para criador. Era o desvio que aparecia logo
+      // depois do cadastro.
+      await refresh()
       setAccepted(res.campaignName ?? res.tenantName)
       toast.success(res.campaignName
         ? `Você entrou na campanha ${res.campaignName}.`

@@ -235,6 +235,12 @@ export type CreatorContractField = {
  * `onboardingUrl` é do provedor, **de uso único e expira em minutos** — por isso não se
  * guarda: cada clique pede um novo.
  */
+/**
+ * Para onde o provedor devolve a pessoa depois do cadastro. Nome de destino, nunca URL —
+ * o caminho é resolvido no backend a partir de uma lista fechada.
+ */
+export type PayoutReturnTo = "cadastro" | "recebimento"
+
 export type StartPayoutOnboarding = {
   onboardingUrl: string | null
   expiresAt: string | null
@@ -282,8 +288,9 @@ export const creatorApi = {
     apiClient.put<{ influencerId: string; profileComplete: boolean }>(
       "/api/creator/profile", body, { noTenant: true }),
 
-  startPayoutOnboarding: () =>
-    apiClient.post<StartPayoutOnboarding>("/api/creator/payout-account", {}, { noTenant: true }),
+  startPayoutOnboarding: (returnTo?: PayoutReturnTo) =>
+    apiClient.post<StartPayoutOnboarding>(
+      "/api/creator/payout-account", returnTo ? { returnTo } : {}, { noTenant: true }),
 
   // POST apesar de parecer leitura: ele escreve. A verificação acontece do lado do
   // provedor sem avisar ninguém, então alguém precisa perguntar.
@@ -442,7 +449,8 @@ export function usePayoutMutations() {
 
   return {
     start: useMutation({
-      mutationFn: () => creatorApi.startPayoutOnboarding(),
+      mutationFn: (returnTo: PayoutReturnTo | void) =>
+        creatorApi.startPayoutOnboarding(returnTo || undefined),
       onSuccess: refresh,
     }),
     sync: useMutation({

@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { Check, Loader2, ExternalLink, ShieldCheck } from "lucide-react"
 import { toast } from "sonner"
 import { ApiError } from "@/lib/api"
@@ -37,7 +37,10 @@ export default function CreatorOnboardingPage() {
   const d = workspace.data
   const perfil = d?.profile
 
-  const [passo, setPasso] = useState(1)
+  const [params] = useSearchParams()
+  // Volta do provedor de pagamentos: o retorno aponta para o passo 3. Sem ler isto a
+  // pessoa reabriria o cadastro no passo 1, como se não tivesse feito nada.
+  const [passo, setPasso] = useState(() => (params.get("passo") === "3" ? 3 : 1))
 
   // Dados pessoais
   const [fullName, setFullName] = useState("")
@@ -485,14 +488,41 @@ function StepRecebimento({
   onBack, onFinish,
 }: { onBack: () => void; onFinish: () => void }) {
   const workspace = useCreatorWorkspace()
-  const { start } = usePayoutMutations()
+  const { start, sync } = usePayoutMutations()
+  const [params, setParams] = useSearchParams()
+  const retorno = params.get("status")
+  // Capturado na montagem: a URL é limpa logo depois, e o aviso precisa sobreviver a isso.
+  const [linkVenceu] = useState(() => params.get("status") === "expirado")
+
+  // Pergunta ao provedor ao entrar no passo — inclusive voltando dele. A verificação
+  // acontece lá sem avisar ninguém; sem perguntar, a tela diria "não conectada" para quem
+  // acabou de concluir. Uma vez por visita, porque o comando escreve.
+  const sincronizado = useRef(false)
+  useEffect(() => {
+    if (sincronizado.current) return
+    sincronizado.current = true
+    sync.mutate(undefined, {
+      onError: (e) => {
+        toast.error(e instanceof ApiError
+          ? `Não foi possível checar sua conta de recebimento: ${e.message}`
+          : "Não foi possível checar sua conta de recebimento agora.")
+      },
+      // Tira passo e status da URL: recarregar não deve repetir a volta que já passou.
+      onSettled: () => { if (retorno) setParams({}, { replace: true }) },
+    })
+  }, [retorno, sync, setParams])
 
   const d = workspace.data
+  const kyc = d?.kycStatus ?? "NotStarted"
   const conectada = d?.canReceivePayout ?? false
+  const emVerificacao = !conectada && kyc === "Pending"
+  const recusada = !conectada && kyc === "Rejected"
+  const conferindo = sync.isPending
 
   const conectar = async () => {
     try {
-      const res = await start.mutateAsync()
+      // "cadastro": o provedor devolve para este passo, e não para a tela de recebimento.
+      const res = await start.mutateAsync("cadastro")
       if (!res.onboardingUrl) {
         toast.error(res.message ?? "O provedor não devolveu o link de cadastro.")
         return
@@ -503,6 +533,22 @@ function StepRecebimento({
     }
   }
 
+  const titulo = conferindo ? "Conferindo sua conta…"
+    : conectada ? "Conta conectada"
+    : emVerificacao ? "Conta criada — em verificação"
+    : recusada ? "O provedor pediu mais dados"
+    : "Conecte sua conta de recebimento"
+
+  const texto = conectada
+    ? "Tudo certo. O valor da entrega aprovada vai direto para ela."
+    : emVerificacao
+      ? "O provedor está conferindo seus dados. Leva de alguns minutos a alguns dias, e "
+        + "você não precisa esperar aqui para concluir."
+      : recusada
+        ? (d?.payoutBlockedReason ?? "Faltou alguma informação. Continue de onde parou.")
+        : "O cadastro é feito no Stripe, que é quem guarda o dinheiro e seus dados "
+          + "bancários — a Zoe nunca os recebe."
+
   return (
     <>
       <Titulo
@@ -510,27 +556,34 @@ function StepRecebimento({
         subtitulo="Onde o dinheiro cai quando a entrega for aprovada."
       />
 
+      {linkVenceu && !conectada && (
+        <p className="text-[12.5px] mb-4 m-0" style={{ color: "#D97706" }}>
+          O link do provedor venceu antes de você terminar. É só continuar de onde parou.
+        </p>
+      )}
+
       <div
         className="rounded-xl border border-border-soft p-5"
         style={{ background: "var(--surface)" }}
       >
         <div className="flex items-start gap-3">
-          <ShieldCheck
-            className="w-5 h-5 mt-0.5 shrink-0"
-            style={{ color: conectada ? "var(--color-teal-500)" : "#D97706" }}
-          />
+          {conferindo
+            ? <Loader2 className="w-5 h-5 mt-0.5 shrink-0 animate-spin text-ink-muted" />
+            : (
+              <ShieldCheck
+                className="w-5 h-5 mt-0.5 shrink-0"
+                style={{ color: conectada ? "var(--color-teal-500)" : "#D97706" }}
+              />
+            )}
           <div>
             <div className="text-[13.5px] font-semibold" style={{ color: "var(--ink)" }}>
-              {conectada ? "Conta conectada" : "Conecte sua conta de recebimento"}
+              {titulo}
             </div>
-            <p className="text-[12.5px] text-ink-muted m-0 mt-1">
-              {conectada
-                ? "Tudo certo. O valor da entrega aprovada vai direto para ela."
-                : "O cadastro é feito no Stripe, que é quem guarda o dinheiro e seus dados "
-                  + "bancários — a Zoe nunca os recebe."}
-            </p>
+            {!conferindo && (
+              <p className="text-[12.5px] text-ink-muted m-0 mt-1">{texto}</p>
+            )}
 
-            {!conectada && (
+            {!conferindo && !conectada && (
               <button
                 onClick={conectar}
                 disabled={start.isPending}
@@ -540,7 +593,7 @@ function StepRecebimento({
                 {start.isPending
                   ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   : <ExternalLink className="w-3.5 h-3.5" />}
-                Conectar conta
+                {kyc === "NotStarted" ? "Conectar conta" : "Continuar cadastro"}
               </button>
             )}
           </div>
@@ -550,10 +603,12 @@ function StepRecebimento({
       {/* Este passo pode ficar para depois de propósito: o KYC trava o PAGAMENTO, não a
           produção (RN-O-012). Prender o cadastro aqui atrasaria a assinatura do contrato
           por uma pendência que só importa no fim. */}
-      <p className="text-[12.5px] text-ink-muted mt-4">
-        Dá para deixar isso para depois — você pode assinar o contrato e gravar sem a conta
-        conectada. O bloqueio é só no pagamento.
-      </p>
+      {!conectada && (
+        <p className="text-[12.5px] text-ink-muted mt-4">
+          Dá para deixar isso para depois — você pode assinar o contrato e gravar sem a conta
+          conectada. O bloqueio é só no pagamento.
+        </p>
+      )}
 
       <div className="flex items-center gap-2.5 mt-8 flex-wrap">
         <button
@@ -564,10 +619,11 @@ function StepRecebimento({
         </button>
         <button
           onClick={onFinish}
-          className="px-5 py-2.5 rounded-lg text-[13.5px] font-medium text-white"
+          disabled={conferindo}
+          className="px-5 py-2.5 rounded-lg text-[13.5px] font-medium text-white disabled:opacity-50"
           style={{ background: "var(--color-teal-500)" }}
         >
-          {conectada ? "Concluir" : "Concluir e fazer isso depois"}
+          {conectada || emVerificacao ? "Concluir" : "Concluir e fazer isso depois"}
         </button>
       </div>
     </>

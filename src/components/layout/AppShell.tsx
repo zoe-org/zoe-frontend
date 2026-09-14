@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { NavLink, Link, Outlet, useLocation, useNavigate } from "react-router-dom"
 import {
@@ -92,10 +92,19 @@ export function AppShell() {
   const [opsOpen, setOpsOpen] = useState(() => getInitialOpenState(STORAGE_OPS_KEY))
 
   // Troca de tenant: descarta o cache do tenant anterior. O tenantId nas query
-  // keys já impede servir dado de outro tenant; isto libera memória e força um
-  // refetch limpo. Isolamento é preocupação de frontend também.
+  // keys já impede servir dado de outro tenant; isto libera memória. Isolamento é
+  // preocupação de frontend também.
+  //
+  // Só as chaves do tenant ANTERIOR, e nunca na montagem. Efeitos de filhos rodam antes
+  // dos do pai: quando este efeito roda, a página já se inscreveu nas próprias queries.
+  // Um clear() geral as apagava de baixo dos observers, que ficavam órfãos — no F5 o
+  // Painel ficava no esqueleto para sempre e Contratos dizia "0 contratos".
+  const previousTenantRef = useRef(activeTenantId)
   useEffect(() => {
-    queryClient.clear()
+    const previous = previousTenantRef.current
+    previousTenantRef.current = activeTenantId
+    if (!previous || previous === activeTenantId) return
+    queryClient.removeQueries({ predicate: (q) => q.queryKey.includes(previous) })
   }, [activeTenantId, queryClient])
 
   useEffect(() => {

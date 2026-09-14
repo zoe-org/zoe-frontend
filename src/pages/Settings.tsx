@@ -7,8 +7,9 @@ import { ApiError } from "@/lib/api"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { useFeatureCatalog, useFeatureMutations, type FeatureCatalog } from "@/lib/api/features"
 import { meApi } from "@/lib/api/me"
+import { ContractDefaultsTab } from "@/pages/operations/ContractDefaultsSettings"
 
-type Tab = "perfil" | "addons" | "aparencia"
+type Tab = "perfil" | "addons" | "contratos" | "aparencia"
 
 function initials(name?: string | null, email?: string | null): string {
   const base = name?.trim() || email || "U"
@@ -28,6 +29,8 @@ export default function SettingsPage() {
   const tabs: { key: Tab; label: string }[] = [
     { key: "perfil", label: "Perfil" },
     { key: "addons", label: "Add-ons" },
+    // Padrões de contrato só existem para quem tem Operations — sem o módulo não há contrato.
+    ...(hasFeature("operations") ? [{ key: "contratos" as const, label: "Contratos" }] : []),
     { key: "aparencia", label: "Aparência" },
   ]
 
@@ -111,6 +114,8 @@ export default function SettingsPage() {
         )}
 
         {tab === "addons" && <AddOnsTab isAdmin={isAdmin} hasFeature={hasFeature} />}
+
+        {tab === "contratos" && hasFeature("operations") && <ContractDefaultsTab isAdmin={isAdmin} />}
 
         {tab === "aparencia" && <AppearanceTab />}
       </section>

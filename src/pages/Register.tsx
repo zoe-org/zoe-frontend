@@ -12,10 +12,12 @@ import { setOnboardingIntent, type OnboardingIntent } from "@/features/auth/onbo
 import {
   getPendingInviteToken, clearPendingInviteToken,
   getPendingInfluencerInviteToken,
+  clearPendingInfluencerInviteToken,
   getPendingInviteEmail,
   clearPendingInviteEmail,
 } from "@/features/auth/pendingInvite"
 import { invitesApi } from "@/lib/api/invites"
+import { operationsApi } from "@/lib/api/operations"
 import { ApiError, setActiveTenantId } from "@/lib/api"
 import { useNavigate, useLocation, Link } from "react-router-dom"
 import { Check, ArrowLeft, Eye, EyeOff, BriefcaseBusiness, Blocks } from "lucide-react"
@@ -494,15 +496,28 @@ function StepVerification({
       }
 
       // Convite de criador: não há workspace para entrar nem membership para criar —
-      // o aceite registra a pessoa como influenciadora. Por isso a própria tela do
-      // convite conduz o fim do fluxo, em vez do dashboard.
+      // o aceite registra a pessoa como influenciadora. Por isso o fim do fluxo é o cadastro
+      // do criador, e não o dashboard.
       const creatorToken = getPendingInfluencerInviteToken()
       if (creatorToken) {
-        // O token fica: quem conduz o aceite é a tela do convite. Só o e-mail sai, que
-        // já cumpriu o papel de destravar o cadastro.
+        // Aceita aqui mesmo, como o convite de membro acima. A pessoa já viu quem a
+        // chamou antes de clicar em "Criar minha conta" — devolvê-la à tela do convite
+        // para clicar em "Aceitar" era um passo a mais, e era nele que o fluxo se perdia.
         clearPendingInviteEmail()
-        await refresh()
-        nav(`/convite-criador/${creatorToken}`, { replace: true })
+        try {
+          await operationsApi.acceptInfluencerInvite(creatorToken)
+          clearPendingInfluencerInviteToken()
+          // O refresh vem DEPOIS do aceite: é o aceite que torna a conta de criador. Antes
+          // dele a sessão diria "conta comum sem workspace", e a guarda de rota mandaria
+          // para a criação de workspace.
+          await refresh()
+          nav("/criador/cadastro", { replace: true })
+        } catch {
+          // Conta criada, aceite recusado (vencido, e-mail divergente). A tela do convite
+          // mostra o motivo e oferece tentar de novo.
+          await refresh()
+          nav(`/convite-criador/${creatorToken}`, { replace: true })
+        }
         return
       }
 

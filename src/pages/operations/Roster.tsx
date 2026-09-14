@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { Plus, X, Loader2, Users, UserPlus, Copy, Check } from "lucide-react"
+import { X, Loader2, Users, UserPlus, Copy, Check } from "lucide-react"
 import { toast } from "sonner"
 import { ApiError } from "@/lib/api"
 import { Input } from "@/components/ui/input"
@@ -14,7 +14,7 @@ import {
 import {
   useRoster, useRosterMutations, useCampaigns, payoutBlockReason, INFLUENCER_INVITE_PATH,
   useCampaign,
-  type RosterItem, type AddInfluencerBody, type InviteInfluencerResponse,
+  type RosterItem, type InviteInfluencerResponse,
   type CampaignBriefing,
 } from "@/lib/api/operations"
 
@@ -30,7 +30,6 @@ const KYC_COLOR: Record<string, string> = {
 
 export default function OperationsRosterPage() {
   const roster = useRoster()
-  const [addOpen, setAddOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
 
   const all = useMemo(() => roster.data?.items ?? [], [roster.data])
@@ -73,19 +72,18 @@ export default function OperationsRosterPage() {
             )}
           <RoleGate minRole="Admin">
             {/* Convidar nao depende de campanha: a marca monta elenco antes de existir
-                acao, e o criador e da marca, nao do projeto. */}
+                acao, e o criador e da marca, nao do projeto.
+
+                E' a unica porta de entrada. Existia tambem "Adicionar criador", que
+                cadastrava sem avisar a pessoa: ela entrava no elenco sem conta, e sem
+                conta nao conecta o recebimento — o contrato andava e o pagamento travava
+                no fim. */}
             <button
               onClick={() => setInviteOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 mr-2 rounded-lg text-[13px] font-medium border border-border-soft"
-            >
-              <UserPlus className="w-3.5 h-3.5" /> Convidar criador
-            </button>
-            <button
-              onClick={() => setAddOpen(true)}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-medium text-white transition-colors"
               style={{ background: "var(--color-teal-500)" }}
             >
-              <Plus className="w-3.5 h-3.5" /> Adicionar criador
+              <UserPlus className="w-3.5 h-3.5" /> Convidar criador
             </button>
           </RoleGate>
           </div>
@@ -105,7 +103,7 @@ export default function OperationsRosterPage() {
             className="py-16"
             icon={<Users className="w-7 h-7" strokeWidth={1.5} />}
             message="Nenhum criador no elenco"
-            hint="Adicione um criador para poder contratá-lo. Sem elenco não há contrato."
+            hint="Convide um criador: ele entra no elenco ao aceitar e passa a poder ser contratado."
           />
         ) : (
           <div className="overflow-x-auto">
@@ -130,7 +128,6 @@ export default function OperationsRosterPage() {
         )}
       </section>
 
-      {addOpen && <AddInfluencerModal onClose={() => setAddOpen(false)} />}
       {inviteOpen && <InviteToRosterModal onClose={() => setInviteOpen(false)} />}
     </div>
   )
@@ -241,9 +238,8 @@ function TabButton({
 /**
  * Convite de criador — proposta de trabalho ou chamada para o elenco.
  *
- * A diferença para "Adicionar criador" é quem assume o cadastro: aqui a própria pessoa
- * cria a conta pelo link. É o caminho preferível, porque dados fiscais e conta de
- * recebimento são dela.
+ * É a única forma de pôr alguém no elenco: a própria pessoa cria a conta pelo link, e é
+ * essa conta que conecta o recebimento. Dados fiscais e conta bancária são dela.
  *
  * <p>Duas portas de entrada, um convite só: escolher alguém que já está no elenco só
  * preenche e-mail e nome — o backend reaproveita o registro em vez de duplicar.</p>
@@ -607,143 +603,3 @@ function BriefingBox({ briefing }: { briefing: CampaignBriefing }) {
     </div>
   )
 }
-
-function AddInfluencerModal({ onClose }: { onClose: () => void }) {
-  const { add } = useRosterMutations()
-  const [form, setForm] = useState<AddInfluencerBody>({
-    email: "", fullName: "", countryCode: "BR", displayName: "",
-  })
-
-  const set = <K extends keyof AddInfluencerBody>(k: K, v: AddInfluencerBody[K]) =>
-    setForm((f) => ({ ...f, [k]: v }))
-
-  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())
-  const canSubmit = emailOk && form.fullName.trim().length >= 2 && !add.isPending
-
-  const submit = () => {
-    if (!canSubmit) return
-    add.mutate(
-      {
-        email: form.email.trim(),
-        fullName: form.fullName.trim(),
-        countryCode: form.countryCode?.trim() || undefined,
-        displayName: form.displayName?.trim() || undefined,
-      },
-      {
-        onSuccess: (res) => {
-          // `created: false` = a pessoa já existia na plataforma e só ganhou o
-          // vínculo. Dizer "criado" nesse caso seria mentira, e é justamente a
-          // diferença que explica por que o KYC dela pode já vir verificado.
-          toast.success(
-            res.created
-              ? "Criador cadastrado e adicionado ao elenco."
-              : "Criador já existia na plataforma — vínculo criado com este workspace.",
-          )
-          onClose()
-        },
-        onError: (e) => {
-          if (e instanceof ApiError && e.status === 409) {
-            toast.error("Esse criador já está no elenco deste workspace.")
-            return
-          }
-          toast.error(e instanceof ApiError ? e.message : "Não foi possível adicionar.")
-        },
-      },
-    )
-  }
-
-  return (
-    <div
-      className="fixed inset-0 z-[90] flex items-center justify-center p-4"
-      style={{ background: "rgba(7,9,26,0.32)", backdropFilter: "blur(2px)" }}
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md rounded-xl border border-border-soft shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
-        style={{ background: "var(--surface)" }}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Adicionar criador ao elenco"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between px-6 pt-5 pb-3 shrink-0">
-          <div>
-            <div className="eyebrow mb-1.5">Elenco</div>
-            <h2 className="font-display m-0" style={{ fontSize: 22, color: "var(--ink)" }}>
-              Adicionar criador
-            </h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D]"
-            aria-label="Fechar"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="px-6 py-2 overflow-y-auto flex-1 flex flex-col gap-3.5">
-          <Field label="E-mail" hint="Identifica a pessoa na plataforma inteira.">
-            <Input
-              type="email"
-              value={form.email}
-              onChange={(e) => set("email", e.target.value)}
-              placeholder="criador@exemplo.com"
-              autoFocus
-            />
-          </Field>
-
-          <Field label="Nome completo" hint="Como consta no contrato.">
-            <Input
-              value={form.fullName}
-              onChange={(e) => set("fullName", e.target.value)}
-              placeholder="Maria Souza"
-            />
-          </Field>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="País">
-              <Input
-                value={form.countryCode ?? ""}
-                onChange={(e) => set("countryCode", e.target.value.toUpperCase().slice(0, 2))}
-                placeholder="BR"
-                maxLength={2}
-              />
-            </Field>
-            <Field label="Nome de exibição" hint="Opcional.">
-              <Input
-                value={form.displayName ?? ""}
-                onChange={(e) => set("displayName", e.target.value)}
-                placeholder="@mariasouza"
-              />
-            </Field>
-          </div>
-
-          <p className="text-[12px] text-ink-muted">
-            O KYC começa como não iniciado. Ele trava o recebimento, não a produção —
-            o criador pode assinar contrato e gravar antes de concluí-lo.
-          </p>
-        </div>
-
-        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-border-soft shrink-0">
-          <button
-            onClick={onClose}
-            className="px-3.5 py-2 rounded-lg text-[13px] font-medium border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D]"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={submit}
-            disabled={!canSubmit}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-medium text-white disabled:opacity-50"
-            style={{ background: "var(--color-teal-500)" }}
-          >
-            {add.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            Adicionar
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-

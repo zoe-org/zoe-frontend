@@ -35,23 +35,6 @@ export type RosterItem = {
 
 export type ListRosterResponse = { items: RosterItem[] }
 
-export type AddInfluencerBody = {
-  email: string
-  fullName: string
-  countryCode?: string
-  displayName?: string
-}
-
-export type AddInfluencerResponse = {
-  influencerId: string
-  tenantInfluencerId: string
-  email: string
-  fullName: string
-  kycStatus: string
-  /** false = a pessoa já existia na plataforma e só o vínculo foi criado. */
-  created: boolean
-}
-
 /**
  * O KYC é gate de RECEBIMENTO, não de entrada (RN-O-012): o criador pode assinar
  * contrato e produzir sem KYC aprovado — só não recebe. Por isso a tela mostra o
@@ -437,6 +420,24 @@ export type ContractField = {
    * tela mostra sem permitir edição: é identidade do registro, não texto a digitar.
    */
   isSystemManaged: boolean
+  /**
+   * De onde veio o valor: TenantDefault | Campaign | Invite | Record | Manual. Nulo em
+   * contrato criado antes de a origem existir.
+   */
+  source: ContractFieldSource | null
+  /** Se o valor pode virar padrão da marca — identidade e termos da negociação não podem. */
+  defaultable: boolean
+}
+
+export type ContractFieldSource = "TenantDefault" | "Campaign" | "Invite" | "Record" | "Manual"
+
+/** Rótulo curto da origem. `Manual` não tem: o que alguém digitou dispensa etiqueta. */
+export const FIELD_SOURCE_LABEL: Record<ContractFieldSource, string | null> = {
+  TenantDefault: "padrão da marca",
+  Campaign: "da campanha",
+  Invite: "da proposta",
+  Record: "do cadastro",
+  Manual: null,
 }
 
 export type ContractClause = { order: number; title: string; isSystem: boolean; body: string }
@@ -519,9 +520,6 @@ export const operationsApi = {
       `/api/operations/influencers${status ? `?status=${encodeURIComponent(status)}` : ""}`,
       { signal: opts?.signal },
     ),
-
-  addInfluencer: (body: AddInfluencerBody) =>
-    apiClient.post<AddInfluencerResponse>("/api/operations/influencers", body),
 
   updateCustomClauses: (contractId: string, clauses: { title: string; body: string }[]) =>
     apiClient.put<{ contractId: string; clauseCount: number }>(
@@ -1067,11 +1065,6 @@ export function useRosterMutations() {
   const { activeTenantId } = useAuth()
   const qc = useQueryClient()
   return {
-    add: useMutation({
-      mutationFn: (body: AddInfluencerBody) => operationsApi.addInfluencer(body),
-      onSuccess: () =>
-        qc.invalidateQueries({ queryKey: ["operations-roster", activeTenantId] }),
-    }),
     invite: useMutation({
       // Um convite, dois destinos. Com campanha ele é proposta de trabalho e vai para o
       // endpoint dela — que é o único que aceita cachê, porque só ali existe modalidade
@@ -1138,5 +1131,63 @@ export function useOperationsDashboard() {
     enabled: Boolean(activeTenantId),
     staleTime: 15_000,
     placeholderData: keepPreviousData,
+  })
+}
+
+// ————————————————————————— Padrões de contrato —————————————————————————
+
+/**
+ * Padrão da marca para um campo de contrato (RN-O-024, Nível 1). Todo contrato novo nasce
+ * com esse valor, e quem preenche pode trocar.
+ */
+export type ContractDefaultField = {
+  placeholder: string
+  label: string
+  dataType: string
+  kind: string
+  helpText: string | null
+  value: string | null
+}
+
+export type ContractDefaults = { fields: ContractDefaultField[] }
+
+/**
+ * Os que quase toda marca repete em todo contrato. A tela mostra estes primeiro; o resto do
+ * catálogo fica numa lista com busca, porque ninguém quer rolar cem campos para achar o foro.
+ */
+export const ESSENTIAL_CONTRACT_DEFAULTS = [
+  "contract_object", "jurisdiction", "applicable_law", "digital_signature",
+  "company_rep_name", "payment_terms", "image_rights", "copyright_assignment",
+  "nda", "morality_clause", "early_termination", "termination_penalty",
+  "late_penalty_company", "late_penalty_influencer", "approval_flow", "min_uptime",
+] as const
+
+export const contractDefaultsApi = {
+  get: (opts?: { signal?: AbortSignal }) =>
+    apiClient.get<ContractDefaults>("/api/operations/contract-defaults", { signal: opts?.signal }),
+
+  /** Merge por campo. Valor vazio remove o padrão. */
+  update: (values: Record<string, string>) =>
+    apiClient.put<ContractDefaults>("/api/operations/contract-defaults", { values }),
+}
+
+export function useContractDefaults() {
+  const { activeTenantId } = useAuth()
+  return useQuery({
+    queryKey: ["operations-contract-defaults", activeTenantId],
+    queryFn: ({ signal }) => contractDefaultsApi.get({ signal }),
+    enabled: Boolean(activeTenantId),
+    staleTime: 60_000,
+  })
+}
+
+export function useUpdateContractDefaults() {
+  const { activeTenantId } = useAuth()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (values: Record<string, string>) => contractDefaultsApi.update(values),
+    onSuccess: (data) => {
+      qc.setQueryData(["operations-contract-defaults", activeTenantId], data)
+    },
   })
 }
