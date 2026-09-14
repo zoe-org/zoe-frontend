@@ -29,6 +29,14 @@ describe("describeError", () => {
     })
   })
 
+  it("status HTTP cru não vira mensagem", () => {
+    // Rota que não existe no build em execução: corpo vazio, só o statusText.
+    expect(describeError(new ApiError(404, "Not Found"), "Não foi possível carregar a oferta.").message)
+      .toBe("Não foi possível carregar a oferta.")
+    expect(describeError(new ApiError(404, "Not Found", { title: "Not Found" }), "falhou").message)
+      .toBe("falhou")
+  })
+
   it("cai no texto da tela quando o erro não veio da API", () => {
     expect(describeError(new TypeError("Failed to fetch"), "Não foi possível salvar.")).toEqual({
       message: "Não foi possível salvar.",

@@ -7,8 +7,10 @@ import { ApiError } from "@/lib/api"
  */
 export function apiMessage(err: unknown, fallback: string): string {
   if (!(err instanceof ApiError)) return fallback
+  // Sem ProblemDetails, ou só com `title`, o texto é o status HTTP ("Not Found") ou um
+  // corpo cru de proxy: não veio da regra de negócio e não diz nada a quem lê.
   const firstFieldError = Object.values(err.problem?.errors ?? {}).flat()[0]
-  return firstFieldError || err.problem?.detail || err.message || fallback
+  return firstFieldError || err.problem?.detail || fallback
 }
 
 export type ErrorFeedback = {

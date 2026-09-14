@@ -18,6 +18,7 @@ import { BrandSwitcher } from "@/components/layout/BrandSwitcher"
 import { NotificationBell } from "@/components/layout/NotificationBell"
 import { SettingsDialog } from "@/components/settings/SettingsDialog"
 import { UpgradeDialog } from "@/components/UpgradeDialog"
+import { BackfillReturn } from "@/components/coverage/BackfillReturn"
 import { useOpenSettings } from "@/components/settings/useSettings"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -373,6 +374,8 @@ export function AppShell() {
           abrir Plano por cima de qualquer tela sem perder o lugar. */}
       <SettingsDialog />
       <UpgradeDialog />
+      {/* Volta do Stripe do backfill: vale para qualquer rota, então mora no shell. */}
+      <BackfillReturn />
     </div>
   )
 }

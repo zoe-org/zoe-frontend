@@ -5,6 +5,7 @@ import { formatDistanceToNow } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { MentionDrawer } from "@/components/features/MentionDrawer"
 import { EmptyState } from "@/components/ui/empty-state"
+import { BlockedFeedNotice } from "@/components/coverage/BlockedFeedNotice"
 import { ConfidenceBadge } from "@/components/ui/confidence-badge"
 import { coverageSaysOwnedContent } from "@/components/ui/coverage-labels"
 import { VideoThumb } from "@/components/ui/video-thumb"
@@ -158,6 +159,7 @@ export default function MonitoringPage() {
   const feed = useVideosFeed(filters)
   const summary = useVideosSummary(filters)
   const items = feed.data?.pages.flatMap((p) => p.items) ?? []
+  const blockedCount = feed.data?.pages[0]?.blockedCount ?? 0
 
   // Contagem por aba. Enquanto a summary não chega, undefined → não renderiza
   // número (melhor do que mostrar 0 e piscar pro valor real).
@@ -351,17 +353,24 @@ export default function MonitoringPage() {
         </div>
       </section>
 
+      {blockedCount > 0 && brand.active && (
+        <BlockedFeedNotice blockedCount={blockedCount} tenantBrandId={brand.active.tenantBrandId} />
+      )}
+
       {/* Feed */}
       {feed.isLoading ? (
         <FeedSkeleton />
       ) : feed.isError ? (
         <ErrorState onRetry={() => feed.refetch()} />
       ) : items.length === 0 ? (
+        // Lista vazia com bloqueado não é "não há vídeo": há, fora da cobertura.
         <EmptyState
-          title="Nenhum vídeo encontrado"
-          description={q || sent || period || min
-            ? "Nenhum resultado para os filtros atuais. Tente ampliar o período ou limpar os filtros."
-            : "Ainda não há vídeos analisados para esta marca. Assim que o pipeline processar, eles aparecem aqui."}
+          title={blockedCount > 0 ? "Nenhum vídeo visível neste período" : "Nenhum vídeo encontrado"}
+          description={blockedCount > 0
+            ? "Há vídeos deste período, mas fora da sua cobertura. Veja o aviso acima."
+            : q || sent || period || min
+              ? "Nenhum resultado para os filtros atuais. Tente ampliar o período ou limpar os filtros."
+              : "Ainda não há vídeos analisados para esta marca. Assim que o pipeline processar, eles aparecem aqui."}
         />
       ) : (
         <section>

@@ -88,7 +88,12 @@ export function hasSelfMeasuredScore(item: VideoListItem): boolean {
  */
 const AUDIENCE_ONLY_PATHS = new Set(["CommentsOnly", "OwnedComments", "OwnedNoSignal"])
 
-export type ListVideosResponse = { items: VideoListItem[]; nextCursor: string | null }
+export type ListVideosResponse = {
+  items: VideoListItem[]
+  nextCursor: string | null
+  /** Análises do período fora da cobertura (ADR-054 D1). Respeita o período, não os filtros de conteúdo. */
+  blockedCount: number
+}
 
 // Espelha VideosSummaryResponse (GET /api/videos/summary).
 export type VideosSummary = {
