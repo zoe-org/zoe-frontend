@@ -122,16 +122,32 @@ export function findTopicGaps(topics: SovTopic[], yourShare: number, limit = 4):
       const leader = leaderOf(topic)
       return { topic, mine, leader }
     })
-    .filter((g): g is TopicGap => g.leader != null && !g.leader.isYou && g.mine < yourShare)
+    // Volume mínimo: "100pp atrás do líder" em 3 menções é ruído com cara de conclusão.
+    .filter((g): g is TopicGap =>
+      !isLowVolume(g.topic) && g.leader != null && !g.leader.isYou && g.mine < yourShare)
     .sort((a, b) => b.topic.volume - a.topic.volume)
     .slice(0, limit)
 }
 
+/**
+ * Quem lidera o tópico — ou null, se o topo está empatado. Empate não tem líder: com
+ * 50% a 50%, dizer "líder: X" é só a ordem em que a lista chegou.
+ */
 export function leaderOf(topic: SovTopic): SovTopicShare | null {
-  return topic.shares.reduce<SovTopicShare | null>(
-    (melhor, s) => (melhor && melhor.sharePct >= s.sharePct ? melhor : s),
-    null,
-  )
+  const max = Math.max(0, ...topic.shares.map((s) => s.sharePct))
+  if (max === 0) return null
+  const topo = topic.shares.filter((s) => s.sharePct === max)
+  return topo.length === 1 ? topo[0] : null
+}
+
+/**
+ * Abaixo disto o share do tópico é acaso: com 2 menções, 50% ou 100% não diz nada sobre
+ * posição. A tela mostra o tópico esmaecido e ele não vira "espaço não ocupado".
+ */
+export const MIN_TOPIC_VOLUME = 5
+
+export function isLowVolume(topic: SovTopic): boolean {
+  return topic.volume < MIN_TOPIC_VOLUME
 }
 
 // ── Comparação direta ─────────────────────────────────────────────────────

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest"
 import type { SovBrand, SovTopic } from "@/lib/api/dashboard"
 import {
-  CONTESTED_MARGIN, findTopicGaps, formatScore, matchup, nearestRival, positionSummary, rankBrands,
-  readSentiment,
+  CONTESTED_MARGIN, findTopicGaps, formatScore, isLowVolume, leaderOf, matchup, MIN_TOPIC_VOLUME,
+  nearestRival, positionSummary, rankBrands, readSentiment,
 } from "@/lib/sov"
 
 const brand = (brandName: string, sharePct: number, over: Partial<SovBrand> = {}): SovBrand => ({
@@ -113,6 +113,37 @@ describe("findTopicGaps", () => {
 
   it("respeita o limite", () => {
     expect(findTopicGaps(topics, 60, 1)).toHaveLength(1)
+  })
+
+  it("tópico de pouco volume não vira conclusão", () => {
+    const poucas = [topic("Expansão", 3, [["Nubank", 100]])]
+    expect(findTopicGaps(poucas, 48)).toEqual([])
+  })
+
+  it("empate no topo não é 'outra marca lidera'", () => {
+    const empate = [topic("Atendimento", 40, [["Nubank", 50], ["Itaú", 50, true]])]
+    expect(findTopicGaps(empate, 60)).toEqual([])
+  })
+})
+
+describe("leaderOf", () => {
+  it("empate no topo não tem líder — seria só a ordem da lista", () => {
+    expect(leaderOf(topic("Investimentos", 20, [["Nubank", 50], ["Itaú", 50, true]]))).toBeNull()
+  })
+
+  it("com um na frente, é ele", () => {
+    expect(leaderOf(topic("App", 20, [["Nubank", 30], ["Itaú", 70, true]]))?.brandName).toBe("Itaú")
+  })
+
+  it("tópico sem share nenhum não tem líder", () => {
+    expect(leaderOf(topic("Vazio", 0, []))).toBeNull()
+  })
+})
+
+describe("isLowVolume", () => {
+  it(`abaixo de ${MIN_TOPIC_VOLUME} menções é amostra pequena`, () => {
+    expect(isLowVolume(topic("A", MIN_TOPIC_VOLUME - 1, []))).toBe(true)
+    expect(isLowVolume(topic("B", MIN_TOPIC_VOLUME, []))).toBe(false)
   })
 })
 
