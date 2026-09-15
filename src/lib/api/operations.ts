@@ -109,6 +109,8 @@ export type CampaignContract = {
   escrowAmountCents: number | null
   escrowState: string | null
   signedAt: string | null
+  /** AwaitingReview | Approved | ChangesRequested — nulo enquanto nenhum corte foi enviado. */
+  draftStatus?: string | null
 }
 
 export type CampaignDelivery = {

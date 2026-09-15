@@ -115,6 +115,21 @@ export function funilDaCampanha(
       continue
     }
 
+    // Sem entrega ainda: o corte diz em que pé está a produção. Corte esperando aprovação é a
+    // etapa em que o criador mais fica parado, e o funil não a mostrava.
+    if (c.draftStatus === "AwaitingReview") {
+      linhas.push({ ...base, etapa: "Corte esperando aprovação", tom: "atencao", acao: { label: "Revisar o corte", to: "/operations/deliveries?etapa=cortes" } })
+      continue
+    }
+    if (c.draftStatus === "ChangesRequested") {
+      linhas.push({ ...base, etapa: "Correção no corte — vez do criador", tom: "neutro", acao: null })
+      continue
+    }
+    if (c.draftStatus === "Approved") {
+      linhas.push({ ...base, etapa: "Corte aprovado — aguardando publicar", tom: "neutro", acao: null })
+      continue
+    }
+
     if (c.usesEscrow && !c.escrowState) {
       linhas.push({ ...base, etapa: "Assinado — custódia não aberta", tom: "atencao", acao: { label: "Abrir custódia", to: contrato } })
     } else if (c.escrowState === "PendingDeposit") {

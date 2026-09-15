@@ -40,6 +40,14 @@ describe("funilDaCampanha", () => {
     expect(etapa(campanha({ contracts: [contrato({ escrowState: "InProduction" })] }))).toEqual(["Em produção"])
   })
 
+  it("sem entrega, o corte diz a etapa — e o que espera aprovação vai para a fila de cortes", () => {
+    const [linha] = funilDaCampanha(campanha({ contracts: [contrato({ escrowState: "InProduction", draftStatus: "AwaitingReview" })] }))
+    expect(linha).toMatchObject({ etapa: "Corte esperando aprovação", tom: "atencao" })
+    expect(linha.acao?.to).toBe("/operations/deliveries?etapa=cortes")
+    expect(etapa(campanha({ contracts: [contrato({ escrowState: "InProduction", draftStatus: "ChangesRequested" })] })))
+      .toEqual(["Correção no corte — vez do criador"])
+  })
+
   it("entrega: a última tentativa decide, e revisar leva à fila no contrato", () => {
     const d = campanha({
       contracts: [contrato({ escrowState: "Delivered" })],
