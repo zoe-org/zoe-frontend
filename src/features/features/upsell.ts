@@ -40,11 +40,6 @@ const COPY: Record<string, UpsellCopy> = {
     pitch:
       "Gere relatórios executivos em PDF com o recorte e o período que você escolher, prontos para apresentar.",
   },
-  competitive_analysis: {
-    name: "Análise competitiva",
-    pitch:
-      "Abra o detalhe de cada concorrente com os painéis de conteúdo próprio e de terceiros separados.",
-  },
 }
 
 export function upsellCopy(slug: string): UpsellCopy {

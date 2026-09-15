@@ -12,7 +12,7 @@ import MonitoringPage from "@/pages/intelligence/Monitoring"
 import SentimentPage from "@/pages/intelligence/Sentiment"
 import SovPage from "@/pages/intelligence/Sov"
 import InfluencersPage from "@/pages/intelligence/Influencers"
-import CompetitorDetailPage from "@/pages/intelligence/CompetitorDetail"
+import { BrandDashboardRedirect } from "@/features/brands/BrandDashboardRedirect"
 import BrandsPage from "@/pages/Brands"
 import AlertsPage from "@/pages/Alerts"
 import ReportsPage from "@/pages/Reports"
@@ -48,7 +48,7 @@ export const router = createBrowserRouter([
       { path: "/intelligence/influencers", element: <InfluencersPage /> },
       // Drill-down do SoV (ADR-035, D6). Por brandId e não por slug: o SoV já
       // tem o id em mãos, e slug de marca global pode mudar na verificação.
-      { path: "/intelligence/competitive/:brandId", element: <CompetitorDetailPage /> },
+      { path: "/intelligence/competitive/:brandId", element: <BrandDashboardRedirect /> },
       // Tela de canal próprio removida: link antigo cai no monitoramento já filtrado.
       { path: "/intelligence/owned", element: <Navigate to="/intelligence/monitoring?rel=owned" replace /> },
       { path: "/mentions", element: <Navigate to="/intelligence/monitoring" replace /> },

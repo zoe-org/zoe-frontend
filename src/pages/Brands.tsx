@@ -267,15 +267,10 @@ export default function BrandsPage() {
             key={selected.tenantBrandId}
             brand={selected}
             canManage={canManage}
-            // Concorrente vai para o drill-down competitivo, não para o dashboard
-            // (ADR-035 D6). Torná-lo a marca ATIVA mostraria "sua marca" para uma
-            // marca que não é dele — e, desde o WS-F4, o switcher nem o lista, então
-            // o usuário ficaria sem caminho de volta.
+            // Concorrente também vira marca ativa (ADR-063): o Dashboard marca que os
+            // números são dele, o seletor do topo o lista com etiqueta, e a reação nos
+            // canais oficiais aparece num card próprio.
             onOpenDashboard={() => {
-              if (selected.relationship === "Competitor") {
-                navigate(`/intelligence/competitive/${selected.brandId}`)
-                return
-              }
               setBrand(selected.brandId)
               navigate("/dashboard")
             }}
@@ -469,7 +464,7 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
           onClick={onOpenDashboard}
           className="inline-flex items-center gap-1.5 h-8 px-3 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors shrink-0"
         >
-          {brand.relationship === "Competitor" ? "Ver análise competitiva" : "Ver no dashboard"}
+          Ver no dashboard
           <ExternalLink className="w-3.5 h-3.5" />
         </button>
       </div>

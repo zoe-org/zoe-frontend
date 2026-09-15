@@ -3,97 +3,108 @@ import { apiClient } from "@/lib/api"
 import { useAuth } from "@/features/auth/context"
 
 /**
- * Superfície OWNED (ADR-035): o bloco de canal do concorrente no drill-down
- * competitivo — único lugar do produto que agrega conteúdo owned de propósito.
- * Em todo o resto, owned está fora por definição de métrica.
+ * Superfície OWNED (ADR-035): como a audiência reage nos vídeos que a PRÓPRIA marca
+ * publicou. Desde a ADR-063 aparece como card no Dashboard quando a marca ativa é um
+ * concorrente — em todo o resto, owned está fora por definição de métrica.
  *
  * ## Por que não existe `score` aqui
  *
- * O corpus owned é permanentemente heterogêneo: as análises do backfill foram
- * classificadas mas não reprocessadas, e enquanto o `zoe-ai-engine` não rotear
- * owned, vídeo do canal oficial continua chegando pelo path `full` — onde
- * `score_360` é 30% roteiro escrito pela própria marca + 20% logo em quadro.
- * Misturar isso com `owned_comments` (100% comentários) numa média dá um número
- * sem significado.
+ * O corpus owned é permanentemente heterogêneo: vídeo do canal oficial pode chegar
+ * pelo path `full`, onde `score_360` é 30% roteiro escrito pela própria marca + 20%
+ * logo em quadro. Misturar isso com `owned_comments` (100% comentários) numa média
+ * dá um número sem significado.
  *
- * A API resolve não devolvendo `score_360` nem `pipeline_path` neste endpoint.
- * O que vem é `audienceSentiment`: o componente de comentários, path-invariante.
+ * A API resolve não devolvendo `score_360` nem `pipeline_path` neste endpoint. O que
+ * vem é `audienceSentiment`: o componente de comentários, path-invariante.
  * **Não tente reconstruir o ConfidenceBadge aqui** — a ausência é a decisão.
  */
 
 /** Sentimento da audiência: 0..1, mesma escala do score_360 e dos componentes. */
 export type AudienceScore = number
 
-export type SentimentBreakdown = {
+/** Agregado do período. Tudo vem de COMENTÁRIOS — o roteiro owned é copy da marca. */
+export type OwnedReactionSummary = {
+  videoCount: number
+  totalComments: number
   positives: number
   neutrals: number
   negatives: number
-}
-
-/** O que TERCEIROS falam do concorrente. Comparável ao próprio earned do cliente. */
-export type CompetitorEarnedBlock = {
-  videoCount: number
-  sentiment: SentimentBreakdown
-  averageScore: number | null
-  topChannels: { channelId: string; channelName: string; videoCount: number }[]
-  /** Fatia no total de menções earned do período, 0..1. */
-  sovShare: number
-}
-
-/** Como a audiência reage nos canais DELE. NÃO comparável com o bloco earned. */
-export type CompetitorOwnedBlock = {
-  videoCount: number
-  commentSentiment: SentimentBreakdown
-  totalComments: number
+  /** Leitura principal: ponderada por volume de comentários. Null se ninguém comentou. */
   audienceSentiment: AudienceScore | null
+  /** Rótulo pela MESMA regra do writer — a tela não inventa limiar. */
   audienceSentimentLabel: string | null
+  /** Média simples entre vídeos com sinal: outra pergunta (o catálogo, não a audiência). */
   audienceSentimentPerVideo: AudienceScore | null
+  /** Resolvido no servidor: as duas médias divergem com amostra suficiente. */
   audienceIsConcentrated: boolean
   videosWithAudienceSignal: number
+  /** Decisão editorial da marca, não lacuna de coleta. */
   videosWithCommentsDisabled: number
   videosWithoutAudienceSignal: number
-  recentVideos: {
-    youtubeVideoId: string
-    title: string
-    publishedAt: string
-    views: number | null
-    commentCount: number
-    audienceSentiment: AudienceScore | null
-  }[]
 }
 
-export type CompetitorDetailResponse = {
-  brand: { id: string; name: string; slug: string }
-  earned: CompetitorEarnedBlock
-  owned: CompetitorOwnedBlock
+export type OwnedVideoItem = {
+  analysisId: string
+  videoId: string
+  youtubeVideoId: string
+  title: string
+  publishedAt: string
+  url: string
+  views: number | null
+  /** Comentários de AUDIÊNCIA (sem o dono do canal) — o peso do vídeo na média. */
+  commentCount: number
+  audienceSentiment: AudienceScore | null
+  audienceSentimentLabel: string | null
+  hasAudienceSignal: boolean
+  commentsDisabled: boolean
+}
+
+export type OwnedReactionResponse = {
+  brandId: string
+  brandName: string
+  /** OwnBrand · Competitor · Other */
+  relationship: string
+  summary: OwnedReactionSummary
+  videos: OwnedVideoItem[]
+  recurringThemes: string[]
+  page: number
+  pageSize: number
+  totalVideos: number
 }
 
 export const ownedApi = {
-  competitorDetail: (
+  reaction: (
     brandId: string,
-    range?: { from?: string; to?: string },
+    range: { from?: string; to?: string },
+    pageSize: number,
     opts?: { signal?: AbortSignal },
   ) => {
-    const q = new URLSearchParams()
-    if (range?.from) q.set("from", range.from)
-    if (range?.to) q.set("to", range.to)
-    return apiClient.get<CompetitorDetailResponse>(
-      `/api/competitors/${encodeURIComponent(brandId)}/detail?${q.toString()}`,
+    const q = new URLSearchParams({ page: "1", pageSize: String(pageSize) })
+    if (range.from) q.set("from", range.from)
+    if (range.to) q.set("to", range.to)
+    return apiClient.get<OwnedReactionResponse>(
+      `/api/brands/${encodeURIComponent(brandId)}/owned-reaction?${q.toString()}`,
       { signal: opts?.signal },
     )
   },
 }
 
-/** Drill-down do concorrente. Gated por `sov` no backend — 403 vira upsell na tela. */
-export function useCompetitorDetail(
+/**
+ * Reação nos canais oficiais. De concorrente, exige o add-on `sov` — e quem chama
+ * passa `enabled` pela feature: o 403 abriria o diálogo de upgrade sozinho
+ * (`featureBlocked` escuta todo erro de query, sem exceção).
+ */
+export function useOwnedReaction(
   brandId: string | null,
-  range?: { from?: string; to?: string },
+  range: { from?: string; to?: string },
+  enabled: boolean,
+  pageSize = 5,
 ) {
   const { activeTenantId } = useAuth()
   return useQuery({
-    queryKey: ["competitor-detail", activeTenantId, brandId, range],
-    queryFn: ({ signal }) => ownedApi.competitorDetail(brandId!, range, { signal }),
-    enabled: Boolean(activeTenantId && brandId),
+    queryKey: ["owned-reaction", activeTenantId, brandId, range, pageSize],
+    queryFn: ({ signal }) => ownedApi.reaction(brandId!, range, pageSize, { signal }),
+    enabled: Boolean(activeTenantId && brandId && enabled),
     staleTime: 60_000,
   })
 }
