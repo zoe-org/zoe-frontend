@@ -389,6 +389,11 @@ export type CreateContractBody = {
   reviewSlaDays?: number
   maxResubmissions?: number
   autoReleaseOnTimeout?: boolean
+  /**
+   * Fluxo financeiro encadeado: assinado abre a custódia e pede a reserva, fundos liberam a
+   * produção, aprovar a entrega pede o pagamento. Ignorado em contrato sem custódia.
+   */
+  autoAdvanceEscrow?: boolean
 }
 
 export type CreateContractResponse = {
@@ -440,6 +445,14 @@ export const FIELD_SOURCE_LABEL: Record<ContractFieldSource, string | null> = {
   Manual: null,
 }
 
+/** Resultado da consulta ao provedor de assinatura. `changed` = virou assinado agora. */
+export type RefreshSignatureResponse = {
+  contractId: string
+  status: string
+  changed: boolean
+  message: string
+}
+
 export type ContractClause = { order: number; title: string; isSystem: boolean; body: string }
 
 export type ContractDetail = {
@@ -457,6 +470,13 @@ export type ContractDetail = {
   reviewSlaDays: number
   maxResubmissions: number
   autoReleaseOnTimeout: boolean
+  /** Fluxo financeiro encadeado — ver `CreateContractBody.autoAdvanceEscrow`. */
+  autoAdvanceEscrow: boolean
+  /**
+   * Provedor de assinatura real configurado. Com ele o atalho "marcar como assinado" é
+   * recusado pela API — a confirmação vem do provedor.
+   */
+  signatureProviderLive?: boolean
   /** Custódia já aberta. Nulo com usesEscrow = a tela oferece abrir. */
   escrowAccountId: string | null
   escrowState: string | null
@@ -637,6 +657,8 @@ export const operationsApi = {
 
   markContractSigned: (contractId: string) =>
     apiClient.post<MarkSignedResponse>(`/api/operations/contracts/${contractId}/mark-signed`),
+  refreshSignature: (contractId: string) =>
+    apiClient.post<RefreshSignatureResponse>(`/api/operations/contracts/${contractId}/refresh-signature`),
 }
 
 /** Elenco do tenant ativo. `activeTenantId` na key isola o cache por workspace. */
@@ -767,6 +789,15 @@ export function useContractDetailMutations(contractId: string | undefined) {
       mutationFn: () => operationsApi.markContractSigned(contractId!),
       onSuccess: refresh,
     }),
+    // Pergunta ao provedor. Com pagamento automático a custódia abre logo depois de
+    // confirmar, então o quadro de custódia sai do cache junto.
+    refreshSignature: useMutation({
+      mutationFn: () => operationsApi.refreshSignature(contractId!),
+      onSuccess: () => {
+        refresh()
+        qc.invalidateQueries({ queryKey: ["operations-escrow", activeTenantId] })
+      },
+    }),
   }
 }
 
@@ -814,6 +845,8 @@ export type DeliverySummary = {
   escrowAmountCents: number | null
   /** Parecer da máquina. Nulo em revisão manual — a ausência é informação. */
   audit: DeliveryAudit | null
+  /** Aprovar já pede o pagamento: o contrato combinou o fluxo encadeado. */
+  paymentFollowsApproval: boolean
 }
 
 /**
@@ -929,6 +962,8 @@ export type EscrowSummary = {
   /** Operação financeira já enfileirada e ainda não processada (RN-O-044). */
   hasPendingCommand: boolean
   createdAt: string
+  /** Reserva e pagamento são pedidos sozinhos; os botões ficam como recurso. */
+  autoAdvance: boolean
 }
 
 export type EscrowTotals = {
@@ -1076,6 +1111,8 @@ export function useRosterMutations() {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: ["operations-roster", activeTenantId] })
         qc.invalidateQueries({ queryKey: ["operations-campaigns", activeTenantId] })
+        // O detalhe da campanha conta criadores: aberto atrás do modal, ficaria desatualizado.
+        qc.invalidateQueries({ queryKey: ["operations-campaign", activeTenantId] })
       },
     }),
   }

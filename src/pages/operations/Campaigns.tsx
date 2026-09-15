@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import {
-  Plus, X, Loader2, Megaphone, UserPlus, Copy, Check, Sparkles,
+  Plus, X, Loader2, Megaphone, UserPlus, Sparkles,
   Pencil, Play, CheckCircle2, Ban,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -17,11 +17,12 @@ import { fmtDate, matches } from "@/pages/operations/format"
 import {
   Field, Select, TableSkeleton, ErrorState, SearchBox, NoResults,
 } from "@/pages/operations/shared"
+import { InviteCreatorModal } from "@/pages/operations/InviteCreatorModal"
 import {
   useCampaigns, useCampaign, useCampaignMutations,
   CAMPAIGN_MODALITIES, escrowRejectionReason, supportsEscrow, fmtCents,
-  INFLUENCER_INVITE_PATH, allowedCampaignTransitions, CAMPAIGN_TRANSITION_LABEL,
-  type CreateCampaignBody, type InviteInfluencerResponse,
+  allowedCampaignTransitions, CAMPAIGN_TRANSITION_LABEL,
+  type CreateCampaignBody,
   type CampaignTransition, type CampaignDetail,
   type CampaignBriefing, type CampaignBriefingInput, type BriefingSentiment,
   BRIEFING_SENTIMENTS,
@@ -158,6 +159,12 @@ export default function OperationsCampaignsPage() {
   )
 }
 
+/** Zero só é "Permuta" quando a modalidade é permuta; nas outras é orçamento não definido. */
+function orcamentoLabel(budgetCents: number, modality: string): string {
+  if (budgetCents > 0) return fmtCents(budgetCents)
+  return modality === "Barter" ? "Permuta" : "Não definido"
+}
+
 function CampaignDetailPanel({ campaignId }: { campaignId: string }) {
   const campaign = useCampaign(campaignId)
   const [inviteOpen, setInviteOpen] = useState(false)
@@ -180,7 +187,7 @@ function CampaignDetailPanel({ campaignId }: { campaignId: string }) {
   const kpis = [
     { label: "Criadores", value: String(d.influencerCount) },
     { label: "Entregas", value: String(d.deliveryCount) },
-    { label: "Orçamento", value: d.budgetCents > 0 ? fmtCents(d.budgetCents) : "Permuta" },
+    { label: "Orçamento", value: orcamentoLabel(d.budgetCents, d.modality) },
     { label: "GMV em custódia", value: d.escrowGmvCents > 0 ? fmtCents(d.escrowGmvCents) : "—" },
   ]
 
@@ -253,7 +260,7 @@ function CampaignDetailPanel({ campaignId }: { campaignId: string }) {
             { label: "Marca", value: d.brandName ?? "—" },
             { label: "Modalidade", value: tEnum("contractModality", d.modality) },
             { label: "Período", value: d.startsAt ? `${fmtDate(d.startsAt)} → ${d.endsAt ? fmtDate(d.endsAt) : "aberto"}` : "—" },
-            { label: "Orçamento", value: d.budgetCents > 0 ? fmtCents(d.budgetCents) : "Permuta" },
+            { label: "Orçamento", value: orcamentoLabel(d.budgetCents, d.modality) },
           ].map((f) => (
             <div key={f.label}>
               <div className="text-[11px] text-ink-muted mb-0.5">{f.label}</div>
@@ -327,167 +334,20 @@ function CampaignDetailPanel({ campaignId }: { campaignId: string }) {
               {dl.isReviewOverdue && (
                 <span className="text-[11px]" style={{ color: "#D97706" }}>prazo vencido</span>
               )}
-              <span className="chip text-[10.5px]">{dl.status}</span>
+              <span className="chip text-[10.5px]">{tEnum("deliveryStatus", dl.status)}</span>
             </div>
           ))
         )}
       </div>
 
       {inviteOpen && (
-        <InviteInfluencerModal
-          campaignId={campaignId}
-          campaignName={d.name}
+        <InviteCreatorModal
+          initialCampaignId={campaignId}
           onClose={() => setInviteOpen(false)}
         />
       )}
 
       {editOpen && <EditCampaignModal campaign={d} onClose={() => setEditOpen(false)} />}
-    </div>
-  )
-}
-
-/**
- * Convite de criador. Duas etapas na mesma janela: o formulário e, depois do envio,
- * o link. O link aparece SEMPRE, não só quando o e-mail falha — é ele que permite
- * mandar por WhatsApp, que é como boa parte das agências realmente fala com criador.
- */
-function InviteInfluencerModal({
-  campaignId, campaignName, onClose,
-}: {
-  campaignId: string
-  campaignName: string
-  onClose: () => void
-}) {
-  const { invite } = useCampaignMutations(campaignId)
-  const [email, setEmail] = useState("")
-  const [fullName, setFullName] = useState("")
-  const [message, setMessage] = useState("")
-  const [sent, setSent] = useState<InviteInfluencerResponse | null>(null)
-  const [copied, setCopied] = useState(false)
-
-  const link = sent
-    ? `${window.location.origin}/${INFLUENCER_INVITE_PATH}/${sent.token}`
-    : ""
-
-  const submit = async () => {
-    try {
-      const res = await invite.mutateAsync({
-        email: email.trim(),
-        fullName: fullName.trim(),
-        message: message.trim() || undefined,
-      })
-      setSent(res)
-      if (res.emailDelivery === "Sent") toast.success(`Convite enviado para ${res.email}.`)
-    } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Não foi possível convidar.")
-    }
-  }
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(link)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      toast.error("Não foi possível copiar — selecione o link manualmente.")
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(11,15,26,.5)" }}>
-      <div className="w-full max-w-md rounded-xl border border-border-soft p-6" style={{ background: "var(--surface)" }}>
-        <div className="flex items-start justify-between mb-5">
-          <div>
-            <h3 className="font-display m-0" style={{ fontSize: 20, color: "var(--ink)" }}>
-              {sent ? "Convite criado" : "Convidar criador"}
-            </h3>
-            <div className="text-[12px] text-ink-muted mt-0.5">{campaignName}</div>
-          </div>
-          <button onClick={onClose} className="text-ink-muted hover:opacity-70" aria-label="Fechar">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {sent ? (
-          <>
-            {sent.emailDelivery !== "Sent" && (
-              <div className="rounded-lg p-3 text-[12px] mb-4" style={{ background: "#D9770615", color: "#D97706" }}>
-                {sent.emailDelivery === "Disabled"
-                  ? "O envio de e-mail não está configurado neste ambiente."
-                  : "O e-mail não saiu."}{" "}
-                Mande o link abaixo — o convite já existe e é válido.
-              </div>
-            )}
-
-            <div className="text-[11px] text-ink-muted mb-1.5">Link do convite</div>
-            <div className="flex items-center gap-2 mb-4">
-              <input
-                readOnly
-                value={link}
-                onFocus={(e) => e.currentTarget.select()}
-                className="flex-1 px-2.5 py-2 rounded-lg border border-border-soft font-mono-zoe text-[11.5px] bg-transparent"
-                style={{ color: "var(--ink)" }}
-              />
-              <button
-                onClick={copy}
-                className="px-2.5 py-2 rounded-lg border border-border-soft shrink-0"
-                aria-label="Copiar link"
-              >
-                {copied ? <Check className="w-3.5 h-3.5" style={{ color: "var(--color-teal-500)" }} />
-                        : <Copy className="w-3.5 h-3.5" />}
-              </button>
-            </div>
-
-            <p className="text-[11.5px] text-ink-muted mb-5">
-              Vence em {fmtDate(sent.expiresAt)}. O criador precisa entrar com o e-mail{" "}
-              <span className="font-mono-zoe">{sent.email}</span> — o convite é dele.
-              {sent.influencerCreated
-                ? " Ele já apareceu no elenco como convidado."
-                : " Ele já estava no seu elenco."}
-            </p>
-
-            <button
-              onClick={onClose}
-              className="w-full px-4 py-2.5 rounded-lg text-[14px] font-medium text-white"
-              style={{ background: "var(--color-teal-500)" }}
-            >
-              Fechar
-            </button>
-          </>
-        ) : (
-          <>
-            <div className="space-y-4">
-              <Field label="E-mail" hint="É por ele que o convite é validado no aceite.">
-                <Input value={email} onChange={(e) => setEmail(e.target.value)}
-                       type="email" placeholder="criador@email.com" />
-              </Field>
-              <Field label="Nome">
-                <Input value={fullName} onChange={(e) => setFullName(e.target.value)}
-                       placeholder="Como ele assina o contrato" />
-              </Field>
-              <Field label="Mensagem" hint="Opcional. Aparece na tela que o criador abre.">
-                <Input value={message} onChange={(e) => setMessage(e.target.value)}
-                       placeholder="Oi! Queremos você nessa campanha." />
-              </Field>
-            </div>
-
-            <div className="flex gap-2 mt-6">
-              <button onClick={onClose} className="flex-1 px-4 py-2.5 rounded-lg text-[14px] border border-border-soft">
-                Cancelar
-              </button>
-              <button
-                onClick={submit}
-                disabled={invite.isPending || !email.trim() || !fullName.trim()}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[14px] font-medium text-white disabled:opacity-50"
-                style={{ background: "var(--color-teal-500)" }}
-              >
-                {invite.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                Enviar convite
-              </button>
-            </div>
-          </>
-        )}
-      </div>
     </div>
   )
 }

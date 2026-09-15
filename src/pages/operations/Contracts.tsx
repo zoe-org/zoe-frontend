@@ -259,6 +259,11 @@ function CreateContractModal({ onClose }: { onClose: () => void }) {
   const [avulsaModality, setAvulsaModality] = useState("")
   const [influencerId, setInfluencerId] = useState("")
   const [usesEscrow, setUsesEscrow] = useState(true)
+  /**
+   * Ligado por padrão: é o fluxo que a regra descreve (assinado → depósito → produção →
+   * aprovação → pagamento) sem os cliques entre um passo e outro. Desligar volta ao manual.
+   */
+  const [autoAdvance, setAutoAdvance] = useState(true)
   const [reviewSlaDays, setReviewSlaDays] = useState("7")
   const [maxResubmissions, setMaxResubmissions] = useState("2")
 
@@ -302,6 +307,7 @@ function CreateContractModal({ onClose }: { onClose: () => void }) {
       campaignId: campaignId || null,
       influencerId,
       usesEscrow,
+      autoAdvanceEscrow: usesEscrow && autoAdvance,
       modality: campaignId ? undefined : avulsaModality,
       reviewSlaDays: Number(reviewSlaDays) || undefined,
       maxResubmissions: Number(maxResubmissions) || undefined,
@@ -445,6 +451,26 @@ function CreateContractModal({ onClose }: { onClose: () => void }) {
 
                 {escrowBlocked && (
                   <p className="text-[11.5px] text-[#D97706] pl-6.5">{escrowBlocked}</p>
+                )}
+
+                {usesEscrow && !escrowBlocked && (
+                  <label className="flex items-start gap-2.5 cursor-pointer pl-6.5">
+                    <input
+                      type="checkbox"
+                      checked={autoAdvance}
+                      onChange={(e) => setAutoAdvance(e.target.checked)}
+                      className="mt-0.5 accent-[var(--color-teal-500)]"
+                    />
+                    <span>
+                      <span className="text-[13px] font-medium" style={{ color: "var(--ink)" }}>
+                        Pagamento automático
+                      </span>
+                      <span className="block text-[11.5px] text-ink-muted mt-0.5">
+                        Assinado o contrato, o valor é reservado e a produção liberada sem
+                        clique. Aprovada a entrega, o pagamento sai. A aprovação continua sua.
+                      </span>
+                    </span>
+                  </label>
                 )}
               </div>
 

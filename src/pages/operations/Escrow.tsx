@@ -461,6 +461,14 @@ function EscrowDrawer({ e, onClose }: { e: EscrowSummary; onClose: () => void })
               </div>
             ) : (
               <div className="mt-6 flex flex-col gap-2">
+                {/* No fluxo encadeado os botões continuam existindo, mas como recurso: o
+                    normal é a reserva e o pagamento serem pedidos sozinhos. */}
+                {e.autoAdvance && (
+                  <p className="text-[12px] text-ink-muted m-0 mb-1">
+                    Pagamento automático: a reserva e o pagamento são pedidos sozinhos. Use os
+                    botões só se algo ficou parado.
+                  </p>
+                )}
                 {/* Os botões vêm de `allowedTriggers`, que é a máquina de estados falando.
                     A tela não decide o que é possível. */}
                 {can("fund") && (

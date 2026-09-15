@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react"
 import { Link, useParams } from "react-router-dom"
 import {
-  ArrowLeft, Loader2, AlertCircle, Lock, Send, Save, PenLine, ChevronRight, BookmarkPlus,
+  ArrowLeft, Loader2, AlertCircle, Lock, Send, Save, PenLine, ChevronRight, BookmarkPlus, RefreshCw,
 } from "lucide-react"
 import { toast } from "sonner"
 import { ApiError } from "@/lib/api"
@@ -29,7 +29,7 @@ function missingFromProblem(err: unknown): string[] {
 export default function ContractDetailPage() {
   const { contractId } = useParams<{ contractId: string }>()
   const contract = useContract(contractId)
-  const { saveFields, sendForSignature, markSigned } = useContractDetailMutations(contractId)
+  const { saveFields, sendForSignature, markSigned, refreshSignature } = useContractDetailMutations(contractId)
 
   // Valores editados localmente. Só o que o usuário tocou vai no PATCH — o
   // backend faz merge por placeholder, então mandar o mundo inteiro seria ruído.
@@ -220,10 +220,20 @@ export default function ContractDetailPage() {
 
         {/* Coluna lateral */}
         <aside className="flex flex-col gap-6">
-          <SignaturePanel data={data} onMarkSigned={() => markSigned.mutate(undefined, {
-            onSuccess: () => toast.success("Contrato marcado como assinado."),
-            onError: (e) => toast.error(e instanceof ApiError ? e.message : "Não foi possível marcar."),
-          })} pending={markSigned.isPending} />
+          <SignaturePanel
+            data={data}
+            onMarkSigned={() => markSigned.mutate(undefined, {
+              onSuccess: () => toast.success("Contrato marcado como assinado."),
+              onError: (e) => toast.error(e instanceof ApiError ? e.message : "Não foi possível marcar."),
+            })}
+            pending={markSigned.isPending}
+            onRefreshSignature={() => refreshSignature.mutate(undefined, {
+              // "Ainda não assinaram" não é erro: é a resposta do provedor, e diz o que falta.
+              onSuccess: (r) => (r.changed ? toast.success(r.message) : toast.info(r.message)),
+              onError: (e) => toast.error(e instanceof ApiError ? e.message : "Não foi possível consultar a assinatura."),
+            })}
+            refreshing={refreshSignature.isPending}
+          />
 
           <ClausesPanel contract={data} />
         </aside>
@@ -396,8 +406,14 @@ function FieldRow({
 }
 
 function SignaturePanel({
-  data, onMarkSigned, pending,
-}: { data: ContractDetail; onMarkSigned: () => void; pending: boolean }) {
+  data, onMarkSigned, pending, onRefreshSignature, refreshing,
+}: {
+  data: ContractDetail
+  onMarkSigned: () => void
+  pending: boolean
+  onRefreshSignature: () => void
+  refreshing: boolean
+}) {
   return (
     <div className="rounded-xl border border-border-soft p-4">
       <div className="eyebrow mb-2">Assinatura</div>
@@ -416,6 +432,28 @@ function SignaturePanel({
 
       {data.status === "SentForSignature" && (
         <RoleGate minRole="Admin">
+          {/* A confirmação chega pelo webhook — mas webhook se perde, e em ambiente local
+              ele nem chega. Sem este botão o contrato assinado ficava preso em "aguardando"
+              e a única saída era chamar a API à mão. */}
+          <button
+            onClick={onRefreshSignature}
+            disabled={refreshing}
+            className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[12.5px] font-medium border border-border-soft disabled:opacity-50"
+          >
+            {refreshing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+            Já assinaram? Confirmar assinatura
+          </button>
+          <p className="text-[11px] text-ink-muted mt-2 mb-3">
+            Enviado para a marca e para o criador. A confirmação costuma chegar sozinha;
+            se demorar, consulte o provedor por aqui.
+          </p>
+        </RoleGate>
+      )}
+
+      {/* O atalho só existe sem provedor real: com a Clicksign ligada a API o recusa, e
+          oferecer um botão que sempre falha era pior do que não ter botão. */}
+      {data.status === "SentForSignature" && data.signatureProviderLive === false && (
+        <RoleGate minRole="Admin">
           <button
             onClick={onMarkSigned}
             disabled={pending}
@@ -433,12 +471,20 @@ function SignaturePanel({
       )}
 
       {data.status === "Signed" && data.usesEscrow && !data.escrowAccountId && (
-        <OpenEscrowPanel contractId={data.contractId} />
+        aguardandoAutomacao(data)
+          ? (
+            <p className="text-[12.5px] text-ink-muted">
+              Assinado. A custódia abre sozinha pelo valor do contrato e a reserva é pedida
+              em seguida — atualize em instantes.
+            </p>
+          )
+          : <OpenEscrowPanel contractId={data.contractId} automationStalled={data.autoAdvanceEscrow} />
       )}
 
       {data.status === "Signed" && data.escrowAccountId && (
         <p className="text-[12.5px]" style={{ color: "var(--color-teal-500)" }}>
           Assinado, com custódia aberta.{" "}
+          {data.autoAdvanceEscrow && "Reserva e pagamento seguem sozinhos. "}
           <Link to="/operations/escrow" className="underline">Ver no quadro</Link>
         </p>
       )}
@@ -462,7 +508,21 @@ function SignaturePanel({
  * <p>A taxa da plataforma NÃO é pedida: ela é termo do contrato e a custódia herda. Pedir
  * de novo abriria espaço para divergir do que foi assinado.</p>
  */
-function OpenEscrowPanel({ contractId }: { contractId: string }) {
+/**
+ * Janela em que a abertura automática ainda é esperada. Passado isso sem custódia, algo a
+ * impediu (valor ilegível, teto do provedor) e a tela devolve o botão manual em vez de
+ * deixar a pessoa esperando um passo que não vai acontecer.
+ */
+const AUTOMACAO_JANELA_MS = 5 * 60_000
+
+function aguardandoAutomacao(data: ContractDetail): boolean {
+  if (!data.autoAdvanceEscrow || !data.signedAt) return false
+  return Date.now() - Date.parse(data.signedAt) < AUTOMACAO_JANELA_MS
+}
+
+function OpenEscrowPanel({
+  contractId, automationStalled = false,
+}: { contractId: string; automationStalled?: boolean }) {
   const { open } = useEscrowMutations()
   const [amount, setAmount] = useState("")
 
@@ -489,8 +549,9 @@ function OpenEscrowPanel({ contractId }: { contractId: string }) {
           Assinado — abra a custódia
         </div>
         <p className="text-[12.5px] text-ink-muted m-0 mb-3">
-          O valor fica reservado no provedor antes de o criador começar a produzir. Nenhum
-          centavo passa por conta da Zoe.
+          {automationStalled
+            ? "A abertura automática não aconteceu — confira se o valor total do contrato está legível, ou abra por aqui."
+            : "O valor fica reservado no provedor antes de o criador começar a produzir. Nenhum centavo passa por conta da Zoe."}
         </p>
 
         <div className="flex gap-2 flex-wrap sm:flex-nowrap">

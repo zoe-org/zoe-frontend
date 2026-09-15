@@ -7,6 +7,7 @@ import { ThemeProvider } from "next-themes"
 import { AuthProvider } from "@/features/auth/AuthContext"
 import { BrandProvider } from "@/features/brands/BrandContext"
 import { router } from "@/app/router"
+import { Toaster } from "@/components/ui/sonner"
 
 const qc = new QueryClient()
 createRoot(document.getElementById("root")!).render(
@@ -16,5 +17,9 @@ createRoot(document.getElementById("root")!).render(
         <BrandProvider><RouterProvider router={router} /></BrandProvider>
       </AuthProvider>
     </QueryClientProvider>
+    {/* O app inteiro chama toast() — sucesso, erro de API, convite duplicado — e o
+        container nunca foi montado: toda mensagem sumia em silêncio. Fica aqui, dentro do
+        ThemeProvider porque o componente lê o tema. */}
+    <Toaster position="top-right" />
   </ThemeProvider>
 )

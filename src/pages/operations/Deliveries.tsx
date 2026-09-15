@@ -351,7 +351,7 @@ function AuditCard({ audit }: { audit: DeliveryAudit | null }) {
 }
 
 function ReviewDrawer({ d, onClose }: { d: DeliverySummary; onClose: () => void }) {
-  const { startReview, decide } = useDeliveryMutations()
+  const { decide } = useDeliveryMutations()
   const [notes, setNotes] = useState("")
 
   const run = async (fn: () => Promise<unknown>, ok: string) => {
@@ -376,7 +376,7 @@ function ReviewDrawer({ d, onClose }: { d: DeliverySummary; onClose: () => void 
     )
   }
 
-  const busy = startReview.isPending || decide.isPending
+  const busy = decide.isPending
   const decided = d.status === "Approved" || d.status === "Rejected"
 
   return (
@@ -495,21 +495,6 @@ function ReviewDrawer({ d, onClose }: { d: DeliverySummary; onClose: () => void 
                 Entrega {tEnum("deliveryStatus", d.status).toLowerCase()} — decisão registrada e
                 não se refaz. Correção posterior é nova submissão do criador.
               </div>
-            ) : d.status === "Submitted" ? (
-              <>
-                <p className="text-[12px] text-ink-muted mt-5 mb-2">
-                  Abrir a revisão fixa o prazo do SLA definido no contrato.
-                </p>
-                <button
-                  onClick={() => run(() => startReview.mutateAsync(d.deliveryId), "Revisão aberta.")}
-                  disabled={busy}
-                  className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[14px] font-medium text-white disabled:opacity-50"
-                  style={{ background: "var(--color-teal-500)" }}
-                >
-                  {busy && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Abrir revisão
-                </button>
-              </>
             ) : (
               <>
                 <div className="mt-5">
@@ -528,17 +513,23 @@ function ReviewDrawer({ d, onClose }: { d: DeliverySummary; onClose: () => void 
                 </div>
 
                 <button
-                  onClick={() => decideWith("Approve", "Entrega aprovada. A custódia ficou liberável.")}
+                  onClick={() => decideWith(
+                    "Approve",
+                    d.paymentFollowsApproval
+                      ? "Entrega aprovada. O pagamento foi pedido."
+                      : "Entrega aprovada. A custódia ficou liberável.",
+                  )}
                   disabled={busy}
                   className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[14px] font-medium text-white mt-3 disabled:opacity-50"
                   style={{ background: "var(--color-teal-500)" }}
                 >
                   {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                  Aprovar entrega
+                  {d.paymentFollowsApproval ? "Aprovar e liberar pagamento" : "Aprovar entrega"}
                 </button>
                 <p className="text-[11px] text-ink-muted mt-1.5 mb-3">
-                  Aprovar não paga: torna a custódia liberável. A liberação é um passo
-                  separado, e continua sendo um clique humano.
+                  {d.paymentFollowsApproval
+                    ? `Aprovar pede o pagamento${d.escrowAmountCents != null ? ` de ${fmtCents(d.escrowAmountCents)}` : ""}. Ele sai pela fila, assim que o criador tiver a conta de recebimento verificada.`
+                    : "Aprovar não paga: torna a custódia liberável. A liberação é um passo separado, e continua sendo um clique humano."}
                 </p>
 
                 <div className="flex gap-2">
