@@ -59,7 +59,8 @@ export function payoutBlockReason(
 /** Formata centavos em BRL. Dinheiro chega inteiro da API e só vira texto aqui. */
 export function fmtCents(cents: number): string {
   return (cents / 100).toLocaleString("pt-BR", {
-    style: "currency", currency: "BRL", maximumFractionDigits: 0,
+    // Sempre duas casas: arredondar escondia taxa de R$ 0,20 como "R$ 0" num contrato de R$ 5.
+    style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2,
   })
 }
 
@@ -593,9 +594,9 @@ export const operationsApi = {
     apiClient.post<{ deliveryId: string; status: DeliveryStatus; reviewDueAt: string }>(
       `/api/operations/deliveries/${deliveryId}/start-review`),
 
-  decideDelivery: (deliveryId: string, decision: DeliveryDecision, notes?: string) =>
+  decideDelivery: (deliveryId: string, decision: DeliveryDecision, notes?: string, scope?: ReworkScope) =>
     apiClient.post<DecideDeliveryResponse>(
-      `/api/operations/deliveries/${deliveryId}/decision`, { decision, notes }),
+      `/api/operations/deliveries/${deliveryId}/decision`, { decision, notes, scope }),
 
   listContracts: (status?: string, opts?: { signal?: AbortSignal }) =>
     apiClient.get<ListContractsResponse>(
@@ -852,6 +853,8 @@ export type DeliverySummary = {
   audit: DeliveryAudit | null
   /** Aprovar já pede o pagamento: o contrato combinou o fluxo encadeado. */
   paymentFollowsApproval: boolean
+  /** Conta de recebimento do criador existe e está verificada — sem ela o pagamento espera. */
+  creatorPayoutReady: boolean
 }
 
 /**
@@ -879,6 +882,12 @@ export type DeliveryAuditItem = {
 export type ListDeliveriesResponse = { items: DeliverySummary[] }
 
 export type DeliveryDecision = "Approve" | "RequestRework" | "Reject"
+
+/**
+ * O que a correção pede: ajustar a publicação (legenda, #publi, link — o vídeo aprovado segue
+ * valendo) ou refazer o vídeo (o corte reabre e volta pela aprovação).
+ */
+export type ReworkScope = "Publication" | "Content"
 
 export type DecideDeliveryResponse = {
   deliveryId: string
@@ -954,8 +963,8 @@ export function useDeliveryMutations() {
       onSuccess: refresh,
     }),
     decide: useMutation({
-      mutationFn: (v: { deliveryId: string; decision: DeliveryDecision; notes?: string }) =>
-        operationsApi.decideDelivery(v.deliveryId, v.decision, v.notes),
+      mutationFn: (v: { deliveryId: string; decision: DeliveryDecision; notes?: string; scope?: ReworkScope }) =>
+        operationsApi.decideDelivery(v.deliveryId, v.decision, v.notes, v.scope),
       onSuccess: refresh,
     }),
   }
@@ -991,6 +1000,8 @@ export type EscrowSummary = {
   createdAt: string
   /** Reserva e pagamento são pedidos sozinhos; os botões ficam como recurso. */
   autoAdvance: boolean
+  /** Conta criada mas ainda em verificação: custódia liberável fica parada esperando. */
+  payoutAccountUnverified: boolean
 }
 
 export type EscrowTotals = {

@@ -17,7 +17,7 @@ import {
 } from "@/pages/operations/shared"
 import {
   useDeliveries, useDeliveryMutations, fmtCents, deliveryThumb, deliveryLink, PLATFORM_LABEL,
-  type DeliverySummary, type DeliveryDecision, type DeliveryAudit,
+  type DeliverySummary, type DeliveryDecision, type DeliveryAudit, type ReworkScope,
 } from "@/lib/api/operations"
 
 const STATUS_COLOR: Record<string, string> = {
@@ -354,9 +354,21 @@ function AuditCard({ audit }: { audit: DeliveryAudit | null }) {
   )
 }
 
+/**
+ * Sugere o tipo de correção pelo que a auditoria reprovou. Identificação publicitária e hashtag
+ * se resolvem editando a postagem; o resto mexe no vídeo. É sugestão — quem revisa escolhe.
+ */
+function sugestaoDeEscopo(audit: DeliveryAudit | null): ReworkScope {
+  const falhas = audit?.checklist.filter((i) => !i.passed).map((i) => i.criterion.toLowerCase()) ?? []
+  if (falhas.length === 0) return "Content"
+  const soPublicacao = falhas.every((c) => c.includes("disclosure") || c.includes("hashtag") || c.includes("conar"))
+  return soPublicacao ? "Publication" : "Content"
+}
+
 function ReviewDrawer({ d, onClose }: { d: DeliverySummary; onClose: () => void }) {
   const { decide } = useDeliveryMutations()
   const [notes, setNotes] = useState("")
+  const [escopo, setEscopo] = useState<ReworkScope>(() => sugestaoDeEscopo(d.audit))
 
   const run = async (fn: () => Promise<unknown>, ok: string) => {
     try {
@@ -375,7 +387,12 @@ function ReviewDrawer({ d, onClose }: { d: DeliverySummary; onClose: () => void 
       return
     }
     return run(
-      () => decide.mutateAsync({ deliveryId: d.deliveryId, decision, notes: notes.trim() || undefined }),
+      () => decide.mutateAsync({
+        deliveryId: d.deliveryId,
+        decision,
+        notes: notes.trim() || undefined,
+        scope: decision === "RequestRework" ? escopo : undefined,
+      }),
       ok,
     )
   }
@@ -525,7 +542,9 @@ function ReviewDrawer({ d, onClose }: { d: DeliverySummary; onClose: () => void 
                   onClick={() => decideWith(
                     "Approve",
                     d.paymentFollowsApproval
-                      ? "Entrega aprovada. O pagamento foi pedido."
+                      ? (d.creatorPayoutReady
+                        ? "Entrega aprovada. O pagamento foi pedido."
+                        : "Entrega aprovada. O pagamento sai assim que a conta do criador for verificada.")
                       : "Entrega aprovada. A custódia ficou liberável.",
                   )}
                   disabled={busy}
@@ -537,13 +556,44 @@ function ReviewDrawer({ d, onClose }: { d: DeliverySummary; onClose: () => void 
                 </button>
                 <p className="text-[11px] text-ink-muted mt-1.5 mb-3">
                   {d.paymentFollowsApproval
-                    ? `Aprovar pede o pagamento${d.escrowAmountCents != null ? ` de ${fmtCents(d.escrowAmountCents)}` : ""}. Ele sai pela fila, assim que o criador tiver a conta de recebimento verificada.`
+                    ? `Aprovar pede o pagamento${d.escrowAmountCents != null ? ` de ${fmtCents(d.escrowAmountCents)}` : ""}. ${d.creatorPayoutReady ? " Ele sai pela fila em instantes." : " A conta de recebimento do criador ainda não está verificada — o pagamento espera por ela."}`
                     : "Aprovar não paga: torna a custódia liberável. A liberação é um passo separado, e continua sendo um clique humano."}
                 </p>
 
+                {/* O tipo muda o caminho do criador: editar a postagem e reenviar o link, ou
+                    subir um corte novo que passa de novo pela aprovação. */}
+                <div className="mb-2">
+                  <div className="text-[11px] text-ink-muted mb-1.5">Se pedir correção, o que precisa mudar?</div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {([
+                      ["Publication", "Ajustar a publicação", "legenda, #publi, link, privacidade"],
+                      ["Content", "Refazer o vídeo", "marca, logo, tom — volta ao corte"],
+                    ] as const).map(([id, label, hint]) => (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => setEscopo(id)}
+                        aria-pressed={escopo === id}
+                        className="px-2.5 py-1.5 rounded-lg text-left border text-[12px] transition-colors"
+                        style={escopo === id
+                          ? { borderColor: "#D97706", background: "#D9770612", color: "#B45309" }
+                          : { borderColor: "var(--border-soft)", color: "var(--ink-muted)" }}
+                      >
+                        <div className="font-medium">{label}</div>
+                        <div className="text-[10.5px] opacity-80">{hint}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="flex gap-2">
                   <button
-                    onClick={() => decideWith("RequestRework", "Correção solicitada.")}
+                    onClick={() => decideWith(
+                      "RequestRework",
+                      escopo === "Publication"
+                        ? "Pedido de ajuste na publicação enviado."
+                        : "Pedido para refazer o vídeo enviado — o corte volta para aprovação.",
+                    )}
                     disabled={busy}
                     className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-[13px] border border-border-soft disabled:opacity-50"
                     style={{ color: "#D97706" }}

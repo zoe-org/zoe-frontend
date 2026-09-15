@@ -49,6 +49,8 @@ export type CreatorEngagement = {
   /** Nulo enquanto nenhum corte foi enviado — é quando a tela pede o arquivo. */
   draft: CreatorDraft | null
   requiresDraftApproval: boolean
+  /** Contrato com custódia — distingue permuta de custódia que ainda não abriu. */
+  usesEscrow: boolean
 }
 
 export type CreatorWorkspace = {

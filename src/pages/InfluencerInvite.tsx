@@ -11,7 +11,7 @@ import {
   clearPendingInfluencerInviteToken,
 } from "@/features/auth/pendingInvite"
 import { tEnum } from "@/i18n/enums"
-import { operationsApi } from "@/lib/api/operations"
+import { operationsApi, fmtCents } from "@/lib/api/operations"
 import { fmtDate } from "@/pages/operations/format"
 
 /**
@@ -153,6 +153,40 @@ function Preview({
           style={{ background: "var(--bg, #F9FAFB)", color: "var(--ink)" }}
         >
           “{data.message}” <span className="text-ink-muted">— {data.inviterName}</span>
+        </div>
+      )}
+
+      {/* A proposta vem antes do botão: o aceite já monta o contrato com estes valores, e quem
+          aceita tem direito de ler o que foi oferecido antes de dizer sim. */}
+      {(data.feeCents != null || data.expectedDeliverables || data.deliveryDeadline) && (
+        <div className="rounded-lg border border-border-soft p-4 mb-5">
+          <div className="eyebrow mb-2.5">O que foi proposto</div>
+          <dl className="m-0 flex flex-col gap-2 text-[13px]">
+            {data.feeCents != null && (
+              <div className="flex justify-between gap-4">
+                <dt className="text-ink-muted">Cachê</dt>
+                <dd className="m-0 font-mono-zoe font-semibold" style={{ color: "var(--ink)" }}>
+                  {fmtCents(data.feeCents)}
+                </dd>
+              </div>
+            )}
+            {data.expectedDeliverables && (
+              <div className="flex justify-between gap-4">
+                <dt className="text-ink-muted shrink-0">Entregas</dt>
+                <dd className="m-0 text-right" style={{ color: "var(--ink)" }}>{data.expectedDeliverables}</dd>
+              </div>
+            )}
+            {data.deliveryDeadline && (
+              <div className="flex justify-between gap-4">
+                <dt className="text-ink-muted">Prazo de entrega</dt>
+                <dd className="m-0" style={{ color: "var(--ink)" }}>{fmtDate(data.deliveryDeadline)}</dd>
+              </div>
+            )}
+          </dl>
+          <p className="text-[11.5px] text-ink-muted mt-3 mb-0">
+            Aceitar não obriga ninguém: a proposta vira contrato, e só vale depois de assinado
+            pelas duas partes.
+          </p>
         </div>
       )}
 

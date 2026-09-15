@@ -261,7 +261,9 @@ function EscrowRow({
         ? { icone: Clock, texto: "autorização vencida", cor: "#D97706", forte: false }
         : e.payoutAccountMissing && !e.isTerminal
           ? { icone: Wallet, texto: "criador sem conta de recebimento", cor: "#D97706", forte: false }
-          : null
+          : e.payoutAccountUnverified && !e.isTerminal
+            ? { icone: Wallet, texto: "aguardando verificação da conta do criador", cor: "#D97706", forte: false }
+            : null
 
   const Icone = alerta?.icone
 
@@ -405,6 +407,20 @@ function EscrowDrawer({ e, onClose }: { e: EscrowSummary; onClose: () => void })
               <span>
                 O criador ainda não tem conta de recebimento. O bloqueio é só no pagamento —
                 a entrega segue normalmente, e a liberação espera a conta existir.
+              </span>
+            </div>
+          )}
+
+          {e.payoutAccountUnverified && !e.isTerminal && (
+            <div
+              className="rounded-lg p-3 text-[12px] mt-4 flex items-start gap-2"
+              style={{ background: "#D9770615", color: "#D97706" }}
+            >
+              <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+              <span>
+                A conta de recebimento do criador está em verificação pelo provedor. A liberação
+                espera essa verificação — o criador conclui pela área dele, e nada precisa ser
+                feito aqui.
               </span>
             </div>
           )}

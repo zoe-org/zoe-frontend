@@ -55,6 +55,11 @@ export function InviteCreatorModal({
   const [search, setSearch] = useState("")
   const [sent, setSent] = useState<InviteInfluencerResponse | null>(null)
   const [copied, setCopied] = useState(false)
+  /**
+   * Convite recusado por já existir. Fica dentro do modal, junto do que a pessoa preencheu: um
+   * toast some em segundos e não diz o que fazer.
+   */
+  const [conflito, setConflito] = useState<{ code: string; message: string } | null>(null)
 
   const { data: rosterData } = useRoster()
   const people = useMemo(() => rosterData?.items ?? [], [rosterData])
@@ -104,7 +109,7 @@ export function InviteCreatorModal({
       if (res.emailDelivery === "Sent") toast.success(`Convite enviado para ${res.email}.`)
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) {
-        toast.error("Esse criador já tem um convite pendente neste workspace.")
+        setConflito({ code: e.code ?? "conflict", message: e.message })
         return
       }
       toast.error(e instanceof ApiError ? e.message : "Não foi possível convidar.")
@@ -331,6 +336,24 @@ export function InviteCreatorModal({
                        placeholder="Adoraria contar com você nessa campanha!" />
               </Field>
             </div>
+
+            {conflito && (
+              <div
+                className="rounded-lg p-3 text-[12.5px] mt-5"
+                style={{ background: "#D9770615", color: "#B45309" }}
+                role="alert"
+              >
+                <div className="font-medium mb-0.5">
+                  {conflito.code === "influencer_already_invited" ? "Essa pessoa já aceitou" : "Já existe um convite pendente"}
+                </div>
+                <div>{conflito.message}</div>
+                {conflito.code === "influencer_already_invited" && (
+                  <a href="/operations/influencers" className="inline-block mt-1.5 underline">
+                    Ver no elenco
+                  </a>
+                )}
+              </div>
+            )}
 
             <div className="flex gap-2 mt-6">
               <button onClick={onClose} className="flex-1 px-4 py-2.5 rounded-lg text-[14px] border border-border-soft">

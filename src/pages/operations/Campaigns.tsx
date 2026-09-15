@@ -159,6 +159,17 @@ export default function OperationsCampaignsPage() {
   )
 }
 
+/**
+ * Campanha ativa com prazo no passado. Não conclui sozinha — pode haver entrega atrasada em
+ * andamento —, mas avisa: senão ela segue recebendo contrato e convite com datas vencidas.
+ */
+function prazoEncerrado(d: { status: string; endsAt: string | null }): boolean {
+  if (d.status !== "Active" || !d.endsAt) return false
+  const hoje = new Date()
+  hoje.setHours(0, 0, 0, 0)
+  return new Date(d.endsAt) < hoje
+}
+
 /** Zero só é "Permuta" quando a modalidade é permuta; nas outras é orçamento não definido. */
 function orcamentoLabel(budgetCents: number, modality: string): string {
   if (budgetCents > 0) return fmtCents(budgetCents)
@@ -198,6 +209,15 @@ function CampaignDetailPanel({ campaignId }: { campaignId: string }) {
           <div className="flex items-center gap-2 mb-1.5">
             <h2 className="font-display m-0" style={{ fontSize: 26, color: "var(--ink)" }}>{d.name}</h2>
             <CampaignChip status={d.status} />
+            {prazoEncerrado(d) && (
+              <span
+                className="chip text-[10.5px]"
+                style={{ color: "#B45309", background: "#D9770615" }}
+                title="O prazo da campanha já passou e ela segue ativa. Concluir fecha para novos contratos e convites."
+              >
+                prazo encerrado
+              </span>
+            )}
           </div>
           <div className="text-[13px] text-ink-muted">
             {d.brandName ?? "sem marca"} · modalidade {tEnum("contractModality", d.modality)}

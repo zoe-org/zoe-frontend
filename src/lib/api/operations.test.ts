@@ -98,13 +98,15 @@ describe("fmtCents", () => {
   // depender de qual espaco a runtime escolheu.
   const norm = (s: string) => s.replace(/\s/g, " ")
 
-  it("formata centavos inteiros em reais", () => {
-    expect(norm(fmtCents(500_000))).toBe("R$ 5.000")
-    expect(norm(fmtCents(0))).toBe("R$ 0")
+  it("formata em reais sempre com duas casas", () => {
+    expect(norm(fmtCents(500_000))).toBe("R$ 5.000,00")
+    expect(norm(fmtCents(0))).toBe("R$ 0,00")
   })
 
-  it("arredonda centavos quebrados em vez de exibir casas", () => {
-    expect(norm(fmtCents(123_456))).toBe("R$ 1.235")
+  it("mostra os centavos em vez de arredondar", () => {
+    // Arredondar escondia a taxa de R$ 0,20 de um contrato de R$ 5 como "R$ 0".
+    expect(norm(fmtCents(123_456))).toBe("R$ 1.234,56")
+    expect(norm(fmtCents(20))).toBe("R$ 0,20")
   })
 })
 

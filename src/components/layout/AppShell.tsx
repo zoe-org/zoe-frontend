@@ -79,7 +79,9 @@ export function AppShell() {
   const hasReports = useFeature("reports")
   // Plano exibido abaixo do nome (design: "Intelligence · Owner"). O módulo é o
   // que o tenant tem; combinado com a role vira a linha de contexto do usuário.
-  const planLabel = hasIntelligence ? "Intelligence" : hasOperations ? "Operations" : null
+  // Os dois módulos quando o workspace tem os dois: mostrar só Intelligence escondia o Operations.
+  const planLabel = [hasIntelligence && "Intelligence", hasOperations && "Operations"]
+    .filter(Boolean).join(" + ") || null
   const userContext = [planLabel, role].filter(Boolean).join(" · ")
   const location = useLocation()
   const navigate = useNavigate()

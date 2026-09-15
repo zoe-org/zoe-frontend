@@ -287,6 +287,11 @@ function EngagementCard({ e }: { e: CreatorEngagement }) {
   // Contrato que não exige corte publica direto — ao vivo, por exemplo.
   const draftApproved = !e.requiresDraftApproval || e.draft?.status === "Approved"
 
+  // A última tentativa decide o recado: com o corte reaberto a marca pediu vídeo novo; com o
+  // corte ainda aprovado, só ajuste na postagem.
+  const ultimaEntrega = [...e.deliveries].sort((a, b) => b.submissionAttempt - a.submissionAttempt)[0]
+  const correcaoPedida = ultimaEntrega?.status === "ReworkRequested"
+
   const send = async () => {
     try {
       await submit.mutateAsync({ contractId: e.contractId, submittedUrl: url.trim() })
@@ -314,13 +319,22 @@ function EngagementCard({ e }: { e: CreatorEngagement }) {
           {/* O que importa para ele é o líquido, não o bruto do contrato — o take rate
               da Zoe sai antes de chegar nele. */}
           <div className="font-mono-zoe text-[18px] font-semibold" style={{ color: "var(--ink)" }}>
-            {e.netToInfluencerCents != null ? fmtCents(e.netToInfluencerCents) : "Permuta"}
+            {e.netToInfluencerCents != null ? fmtCents(e.netToInfluencerCents) : e.usesEscrow ? "a reservar" : "Permuta"}
           </div>
           {e.netToInfluencerCents != null && (
             <div className="text-[11px] text-ink-muted">seu valor líquido</div>
           )}
         </div>
       </div>
+
+      {correcaoPedida && (
+        <div className="rounded-lg p-3 text-[12.5px] mb-4" style={{ background: "#D9770612", color: "#B45309" }}>
+          <div className="font-medium mb-0.5">A marca pediu uma correção</div>
+          {e.draft?.status === "ChangesRequested"
+            ? "É para refazer o vídeo: envie um novo corte para aprovação antes de publicar de novo."
+            : "É um ajuste na publicação: corrija a postagem (legenda, #publi, link ou privacidade) e reenvie o link abaixo."}
+        </div>
+      )}
 
       {e.deliveries.length > 0 && (
         <div className="flex flex-col gap-2.5 mb-4">

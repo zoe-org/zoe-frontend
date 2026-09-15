@@ -68,6 +68,15 @@ export default function ContractDetailPage() {
   }
 
   const isDraft = data.status === "Draft"
+
+  // Datas que já passaram, num rascunho. Herdadas de uma campanha antiga, elas pareciam
+  // combinadas e iam para a assinatura sem ninguém notar.
+  const hoje = new Date().toISOString().slice(0, 10)
+  const datasVencidas = isDraft
+    ? fields.filter((f) =>
+      ["start_date", "end_date", "publish_deadline", "creation_deadline"].includes(f.placeholder)
+      && Boolean(f.value) && (f.value ?? "") < hoje)
+    : []
   const missing = new Set([...data.missingRequiredFields, ...serverMissing])
 
   // Vazio pelo valor SALVO, não pelo que está sendo digitado: senão o campo sumiria da lista
@@ -189,6 +198,14 @@ export default function ContractDetailPage() {
             <p className="text-[12.5px] text-ink-muted mb-4">
               Contrato fora de rascunho: os campos ficam somente leitura.
             </p>
+          )}
+
+          {datasVencidas.length > 0 && (
+            <div className="rounded-lg p-3 text-[12.5px] mb-4" style={{ background: "#D9770615", color: "#B45309" }}>
+              <span className="font-medium">Datas no passado:</span>{" "}
+              {datasVencidas.map((f) => f.label).join(", ")}. Confira antes de enviar para assinatura —
+              o contrato nasceria com prazos já vencidos.
+            </div>
           )}
 
           {/* Duas colunas para o que e' curto. Um campo de data ocupando 1300px de
@@ -351,7 +368,7 @@ function FieldRow({
             className="chip text-[10px]"
             title="Campo que o sistema usa — alimenta auditoria, prazos ou valores. Não é só texto do documento."
           >
-            sistema
+            usado pelo sistema
           </span>
         )}
       </span>

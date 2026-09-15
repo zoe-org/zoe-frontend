@@ -40,7 +40,7 @@ export default function SettingsPage() {
       <section className="px-8 pt-7 pb-5 border-b border-border-soft" style={{ background: "var(--surface)" }}>
         <div className="eyebrow mb-2.5">Conta · Configurações</div>
         <h1 className="font-display m-0" style={{ fontSize: 34, lineHeight: 1.1, color: "var(--ink)" }}>
-          Meu perfil
+          {tab === "contratos" ? "Padrões de contrato" : tab === "addons" ? "Add-ons" : tab === "aparencia" ? "Aparência" : "Meu perfil"}
         </h1>
         <div className="text-[14px] text-ink-muted mt-1.5 max-w-140">
           Gerencie seus dados, add-ons do workspace e preferências de aparência.

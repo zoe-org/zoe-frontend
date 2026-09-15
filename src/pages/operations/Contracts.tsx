@@ -253,6 +253,7 @@ function CreateContractModal({ onClose }: { onClose: () => void }) {
   const campaigns = useCampaigns()
   const { create } = useContractMutations()
   const navigate = useNavigate()
+  const contratosExistentes = useContracts()
 
   const [campaignId, setCampaignId] = useState("")
   /** Modalidade do avulso. Ignorada quando há campanha — lá ela é quem manda. */
@@ -268,6 +269,14 @@ function CreateContractModal({ onClose }: { onClose: () => void }) {
   const [maxResubmissions, setMaxResubmissions] = useState("2")
 
   const people = useMemo(() => roster.data?.items ?? [], [roster.data])
+
+  const repetidos = useMemo(
+    () => campaignId && influencerId
+      ? (contratosExistentes.data?.items ?? []).filter(
+        (c) => c.campaignId === campaignId && c.influencerId === influencerId && c.status !== "Cancelled")
+      : [],
+    [contratosExistentes.data, campaignId, influencerId],
+  )
   // Campanha encerrada não recebe contrato — o domínio recusa, então nem oferecemos.
   const openCampaigns = useMemo(
     () => (campaigns.data?.items ?? []).filter(
@@ -426,6 +435,23 @@ function CreateContractModal({ onClose }: { onClose: () => void }) {
                   ))}
                 </Select>
               </Field>
+
+              {/* Com o rascunho nascendo no aceite do convite, criar pela tela duplicava sem
+                  ninguém perceber. Não bloqueia: dois trabalhos na mesma campanha existem. */}
+              {repetidos.length > 0 && (
+                <div className="rounded-lg p-3 text-[12px]" style={{ background: "#D9770615", color: "#B45309" }}>
+                  Este criador já tem {repetidos.length === 1 ? "um contrato" : `${repetidos.length} contratos`} nesta
+                  campanha ({repetidos.map((c) => tEnum("contractStatus", c.status).toLowerCase()).join(", ")}).{" "}
+                  <button
+                    type="button"
+                    className="underline"
+                    onClick={() => { onClose(); navigate(`/operations/contracts/${repetidos[0].contractId}`) }}
+                  >
+                    Abrir o existente
+                  </button>
+                  {" "}— ou crie outro se for um trabalho novo.
+                </div>
+              )}
 
               <div
                 className="rounded-lg border p-3 flex flex-col gap-2"
