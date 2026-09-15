@@ -526,7 +526,14 @@ function ReviewPanel({ group, onDecided }: { group: DeliveryGroup; onDecided: ()
           {d.isReviewOverdue
             ? `Prazo de revisão venceu em ${fmtDate(d.reviewDueAt)}.`
             : `Prazo de revisão até ${fmtDate(d.reviewDueAt)}.`}
-          {" "}Nada acontece automaticamente — a decisão é sua.
+          {" "}
+          {/* Antes dizia sempre que nada acontecia sozinho. Com o termo no contrato (RN-O-055) o prazo
+              decide, e quem revisa precisa saber disso antes de deixar para depois. */}
+          {d.autoReleaseOnTimeout
+            ? d.isReviewOverdue
+              ? "Pelo contrato, a entrega será aprovada automaticamente em instantes."
+              : "Se ninguém revisar até lá, a entrega é aprovada automaticamente, como diz o contrato."
+            : "Nada acontece automaticamente — a decisão é sua."}
         </div>
       )}
 

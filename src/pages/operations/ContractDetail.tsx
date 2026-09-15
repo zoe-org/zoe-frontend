@@ -294,11 +294,52 @@ export default function ContractDetailPage() {
             refreshing={refreshSignature.isPending}
           />
 
+          <AutoReleasePanel data={data} />
+
           <ContractTimeline contractId={data.contractId} />
 
           <ClausesPanel contract={data} />
         </aside>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Aprovação por prazo de revisão vencido (RN-O-055). Em rascunho, quem prepara o contrato liga ou
+ * desliga; depois do envio só informa — é termo do que as partes assinaram.
+ */
+function AutoReleasePanel({ data }: { data: ContractDetail }) {
+  const { setAutoRelease } = useContractDetailMutations(data.contractId)
+  const isDraft = data.status === "Draft"
+
+  return (
+    <div className="rounded-xl border border-border-soft p-4">
+      <div className="eyebrow mb-2">Prazo de revisão</div>
+      <p className="text-[12.5px] m-0" style={{ color: "var(--ink)" }}>
+        {data.autoReleaseOnTimeout
+          ? `Sem revisão em ${data.reviewSlaDays} dias, a entrega é aprovada automaticamente.`
+          : "Prazo vencido não aprova nada: a entrega espera a revisão."}
+      </p>
+      {isDraft && (
+        <RoleGate minRole="Admin">
+          <label className="flex items-center gap-2 text-[12px] mt-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={data.autoReleaseOnTimeout}
+              disabled={setAutoRelease.isPending}
+              onChange={(e) => setAutoRelease.mutate(e.target.checked, {
+                onError: (err) => toast.error(err instanceof ApiError ? err.message : "Não foi possível mudar o termo."),
+              })}
+              className="accent-[var(--color-teal-500)]"
+            />
+            Aprovar a entrega se o prazo vencer
+          </label>
+          <p className="text-[11px] text-ink-muted mt-1.5 mb-0">
+            Vai escrito no contrato. Depois de enviar para assinatura, não muda.
+          </p>
+        </RoleGate>
+      )}
     </div>
   )
 }
@@ -332,6 +373,7 @@ function Header({
             {data.usesEscrow ? "com custódia" : "sem custódia"}
             {" · revisão em "}{data.reviewSlaDays} dias
             {" · "}{data.maxResubmissions} correções
+            {data.autoReleaseOnTimeout && " · aprova se o prazo de revisão vencer"}
           </div>
         </div>
 

@@ -16,6 +16,7 @@ import {
   Field, Select, TableSkeleton, ErrorState, SearchBox, NoResults,
 } from "@/pages/operations/shared"
 import {
+  useContractDefaults,
   useContracts, useContractMutations, useRoster, useCampaigns, useCampaign, fmtCents,
   supportsEscrow, escrowRejectionReason, CONTRACT_MODALITIES,
   type ContractSummary, type CreateContractBody, type CampaignInvite, type RosterItem,
@@ -316,6 +317,13 @@ function CreateContractModal({
   const [autoAdvance, setAutoAdvance] = useState(true)
   const [reviewSlaDays, setReviewSlaDays] = useState("7")
   const [maxResubmissions, setMaxResubmissions] = useState("2")
+  /**
+   * Aprovação por prazo vencido (RN-O-055). Nulo enquanto a pessoa não mexe: a tela mostra o padrão da
+   * marca e o pedido vai sem o campo, para o servidor aplicar o mesmo padrão.
+   */
+  const [autoRelease, setAutoRelease] = useState<boolean | null>(null)
+  const padroesMarca = useContractDefaults()
+  const liberaPorPrazo = autoRelease ?? padroesMarca.data?.autoReleaseOnTimeout ?? true
   useEscapeKey(onClose)
   const dialogRef = useFocusTrap<HTMLDivElement>()
 
@@ -411,6 +419,7 @@ function CreateContractModal({
       modality: campaignId ? undefined : avulsaModality,
       reviewSlaDays: Number(reviewSlaDays) || undefined,
       maxResubmissions: Number(maxResubmissions) || undefined,
+      autoReleaseOnTimeout: autoRelease ?? undefined,
     }
     create.mutate(body, {
       onSuccess: (res) => {
@@ -645,6 +654,28 @@ function CreateContractModal({
                   />
                 </Field>
               </div>
+
+              <label
+                className="flex items-start gap-2.5 cursor-pointer rounded-lg border p-3"
+                style={{ borderColor: "var(--border-soft)" }}
+              >
+                <input
+                  type="checkbox"
+                  checked={liberaPorPrazo}
+                  onChange={(e) => setAutoRelease(e.target.checked)}
+                  className="mt-0.5 accent-[var(--color-teal-500)]"
+                />
+                <span>
+                  <span className="text-[13px] font-medium" style={{ color: "var(--ink)" }}>
+                    Aprovar a entrega se o prazo de revisão vencer
+                  </span>
+                  <span className="block text-[11.5px] text-ink-muted mt-0.5">
+                    Sem revisão em {Number(reviewSlaDays) || 7} dias, a entrega é aprovada e segue como numa
+                    aprovação sua — nunca sobre entrega com auditoria reprovada. Vai escrito no contrato e dá
+                    para mudar até enviar para assinatura.
+                  </span>
+                </span>
+              </label>
 
               <p className="text-[12px] text-ink-muted">
                 O contrato nasce como rascunho. Os campos obrigatórios são preenchidos

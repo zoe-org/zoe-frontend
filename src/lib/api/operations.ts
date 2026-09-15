@@ -726,6 +726,10 @@ export const operationsApi = {
     apiClient.post<MarkSignedResponse>(`/api/operations/contracts/${contractId}/mark-signed`),
   refreshSignature: (contractId: string) =>
     apiClient.post<RefreshSignatureResponse>(`/api/operations/contracts/${contractId}/refresh-signature`),
+  /** Liga ou desliga, no rascunho, a aprovação da entrega quando o prazo de revisão vence (RN-O-055). */
+  setContractAutoRelease: (contractId: string, enabled: boolean) =>
+    apiClient.put<{ contractId: string; autoReleaseOnTimeout: boolean }>(
+      `/api/operations/contracts/${contractId}/auto-release`, { enabled }),
 }
 
 /** Elenco do tenant ativo. `activeTenantId` na key isola o cache por workspace. */
@@ -903,6 +907,10 @@ export function useContractDetailMutations(contractId: string | undefined) {
         qc.invalidateQueries({ queryKey: ["operations-escrow", activeTenantId] })
       },
     }),
+    setAutoRelease: useMutation({
+      mutationFn: (enabled: boolean) => operationsApi.setContractAutoRelease(contractId!, enabled),
+      onSuccess: refresh,
+    }),
   }
 }
 
@@ -956,6 +964,11 @@ export type DeliverySummary = {
   paymentFollowsApproval: boolean
   /** Conta de recebimento do criador existe e está verificada — sem ela o pagamento espera. */
   creatorPayoutReady: boolean
+  /**
+   * O contrato aprova a entrega quando o prazo de revisão vence (RN-O-055). A tela diz isso em vez de
+   * "nada acontece automaticamente".
+   */
+  autoReleaseOnTimeout?: boolean
 }
 
 /**
@@ -1337,7 +1350,11 @@ export type ContractDefaultField = {
   modalities?: string[]
 }
 
-export type ContractDefaults = { fields: ContractDefaultField[] }
+export type ContractDefaults = {
+  fields: ContractDefaultField[]
+  /** Contrato novo nasce aprovando a entrega quando o prazo de revisão vence (RN-O-055). */
+  autoReleaseOnTimeout?: boolean
+}
 
 /**
  * Os que quase toda marca repete em todo contrato. A tela mostra estes primeiro; o resto do
@@ -1357,6 +1374,10 @@ export const contractDefaultsApi = {
   /** Merge por campo. Valor vazio remove o padrão. */
   update: (values: Record<string, string>) =>
     apiClient.put<ContractDefaults>("/api/operations/contract-defaults", { values }),
+
+  /** Padrão de liberação por prazo vencido para contratos novos. Não mexe nos valores de campo. */
+  setAutoRelease: (enabled: boolean) =>
+    apiClient.put<ContractDefaults>("/api/operations/contract-defaults", { values: {}, autoReleaseOnTimeout: enabled }),
 }
 
 export function useContractDefaults() {
@@ -1374,6 +1395,18 @@ export function useUpdateContractDefaults() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (values: Record<string, string>) => contractDefaultsApi.update(values),
+    onSuccess: (data) => {
+      qc.setQueryData(["operations-contract-defaults", activeTenantId], data)
+    },
+  })
+}
+
+/** Padrão da marca para a liberação por prazo vencido. Salva na hora, fora da lista de campos. */
+export function useSetAutoReleaseDefault() {
+  const { activeTenantId } = useAuth()
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (enabled: boolean) => contractDefaultsApi.setAutoRelease(enabled),
     onSuccess: (data) => {
       qc.setQueryData(["operations-contract-defaults", activeTenantId], data)
     },

@@ -7,6 +7,7 @@ import { SearchBox } from "@/pages/operations/shared"
 import { matches } from "@/pages/operations/format"
 import {
   useContractDefaults, useUpdateContractDefaults, ESSENTIAL_CONTRACT_DEFAULTS, useCampaigns, useContracts,
+  useSetAutoReleaseDefault,
   type ContractDefaultField,
 } from "@/lib/api/operations"
 
@@ -34,6 +35,7 @@ const EXEMPLO: Record<string, string> = {
 export function ContractDefaultsTab({ isAdmin }: { isAdmin: boolean }) {
   const defaults = useContractDefaults()
   const salvar = useUpdateContractDefaults()
+  const salvarLiberacao = useSetAutoReleaseDefault()
 
   const [edits, setEdits] = useState<Record<string, string>>({})
   const [mostrarTodos, setMostrarTodos] = useState(false)
@@ -147,6 +149,34 @@ export function ContractDefaultsTab({ isAdmin }: { isAdmin: boolean }) {
           Só Owner e Admin alteram os padrões. Você está vendo os valores atuais.
         </p>
       )}
+
+      {/* Fora da lista de campos: não é texto do documento, é como o prazo de revisão age. Salva na
+          hora, como um interruptor. */}
+      <div className="rounded-xl border border-border-soft p-5 mb-5" style={{ background: "var(--surface)" }}>
+        <label className={`flex items-start gap-2.5 ${isAdmin ? "cursor-pointer" : ""}`}>
+          <input
+            type="checkbox"
+            checked={defaults.data?.autoReleaseOnTimeout ?? true}
+            disabled={!isAdmin || salvarLiberacao.isPending}
+            onChange={(e) => salvarLiberacao.mutate(e.target.checked, {
+              onSuccess: (res) => toast.success(res.autoReleaseOnTimeout === false
+                ? "Contratos novos passam a esperar a revisão mesmo depois do prazo."
+                : "Contratos novos passam a aprovar a entrega quando o prazo de revisão vencer."),
+              onError: (err) => toast.error(err instanceof ApiError ? err.message : "Não foi possível salvar."),
+            })}
+            className="mt-0.5 accent-[var(--color-teal-500)] disabled:opacity-60"
+          />
+          <span>
+            <span className="text-[13px] font-medium" style={{ color: "var(--ink)" }}>
+              Aprovar a entrega quando o prazo de revisão vencer
+            </span>
+            <span className="block text-[12px] text-ink-muted mt-0.5">
+              Padrão dos contratos novos. Protege o criador de esperar sem resposta e nunca vale para entrega
+              com auditoria reprovada. Cada contrato pode mudar no rascunho; os já criados não mudam.
+            </span>
+          </span>
+        </label>
+      </div>
 
       <div
         className="rounded-xl border border-border-soft p-5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5"
