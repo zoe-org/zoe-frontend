@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react"
 import { Link, useSearchParams } from "react-router-dom"
-import { Users, UserPlus, X, ExternalLink } from "lucide-react"
+import { Users, UserPlus, X, ExternalLink, Loader2, Mail } from "lucide-react"
+import { toast } from "sonner"
+import { ApiError } from "@/lib/api"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { RoleGate } from "@/features/auth/RoleGate"
 import { tEnum } from "@/i18n/enums"
@@ -11,7 +13,7 @@ import {
 } from "@/pages/operations/shared"
 import { InviteCreatorModal } from "@/pages/operations/InviteCreatorModal"
 import {
-  useRoster, useContracts, canReceivePayout, fmtCents,
+  useRoster, useContracts, useRosterMutations, canReceivePayout, fmtCents,
   type RosterItem,
 } from "@/lib/api/operations"
 import { AUDIENCE_SIZES } from "@/lib/api/creator"
@@ -292,6 +294,11 @@ function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => voi
                 <Link to="/operations/escrow" className="underline">Ver na custódia</Link>
               </div>
             )}
+            {!canReceivePayout(item) && (
+              <RoleGate minRole="Admin">
+                <LembrarCriador influencerId={item.influencerId} nome={item.displayName || item.fullName} />
+              </RoleGate>
+            )}
           </div>
 
           <div className="mt-5">
@@ -369,6 +376,39 @@ function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => voi
         </div>
       </div>
     </>
+  )
+}
+
+/**
+ * Lembrete por e-mail para o criador resolver a conta de recebimento. A conta é dele — a marca
+ * não tem como concluir por ele —, e sem isto o caminho era mandar mensagem por fora sem saber
+ * o que dizer. O servidor limita o envio e recusa quando a conta já está pronta.
+ */
+function LembrarCriador({ influencerId, nome }: { influencerId: string; nome: string }) {
+  const { remindPayout } = useRosterMutations()
+  const [enviado, setEnviado] = useState(false)
+
+  const lembrar = async () => {
+    try {
+      const res = await remindPayout.mutateAsync(influencerId)
+      setEnviado(true)
+      if (res.emailDelivery === "Sent") toast.success(`Lembrete enviado para ${nome}.`)
+      else toast.error("O e-mail não saiu — o envio está desligado ou falhou neste ambiente.")
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Não foi possível lembrar o criador.")
+    }
+  }
+
+  return (
+    <button
+      onClick={lembrar}
+      disabled={remindPayout.isPending || enviado}
+      className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-medium border border-border-soft disabled:opacity-50"
+      style={{ color: "var(--color-teal-500)" }}
+    >
+      {remindPayout.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
+      {enviado ? "Lembrete enviado" : "Lembrar criador por e-mail"}
+    </button>
   )
 }
 

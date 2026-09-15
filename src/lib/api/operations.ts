@@ -665,6 +665,11 @@ export const operationsApi = {
         : "/api/operations/influencers/invites/resend",
       { email }),
 
+  // Lembrete ao criador de conectar ou concluir a conta de recebimento. Limitado no servidor.
+  remindPayoutAccount: (influencerId: string) =>
+    apiClient.post<{ influencerId: string; emailDelivery: string }>(
+      `/api/operations/influencers/${influencerId}/payout-reminder`),
+
   inviteInfluencer: (campaignId: string, body: InviteInfluencerBody) =>
     apiClient.post<InviteInfluencerResponse>(
       `/api/operations/campaigns/${campaignId}/invites`, body),
@@ -1217,6 +1222,9 @@ export function useRosterMutations() {
     resendInvite: useMutation({
       mutationFn: (v: { email: string; campaignId?: string }) =>
         operationsApi.resendInfluencerInvite(v.email, v.campaignId),
+    }),
+    remindPayout: useMutation({
+      mutationFn: (influencerId: string) => operationsApi.remindPayoutAccount(influencerId),
     }),
   }
 }
