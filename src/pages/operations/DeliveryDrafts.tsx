@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react"
+import { DRAFT_STATUS_COLOR } from "@/pages/operations/statusColors"
 import { Loader2, Check, RotateCcw, Film } from "lucide-react"
 import { toast } from "sonner"
 import { ApiError } from "@/lib/api"
@@ -20,11 +21,10 @@ const STATUS_LABEL: Record<string, string> = {
   ChangesRequested: "Correção pedida",
 }
 
-const STATUS_COLOR: Record<string, string> = {
-  AwaitingReview: "#D97706",
-  Approved: "#00A799",
-  ChangesRequested: "#DC2626",
-}
+const STATUS_COLOR = DRAFT_STATUS_COLOR
+
+/** Valor do filtro de campanha para contrato avulso — "" já significa "todas". */
+const SEM_CAMPANHA = "avulso"
 
 const DraftChip = ({ status }: { status: string }) => (
   <span
@@ -49,6 +49,7 @@ export function DeliveryDrafts() {
   const wide = useIsWide()
   const [filter, setFilter] = useState<string>("AwaitingReview")
   const [busca, setBusca] = useState("")
+  const [campanha, setCampanha] = useState("")
   const [selected, setSelected] = useState<string | null>(null)
 
   // Busca SEM filtro e separa em memoria, como Entregas e Custodia ja' faziam. Mandar o
@@ -58,15 +59,24 @@ export function DeliveryDrafts() {
 
   const todos = useMemo(() => data?.items ?? [], [data])
 
+  // Mesmo filtro das entregas publicadas: com várias campanhas ao mesmo tempo, a fila de cortes
+  // misturava trabalhos de marcas e prazos diferentes numa lista só.
+  const campanhas = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const d of todos) m.set(d.campaignId ?? SEM_CAMPANHA, campanhaLabel(d.campaignName))
+    return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1], "pt-BR"))
+  }, [todos])
+
   // Aguardando: quem chegou antes no topo, que é a ordem de trabalho. Todos: mais recentes.
   const items = useMemo(
     () => todos
       .filter((d) => (!filter || d.status === filter)
+        && (!campanha || (d.campaignId ?? SEM_CAMPANHA) === campanha)
         && matches(busca, d.influencerName, d.campaignName, d.fileName))
       .sort((a, b) => filter
         ? Date.parse(a.submittedAt) - Date.parse(b.submittedAt)
         : Date.parse(b.submittedAt) - Date.parse(a.submittedAt)),
-    [todos, filter, busca],
+    [todos, filter, busca, campanha],
   )
 
   const contagem = {
@@ -132,7 +142,21 @@ export function DeliveryDrafts() {
           ))}
         </div>
         {todos.length > 0 && (
-          <SearchBox value={busca} onChange={setBusca} placeholder="Buscar por criador, campanha…" />
+          <div className="flex gap-2 flex-wrap items-center">
+            {campanhas.length > 1 && (
+              <select
+                value={campanha}
+                onChange={(e) => setCampanha(e.target.value)}
+                aria-label="Filtrar por campanha"
+                className="h-9 px-2.5 rounded-lg border border-border-soft text-[12.5px] bg-transparent max-w-[220px]"
+                style={{ color: "var(--ink)" }}
+              >
+                <option value="">Todas as campanhas</option>
+                {campanhas.map(([id, nome]) => <option key={id} value={id}>{nome}</option>)}
+              </select>
+            )}
+            <SearchBox value={busca} onChange={setBusca} placeholder="Buscar por criador, campanha…" />
+          </div>
         )}
       </div>
 
@@ -140,8 +164,11 @@ export function DeliveryDrafts() {
         <TableSkeleton />
       ) : isError ? (
         <ErrorState onRetry={() => refetch()} />
-      ) : items.length === 0 && busca ? (
-        <NoResults query={busca} onClear={() => setBusca("")} />
+      ) : items.length === 0 && (busca || campanha) ? (
+        <NoResults
+          query={busca || campanhas.find(([id]) => id === campanha)?.[1] || ""}
+          onClear={() => { setBusca(""); setCampanha("") }}
+        />
       ) : items.length === 0 ? (
         <EmptyBlock
           className="py-14"

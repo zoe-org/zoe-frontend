@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { CONTRACT_STATUS_COLOR, ESCROW_STATE_COLOR } from "@/pages/operations/statusColors"
 import { Loader2, FileText, Lock, Download, AlertCircle, Send, Wallet } from "lucide-react"
 import { toast } from "sonner"
 import { ApiError } from "@/lib/api"
@@ -12,24 +13,9 @@ import {
   type CreatorContractField,
 } from "@/lib/api/creator"
 
-const CONTRACT_COLOR: Record<string, string> = {
-  Draft: "#6B7280",
-  SentForSignature: "#D97706",
-  Signed: "#00A799",
-  Cancelled: "#DC2626",
-}
+const CONTRACT_COLOR = CONTRACT_STATUS_COLOR
 
-const ESCROW_COLOR: Record<string, string> = {
-  PendingDeposit: "#9CA3AF",
-  Funded: "#2563EB",
-  InProduction: "#D97706",
-  Delivered: "#7C3AED",
-  UnderReview: "#8B5CF6",
-  Releasable: "#00A799",
-  Released: "#059669",
-  Disputed: "#DC2626",
-  Refunded: "#6B7280",
-}
+const ESCROW_COLOR = ESCROW_STATE_COLOR
 
 /**
  * O estado da custódia dito do ponto de vista de quem vai receber.

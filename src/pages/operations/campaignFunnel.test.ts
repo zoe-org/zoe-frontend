@@ -81,6 +81,32 @@ describe("funilDaCampanha", () => {
     }))).toEqual(["Rascunho do contrato"])
   })
 
+  it("vários trabalhos do mesmo criador: a linha mostra o que precisa da marca e conta os outros", () => {
+    const d = campanha({
+      contracts: [
+        contrato({ contractId: "k1", escrowState: "Delivered" }),
+        contrato({ contractId: "k2", status: "Draft" }),
+        contrato({ contractId: "k3", escrowState: "Released" }),
+        contrato({ contractId: "k4", status: "Cancelled" }),
+      ],
+      deliveries: [entrega({ contractId: "k1" })],
+    })
+    const linhas = funilDaCampanha(d)
+    expect(linhas).toHaveLength(1)
+    // Empate em "atenção" entre a entrega e o rascunho: vale o mais antigo, esperando há mais tempo.
+    expect(linhas[0]).toMatchObject({ etapa: "Entrega esperando revisão", outrosContratos: 2 })
+  })
+
+  it("o pago antigo não esconde o trabalho novo em andamento", () => {
+    const d = campanha({
+      contracts: [
+        contrato({ contractId: "velho", escrowState: "Released" }),
+        contrato({ contractId: "novo", escrowState: "InProduction" }),
+      ],
+    })
+    expect(funilDaCampanha(d)[0]).toMatchObject({ etapa: "Em produção", outrosContratos: 1 })
+  })
+
   it("quem precisa da marca sobe; o que terminou desce", () => {
     const d = campanha({
       contracts: [

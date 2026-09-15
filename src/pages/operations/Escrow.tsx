@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react"
+import { ESCROW_STATE_COLOR } from "@/pages/operations/statusColors"
 import { Link } from "react-router-dom"
 import { Loader2, Wallet, AlertTriangle, Clock, X } from "lucide-react"
 import { toast } from "sonner"
 import { useEscapeKey } from "@/lib/useEscapeKey"
+import { useFocusTrap } from "@/lib/useFocusTrap"
 import { ApiError } from "@/lib/api"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { RoleGate } from "@/features/auth/RoleGate"
@@ -34,17 +36,7 @@ import {
  * tela de dinheiro é o pior lugar possível para simplificar — some justamente com os casos
  * que o operador precisa achar rápido.</p>
  */
-const COLUMN_COLOR: Record<string, string> = {
-  PendingDeposit: "#9CA3AF",
-  Funded: "#2563EB",
-  InProduction: "#D97706",
-  Delivered: "#7C3AED",
-  UnderReview: "#8B5CF6",
-  Releasable: "#00A799",
-  Released: "#059669",
-  Disputed: "#DC2626",
-  Refunded: "#6B7280",
-}
+const COLUMN_COLOR = ESCROW_STATE_COLOR
 
 const NO_ITEMS: EscrowSummary[] = []
 
@@ -325,6 +317,7 @@ function EscrowRow({
 function EscrowDrawer({ e, onClose }: { e: EscrowSummary; onClose: () => void }) {
   const { apply } = useEscrowMutations()
   useEscapeKey(onClose)
+  const dialogRef = useFocusTrap<HTMLDivElement>()
 
   const can = (action: EscrowAction) => e.allowedTriggers.includes(ESCROW_ACTION_TRIGGER[action])
 
@@ -351,8 +344,12 @@ function EscrowDrawer({ e, onClose }: { e: EscrowSummary; onClose: () => void })
     <>
       <div className="fixed inset-0 z-40" style={{ background: "rgba(11,15,26,.5)" }} onClick={onClose} />
       <div
+        ref={dialogRef}
         className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-[440px] overflow-y-auto border-l border-border-soft"
         style={{ background: "var(--surface)" }}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Custódia"
       >
         <div
           className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b border-border-soft"

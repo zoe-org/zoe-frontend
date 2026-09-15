@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { DELIVERY_STATUS_COLOR } from "@/pages/operations/statusColors"
 import { Link, useNavigate } from "react-router-dom"
 import {
   Loader2, LogOut, Upload, ExternalLink, AlertCircle, Play, FileText, Megaphone,
@@ -22,13 +23,7 @@ import { CreatorDraftUpload } from "@/pages/creator/CreatorDraftUpload"
 import { proximosPassos, type ProximoPasso } from "@/pages/creator/nextSteps"
 import ZoeLogo from "@/assets/zoe-logo.svg?react"
 
-const DELIVERY_COLOR: Record<string, string> = {
-  Submitted: "#6B7280",
-  UnderReview: "#D97706",
-  Approved: "#00A799",
-  ReworkRequested: "#DC2626",
-  Rejected: "#DC2626",
-}
+const DELIVERY_COLOR = DELIVERY_STATUS_COLOR
 
 /**
  * Área do criador. Shell próprio, fora do AppShell da marca: não há workspace para

@@ -7,6 +7,7 @@ import { EmptyBlock } from "@/components/ui/empty-block"
 import { RoleGate } from "@/features/auth/RoleGate"
 import { tEnum } from "@/i18n/enums"
 import { useEscapeKey } from "@/lib/useEscapeKey"
+import { useFocusTrap } from "@/lib/useFocusTrap"
 import { fmtDate, initials, matches, campanhaLabel } from "@/pages/operations/format"
 import {
   TableSkeleton, ErrorState, SearchBox, NoResults,
@@ -268,6 +269,7 @@ function RosterRow({ item, index, onOpen }: { item: RosterItem; index: number; o
  */
 function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => void }) {
   useEscapeKey(onClose)
+  const dialogRef = useFocusTrap<HTMLDivElement>()
   const contratos = useContracts()
   const meus = (contratos.data?.items ?? []).filter((c) => c.influencerId === item.influencerId)
   const rec = situacaoRecebimento(item)
@@ -281,6 +283,7 @@ function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => voi
       <div
         className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-[460px] overflow-y-auto border-l border-border-soft"
         style={{ background: "var(--surface)" }}
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label={`Criador ${item.fullName}`}
@@ -373,6 +376,23 @@ function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => voi
 
           <div className="mt-5">
             <div className="eyebrow mb-2">Contratos com você ({meus.length})</div>
+            {/* O dinheiro da relação num relance, sempre em líquido — o que chega nele. */}
+            {((item.paidCents ?? 0) > 0 || (item.inEscrowCents ?? 0) > 0 || (item.releasableCents ?? 0) > 0) && (
+              <div className="grid grid-cols-3 gap-2 mb-2.5">
+                {([
+                  ["Pago", item.paidCents ?? 0],
+                  ["Em custódia", item.inEscrowCents ?? 0],
+                  ["Liberável", item.releasableCents ?? 0],
+                ] as const).map(([rotulo, valor]) => (
+                  <div key={rotulo} className="rounded-lg border border-border-soft px-2.5 py-2">
+                    <div className="text-[10.5px] text-ink-muted">{rotulo}</div>
+                    <div className="font-mono-zoe text-[12.5px] font-semibold" style={{ color: "var(--ink)" }}>
+                      {fmtCents(valor)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             {meus.length === 0 ? (
               <p className="text-[12.5px] text-ink-muted m-0">Nenhum contrato com este criador ainda.</p>
             ) : (

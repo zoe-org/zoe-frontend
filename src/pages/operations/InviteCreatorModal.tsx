@@ -2,6 +2,8 @@ import { useMemo, useState } from "react"
 import { X, Loader2, Copy, Check } from "lucide-react"
 import { toast } from "sonner"
 import { useEscapeKey } from "@/lib/useEscapeKey"
+import { useFocusTrap } from "@/lib/useFocusTrap"
+import { MoneyInput } from "@/components/ui/money-input"
 import { parseBRLToCents } from "@/lib/money"
 import { ApiError } from "@/lib/api"
 import { Input } from "@/components/ui/input"
@@ -59,7 +61,10 @@ export function InviteCreatorModal({
   const [copied, setCopied] = useState(false)
   /** O convite da tela final foi reenviado, não criado. */
   const [reenviado, setReenviado] = useState(false)
+  /** No reenvio, trocar a proposta pelos valores do formulário. Ligado: é por isso que se reenvia. */
+  const [atualizarProposta, setAtualizarProposta] = useState(true)
   useEscapeKey(onClose)
+  const dialogRef = useFocusTrap<HTMLDivElement>()
   /**
    * Convite recusado por já existir. Fica dentro do modal, junto do que a pessoa preencheu: um
    * toast some em segundos e não diz o que fazer.
@@ -128,11 +133,25 @@ export function InviteCreatorModal({
 
   // A saída do convite pendente: mesmo convite, link novo. Sem este botão a mensagem mandava
   // "reenviar o link" e não havia onde clicar.
+  const temProposta = Boolean(campaignId) && Boolean(deliverables.trim() || fee.trim() || deadline)
+
   const reenviar = async () => {
     try {
+      const cents = fee.trim() && !isBarter ? parseBRLToCents(fee) : undefined
+      if (cents === null) {
+        toast.error("Cachê inválido — use o formato 12.000,00.")
+        return
+      }
       const res = await resendInvite.mutateAsync({
         email: email.trim(),
         campaignId: campaignId || undefined,
+        proposta: temProposta && atualizarProposta
+          ? {
+            expectedDeliverables: deliverables.trim() || undefined,
+            feeCents: cents,
+            deliveryDeadline: deadline ? new Date(`${deadline}T12:00:00`).toISOString() : undefined,
+          }
+          : undefined,
       })
       setConflito(null)
       setReenviado(true)
@@ -162,6 +181,7 @@ export function InviteCreatorModal({
       <div
         className="w-full max-w-lg rounded-xl border border-border-soft shadow-2xl p-6 overflow-y-auto max-h-[88vh]"
         style={{ background: "var(--surface)" }}
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="Convidar influenciador"
@@ -340,11 +360,10 @@ export function InviteCreatorModal({
                       label="Cachê"
                       hint={isBarter ? "Permuta não move dinheiro." : "Valor bruto proposto, em reais."}
                     >
-                      <Input
+                      <MoneyInput
                         value={isBarter ? "" : fee}
-                        onChange={(e) => setFee(e.target.value)}
+                        onChange={setFee}
                         disabled={isBarter}
-                        inputMode="decimal"
                         placeholder={isBarter ? "permuta" : "12.000,00"}
                       />
                     </Field>
@@ -390,9 +409,23 @@ export function InviteCreatorModal({
                       {resendInvite.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                       Reenviar convite
                     </button>
+                    {/* Quem reenviou quase sempre ajustou a proposta: sem esta opção, o novo cachê
+                        digitado era descartado e o convite seguia com o antigo. */}
+                    {temProposta && (
+                      <label className="flex items-center gap-2 text-[12px] mt-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={atualizarProposta}
+                          onChange={(e) => setAtualizarProposta(e.target.checked)}
+                          className="accent-[#D97706]"
+                        />
+                        Atualizar a proposta com os valores deste formulário
+                      </label>
+                    )}
                     <div className="text-[11.5px] mt-1.5" style={{ opacity: 0.9 }}>
-                      Gera um link novo para o mesmo convite, com a proposta enviada antes. O link
-                      anterior deixa de valer.
+                      Gera um link novo para o mesmo convite
+                      {temProposta && atualizarProposta ? ", com a proposta deste formulário" : ", com a proposta enviada antes"}.
+                      O link anterior deixa de valer.
                     </div>
                   </div>
                 )}

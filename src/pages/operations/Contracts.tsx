@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react"
+import { CONTRACT_STATUS_COLOR } from "@/pages/operations/statusColors"
 import { Plus, X, Loader2, FileText, ShieldAlert, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { useEscapeKey } from "@/lib/useEscapeKey"
+import { useFocusTrap } from "@/lib/useFocusTrap"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { ApiError } from "@/lib/api"
 import { Input } from "@/components/ui/input"
@@ -19,12 +21,7 @@ import {
   type ContractSummary, type CreateContractBody, type CampaignInvite, type RosterItem,
 } from "@/lib/api/operations"
 
-const STATUS_COLOR: Record<string, string> = {
-  Draft: "#6B7280",
-  SentForSignature: "#D97706",
-  Signed: "#00A799",
-  Cancelled: "#DC2626",
-}
+const STATUS_COLOR = CONTRACT_STATUS_COLOR
 
 /**
  * Célula de custódia. Três situações diferentes que não podem virar a mesma coisa:
@@ -320,6 +317,7 @@ function CreateContractModal({
   const [reviewSlaDays, setReviewSlaDays] = useState("7")
   const [maxResubmissions, setMaxResubmissions] = useState("2")
   useEscapeKey(onClose)
+  const dialogRef = useFocusTrap<HTMLDivElement>()
 
   const people = useMemo(() => roster.data?.items ?? [], [roster.data])
 
@@ -441,6 +439,7 @@ function CreateContractModal({
       <div
         className="w-full max-w-md rounded-xl border border-border-soft shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
         style={{ background: "var(--surface)" }}
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="Novo contrato"

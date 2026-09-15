@@ -43,8 +43,12 @@ export type RosterItem = {
   /** Campanha do contrato mais recente com este workspace. */
   lastCampaignName?: string | null
   lastContractAt?: string | null
-  /** Custódias deste workspace já liberáveis para ele — parado se a conta não estiver pronta. */
+  /** Líquido das custódias deste workspace já liberáveis para ele — parado se a conta não estiver pronta. */
   releasableCents?: number
+  /** Líquido já transferido a ele por este workspace. */
+  paidCents?: number
+  /** Líquido reservado em custódias em andamento. */
+  inEscrowCents?: number
 }
 
 export type ListRosterResponse = { items: RosterItem[] }
@@ -254,6 +258,13 @@ export type InviteInfluencerBody = {
 }
 
 /** `emailDelivery`: Sent | Failed | Disabled — decide se o link copiável é o caminho. */
+/** Proposta revisada que acompanha o reenvio do convite. */
+export type ResendProposal = {
+  expectedDeliverables?: string
+  feeCents?: number
+  deliveryDeadline?: string
+}
+
 export type InviteInfluencerResponse = {
   inviteId: string
   campaignId: string | null
@@ -660,12 +671,13 @@ export const operationsApi = {
     apiClient.post<InviteInfluencerResponse>("/api/operations/influencers/invites", body),
 
   // Reenvio do convite pendente: o mesmo convite com link novo. A proposta enviada não muda.
-  resendInfluencerInvite: (email: string, campaignId?: string) =>
+  // Com `proposta`, a proposta do convite é trocada antes do reenvio (só em convite de campanha).
+  resendInfluencerInvite: (email: string, campaignId?: string, proposta?: ResendProposal) =>
     apiClient.post<InviteInfluencerResponse>(
       campaignId
         ? `/api/operations/campaigns/${campaignId}/invites/resend`
         : "/api/operations/influencers/invites/resend",
-      { email }),
+      { email, ...(campaignId && proposta ? { ...proposta, reviseProposal: true } : {}) }),
 
   // Lembrete ao criador de conectar ou concluir a conta de recebimento. Limitado no servidor.
   remindPayoutAccount: (influencerId: string) =>
@@ -1037,6 +1049,7 @@ export function useDeliveryMutations() {
   // então campanhas e custódia saem do cache junto com a fila.
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["operations-deliveries", activeTenantId] })
+    qc.invalidateQueries({ queryKey: ["operations-contract-timeline", activeTenantId] })
     qc.invalidateQueries({ queryKey: ["operations-campaign", activeTenantId] })
     qc.invalidateQueries({ queryKey: ["operations-escrow", activeTenantId] })
   }
@@ -1166,6 +1179,7 @@ export function useDeliveryDraftMutations() {
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: ["operations-drafts", activeTenantId] })
         qc.invalidateQueries({ queryKey: ["operations-deliveries", activeTenantId] })
+        qc.invalidateQueries({ queryKey: ["operations-contract-timeline", activeTenantId] })
       },
     }),
   }
@@ -1244,8 +1258,8 @@ export function useRosterMutations() {
     }),
     // Nada a invalidar: reenviar não muda elenco, contagem nem proposta — só o link.
     resendInvite: useMutation({
-      mutationFn: (v: { email: string; campaignId?: string }) =>
-        operationsApi.resendInfluencerInvite(v.email, v.campaignId),
+      mutationFn: (v: { email: string; campaignId?: string; proposta?: ResendProposal }) =>
+        operationsApi.resendInfluencerInvite(v.email, v.campaignId, v.proposta),
     }),
     remindPayout: useMutation({
       mutationFn: (influencerId: string) => operationsApi.remindPayoutAccount(influencerId),

@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from "react"
 import { X } from "lucide-react"
+import { useFocusTrap } from "@/lib/useFocusTrap"
 
 /*
  * Peças da fila de revisão, comuns a "Cortes por aprovar" e "Entregas publicadas". Largura e
@@ -26,6 +27,9 @@ export function QueueLayout({
   /** Rodapé da lista — os atalhos, só onde há teclado. */
   hint?: ReactNode
 }) {
+  // Só a gaveta do celular prende o foco; lado a lado, lista e detalhe convivem na página.
+  const drawerRef = useFocusTrap<HTMLDivElement>(!wide && Boolean(detail))
+
   if (wide) {
     return (
       <div className="grid grid-cols-[minmax(300px,380px)_minmax(0,1fr)] gap-5 items-start">
@@ -59,6 +63,7 @@ export function QueueLayout({
           <div
             className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-[520px] overflow-y-auto border-l border-border-soft"
             style={{ background: "var(--surface)" }}
+            ref={drawerRef}
             role="dialog"
             aria-modal="true"
             aria-label={detailTitle}

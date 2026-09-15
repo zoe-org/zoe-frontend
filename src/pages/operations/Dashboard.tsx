@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom"
+import { ESCROW_STATE_COLOR } from "@/pages/operations/statusColors"
 import {
   AlertTriangle, ArrowRight, CheckCircle2, FileText, Film, Megaphone, Users,
   Wallet, PenLine, Banknote,
@@ -10,17 +11,7 @@ import {
 } from "@/lib/api/operations"
 
 /** Mesmas cores da trilha de custódia — o mesmo estado não pode mudar de cor entre telas. */
-const ESCROW_COLOR: Record<string, string> = {
-  PendingDeposit: "#9CA3AF",
-  Funded: "#2563EB",
-  InProduction: "#D97706",
-  Delivered: "#7C3AED",
-  UnderReview: "#8B5CF6",
-  Releasable: "#00A799",
-  Released: "#059669",
-  Disputed: "#DC2626",
-  Refunded: "#6B7280",
-}
+const ESCROW_COLOR = ESCROW_STATE_COLOR
 
 /**
  * Painel do Operations.

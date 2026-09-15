@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react"
+import { DELIVERY_STATUS_COLOR } from "@/pages/operations/statusColors"
 import { DeliveryDrafts } from "@/pages/operations/DeliveryDrafts"
 import { Link, useSearchParams } from "react-router-dom"
 import {
@@ -16,6 +17,7 @@ import {
   TableSkeleton, ErrorState, SearchBox, NoResults, PlatformCover,
 } from "@/pages/operations/shared"
 import { QueueLayout, QueueRow } from "@/pages/operations/ReviewQueue"
+import { ContractTimeline } from "@/pages/operations/ContractTimeline"
 import { useIsWide, useQueueKeys, esperaLabel } from "@/pages/operations/queueNavigation"
 import {
   agruparPorContrato, ordenarFila, PENDENTE, type DeliveryGroup,
@@ -26,13 +28,7 @@ import {
   type DeliverySummary, type DeliveryDecision, type DeliveryAudit, type ReworkScope,
 } from "@/lib/api/operations"
 
-const STATUS_COLOR: Record<string, string> = {
-  Submitted: "#6B7280",
-  UnderReview: "#D97706",
-  Approved: "#00A799",
-  ReworkRequested: "#DC2626",
-  Rejected: "#DC2626",
-}
+const STATUS_COLOR = DELIVERY_STATUS_COLOR
 
 const DeliveryChip = (p: { status: string; small?: boolean }) => (
   <StatusChip {...p} kind="deliveryStatus" colors={STATUS_COLOR} />
@@ -597,6 +593,12 @@ function ReviewPanel({ group, onDecided }: { group: DeliveryGroup; onDecided: ()
           </ol>
         </div>
       )}
+
+      {/* A história do contrato, recolhida: quem revisa a 2ª tentativa precisa ver o que foi
+          pedido da outra vez, e o corte que passou antes. */}
+      <div className="mt-4">
+        <ContractTimeline contractId={d.contractId} recolhivel />
+      </div>
 
       <RoleGate minRole="Manager">
         {decided ? (
