@@ -11,7 +11,8 @@ import { StatusChip } from "@/components/ui/status-chip"
 import { useAuth } from "@/features/auth/context"
 import { tEnum } from "@/i18n/enums"
 import { fmtDate, initials } from "@/pages/operations/format"
-import { fmtCents, youtubeThumb, youtubeWatch } from "@/lib/api/operations"
+import { fmtCents, deliveryThumb, deliveryLink } from "@/lib/api/operations"
+import { PlatformCover } from "@/pages/operations/shared"
 import {
   useCreatorWorkspace, useCreatorMutations, useSetCreatorTaxId, trabalhoLabel,
   type CreatorEngagement, type CreatorDelivery,
@@ -339,13 +340,13 @@ function EngagementCard({ e }: { e: CreatorEngagement }) {
       {e.canSubmitDelivery && draftApproved ? (
         <div>
           <div className="text-[11px] text-ink-muted mb-1.5">
-            Link do vídeo já publicado no YouTube
+            Link do vídeo já publicado — YouTube, Instagram ou TikTok
           </div>
           <div className="flex gap-2 flex-wrap sm:flex-nowrap">
             <Input
               value={url}
               onChange={(ev) => setUrl(ev.target.value)}
-              placeholder="https://youtube.com/watch?v=…"
+              placeholder="youtube.com/watch?v=…  ·  instagram.com/reel/…  ·  tiktok.com/@…/video/…"
               className="flex-1 min-w-[200px]"
             />
             <button
@@ -380,18 +381,22 @@ function DeliveryRow({ dl }: { dl: CreatorDelivery }) {
   return (
     <div className="flex items-start gap-3 rounded-lg border border-border-soft p-2.5">
       <a
-        href={youtubeWatch(dl.youtubeVideoId)}
+        href={deliveryLink(dl)}
         target="_blank"
         rel="noreferrer noopener"
         className="relative w-[92px] aspect-video rounded overflow-hidden bg-[#111827] shrink-0"
       >
-        <img
-          src={youtubeThumb(dl.youtubeVideoId)}
-          alt=""
-          loading="lazy"
-          className="absolute inset-0 w-full h-full object-cover"
-          onError={(ev) => { ev.currentTarget.style.visibility = "hidden" }}
-        />
+        {deliveryThumb(dl) ? (
+          <img
+            src={deliveryThumb(dl)!}
+            alt=""
+            loading="lazy"
+            className="absolute inset-0 w-full h-full object-cover"
+            onError={(ev) => { ev.currentTarget.style.visibility = "hidden" }}
+          />
+        ) : (
+          <PlatformCover platform={dl.platform} compact />
+        )}
         <div className="absolute inset-0 grid place-items-center">
           <Play className="w-4 h-4" style={{ color: "rgba(255,255,255,.9)" }} />
         </div>
@@ -405,7 +410,7 @@ function DeliveryRow({ dl }: { dl: CreatorDelivery }) {
           <span className="text-[10.5px] text-ink-muted">{fmtDate(dl.submittedAt)}</span>
         </div>
         <a
-          href={youtubeWatch(dl.youtubeVideoId)}
+          href={deliveryLink(dl)}
           target="_blank"
           rel="noreferrer noopener"
           className="inline-flex items-center gap-1 text-[11.5px] font-mono-zoe truncate max-w-full"

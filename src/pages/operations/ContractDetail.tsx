@@ -478,7 +478,13 @@ function SignaturePanel({
               em seguida — atualize em instantes.
             </p>
           )
-          : <OpenEscrowPanel contractId={data.contractId} automationStalled={data.autoAdvanceEscrow} />
+          : (
+            <OpenEscrowPanel
+              contractId={data.contractId}
+              automationStalled={data.autoAdvanceEscrow}
+              declaredTotalCents={data.declaredTotalCents ?? null}
+            />
+          )
       )}
 
       {data.status === "Signed" && data.escrowAccountId && (
@@ -520,19 +526,27 @@ function aguardandoAutomacao(data: ContractDetail): boolean {
   return Date.now() - Date.parse(data.signedAt) < AUTOMACAO_JANELA_MS
 }
 
+/** Valor com centavos: é o que vai ser reservado, e arredondar aqui esconderia diferença. */
+const brl = (cents: number) =>
+  (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+
 function OpenEscrowPanel({
-  contractId, automationStalled = false,
-}: { contractId: string; automationStalled?: boolean }) {
+  contractId, automationStalled = false, declaredTotalCents = null,
+}: { contractId: string; automationStalled?: boolean; declaredTotalCents?: number | null }) {
   const { open } = useEscrowMutations()
   const [amount, setAmount] = useState("")
 
+  // O valor do contrato assinado é o único que a custódia aceita: com ele legível, não há o
+  // que digitar. O campo só aparece quando o contrato não traz valor que dê para ler.
+  const temValorDoContrato = declaredTotalCents != null && declaredTotalCents > 0
+
   const cents = Math.round(Number(amount.replace(/\./g, "").replace(",", ".")) * 100)
-  const valid = Number.isFinite(cents) && cents > 0
+  const valid = temValorDoContrato || (Number.isFinite(cents) && cents > 0)
 
   const submit = async () => {
     if (!valid) return
     try {
-      await open.mutateAsync({ contractId, amountCents: cents })
+      await open.mutateAsync(temValorDoContrato ? { contractId } : { contractId, amountCents: cents })
       toast.success("Custódia aberta. O próximo passo é o depósito.")
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Não foi possível abrir a custódia.")
@@ -555,15 +569,27 @@ function OpenEscrowPanel({
         </p>
 
         <div className="flex gap-2 flex-wrap sm:flex-nowrap">
-          <div className="flex-1 min-w-[160px]">
-            <div className="text-[11px] text-ink-muted mb-1.5">Valor bruto do contrato</div>
-            <Input
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              inputMode="decimal"
-              placeholder="15000,00"
-            />
-          </div>
+          {temValorDoContrato ? (
+            <div className="flex-1 min-w-[160px]">
+              <div className="text-[11px] text-ink-muted mb-1.5">Valor do contrato assinado</div>
+              <div
+                className="h-9 flex items-center font-mono-zoe text-[15px] font-semibold"
+                style={{ color: "var(--ink)" }}
+              >
+                {brl(declaredTotalCents!)}
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 min-w-[160px]">
+              <div className="text-[11px] text-ink-muted mb-1.5">Valor bruto do contrato</div>
+              <Input
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                inputMode="decimal"
+                placeholder="15000,00"
+              />
+            </div>
+          )}
           <button
             onClick={submit}
             disabled={!valid || open.isPending}
@@ -571,12 +597,14 @@ function OpenEscrowPanel({
             style={{ background: "var(--color-teal-500)" }}
           >
             {open.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            Abrir custódia
+            {temValorDoContrato ? `Abrir custódia de ${brl(declaredTotalCents!)}` : "Abrir custódia"}
           </button>
         </div>
 
         <p className="text-[11.5px] text-ink-muted mt-2 mb-0">
-          A taxa da plataforma vem do contrato assinado — não é pedida de novo aqui.
+          {temValorDoContrato
+            ? "Valor e taxa vêm do contrato assinado e não mudam depois da assinatura."
+            : "O contrato não tem valor total legível — informe o valor combinado. A taxa da plataforma vem do contrato."}
         </p>
       </div>
     </RoleGate>

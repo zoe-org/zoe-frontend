@@ -131,3 +131,24 @@ export function NoResults({ query, onClear }: { query: string; onClear: () => vo
     </div>
   )
 }
+
+/**
+ * Capa de entrega sem miniatura — Reel e TikTok não têm imagem pública por id, e uma área
+ * preta vazia parecia vídeo quebrado. O nome da plataforma diz onde o conteúdo está.
+ */
+export function PlatformCover({ platform, compact = false }: { platform: string; compact?: boolean }) {
+  const fundo = platform === "Instagram"
+    ? "linear-gradient(135deg, #F58529, #DD2A7B 55%, #8134AF)"
+    : "linear-gradient(135deg, #0B0F1A, #1F2937 60%, #0E7490)"
+
+  return (
+    <div className="absolute inset-0 flex items-center justify-center" style={{ background: fundo }}>
+      <span
+        className={`font-semibold text-white ${compact ? "text-[10px]" : "text-[13px]"}`}
+        style={{ textShadow: "0 1px 3px rgba(0,0,0,.45)" }}
+      >
+        {platform}
+      </span>
+    </div>
+  )
+}

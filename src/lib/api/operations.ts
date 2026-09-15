@@ -477,6 +477,8 @@ export type ContractDetail = {
    * recusado pela API — a confirmação vem do provedor.
    */
   signatureProviderLive?: boolean
+  /** Valor total declarado no contrato, em centavos, quando legível — o que a custódia reserva. */
+  declaredTotalCents?: number | null
   /** Custódia já aberta. Nulo com usesEscrow = a tela oferece abrir. */
   escrowAccountId: string | null
   escrowState: string | null
@@ -557,7 +559,8 @@ export const operationsApi = {
    * StartProduction transiciona na hora porque não move dinheiro.
    */
   /** Abre a custódia de um contrato assinado. A taxa NÃO vai aqui — vem do contrato. */
-  openEscrow: (body: { contractId: string; amountCents: number; currency?: string }) =>
+  // Sem amountCents a API usa o valor total declarado no contrato.
+  openEscrow: (body: { contractId: string; amountCents?: number; currency?: string }) =>
     apiClient.post<{
       escrowAccountId: string
       contractId: string
@@ -831,7 +834,9 @@ export type DeliverySummary = {
   campaignName: string | null
   influencerName: string
   submittedUrl: string
-  youtubeVideoId: string
+  /** Só no YouTube. Reel e TikTok não têm id de vídeo do YouTube nem miniatura pública. */
+  youtubeVideoId: string | null
+  platform: DeliveryPlatform
   status: DeliveryStatus
   submissionAttempt: number
   submittedAt: string
@@ -890,6 +895,28 @@ export const youtubeThumb = (videoId: string) =>
 
 export const youtubeWatch = (videoId: string) =>
   `https://www.youtube.com/watch?v=${videoId}`
+
+/** Onde a entrega foi publicada. A conferência é sempre sobre o link público (RN-O-050). */
+export type DeliveryPlatform = "YouTube" | "Instagram" | "TikTok"
+
+export const PLATFORM_LABEL: Record<string, string> = {
+  YouTube: "YouTube",
+  Instagram: "Instagram",
+  TikTok: "TikTok",
+}
+
+type DeliveryLinkish = { platform?: string | null; youtubeVideoId: string | null; submittedUrl: string }
+
+/**
+ * Miniatura da entrega. Só o YouTube expõe imagem pública pelo id do vídeo; nas outras a
+ * tela mostra uma capa com o nome da plataforma.
+ */
+export const deliveryThumb = (d: Omit<DeliveryLinkish, "submittedUrl">): string | null =>
+  (d.platform ?? "YouTube") === "YouTube" && d.youtubeVideoId ? youtubeThumb(d.youtubeVideoId) : null
+
+/** Onde abrir a entrega: a URL canônica no YouTube, e o próprio link enviado nas outras. */
+export const deliveryLink = (d: DeliveryLinkish): string =>
+  (d.platform ?? "YouTube") === "YouTube" && d.youtubeVideoId ? youtubeWatch(d.youtubeVideoId) : d.submittedUrl
 
 export function useDeliveries(status?: string) {
   const { activeTenantId } = useAuth()
@@ -1076,7 +1103,7 @@ export function useEscrowMutations() {
   const qc = useQueryClient()
   return {
     open: useMutation({
-      mutationFn: (v: { contractId: string; amountCents: number }) =>
+      mutationFn: (v: { contractId: string; amountCents?: number }) =>
         operationsApi.openEscrow(v),
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: ["operations-escrow", activeTenantId] })

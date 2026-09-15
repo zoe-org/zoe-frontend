@@ -13,10 +13,10 @@ import { RoleGate } from "@/features/auth/RoleGate"
 import { tEnum } from "@/i18n/enums"
 import { fmtDate, matches, campanhaLabel } from "@/pages/operations/format"
 import {
-  TableSkeleton, ErrorState, SearchBox, NoResults,
+  TableSkeleton, ErrorState, SearchBox, NoResults, PlatformCover,
 } from "@/pages/operations/shared"
 import {
-  useDeliveries, useDeliveryMutations, fmtCents, youtubeThumb, youtubeWatch,
+  useDeliveries, useDeliveryMutations, fmtCents, deliveryThumb, deliveryLink, PLATFORM_LABEL,
   type DeliverySummary, type DeliveryDecision, type DeliveryAudit,
 } from "@/lib/api/operations"
 
@@ -176,13 +176,17 @@ function DeliveryCard({ d, onOpen }: { d: DeliverySummary; onOpen: () => void })
       <div className="relative aspect-video bg-[#111827]">
         {/* A miniatura vem do YouTube porque a entrega É um vídeo público. Se o id
             estiver errado a imagem não carrega e o play continua legível. */}
-        <img
-          src={youtubeThumb(d.youtubeVideoId)}
-          alt=""
-          loading="lazy"
-          className="absolute inset-0 w-full h-full object-cover"
-          onError={(e) => { e.currentTarget.style.visibility = "hidden" }}
-        />
+        {deliveryThumb(d) ? (
+          <img
+            src={deliveryThumb(d)!}
+            alt=""
+            loading="lazy"
+            className="absolute inset-0 w-full h-full object-cover"
+            onError={(e) => { e.currentTarget.style.visibility = "hidden" }}
+          />
+        ) : (
+          <PlatformCover platform={d.platform} />
+        )}
         {/* Escurece so' a faixa superior, onde vivem a etiqueta e a nota. Escurecer a
             capa inteira esconderia o video, que e' o conteudo. */}
         <div
@@ -398,17 +402,21 @@ function ReviewDrawer({ d, onClose }: { d: DeliverySummary; onClose: () => void 
 
         <div className="p-6">
           <a
-            href={youtubeWatch(d.youtubeVideoId)}
+            href={deliveryLink(d)}
             target="_blank"
             rel="noreferrer noopener"
             className="block relative aspect-video rounded-lg overflow-hidden bg-[#111827] mb-4"
           >
-            <img
-              src={youtubeThumb(d.youtubeVideoId)}
-              alt=""
-              className="absolute inset-0 w-full h-full object-cover"
-              onError={(e) => { e.currentTarget.style.visibility = "hidden" }}
-            />
+            {deliveryThumb(d) ? (
+              <img
+                src={deliveryThumb(d)!}
+                alt=""
+                className="absolute inset-0 w-full h-full object-cover"
+                onError={(e) => { e.currentTarget.style.visibility = "hidden" }}
+              />
+            ) : (
+              <PlatformCover platform={d.platform} />
+            )}
             <div className="absolute inset-0 flex items-center justify-center">
               <div
                 className="w-14 h-14 rounded-full flex items-center justify-center"
@@ -421,6 +429,7 @@ function ReviewDrawer({ d, onClose }: { d: DeliverySummary; onClose: () => void 
 
           <div className="flex items-center gap-2 flex-wrap mb-1.5">
             <DeliveryChip status={d.status} />
+            <span className="chip text-[10.5px]">{PLATFORM_LABEL[d.platform] ?? d.platform}</span>
             {d.submissionAttempt > 1 && (
               <span className="chip text-[10.5px]">{d.submissionAttempt}ª tentativa</span>
             )}
@@ -433,7 +442,7 @@ function ReviewDrawer({ d, onClose }: { d: DeliverySummary; onClose: () => void 
             {d.influencerName} · enviada em {fmtDate(d.submittedAt)}
           </div>
           <a
-            href={youtubeWatch(d.youtubeVideoId)}
+            href={deliveryLink(d)}
             target="_blank"
             rel="noreferrer noopener"
             className="inline-flex items-center gap-1 text-[12px] font-mono-zoe"

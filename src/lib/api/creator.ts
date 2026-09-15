@@ -12,7 +12,8 @@ import type { DeliveryStatus, EscrowState } from "@/lib/api/operations"
 export type CreatorDelivery = {
   deliveryId: string
   submittedUrl: string
-  youtubeVideoId: string
+  youtubeVideoId: string | null
+  platform: string
   status: DeliveryStatus
   submissionAttempt: number
   submittedAt: string
