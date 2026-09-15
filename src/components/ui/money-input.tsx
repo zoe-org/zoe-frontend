@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react"
 import { Input } from "@/components/ui/input"
 import { centsToBRLInput, parseBRLToCents } from "@/lib/money"
 
@@ -11,13 +12,16 @@ import { centsToBRLInput, parseBRLToCents } from "@/lib/money"
  * que dizer.</p>
  */
 export function MoneyInput({
-  value, onChange, placeholder, disabled, className,
+  value, onChange, placeholder, disabled, className, style, invalid,
 }: {
   value: string
   onChange: (value: string) => void
   placeholder?: string
   disabled?: boolean
   className?: string
+  style?: CSSProperties
+  /** Campo obrigatório ainda vazio — vira `aria-invalid`, como nos outros campos do formulário. */
+  invalid?: boolean
 }) {
   return (
     <Input
@@ -32,6 +36,8 @@ export function MoneyInput({
       placeholder={placeholder}
       disabled={disabled}
       className={className}
+      style={style}
+      aria-invalid={invalid || undefined}
     />
   )
 }

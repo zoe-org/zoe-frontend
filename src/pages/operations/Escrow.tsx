@@ -110,17 +110,23 @@ export default function OperationsEscrowPage() {
       </div>
 
       <div className="rounded-xl border border-border-soft overflow-hidden" style={{ background: "var(--surface)" }}>
-        <div className="grid grid-cols-1 sm:grid-cols-3">
+        {/* Três colunas só quando cabe o valor inteiro. Com a barra lateral aberta, "R$ 1.746.205,00"
+            em 26 px passava do card e encostava no do lado (visto em 15/09). */}
+        <div className="grid grid-cols-1 lg:grid-cols-3">
           {kpis.map((k, i) => (
             <div
               key={k.label}
-              className="px-5 py-4"
-              style={{ borderRight: i < 2 ? "1px solid var(--border-soft)" : undefined }}
+              className={`px-5 py-4 min-w-0 ${i < 2 ? "border-b lg:border-b-0 lg:border-r border-border-soft" : ""}`}
             >
               <div className="eyebrow">{k.label}</div>
               <div
                 className="font-display mt-1.5"
-                style={{ fontSize: 26, lineHeight: 1, color: k.color ?? "var(--ink)" }}
+                style={{
+                  fontSize: k.value.length > 13 ? 21 : 26,
+                  lineHeight: 1.1,
+                  color: k.color ?? "var(--ink)",
+                  overflowWrap: "anywhere",
+                }}
               >
                 {k.value}
               </div>

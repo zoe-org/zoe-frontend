@@ -425,6 +425,17 @@ function FieldRow({
           onChange={(e) => onChange(String(e.target.checked))}
           className="w-4 h-4 accent-[var(--color-teal-500)] disabled:opacity-50"
         />
+      ) : field.dataType === "Currency" && !field.isSystemManaged ? (
+        // Valor em reais no formato brasileiro. O campo de número não exibia "1500,00": o valor
+        // herdado da proposta aparecia vazio, justo o que a marca confere antes de mandar assinar.
+        <MoneyInput
+          value={value}
+          onChange={onChange}
+          disabled={readOnly}
+          placeholder="1.500,00"
+          invalid={isMissing}
+          style={isMissing ? { borderLeft: "3px solid #D97706" } : undefined}
+        />
       ) : (
         <Input
           type={field.isSystemManaged ? "text" : kind}
@@ -434,7 +445,6 @@ function FieldRow({
           // Fonte monoespaçada no identificador: é para conferir caractere a caractere
           // contra o rodapé do PDF, não para ler como frase.
           className={field.isSystemManaged ? "font-mono-zoe text-[12px]" : undefined}
-          step={field.dataType === "Currency" ? "0.01" : undefined}
           onChange={(e) => onChange(e.target.value)}
           aria-invalid={isMissing || undefined}
           // Pendencia nao e' erro. Antes todo campo obrigatorio vazio nascia com borda
