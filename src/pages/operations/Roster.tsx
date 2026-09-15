@@ -4,6 +4,8 @@ import { Users, UserPlus, X, ExternalLink, Loader2, Mail } from "lucide-react"
 import { toast } from "sonner"
 import { ApiError } from "@/lib/api"
 import { EmptyBlock } from "@/components/ui/empty-block"
+import { StatusChip } from "@/components/ui/status-chip"
+import { DELIVERY_STATUS_COLOR } from "@/pages/operations/statusColors"
 import { RoleGate } from "@/features/auth/RoleGate"
 import { tEnum } from "@/i18n/enums"
 import { useEscapeKey } from "@/lib/useEscapeKey"
@@ -15,6 +17,7 @@ import {
 import { InviteCreatorModal } from "@/pages/operations/InviteCreatorModal"
 import {
   useRoster, useContracts, useRosterMutations, canReceivePayout, fmtCents,
+  useDeliveries, useEscrowAccounts,
   type RosterItem,
 } from "@/lib/api/operations"
 import { AUDIENCE_SIZES } from "@/lib/api/creator"
@@ -80,11 +83,18 @@ export default function OperationsRosterPage() {
   const [rel, setRel] = useState<string>("")
   const [busca, setBusca] = useState("")
   const [area, setArea] = useState("")
+  const [audiencia, setAudiencia] = useState("")
 
   // Só as áreas que existem no elenco: oferecer as quinze do cadastro faria a maioria dar vazio.
   const areas = useMemo(
     () => [...new Set(all.map((i) => i.primaryArea).filter((a): a is string => Boolean(a)))]
       .sort((a, b) => a.localeCompare(b, "pt-BR")),
+    [all],
+  )
+
+  // Só as faixas que existem no elenco, na ordem de tamanho do cadastro.
+  const audiencias = useMemo(
+    () => AUDIENCE_SIZES.filter((a) => all.some((i) => i.audienceSize === a.value)),
     [all],
   )
 
@@ -94,8 +104,9 @@ export default function OperationsRosterPage() {
       // veio de fora — de uma conversa, de uma planilha — e nem sempre sabe o nome exato
       // com que o criador foi cadastrado aqui.
       .filter((i) => !area || i.primaryArea === area)
+      .filter((i) => !audiencia || i.audienceSize === audiencia)
       .filter((i) => matches(busca, i.displayName, i.fullName, i.email, i.primaryArea)),
-    [all, rel, busca, area],
+    [all, rel, busca, area, audiencia],
   )
 
   const atual = selecionado ? all.find((i) => i.influencerId === selecionado) ?? null : null
@@ -132,6 +143,18 @@ export default function OperationsRosterPage() {
                 {areas.map((a) => <option key={a} value={a}>{a}</option>)}
               </select>
             )}
+            {audiencias.length > 1 && (
+              <select
+                value={audiencia}
+                onChange={(e) => setAudiencia(e.target.value)}
+                aria-label="Filtrar por audiência"
+                className="h-9 px-2.5 rounded-lg border border-border-soft text-[12.5px] bg-transparent max-w-[200px]"
+                style={{ color: "var(--ink)" }}
+              >
+                <option value="">Qualquer audiência</option>
+                {audiencias.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
+              </select>
+            )}
             {all.length > 0 && (
               <SearchBox value={busca} onChange={setBusca} placeholder="Buscar por nome, e-mail, área…" />
             )}
@@ -160,8 +183,11 @@ export default function OperationsRosterPage() {
           <TableSkeleton />
         ) : roster.isError ? (
           <ErrorState onRetry={() => roster.refetch()} />
-        ) : items.length === 0 && (busca || area) ? (
-          <NoResults query={busca || area} onClear={() => { setBusca(""); setArea("") }} />
+        ) : items.length === 0 && (busca || area || audiencia) ? (
+          <NoResults
+            query={busca || area || AUDIENCE_SIZES.find((a) => a.value === audiencia)?.label || ""}
+            onClear={() => { setBusca(""); setArea(""); setAudiencia("") }}
+          />
         ) : items.length === 0 ? (
           <EmptyBlock
             className="py-16"
@@ -272,6 +298,17 @@ function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => voi
   const dialogRef = useFocusTrap<HTMLDivElement>()
   const contratos = useContracts()
   const meus = (contratos.data?.items ?? []).filter((c) => c.influencerId === item.influencerId)
+
+  // Histórico do trabalho com este criador. As entregas vêm pela lista de contratos dele (a fila
+  // não traz o id do criador); os pagamentos, pelas custódias já liberadas.
+  const entregas = useDeliveries()
+  const custodias = useEscrowAccounts()
+  const idsContratos = new Set(meus.map((c) => c.contractId))
+  const minhasEntregas = (entregas.data?.items ?? [])
+    .filter((d) => idsContratos.has(d.contractId))
+    .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt))
+  const meusPagamentos = (custodias.data?.items ?? [])
+    .filter((e) => e.influencerId === item.influencerId && e.state === "Released")
   const rec = situacaoRecebimento(item)
   const audiencia = AUDIENCE_SIZES.find((a) => a.value === item.audienceSize)?.label
   const redes = Object.entries(item.handles ?? {})
@@ -414,6 +451,58 @@ function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => voi
               </div>
             )}
           </div>
+
+          {minhasEntregas.length > 0 && (
+            <div className="mt-5">
+              <div className="eyebrow mb-2">Entregas ({minhasEntregas.length})</div>
+              <div className="rounded-lg border border-border-soft">
+                {minhasEntregas.slice(0, 5).map((d, i) => (
+                  <Link
+                    key={d.deliveryId}
+                    to={`/operations/deliveries?contrato=${d.contractId}`}
+                    className="flex items-center gap-2 px-3.5 py-2.5 text-[12.5px] hover:bg-[#FAFBFC] dark:hover:bg-[#181B28]"
+                    style={{ borderTop: i === 0 ? undefined : "1px solid var(--border-soft)" }}
+                  >
+                    <span className="flex-1 min-w-0">
+                      <span className="block truncate" style={{ color: "var(--ink)" }}>{campanhaLabel(d.campaignName)}</span>
+                      <span className="text-[11px] text-ink-muted">
+                        {fmtDate(d.submittedAt)}
+                        {d.submissionAttempt > 1 && ` · ${d.submissionAttempt}ª tentativa`}
+                      </span>
+                    </span>
+                    <StatusChip status={d.status} kind="deliveryStatus" colors={DELIVERY_STATUS_COLOR} small />
+                  </Link>
+                ))}
+              </div>
+              {minhasEntregas.length > 5 && (
+                <p className="text-[11.5px] text-ink-muted m-0 mt-1.5">
+                  Mostrando as 5 mais recentes. As demais estão na fila de entregas.
+                </p>
+              )}
+            </div>
+          )}
+
+          {meusPagamentos.length > 0 && (
+            <div className="mt-5">
+              <div className="eyebrow mb-2">Pagamentos feitos ({meusPagamentos.length})</div>
+              <div className="rounded-lg border border-border-soft">
+                {meusPagamentos.map((e, i) => (
+                  <Link
+                    key={e.escrowAccountId}
+                    to="/operations/escrow"
+                    className="flex items-center gap-2 px-3.5 py-2.5 text-[12.5px] hover:bg-[#FAFBFC] dark:hover:bg-[#181B28]"
+                    style={{ borderTop: i === 0 ? undefined : "1px solid var(--border-soft)" }}
+                  >
+                    <span className="flex-1 truncate" style={{ color: "var(--ink)" }}>{campanhaLabel(e.campaignName)}</span>
+                    {/* Líquido: o que chegou nele, como no resumo acima. */}
+                    <span className="font-mono-zoe text-[12px]" style={{ color: "var(--ink)" }}>
+                      {fmtCents(e.netToInfluencerCents)}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </>

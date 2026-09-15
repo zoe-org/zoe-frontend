@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react"
 import { Sparkles, Check, Loader2, Plus, Sun, Moon, Monitor } from "lucide-react"
 import { useTheme } from "next-themes"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { useAuth } from "@/features/auth/context"
 import { ApiError } from "@/lib/api"
@@ -110,6 +111,8 @@ export default function SettingsPage() {
                 canEdit={isAdmin}
               />
             </div>
+
+            {hasFeature("operations") && <OperationsEmailCard tenantId={activeTenantId} />}
           </div>
         )}
 
@@ -119,6 +122,56 @@ export default function SettingsPage() {
 
         {tab === "aparencia" && <AppearanceTab />}
       </section>
+    </div>
+  )
+}
+
+/**
+ * Avisos do Operations por e-mail para você, neste workspace.
+ *
+ * <p>Iam para todo Owner, Admin e Manager sem opção de desligar — num workspace com volume, quem não
+ * revisa recebia um e-mail por evento. Desligar aqui vale só para você e só neste workspace.</p>
+ */
+function OperationsEmailCard({ tenantId }: { tenantId: string | null }) {
+  const qc = useQueryClient()
+  const prefs = useQuery({
+    queryKey: ["me-notifications", tenantId],
+    queryFn: () => meApi.getNotifications(),
+    enabled: Boolean(tenantId),
+  })
+  const salvar = useMutation({
+    mutationFn: (operationsEmail: boolean) => meApi.setNotifications({ operationsEmail }),
+    onSuccess: (data) => {
+      qc.setQueryData(["me-notifications", tenantId], data)
+      toast.success(data.operationsEmail
+        ? "Você volta a receber os avisos do Operations por e-mail."
+        : "Você não recebe mais os avisos do Operations por e-mail neste workspace.")
+    },
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : "Não foi possível salvar a preferência."),
+  })
+  const ligado = prefs.data?.operationsEmail ?? true
+
+  return (
+    <div className="p-6 rounded-[14px] border border-border-soft lg:col-span-2" style={{ background: "var(--surface)" }}>
+      <div className="eyebrow mb-4">Avisos por e-mail</div>
+      <label className="flex items-start gap-2.5 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={ligado}
+          disabled={prefs.isLoading || salvar.isPending}
+          onChange={(e) => salvar.mutate(e.target.checked)}
+          className="mt-0.5 accent-[var(--color-teal-500)] disabled:opacity-60"
+        />
+        <span>
+          <span className="text-[13px] font-medium" style={{ color: "var(--ink)" }}>
+            Receber os avisos do Operations
+          </span>
+          <span className="block text-[12px] text-ink-muted mt-0.5">
+            Corte e entrega esperando revisão, contrato assinado, prazo de revisão acabando, reserva confirmada
+            e convite aceito. Vale só para você e só neste workspace.
+          </span>
+        </span>
+      </label>
     </div>
   )
 }

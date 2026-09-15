@@ -20,6 +20,12 @@ export type Me = {
   memberships: Membership[]
 }
 
+/** Preferências de aviso do próprio usuário no workspace ativo. */
+export type NotificationPreferences = {
+  /** Recebe por e-mail os avisos do Operations (revisões, assinatura, prazos, reserva, convite aceito). */
+  operationsEmail: boolean
+}
+
 export type TenantInfo = {
   id: string
   name: string
@@ -46,4 +52,9 @@ export const meApi = {
   setTaxId: (tenantId: string, taxId: string) =>
     apiClient.put<{ taxId: string; formatted: string }>(
       `/api/tenants/${tenantId}/tax-id`, { taxId }),
+
+  /** Preferências de aviso no workspace ativo (X-Tenant-Id injetado pelo client). */
+  getNotifications: () => apiClient.get<NotificationPreferences>("/api/me/tenant/notifications"),
+  setNotifications: (prefs: NotificationPreferences) =>
+    apiClient.put<NotificationPreferences>("/api/me/tenant/notifications", prefs),
 }
