@@ -692,6 +692,10 @@ export const operationsApi = {
   getContract: (contractId: string, opts?: { signal?: AbortSignal }) =>
     apiClient.get<ContractDetail>(`/api/operations/contracts/${contractId}`, { signal: opts?.signal }),
 
+  getContractTimeline: (contractId: string, opts?: { signal?: AbortSignal }) =>
+    apiClient.get<{ items: ContractTimelineItem[] }>(
+      `/api/operations/contracts/${contractId}/timeline`, { signal: opts?.signal }),
+
   updateContractFields: (contractId: string, fieldValues: Record<string, string>) =>
     apiClient.patch<UpdateFieldsResponse>(
       `/api/operations/contracts/${contractId}/fields`, { fieldValues },
@@ -833,6 +837,24 @@ export function useContract(contractId: string | undefined) {
     queryFn: ({ signal }) => operationsApi.getContract(contractId!, { signal }),
     enabled: Boolean(activeTenantId && contractId),
     refetchInterval: (query) => intervaloDeEspera(query.state.data),
+  })
+}
+
+/** Um acontecimento do contrato. `kind` escolhe a cor: contract, draft, delivery ou escrow. */
+export type ContractTimelineItem = {
+  at: string
+  kind: "contract" | "draft" | "delivery" | "escrow" | string
+  title: string
+  detail: string | null
+}
+
+export function useContractTimeline(contractId: string | undefined) {
+  const { activeTenantId } = useAuth()
+  return useQuery({
+    queryKey: ["operations-contract-timeline", activeTenantId, contractId],
+    queryFn: ({ signal }) => operationsApi.getContractTimeline(contractId!, { signal }),
+    enabled: Boolean(activeTenantId && contractId),
+    staleTime: 10_000,
   })
 }
 

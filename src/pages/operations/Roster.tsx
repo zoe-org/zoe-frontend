@@ -78,14 +78,23 @@ export default function OperationsRosterPage() {
   const all = useMemo(() => roster.data?.items ?? [], [roster.data])
   const [rel, setRel] = useState<string>("")
   const [busca, setBusca] = useState("")
+  const [area, setArea] = useState("")
+
+  // Só as áreas que existem no elenco: oferecer as quinze do cadastro faria a maioria dar vazio.
+  const areas = useMemo(
+    () => [...new Set(all.map((i) => i.primaryArea).filter((a): a is string => Boolean(a)))]
+      .sort((a, b) => a.localeCompare(b, "pt-BR")),
+    [all],
+  )
 
   const items = useMemo(
     () => (rel === TRAVADO ? all.filter(pagamentoTravado) : rel ? all.filter((i) => i.relationshipStatus === rel) : all)
       // E-mail entra na busca porque e' o identificador que a pessoa tem em maos quando
       // veio de fora — de uma conversa, de uma planilha — e nem sempre sabe o nome exato
       // com que o criador foi cadastrado aqui.
+      .filter((i) => !area || i.primaryArea === area)
       .filter((i) => matches(busca, i.displayName, i.fullName, i.email, i.primaryArea)),
-    [all, rel, busca],
+    [all, rel, busca, area],
   )
 
   const atual = selecionado ? all.find((i) => i.influencerId === selecionado) ?? null : null
@@ -110,6 +119,18 @@ export default function OperationsRosterPage() {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            {areas.length > 1 && (
+              <select
+                value={area}
+                onChange={(e) => setArea(e.target.value)}
+                aria-label="Filtrar por área"
+                className="h-9 px-2.5 rounded-lg border border-border-soft text-[12.5px] bg-transparent max-w-[200px]"
+                style={{ color: "var(--ink)" }}
+              >
+                <option value="">Todas as áreas</option>
+                {areas.map((a) => <option key={a} value={a}>{a}</option>)}
+              </select>
+            )}
             {all.length > 0 && (
               <SearchBox value={busca} onChange={setBusca} placeholder="Buscar por nome, e-mail, área…" />
             )}
@@ -138,8 +159,8 @@ export default function OperationsRosterPage() {
           <TableSkeleton />
         ) : roster.isError ? (
           <ErrorState onRetry={() => roster.refetch()} />
-        ) : items.length === 0 && busca ? (
-          <NoResults query={busca} onClear={() => setBusca("")} />
+        ) : items.length === 0 && (busca || area) ? (
+          <NoResults query={busca || area} onClear={() => { setBusca(""); setArea("") }} />
         ) : items.length === 0 ? (
           <EmptyBlock
             className="py-16"
