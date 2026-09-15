@@ -6,6 +6,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { useEscapeKey } from "@/lib/useEscapeKey"
+import { funilDaCampanha, type TomFunil } from "@/pages/operations/campaignFunnel"
 import { parseBRLToCents, centsToBRLInput } from "@/lib/money"
 import { ApiError } from "@/lib/api"
 import { Input } from "@/components/ui/input"
@@ -27,7 +28,7 @@ import {
   type CreateCampaignBody,
   type CampaignTransition, type CampaignDetail,
   type CampaignBriefing, type CampaignBriefingInput, type BriefingSentiment,
-  BRIEFING_SENTIMENTS,
+  BRIEFING_SENTIMENTS, useRoster, canReceivePayout,
 } from "@/lib/api/operations"
 
 const STATUS_COLOR: Record<string, string> = {
@@ -308,6 +309,8 @@ function CampaignDetailPanel({ campaignId }: { campaignId: string }) {
 
       <BriefingCard briefing={d.briefing} />
 
+      <CampaignFunnel d={d} />
+
       {/* Contratos */}
       <div className="rounded-xl border border-border-soft p-5" style={{ background: "var(--surface)" }}>
         <div className="flex items-center justify-between mb-3.5">
@@ -580,6 +583,70 @@ function ConfirmCancel({
  * contratos já a herdaram, e trocá-la deixaria contrato e campanha discordando sobre que
  * acordo foi firmado — é a mesma razão pela qual o comando no backend não a aceita.
  */
+const COR_TOM: Record<TomFunil, string> = {
+  alerta: "#DC2626",
+  atencao: "#B45309",
+  neutro: "var(--ink-muted)",
+  ok: "#00A799",
+}
+
+/**
+ * Cada criador da campanha numa linha: a etapa e, quando a vez é da marca, o botão para o lugar
+ * de agir. É a pergunta de quem abre a campanha — "o que falta de mim?" — sem cruzar contratos e
+ * entregas de cabeça.
+ */
+function CampaignFunnel({ d }: { d: CampaignDetail }) {
+  // A situação da conta vem do elenco: o detalhe da campanha não a traz, e sem ela custódia
+  // liberável de quem ainda não pode receber virava pendência da marca.
+  const roster = useRoster()
+  const contaNaoPronta = new Set(
+    (roster.data?.items ?? []).filter((r) => !canReceivePayout(r)).map((r) => r.influencerId))
+  const linhas = funilDaCampanha(d, contaNaoPronta)
+  if (linhas.length === 0) return null
+  const comVoce = linhas.filter((l) => l.tom === "alerta" || l.tom === "atencao").length
+
+  return (
+    <div className="rounded-xl border border-border-soft p-5" style={{ background: "var(--surface)" }}>
+      <div className="flex items-center justify-between mb-3.5 gap-2 flex-wrap">
+        <div className="eyebrow">Funil por criador ({linhas.length})</div>
+        {comVoce > 0 && (
+          <span className="text-[11.5px] font-medium" style={{ color: "#B45309" }}>
+            {comVoce} {comVoce === 1 ? "precisa" : "precisam"} de você
+          </span>
+        )}
+      </div>
+      {linhas.map((l, i) => (
+        <div
+          key={l.influencerId}
+          className="flex items-center gap-x-3 gap-y-1 py-2.5 flex-wrap"
+          style={{ borderTop: i === 0 ? undefined : "1px solid var(--border-soft)" }}
+        >
+          <Link
+            to={`/operations/influencers?criador=${l.influencerId}`}
+            className="flex-1 min-w-[130px] text-[13px] truncate hover:underline"
+            style={{ color: "var(--ink)" }}
+          >
+            {l.nome}
+          </Link>
+          <span className="text-[12px] inline-flex items-center gap-1.5" style={{ color: COR_TOM[l.tom] }}>
+            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: COR_TOM[l.tom] }} />
+            {l.etapa}
+          </span>
+          {l.acao && (
+            <Link
+              to={l.acao.to}
+              className="text-[12px] font-medium px-2.5 py-1 rounded-md border border-border-soft whitespace-nowrap"
+              style={{ color: "var(--color-teal-500)" }}
+            >
+              {l.acao.label} →
+            </Link>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function EditCampaignModal({
   campaign, onClose,
 }: {

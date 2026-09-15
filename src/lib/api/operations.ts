@@ -31,6 +31,20 @@ export type RosterItem = {
    * convite. Não existe "Recusou" — o convite não tem recusa explícita.
    */
   relationshipStatus: string
+  // Cadastro declarado pelo criador — opcionais porque a API antiga não os mandava.
+  primaryArea?: string | null
+  audienceSize?: string | null
+  topics?: string[]
+  /** Arroba por plataforma: YouTube | Instagram | TikTok. */
+  handles?: Record<string, string>
+  bio?: string | null
+  portfolioUrl?: string | null
+  profileComplete?: boolean
+  /** Campanha do contrato mais recente com este workspace. */
+  lastCampaignName?: string | null
+  lastContractAt?: string | null
+  /** Custódias deste workspace já liberáveis para ele — parado se a conta não estiver pronta. */
+  releasableCents?: number
 }
 
 export type ListRosterResponse = { items: RosterItem[] }

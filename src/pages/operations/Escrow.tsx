@@ -408,7 +408,10 @@ function EscrowDrawer({ e, onClose }: { e: EscrowSummary; onClose: () => void })
               <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
               <span>
                 O criador ainda não tem conta de recebimento. O bloqueio é só no pagamento —
-                a entrega segue normalmente, e a liberação espera a conta existir.
+                a entrega segue normalmente, e a liberação espera a conta existir.{" "}
+                <Link to={`/operations/influencers?criador=${e.influencerId}`} className="underline">
+                  Ver {e.influencerName} no elenco
+                </Link>
               </span>
             </div>
           )}
@@ -422,7 +425,10 @@ function EscrowDrawer({ e, onClose }: { e: EscrowSummary; onClose: () => void })
               <span>
                 A conta de recebimento do criador está em verificação pelo provedor. A liberação
                 espera essa verificação — o criador conclui pela área dele, e nada precisa ser
-                feito aqui.
+                feito aqui.{" "}
+                <Link to={`/operations/influencers?criador=${e.influencerId}`} className="underline">
+                  Ver {e.influencerName} no elenco
+                </Link>
               </span>
             </div>
           )}
@@ -455,13 +461,16 @@ function EscrowDrawer({ e, onClose }: { e: EscrowSummary; onClose: () => void })
             </p>
           )}
 
-          <Link
-            to={`/operations/contracts/${e.contractId}`}
-            className="text-[12.5px] mt-4 inline-block"
-            style={{ color: "var(--color-teal-500)" }}
-          >
-            Ver contrato →
-          </Link>
+          <div className="flex gap-4 flex-wrap mt-4 text-[12.5px]">
+            <Link to={`/operations/contracts/${e.contractId}`} style={{ color: "var(--color-teal-500)" }}>
+              Ver contrato →
+            </Link>
+            {/* Só o contrato não bastava: para saber quem é o criador e em que pé está a conta
+                dele, era preciso lembrar o nome e procurar no Elenco. */}
+            <Link to={`/operations/influencers?criador=${e.influencerId}`} style={{ color: "var(--color-teal-500)" }}>
+              Ver criador no elenco →
+            </Link>
+          </div>
 
           <RoleGate minRole="Admin">
             {e.isTerminal ? (

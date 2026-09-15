@@ -1,50 +1,95 @@
 import { useMemo, useState } from "react"
-import { Users, UserPlus } from "lucide-react"
+import { Link, useSearchParams } from "react-router-dom"
+import { Users, UserPlus, X, ExternalLink } from "lucide-react"
 import { EmptyBlock } from "@/components/ui/empty-block"
-import { StatusChip } from "@/components/ui/status-chip"
 import { RoleGate } from "@/features/auth/RoleGate"
 import { tEnum } from "@/i18n/enums"
-import { fmtDate, initials, matches } from "@/pages/operations/format"
+import { useEscapeKey } from "@/lib/useEscapeKey"
+import { fmtDate, initials, matches, campanhaLabel } from "@/pages/operations/format"
 import {
   TableSkeleton, ErrorState, SearchBox, NoResults,
 } from "@/pages/operations/shared"
 import { InviteCreatorModal } from "@/pages/operations/InviteCreatorModal"
 import {
-  useRoster, payoutBlockReason,
+  useRoster, useContracts, canReceivePayout, fmtCents,
   type RosterItem,
 } from "@/lib/api/operations"
+import { AUDIENCE_SIZES } from "@/lib/api/creator"
 
-// Cor por estado do KYC. Verificado é o único verde: os outros três são graus
-// diferentes de "ainda não recebe", e recusado precisa saltar aos olhos.
-// A primeira entrada é o fallback de valor desconhecido.
-const KYC_COLOR: Record<string, string> = {
-  NotStarted: "#6B7280",
-  Pending: "#D97706",
-  Verified: "#00A799",
-  Rejected: "#DC2626",
+/** Valor da aba do filtro de pagamento travado — não é um estado de relacionamento. */
+const TRAVADO = "pagamento-travado"
+
+/**
+ * A conta de recebimento numa situação só. Eram duas colunas, KYC e Recebimento, dizendo quase o
+ * mesmo com palavras diferentes — e nenhuma das duas dizia o que fazer.
+ */
+function situacaoRecebimento(it: RosterItem): { label: string; cor: string; explicacao: string } {
+  if (canReceivePayout(it)) {
+    return { label: "pode receber", cor: "#00A799", explicacao: "Conta de recebimento conectada e verificada." }
+  }
+  if (it.kycStatus === "Rejected") {
+    return {
+      label: "verificação recusada",
+      cor: "#DC2626",
+      explicacao: "O provedor recusou a verificação. O criador revisa os dados pela área dele — daqui não há o que fazer além de avisá-lo.",
+    }
+  }
+  if (it.hasStripeAccount || it.kycStatus === "Pending") {
+    return {
+      label: "em verificação",
+      cor: "#D97706",
+      explicacao: "A conta existe e está em verificação pelo provedor. O criador conclui pela área dele.",
+    }
+  }
+  return {
+    label: "sem conta",
+    cor: "#6B7280",
+    explicacao: "O criador ainda não conectou a conta de recebimento. Ele faz isso pela área dele; sem ela, pagamento aprovado espera.",
+  }
 }
+
+/** Dinheiro já aprovado para ele, parado porque a conta não está pronta. */
+const pagamentoTravado = (it: RosterItem) => (it.releasableCents ?? 0) > 0 && !canReceivePayout(it)
+
+const REDES: Record<string, { sigla: string; url: (handle: string) => string }> = {
+  YouTube: { sigla: "YT", url: (h) => `https://www.youtube.com/@${h}` },
+  Instagram: { sigla: "IG", url: (h) => `https://www.instagram.com/${h}` },
+  TikTok: { sigla: "TT", url: (h) => `https://www.tiktok.com/@${h}` },
+}
+
+const semArroba = (h: string) => h.trim().replace(/^@/, "")
 
 export default function OperationsRosterPage() {
   const roster = useRoster()
   const [inviteOpen, setInviteOpen] = useState(false)
 
+  // O criador aberto vive na URL: é assim que a custódia e o funil da campanha trazem a pessoa
+  // direto para cá, e o voltar do navegador fecha a gaveta.
+  const [params, setParams] = useSearchParams()
+  const selecionado = params.get("criador")
+  const abrir = (influencerId: string | null) => setParams((p) => {
+    if (influencerId) p.set("criador", influencerId)
+    else p.delete("criador")
+    return p
+  })
+
   const all = useMemo(() => roster.data?.items ?? [], [roster.data])
   const [rel, setRel] = useState<string>("")
-
   const [busca, setBusca] = useState("")
 
   const items = useMemo(
-    () => (rel ? all.filter((i) => i.relationshipStatus === rel) : all)
+    () => (rel === TRAVADO ? all.filter(pagamentoTravado) : rel ? all.filter((i) => i.relationshipStatus === rel) : all)
       // E-mail entra na busca porque e' o identificador que a pessoa tem em maos quando
       // veio de fora — de uma conversa, de uma planilha — e nem sempre sabe o nome exato
       // com que o criador foi cadastrado aqui.
-      .filter((i) => matches(busca, i.displayName, i.fullName, i.email)),
+      .filter((i) => matches(busca, i.displayName, i.fullName, i.email, i.primaryArea)),
     [all, rel, busca],
   )
 
+  const atual = selecionado ? all.find((i) => i.influencerId === selecionado) ?? null : null
+
   return (
     <div className="-m-6 border-t border-border-soft" style={{ color: "var(--ink)" }}>
-      {/* Hero */}
       <RelationshipTabs items={all} value={rel} onChange={setRel} />
 
       <section className="px-8 pt-7 pb-5 border-b border-border-soft" style={{ background: "var(--surface)" }}>
@@ -64,7 +109,7 @@ export default function OperationsRosterPage() {
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {all.length > 0 && (
-              <SearchBox value={busca} onChange={setBusca} placeholder="Buscar por nome, e-mail…" />
+              <SearchBox value={busca} onChange={setBusca} placeholder="Buscar por nome, e-mail, área…" />
             )}
           <RoleGate minRole="Admin">
             {/* Convidar nao depende de campanha: a marca monta elenco antes de existir
@@ -86,7 +131,6 @@ export default function OperationsRosterPage() {
         </div>
       </section>
 
-      {/* Tabela */}
       <section style={{ background: "var(--surface)" }}>
         {roster.isLoading ? (
           <TableSkeleton />
@@ -107,16 +151,16 @@ export default function OperationsRosterPage() {
               <thead>
                 <tr className="border-b border-border-soft">
                   <th className="text-left px-8 py-3 eyebrow font-semibold">Criador</th>
-                  <th className="text-left py-3 eyebrow font-semibold">País</th>
-                  <th className="text-left py-3 eyebrow font-semibold">KYC</th>
+                  <th className="text-left py-3 eyebrow font-semibold">Redes</th>
+                  <th className="text-left py-3 eyebrow font-semibold">Área</th>
                   <th className="text-left py-3 eyebrow font-semibold">Recebimento</th>
                   <th className="text-left py-3 eyebrow font-semibold">Contratos</th>
-                  <th className="text-left px-8 py-3 eyebrow font-semibold">Adicionado em</th>
+                  <th className="text-left px-8 py-3 eyebrow font-semibold">Última campanha</th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((it, i) => (
-                  <RosterRow key={it.tenantInfluencerId} item={it} index={i} />
+                  <RosterRow key={it.tenantInfluencerId} item={it} index={i} onOpen={() => abrir(it.influencerId)} />
                 ))}
               </tbody>
             </table>
@@ -124,16 +168,23 @@ export default function OperationsRosterPage() {
         )}
       </section>
 
+      {atual && <CreatorDrawer item={atual} onClose={() => abrir(null)} />}
       {inviteOpen && <InviteCreatorModal onClose={() => setInviteOpen(false)} />}
     </div>
   )
 }
 
-function RosterRow({ item, index }: { item: RosterItem; index: number }) {
-  const blocked = payoutBlockReason(item)
+function RosterRow({ item, index, onOpen }: { item: RosterItem; index: number; onOpen: () => void }) {
   const name = item.displayName || item.fullName
+  const rec = situacaoRecebimento(item)
+  const redes = Object.entries(item.handles ?? {})
+
   return (
-    <tr className="border-b border-border-soft hover:bg-[#FAFBFC] dark:hover:bg-[#181B28] transition-colors">
+    // A linha inteira abre a gaveta; o nome é o botão, para teclado e leitor de tela.
+    <tr
+      onClick={onOpen}
+      className="border-b border-border-soft hover:bg-[#FAFBFC] dark:hover:bg-[#181B28] transition-colors cursor-pointer"
+    >
       <td className="px-8 py-3.5">
         <div className="flex items-center gap-3">
           <div
@@ -143,26 +194,181 @@ function RosterRow({ item, index }: { item: RosterItem; index: number }) {
             {initials(item.fullName, item.email)}
           </div>
           <div className="min-w-0">
-            <div className="font-medium flex items-center gap-2" style={{ color: "var(--ink)" }}>
+            <button
+              onClick={(e) => { e.stopPropagation(); onOpen() }}
+              className="font-medium flex items-center gap-2 text-left hover:underline"
+              style={{ color: "var(--ink)" }}
+            >
               {name}
               {item.status !== "Active" && (
                 <span className="chip text-[10px]">{tEnum("rosterStatus", item.status)}</span>
               )}
-            </div>
+            </button>
             <div className="font-mono-zoe text-[11.5px] text-ink-muted truncate">{item.email}</div>
           </div>
         </div>
       </td>
-      <td className="py-3.5 font-mono-zoe text-ink-2">{item.countryCode ?? "—"}</td>
-      <td className="py-3.5">
-        <StatusChip status={item.kycStatus} kind="kycStatus" colors={KYC_COLOR} />
+      <td className="py-3.5 text-[12px] text-ink-2">
+        {redes.length === 0
+          ? <span className="text-ink-muted">—</span>
+          : redes.map(([rede, handle]) => (
+            <span key={rede} className="mr-2 whitespace-nowrap">
+              <span className="text-ink-muted">{REDES[rede]?.sigla ?? rede}</span> @{semArroba(handle)}
+            </span>
+          ))}
       </td>
-      <td className="py-3.5 text-ink-muted text-[12.5px]">
-        {blocked ?? <span style={{ color: "var(--color-teal-500)" }}>liberado</span>}
+      <td className="py-3.5 text-[12.5px] text-ink-2">
+        {item.primaryArea ?? <span className="text-ink-muted">—</span>}
+      </td>
+      <td className="py-3.5 text-[12.5px]">
+        <span style={{ color: rec.cor }}>{rec.label}</span>
+        {pagamentoTravado(item) && (
+          <div className="text-[11px] font-medium" style={{ color: "#DC2626" }}>
+            {fmtCents(item.releasableCents ?? 0)} esperando
+          </div>
+        )}
       </td>
       <td className="py-3.5 font-mono-zoe text-ink-2">{item.contractCount}</td>
-      <td className="px-8 py-3.5 font-mono-zoe text-ink-2">{fmtDate(item.addedAt)}</td>
+      <td className="px-8 py-3.5 text-[12.5px] text-ink-2">
+        {item.lastContractAt
+          ? <>{campanhaLabel(item.lastCampaignName)} <span className="text-ink-muted">· {fmtDate(item.lastContractAt)}</span></>
+          : <span className="text-ink-muted">—</span>}
+      </td>
     </tr>
+  )
+}
+
+/**
+ * O criador por inteiro: situação da conta, o que ele declarou no cadastro e os contratos com
+ * este workspace. A linha do elenco não abria nada, e para saber qualquer coisa além do nome era
+ * preciso caçar em Contratos ou Custódia.
+ */
+function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => void }) {
+  useEscapeKey(onClose)
+  const contratos = useContracts()
+  const meus = (contratos.data?.items ?? []).filter((c) => c.influencerId === item.influencerId)
+  const rec = situacaoRecebimento(item)
+  const audiencia = AUDIENCE_SIZES.find((a) => a.value === item.audienceSize)?.label
+  const redes = Object.entries(item.handles ?? {})
+  const topicos = item.topics ?? []
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40" style={{ background: "rgba(11,15,26,.5)" }} onClick={onClose} />
+      <div
+        className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-[460px] overflow-y-auto border-l border-border-soft"
+        style={{ background: "var(--surface)" }}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Criador ${item.fullName}`}
+      >
+        <div
+          className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b border-border-soft"
+          style={{ background: "var(--surface)" }}
+        >
+          <div className="eyebrow">Criador</div>
+          <button onClick={onClose} className="text-ink-muted hover:opacity-70" aria-label="Fechar">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-6">
+          <h2 className="font-display m-0" style={{ fontSize: 21, color: "var(--ink)" }}>
+            {item.displayName || item.fullName}
+          </h2>
+          <div className="font-mono-zoe text-[12px] text-ink-muted mt-0.5">{item.email}</div>
+          <div className="flex gap-1.5 flex-wrap mt-2">
+            <span className="chip text-[10.5px]">{tEnum("relationshipStatus", item.relationshipStatus)}</span>
+            {item.countryCode && <span className="chip text-[10.5px]">{item.countryCode}</span>}
+          </div>
+
+          <div className="rounded-lg border border-border-soft p-4 mt-5">
+            <div className="eyebrow mb-1.5">Recebimento</div>
+            <div className="text-[13px] font-medium" style={{ color: rec.cor }}>{rec.label}</div>
+            <p className="text-[12px] text-ink-muted m-0 mt-1">{rec.explicacao}</p>
+            {pagamentoTravado(item) && (
+              <div className="rounded-md p-2.5 mt-2.5 text-[12px]" style={{ background: "#DC262612", color: "#B91C1C" }}>
+                {fmtCents(item.releasableCents ?? 0)} já aprovados para este criador esperam esta conta.{" "}
+                <Link to="/operations/escrow" className="underline">Ver na custódia</Link>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-5">
+            <div className="eyebrow mb-2">Cadastro</div>
+            {!item.profileComplete && (
+              <p className="text-[12px] text-ink-muted m-0 mb-2">
+                Ainda não completou o cadastro — o que estiver abaixo pode estar incompleto.
+              </p>
+            )}
+            <div className="text-[12.5px] flex flex-col gap-1.5" style={{ color: "var(--ink-2)" }}>
+              <div>
+                <span className="text-ink-muted">Área: </span>
+                {item.primaryArea ?? "—"}
+                {audiencia && <span className="text-ink-muted"> · audiência {audiencia.toLowerCase()}</span>}
+              </div>
+              {redes.length > 0 && (
+                <div className="flex flex-wrap gap-x-3 gap-y-1">
+                  {redes.map(([rede, handle]) => (
+                    <a
+                      key={rede}
+                      href={REDES[rede]?.url(semArroba(handle)) ?? "#"}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="inline-flex items-center gap-1"
+                      style={{ color: "var(--color-teal-500)" }}
+                    >
+                      {rede} @{semArroba(handle)} <ExternalLink className="w-3 h-3" />
+                    </a>
+                  ))}
+                </div>
+              )}
+              {topicos.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-0.5">
+                  {topicos.map((t) => <span key={t} className="chip text-[10.5px]">{t}</span>)}
+                </div>
+              )}
+              {item.bio && <p className="m-0 mt-1">{item.bio}</p>}
+              {item.portfolioUrl && (
+                <a
+                  href={item.portfolioUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="inline-flex items-center gap-1 break-all"
+                  style={{ color: "var(--color-teal-500)" }}
+                >
+                  Portfólio <ExternalLink className="w-3 h-3 shrink-0" />
+                </a>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-5">
+            <div className="eyebrow mb-2">Contratos com você ({meus.length})</div>
+            {meus.length === 0 ? (
+              <p className="text-[12.5px] text-ink-muted m-0">Nenhum contrato com este criador ainda.</p>
+            ) : (
+              <div className="rounded-lg border border-border-soft">
+                {meus.map((c, i) => (
+                  <Link
+                    key={c.contractId}
+                    to={`/operations/contracts/${c.contractId}`}
+                    className="flex items-center gap-2 px-3.5 py-2.5 text-[12.5px] hover:bg-[#FAFBFC] dark:hover:bg-[#181B28]"
+                    style={{ borderTop: i === 0 ? undefined : "1px solid var(--border-soft)" }}
+                  >
+                    <span className="flex-1 truncate" style={{ color: "var(--ink)" }}>{campanhaLabel(c.campaignName)}</span>
+                    {c.escrowState && (
+                      <span className="text-[11px] text-ink-muted">{tEnum("escrowState", c.escrowState)}</span>
+                    )}
+                    <span className="chip text-[10.5px]">{tEnum("contractStatus", c.status)}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
   )
 }
 
@@ -175,6 +381,9 @@ function RosterRow({ item, index }: { item: RosterItem; index: number }) {
  * <p><b>Não há "Recusou".</b> O convite tem aceite e vencimento, e nenhuma recusa
  * explícita — o criador aceita ou deixa vencer. O protótipo mostra essa aba; o domínio
  * não sabe produzi-la, e inventá-la aqui seria rotular como recusa o que é silêncio.</p>
+ *
+ * <p>"Pagamento travado" vem por último e só com alguém nele: não é etapa da relação, é o
+ * que a marca procura quando a custódia avisa que um pagamento está parado.</p>
  */
 function RelationshipTabs({
   items,
@@ -190,12 +399,13 @@ function RelationshipTabs({
     for (const i of items) m.set(i.relationshipStatus, (m.get(i.relationshipStatus) ?? 0) + 1)
     return m
   }, [items])
+  const travados = items.filter(pagamentoTravado).length
 
   // Ordem do fluxo, não alfabética: é a jornada do criador com a marca.
   const ORDER = ["Convidado", "Aceito", "Contratado", "Active", "Paused", "ConviteExpirado", "Archived"]
   const present = ORDER.filter((k) => counts.has(k))
 
-  if (present.length <= 1) return null
+  if (present.length <= 1 && travados === 0) return null
 
   return (
     <div className="flex gap-1 flex-wrap">
@@ -209,21 +419,31 @@ function RelationshipTabs({
           onClick={() => onChange(k)}
         />
       ))}
+      {travados > 0 && (
+        <TabButton
+          label="Pagamento travado"
+          count={travados}
+          active={value === TRAVADO}
+          onClick={() => onChange(TRAVADO)}
+          alerta
+        />
+      )}
     </div>
   )
 }
 
 function TabButton({
-  label, count, active, onClick,
-}: { label: string; count: number; active: boolean; onClick: () => void }) {
+  label, count, active, onClick, alerta = false,
+}: { label: string; count: number; active: boolean; onClick: () => void; alerta?: boolean }) {
+  const cor = alerta ? "#DC2626" : "var(--color-teal-500)"
   return (
     <button
       onClick={onClick}
       className="px-3 py-1.5 rounded-lg text-[12.5px] font-medium transition-colors"
       style={
         active
-          ? { background: "var(--color-teal-500)", color: "#fff" }
-          : { color: "var(--ink-muted)", border: "1px solid var(--border-soft)" }
+          ? { background: cor, color: "#fff" }
+          : { color: alerta ? "#DC2626" : "var(--ink-muted)", border: `1px solid ${alerta ? "#DC262640" : "var(--border-soft)"}` }
       }
     >
       {label} <span style={{ opacity: 0.7 }}>({count})</span>
