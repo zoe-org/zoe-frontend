@@ -77,6 +77,14 @@ export default function ContractDetailPage() {
       ["start_date", "end_date", "publish_deadline", "creation_deadline"].includes(f.placeholder)
       && Boolean(f.value) && (f.value ?? "") < hoje)
     : []
+
+  const propostaUsadaEm = isDraft ? data.proposalUsedByContractId ?? null : null
+
+  // Pelo valor SALVO: é dele que a API tira o valor da custódia. "a combinar" passava pela
+  // assinatura e só travava depois, com o contrato já assinado e o valor sem poder mudar.
+  const campoValorTotal = data.fields.find((f) => f.placeholder === "total_value")
+  const valorTotalSalvo = (campoValorTotal?.value ?? "").trim()
+  const valorIlegivel = isDraft && data.usesEscrow && valorTotalSalvo !== "" && data.declaredTotalCents == null
   const missing = new Set([...data.missingRequiredFields, ...serverMissing])
 
   // Vazio pelo valor SALVO, não pelo que está sendo digitado: senão o campo sumiria da lista
@@ -205,6 +213,35 @@ export default function ContractDetailPage() {
               <span className="font-medium">Datas no passado:</span>{" "}
               {datasVencidas.map((f) => f.label).join(", ")}. Confira antes de enviar para assinatura —
               o contrato nasceria com prazos já vencidos.
+            </div>
+          )}
+
+          {valorIlegivel && (
+            <div className="rounded-lg p-3 text-[12.5px] mb-4" style={{ background: "#D9770615", color: "#B45309" }}>
+              <span className="font-medium">{campoValorTotal?.label ?? "Valor total"} ilegível:</span>{" "}
+              “{valorTotalSalvo}” não é um valor em reais que a custódia consiga ler (ex.: 5.000,00).
+              Assim, ela não abre sozinha depois da assinatura — e o valor assinado já não muda.
+            </div>
+          )}
+
+          {/* Sem isto o cachê vazio parecia herança quebrada: a proposta vale para um contrato
+              só, e outro deste criador nesta campanha já a levou. */}
+          {propostaUsadaEm && (
+            <div
+              className="rounded-lg p-3 text-[12.5px] mb-4 border border-border-soft"
+              style={{ background: "var(--bg, #F9FAFB)", color: "var(--ink-2)" }}
+            >
+              <span className="font-medium" style={{ color: "var(--ink)" }}>Sem a proposta do convite:</span>{" "}
+              ela já foi usada em{" "}
+              <Link
+                to={`/operations/contracts/${propostaUsadaEm}`}
+                className="underline"
+                style={{ color: "var(--color-teal-500)" }}
+              >
+                outro contrato deste criador nesta campanha
+              </Link>
+              . Cada proposta vale para um contrato — cachê, entregáveis e prazo deste ficam para
+              você preencher.
             </div>
           )}
 
@@ -490,9 +527,12 @@ function SignaturePanel({
       {data.status === "Signed" && data.usesEscrow && !data.escrowAccountId && (
         aguardandoAutomacao(data)
           ? (
-            <p className="text-[12.5px] text-ink-muted">
-              Assinado. A custódia abre sozinha pelo valor do contrato e a reserva é pedida
-              em seguida — atualize em instantes.
+            <p className="text-[12.5px] text-ink-muted flex items-start gap-1.5">
+              <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0 mt-0.5" />
+              <span>
+                Assinado. A custódia abre sozinha pelo valor do contrato e a reserva é pedida
+                em seguida — esta tela se atualiza sozinha.
+              </span>
             </p>
           )
           : (

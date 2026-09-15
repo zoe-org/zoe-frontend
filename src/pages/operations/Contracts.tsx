@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react"
 import { Plus, X, Loader2, FileText, ShieldAlert, Trash2 } from "lucide-react"
 import { toast } from "sonner"
-import { Link, useNavigate } from "react-router-dom"
+import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { ApiError } from "@/lib/api"
 import { Input } from "@/components/ui/input"
 import { EmptyBlock } from "@/components/ui/empty-block"
@@ -48,16 +48,30 @@ export default function OperationsContractsPage() {
   const contracts = useContracts()
   const [createOpen, setCreateOpen] = useState(false)
   const [busca, setBusca] = useState("")
+  // Vem do "Ver todos" da campanha. Na URL, e não em estado, para o voltar do navegador e o
+  // link copiado levarem à mesma lista.
+  const [params, setParams] = useSearchParams()
+  const campanhaFiltro = params.get("campanha")
 
   const todos = useMemo(() => contracts.data?.items ?? [], [contracts.data])
+  // O nome vem da lista de campanhas, não dos contratos: campanha sem contrato nenhum também
+  // precisa de nome no selo, e a lista de contratos ainda carregando dizia "Campanha: campanha".
+  const campanhas = useCampaigns()
+  const nomeCampanhaFiltro = campanhaFiltro
+    ? campanhas.data?.items.find((c) => c.campaignId === campanhaFiltro)?.name ?? "…"
+    : null
+  const limparCampanha = () => setParams((p) => {
+    p.delete("campanha")
+    return p
+  })
 
   // Criador e campanha sao o que se procura; status e modalidade entram porque "assinado"
   // e "publipost" sao termos que a pessoa digita sem pensar que sao filtros.
   const items = useMemo(
-    () => todos.filter((c) => matches(
+    () => todos.filter((c) => (!campanhaFiltro || c.campaignId === campanhaFiltro) && matches(
       busca, c.influencerName, c.campaignName, tEnum("contractStatus", c.status),
       c.modality ? tEnum("contractModality", c.modality) : c.hybridCode)),
-    [todos, busca],
+    [todos, busca, campanhaFiltro],
   )
 
   return (
@@ -78,6 +92,16 @@ export default function OperationsContractsPage() {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            {nomeCampanhaFiltro && (
+              <button
+                onClick={limparCampanha}
+                title="Mostrar os contratos de todas as campanhas"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[12px] font-medium"
+                style={{ background: "var(--color-teal-50, #F0FDFB)", color: "var(--color-teal-500)" }}
+              >
+                Campanha: {nomeCampanhaFiltro} <X className="w-3 h-3" />
+              </button>
+            )}
             {todos.length > 0 && (
               <SearchBox
                 value={busca}
@@ -103,8 +127,11 @@ export default function OperationsContractsPage() {
           <TableSkeleton />
         ) : contracts.isError ? (
           <ErrorState onRetry={() => contracts.refetch()} />
-        ) : items.length === 0 && busca ? (
-          <NoResults query={busca} onClear={() => setBusca("")} />
+        ) : items.length === 0 && (busca || nomeCampanhaFiltro) ? (
+          <NoResults
+            query={busca || nomeCampanhaFiltro || ""}
+            onClear={() => { setBusca(""); limparCampanha() }}
+          />
         ) : items.length === 0 ? (
           <EmptyBlock
             className="py-16"

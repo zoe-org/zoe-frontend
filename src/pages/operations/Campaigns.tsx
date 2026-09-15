@@ -310,7 +310,11 @@ function CampaignDetailPanel({ campaignId }: { campaignId: string }) {
       <div className="rounded-xl border border-border-soft p-5" style={{ background: "var(--surface)" }}>
         <div className="flex items-center justify-between mb-3.5">
           <div className="eyebrow">Contratos ({d.contracts.length})</div>
-          <Link to="/operations/contracts" className="text-[12.5px]" style={{ color: "var(--color-teal-500)" }}>
+          <Link
+            to={`/operations/contracts?campanha=${campaignId}`}
+            className="text-[12.5px]"
+            style={{ color: "var(--color-teal-500)" }}
+          >
             Ver todos →
           </Link>
         </div>

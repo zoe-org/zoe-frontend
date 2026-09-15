@@ -42,7 +42,7 @@ export function InviteCreatorModal({
    */
   initialCampaignId?: string
 }) {
-  const { invite } = useRosterMutations()
+  const { invite, resendInvite } = useRosterMutations()
   const { data: campaignsData } = useCampaigns()
   const [tab, setTab] = useState<"roster" | "email">("roster")
   const [email, setEmail] = useState("")
@@ -55,6 +55,8 @@ export function InviteCreatorModal({
   const [search, setSearch] = useState("")
   const [sent, setSent] = useState<InviteInfluencerResponse | null>(null)
   const [copied, setCopied] = useState(false)
+  /** O convite da tela final foi reenviado, não criado. */
+  const [reenviado, setReenviado] = useState(false)
   /**
    * Convite recusado por já existir. Fica dentro do modal, junto do que a pessoa preencheu: um
    * toast some em segundos e não diz o que fazer.
@@ -87,6 +89,7 @@ export function InviteCreatorModal({
   const pick = (p: RosterItem) => {
     setEmail(p.email)
     setFullName(p.fullName)
+    setConflito(null)
   }
 
   const submit = async () => {
@@ -113,6 +116,23 @@ export function InviteCreatorModal({
         return
       }
       toast.error(e instanceof ApiError ? e.message : "Não foi possível convidar.")
+    }
+  }
+
+  // A saída do convite pendente: mesmo convite, link novo. Sem este botão a mensagem mandava
+  // "reenviar o link" e não havia onde clicar.
+  const reenviar = async () => {
+    try {
+      const res = await resendInvite.mutateAsync({
+        email: email.trim(),
+        campaignId: campaignId || undefined,
+      })
+      setConflito(null)
+      setReenviado(true)
+      setSent(res)
+      if (res.emailDelivery === "Sent") toast.success(`Convite reenviado para ${res.email}.`)
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "Não foi possível reenviar.")
     }
   }
 
@@ -144,7 +164,7 @@ export function InviteCreatorModal({
           <div>
             <div className="eyebrow mb-1">Proposta de trabalho</div>
             <h2 className="font-display m-0" style={{ fontSize: 20, color: "var(--ink)" }}>
-              {sent ? "Convite criado" : "Convidar influenciador"}
+              {sent ? (reenviado ? "Convite reenviado" : "Convite criado") : "Convidar influenciador"}
             </h2>
             {!sent && (
               <p className="text-[12.5px] text-ink-muted m-0 mt-1">
@@ -276,7 +296,7 @@ export function InviteCreatorModal({
                     label="E-mail"
                     hint="Ela ainda não está na Zoe — vai receber um convite para se cadastrar e ver a proposta."
                   >
-                    <Input value={email} onChange={(e) => setEmail(e.target.value)}
+                    <Input value={email} onChange={(e) => { setEmail(e.target.value); setConflito(null) }}
                            type="email" placeholder="criador@email.com" />
                   </Field>
                 </>
@@ -284,7 +304,7 @@ export function InviteCreatorModal({
 
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Campanha" hint="Em branco convida só para o elenco.">
-                  <Select value={campaignId} onChange={setCampaignId}>
+                  <Select value={campaignId} onChange={(v) => { setCampaignId(v); setConflito(null) }}>
                     <option value="">Sem campanha</option>
                     {campaigns.map((c) => (
                       <option key={c.campaignId} value={c.campaignId}>{c.name}</option>
@@ -351,6 +371,23 @@ export function InviteCreatorModal({
                   <a href="/operations/influencers" className="inline-block mt-1.5 underline">
                     Ver no elenco
                   </a>
+                )}
+                {conflito.code === "influencer_invite_pending" && (
+                  <div className="mt-2.5">
+                    <button
+                      onClick={reenviar}
+                      disabled={resendInvite.isPending}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-medium text-white disabled:opacity-50"
+                      style={{ background: "#D97706" }}
+                    >
+                      {resendInvite.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      Reenviar convite
+                    </button>
+                    <div className="text-[11.5px] mt-1.5" style={{ opacity: 0.9 }}>
+                      Gera um link novo para o mesmo convite, com a proposta enviada antes. O link
+                      anterior deixa de valer.
+                    </div>
+                  </div>
                 )}
               </div>
             )}

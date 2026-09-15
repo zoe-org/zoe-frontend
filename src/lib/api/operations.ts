@@ -480,6 +480,8 @@ export type ContractDetail = {
   signatureProviderLive?: boolean
   /** Valor total declarado no contrato, em centavos, quando legível — o que a custódia reserva. */
   declaredTotalCents?: number | null
+  /** Rascunho que ficou sem a proposta do convite porque outro contrato a levou — é este. */
+  proposalUsedByContractId?: string | null
   /** Custódia já aberta. Nulo com usesEscrow = a tela oferece abrir. */
   escrowAccountId: string | null
   escrowState: string | null
@@ -625,6 +627,14 @@ export const operationsApi = {
   inviteToRoster: (body: InviteInfluencerBody) =>
     apiClient.post<InviteInfluencerResponse>("/api/operations/influencers/invites", body),
 
+  // Reenvio do convite pendente: o mesmo convite com link novo. A proposta enviada não muda.
+  resendInfluencerInvite: (email: string, campaignId?: string) =>
+    apiClient.post<InviteInfluencerResponse>(
+      campaignId
+        ? `/api/operations/campaigns/${campaignId}/invites/resend`
+        : "/api/operations/influencers/invites/resend",
+      { email }),
+
   inviteInfluencer: (campaignId: string, body: InviteInfluencerBody) =>
     apiClient.post<InviteInfluencerResponse>(
       `/api/operations/campaigns/${campaignId}/invites`, body),
@@ -760,12 +770,32 @@ export function useContractMutations() {
   }
 }
 
+/**
+ * De quanto em quanto tempo o detalhe do contrato se atualiza sozinho, ou `false`.
+ *
+ * <p>Enquanto a tela espera um passo que acontece fora dela — a assinatura (webhook ou consulta
+ * periódica) e, com pagamento automático, a custódia abrindo e reservando — ela vai buscar.
+ * Antes dizia "atualize em instantes" e dependia de F5.</p>
+ */
+export function intervaloDeEspera(d: ContractDetail | undefined, now: number = Date.now()): number | false {
+  if (!d) return false
+  if (d.status === "SentForSignature") return 30_000
+
+  const abrindoCustodia = d.status === "Signed" && d.usesEscrow && Boolean(d.autoAdvanceEscrow)
+    && (!d.escrowAccountId || d.escrowState === "PendingDeposit")
+  // Janela curta: passado isso, algo impediu a abertura e a tela já oferece fazer à mão.
+  if (abrindoCustodia && d.signedAt && now - Date.parse(d.signedAt) < 10 * 60_000) return 4_000
+
+  return false
+}
+
 export function useContract(contractId: string | undefined) {
   const { activeTenantId } = useAuth()
   return useQuery({
     queryKey: ["operations-contract", activeTenantId, contractId],
     queryFn: ({ signal }) => operationsApi.getContract(contractId!, { signal }),
     enabled: Boolean(activeTenantId && contractId),
+    refetchInterval: (query) => intervaloDeEspera(query.state.data),
   })
 }
 
@@ -1152,6 +1182,11 @@ export function useRosterMutations() {
         // O detalhe da campanha conta criadores: aberto atrás do modal, ficaria desatualizado.
         qc.invalidateQueries({ queryKey: ["operations-campaign", activeTenantId] })
       },
+    }),
+    // Nada a invalidar: reenviar não muda elenco, contagem nem proposta — só o link.
+    resendInvite: useMutation({
+      mutationFn: (v: { email: string; campaignId?: string }) =>
+        operationsApi.resendInfluencerInvite(v.email, v.campaignId),
     }),
   }
 }
