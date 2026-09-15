@@ -53,6 +53,9 @@ export default function OperationsContractsPage() {
   // link copiado levarem à mesma lista.
   const [params, setParams] = useSearchParams()
   const campanhaFiltro = params.get("campanha")
+  // "?novo=1" abre o modal; com "campanha" e "criador" ele já vem escolhido — é o "Criar
+  // contrato" do funil da campanha.
+  const abrirPorLink = params.get("novo") === "1"
 
   const todos = useMemo(() => contracts.data?.items ?? [], [contracts.data])
   // O nome vem da lista de campanhas, não dos contratos: campanha sem contrato nenhum também
@@ -217,7 +220,22 @@ export default function OperationsContractsPage() {
         )}
       </section>
 
-      {createOpen && <CreateContractModal onClose={() => setCreateOpen(false)} />}
+      {(createOpen || abrirPorLink) && (
+        <CreateContractModal
+          initialCampaignId={abrirPorLink ? campanhaFiltro ?? undefined : undefined}
+          initialInfluencerId={abrirPorLink ? params.get("criador") ?? undefined : undefined}
+          onClose={() => {
+            setCreateOpen(false)
+            if (abrirPorLink) {
+              setParams((p) => {
+                p.delete("novo")
+                p.delete("criador")
+                return p
+              })
+            }
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -276,17 +294,23 @@ function ExcluirRascunho({ item }: { item: ContractSummary }) {
   )
 }
 
-function CreateContractModal({ onClose }: { onClose: () => void }) {
+function CreateContractModal({
+  onClose, initialCampaignId, initialInfluencerId,
+}: {
+  onClose: () => void
+  initialCampaignId?: string
+  initialInfluencerId?: string
+}) {
   const roster = useRoster()
   const campaigns = useCampaigns()
   const { create } = useContractMutations()
   const navigate = useNavigate()
   const contratosExistentes = useContracts()
 
-  const [campaignId, setCampaignId] = useState("")
+  const [campaignId, setCampaignId] = useState(initialCampaignId ?? "")
   /** Modalidade do avulso. Ignorada quando há campanha — lá ela é quem manda. */
   const [avulsaModality, setAvulsaModality] = useState("")
-  const [influencerId, setInfluencerId] = useState("")
+  const [influencerId, setInfluencerId] = useState(initialInfluencerId ?? "")
   const [usesEscrow, setUsesEscrow] = useState(true)
   /**
    * Ligado por padrão: é o fluxo que a regra descreve (assinado → depósito → produção →
@@ -382,8 +406,10 @@ function CreateContractModal({ onClose }: { onClose: () => void }) {
     const body: CreateContractBody = {
       campaignId: campaignId || null,
       influencerId,
-      usesEscrow,
-      autoAdvanceEscrow: usesEscrow && autoAdvance,
+      // Campanha que veio pelo link não passou por changeCampaign: a modalidade dela decide
+      // aqui, senão uma permuta sairia pedindo custódia e voltaria recusada.
+      usesEscrow: usesEscrow && !escrowBlocked,
+      autoAdvanceEscrow: usesEscrow && !escrowBlocked && autoAdvance,
       modality: campaignId ? undefined : avulsaModality,
       reviewSlaDays: Number(reviewSlaDays) || undefined,
       maxResubmissions: Number(maxResubmissions) || undefined,
@@ -562,7 +588,7 @@ function CreateContractModal({ onClose }: { onClose: () => void }) {
                 <label className="flex items-start gap-2.5 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={usesEscrow}
+                    checked={usesEscrow && !escrowBlocked}
                     disabled={Boolean(escrowBlocked) || !modality}
                     onChange={(e) => setUsesEscrow(e.target.checked)}
                     className="mt-0.5 accent-[var(--color-teal-500)] disabled:opacity-40"

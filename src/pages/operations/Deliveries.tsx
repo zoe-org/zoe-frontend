@@ -74,7 +74,10 @@ const SEM_CAMPANHA = "avulso"
 export default function OperationsDeliveriesPage() {
   // Os dois portões são momentos distintos do processo — cortes por aprovar e vídeos já
   // publicados. Numa lista só, a distinção some e alguém aprova o que não pretendia.
-  const [gate, setGate] = useState<Gate>("published")
+  // "?etapa=cortes" abre direto no primeiro portão: é para onde o Painel manda quem tem corte
+  // esperando, e cair em "Entregas publicadas" fazia parecer que não havia nada.
+  const [params] = useSearchParams()
+  const [gate, setGate] = useState<Gate>(() => (params.get("etapa") === "cortes" ? "drafts" : "published"))
   const deliveries = useDeliveries()
   const drafts = useDeliveryDrafts()
 

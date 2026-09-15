@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { SearchBox } from "@/pages/operations/shared"
 import { matches } from "@/pages/operations/format"
 import {
-  useContractDefaults, useUpdateContractDefaults, ESSENTIAL_CONTRACT_DEFAULTS,
+  useContractDefaults, useUpdateContractDefaults, ESSENTIAL_CONTRACT_DEFAULTS, useCampaigns, useContracts,
   type ContractDefaultField,
 } from "@/lib/api/operations"
 
@@ -38,6 +38,17 @@ export function ContractDefaultsTab({ isAdmin }: { isAdmin: boolean }) {
   const [edits, setEdits] = useState<Record<string, string>>({})
   const [mostrarTodos, setMostrarTodos] = useState(false)
   const [busca, setBusca] = useState("")
+  const [todasModalidades, setTodasModalidades] = useState(false)
+
+  // Modalidades que a marca de fato usa, pelas campanhas e contratos. O catálogo traz campos de
+  // todos os templates publicados, e quem só faz publipost rolava dezenas de campos de permuta
+  // e eventos que nunca vão aparecer num contrato seu.
+  const campanhas = useCampaigns()
+  const contratos = useContracts()
+  const usadas = useMemo(() => new Set<string>([
+    ...(campanhas.data?.items ?? []).map((c) => c.modality),
+    ...(contratos.data?.items ?? []).map((c) => c.modality).filter((m): m is string => Boolean(m)),
+  ]), [campanhas.data, contratos.data])
 
   const campos = useMemo(() => defaults.data?.fields ?? [], [defaults.data])
 
@@ -48,12 +59,16 @@ export function ContractDefaultsTab({ isAdmin }: { isAdmin: boolean }) {
       .filter((c): c is ContractDefaultField => Boolean(c))
   }, [campos])
 
-  const outros = useMemo(() => {
+  const naoEssenciais = useMemo(() => {
     const essenciaisSet = new Set<string>(ESSENTIAL_CONTRACT_DEFAULTS)
-    return campos
-      .filter((c) => !essenciaisSet.has(c.placeholder))
-      .filter((c) => matches(busca, c.label, c.helpText, c.placeholder))
-  }, [campos, busca])
+    return campos.filter((c) => !essenciaisSet.has(c.placeholder))
+  }, [campos])
+
+  // Sem modalidade conhecida (marca nova, nada criado ainda) mostra tudo: esconder por falta de
+  // dado faria o catálogo parecer vazio.
+  const daMarca = naoEssenciais.filter((c) => !c.modalities?.length || c.modalities.some((m) => usadas.has(m)))
+  const visiveis = usadas.size > 0 && !todasModalidades ? daMarca : naoEssenciais
+  const outros = visiveis.filter((c) => matches(busca, c.label, c.helpText, c.placeholder))
 
   const definidos = campos.filter((c) => (c.value ?? "").trim()).length
   const dirty = Object.keys(edits).length > 0
@@ -161,7 +176,7 @@ export function ContractDefaultsTab({ isAdmin }: { isAdmin: boolean }) {
               className="w-3.5 h-3.5 transition-transform"
               style={{ transform: mostrarTodos ? "rotate(180deg)" : undefined }}
             />
-            {mostrarTodos ? "Esconder os demais campos" : `Mostrar os demais campos (${campos.length - essenciais.length})`}
+            {mostrarTodos ? "Esconder os demais campos" : `Mostrar os demais campos (${visiveis.length})`}
           </button>
 
           {mostrarTodos && (
@@ -169,7 +184,18 @@ export function ContractDefaultsTab({ isAdmin }: { isAdmin: boolean }) {
               className="mt-3 rounded-xl border border-border-soft p-5"
               style={{ background: "var(--surface)" }}
             >
-              <SearchBox value={busca} onChange={setBusca} placeholder="Buscar campo…" className="w-full sm:max-w-[320px] mb-4" />
+              <SearchBox value={busca} onChange={setBusca} placeholder="Buscar campo…" className="w-full sm:max-w-[320px] mb-3" />
+              {usadas.size > 0 && naoEssenciais.length > daMarca.length && (
+                <label className="flex items-center gap-2 text-[12px] text-ink-muted mb-4 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={todasModalidades}
+                    onChange={(e) => setTodasModalidades(e.target.checked)}
+                    className="accent-[var(--color-teal-500)]"
+                  />
+                  Incluir campos de modalidades que você não usa ({naoEssenciais.length - daMarca.length})
+                </label>
+              )}
               {outros.length === 0 ? (
                 <p className="text-[12.5px] text-ink-muted m-0">Nenhum campo com esse nome.</p>
               ) : (

@@ -8,6 +8,19 @@ import { fmtDate } from "@/pages/operations/format"
 import { useDraftUpload, type CreatorEngagement } from "@/lib/api/creator"
 
 /**
+ * Teto de um PUT único no S3. Acima disso o storage recusa depois de a pessoa esperar o arquivo
+ * inteiro subir — melhor dizer antes de começar.
+ */
+const LIMITE_BYTES = 5 * 1024 ** 3
+
+const FORMATOS = ["video/mp4", "video/quicktime", "video/x-matroska", "video/webm"]
+
+function fmtRestante(ms: number): string {
+  if (ms < 60_000) return "menos de 1 min"
+  return `~${Math.ceil(ms / 60_000)} min`
+}
+
+/**
  * Primeiro dos dois portões, do lado do criador: subir o corte para a marca ver **antes**
  * de publicar.
  *
@@ -26,6 +39,28 @@ export function CreatorDraftUpload({ engagement }: { engagement: CreatorEngageme
   const [notes, setNotes] = useState("")
   const [arrastando, setArrastando] = useState(false)
   const [progresso, setProgresso] = useState(0)
+  /** Estimativa pelo ritmo até agora. Nulo no começo, quando o ritmo ainda não diz nada. */
+  const [restanteMs, setRestanteMs] = useState<number | null>(null)
+  const inicio = useRef(0)
+
+  // Tamanho e formato conferidos na escolha: a recusa do servidor chegava só depois de o
+  // arquivo inteiro subir.
+  const escolher = (f: File | null) => {
+    const recusar = (motivo: string) => {
+      toast.error(motivo)
+      if (inputRef.current) inputRef.current.value = ""
+    }
+    if (f && f.size > LIMITE_BYTES) {
+      recusar(`O arquivo tem ${(f.size / 1024 ** 3).toFixed(1)} GB — o limite é 5 GB. Exporte com resolução ou bitrate menor.`)
+      return
+    }
+    // Tipo vazio acontece com .mkv em alguns sistemas: passa, e o servidor decide.
+    if (f && f.type && !FORMATOS.includes(f.type)) {
+      recusar("Formato não aceito. Envie o vídeo em MP4, MOV, MKV ou WebM.")
+      return
+    }
+    setFile(f)
+  }
 
   const draft = engagement.draft
   const changesRequested = draft?.status === "ChangesRequested"
@@ -36,11 +71,16 @@ export function CreatorDraftUpload({ engagement }: { engagement: CreatorEngageme
     if (!file) return
     try {
       setProgresso(0)
+      setRestanteMs(null)
+      inicio.current = Date.now()
       await upload.mutateAsync({
         contractId: engagement.contractId,
         file,
         notes,
-        onProgress: setProgresso,
+        onProgress: (fracao) => {
+          setProgresso(fracao)
+          if (fracao > 0.02) setRestanteMs(((Date.now() - inicio.current) / fracao) * (1 - fracao))
+        },
       })
       setFile(null)
       setNotes("")
@@ -133,7 +173,7 @@ export function CreatorDraftUpload({ engagement }: { engagement: CreatorEngageme
                 ref={inputRef}
                 type="file"
                 accept="video/mp4,video/quicktime,video/x-matroska,video/webm"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                onChange={(e) => escolher(e.target.files?.[0] ?? null)}
                 className="hidden"
               />
 
@@ -147,7 +187,7 @@ export function CreatorDraftUpload({ engagement }: { engagement: CreatorEngageme
                     e.preventDefault()
                     setArrastando(false)
                     const f = e.dataTransfer.files?.[0]
-                    if (f) setFile(f)
+                    if (f) escolher(f)
                   }}
                   className="rounded-lg border-2 border-dashed px-4 py-6 text-center transition-colors"
                   style={{
@@ -163,7 +203,7 @@ export function CreatorDraftUpload({ engagement }: { engagement: CreatorEngageme
                     Arraste o vídeo aqui ou clique para escolher
                   </div>
                   <div className="text-[11.5px] text-ink-muted mt-1">
-                    MP4, MOV, MKV ou WebM
+                    MP4, MOV, MKV ou WebM · até 5 GB
                   </div>
                 </button>
               ) : (
@@ -231,7 +271,7 @@ export function CreatorDraftUpload({ engagement }: { engagement: CreatorEngageme
                   <p className="text-[11.5px] text-ink-muted m-0">
                     {progresso >= 1
                       ? "Finalizando…"
-                      : `${Math.round(progresso * 100)}% enviado — não feche esta aba.`}
+                      : `${Math.round(progresso * 100)}% enviado${restanteMs != null ? ` · faltam ${fmtRestante(restanteMs)}` : ""} — não feche esta aba até terminar.`}
                   </p>
                 </div>
               )}

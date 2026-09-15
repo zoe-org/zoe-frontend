@@ -52,7 +52,7 @@ export function funilDaCampanha(
       const convites = (d.invites ?? []).filter((i) => i.influencerId === influencerId)
       const convite = convites.find((i) => i.accepted) ?? convites[0]
       if (convite?.accepted) {
-        linhas.push({ ...base, etapa: "Aceitou — sem contrato", tom: "atencao", acao: { label: "Criar contrato", to: "/operations/contracts" } })
+        linhas.push({ ...base, etapa: "Aceitou — sem contrato", tom: "atencao", acao: { label: "Criar contrato", to: `/operations/contracts?novo=1&campanha=${d.campaignId}&criador=${influencerId}` } })
       } else if (convite?.expired) {
         linhas.push({ ...base, etapa: "Convite vencido", tom: "neutro", acao: null })
       } else {

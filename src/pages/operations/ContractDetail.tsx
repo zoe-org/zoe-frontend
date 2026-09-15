@@ -220,8 +220,10 @@ export default function ContractDetailPage() {
           {valorIlegivel && (
             <div className="rounded-lg p-3 text-[12.5px] mb-4" style={{ background: "#D9770615", color: "#B45309" }}>
               <span className="font-medium">{campoValorTotal?.label ?? "Valor total"} ilegível:</span>{" "}
-              “{valorTotalSalvo}” não é um valor em reais que a custódia consiga ler (ex.: 5.000,00).
-              Assim, ela não abre sozinha depois da assinatura — e o valor assinado já não muda.
+              “{valorTotalSalvo}” não é um valor em reais que a custódia consiga ler (ex.: 5.000,00).{" "}
+              {data.autoAdvanceEscrow
+                ? "Com pagamento automático, o envio para assinatura é recusado até corrigir."
+                : "Assim, ela não abre sozinha depois da assinatura — e o valor assinado já não muda."}
             </div>
           )}
 

@@ -1287,6 +1287,8 @@ export type ContractDefaultField = {
   kind: string
   helpText: string | null
   value: string | null
+  /** Modalidades cujos templates usam o campo. */
+  modalities?: string[]
 }
 
 export type ContractDefaults = { fields: ContractDefaultField[] }

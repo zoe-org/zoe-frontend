@@ -88,7 +88,7 @@ function PendingPanel({ pending: p }: { pending: OperationsDashboard["pending"] 
       n: p.draftsAwaitingReview,
       rotulo: p.draftsAwaitingReview === 1 ? "corte por aprovar" : "cortes por aprovar",
       detalhe: "O criador espera o aval antes de publicar.",
-      href: "/operations/deliveries",
+      href: "/operations/deliveries?etapa=cortes",
       icon: <Film className="w-4 h-4" />,
       urgente: true,
     },
