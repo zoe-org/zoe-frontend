@@ -4,6 +4,7 @@ import {
   ArrowLeft, Loader2, AlertCircle, Lock, Send, Save, PenLine, ChevronRight, BookmarkPlus, RefreshCw,
 } from "lucide-react"
 import { toast } from "sonner"
+import { parseBRLToCents } from "@/lib/money"
 import { ApiError } from "@/lib/api"
 import { Input } from "@/components/ui/input"
 import { RoleGate } from "@/features/auth/RoleGate"
@@ -597,13 +598,13 @@ function OpenEscrowPanel({
   // que digitar. O campo só aparece quando o contrato não traz valor que dê para ler.
   const temValorDoContrato = declaredTotalCents != null && declaredTotalCents > 0
 
-  const cents = Math.round(Number(amount.replace(/\./g, "").replace(",", ".")) * 100)
-  const valid = temValorDoContrato || (Number.isFinite(cents) && cents > 0)
+  const cents = parseBRLToCents(amount)
+  const valid = temValorDoContrato || (cents !== null && cents > 0)
 
   const submit = async () => {
     if (!valid) return
     try {
-      await open.mutateAsync(temValorDoContrato ? { contractId } : { contractId, amountCents: cents })
+      await open.mutateAsync(temValorDoContrato ? { contractId } : { contractId, amountCents: cents ?? undefined })
       toast.success("Custódia aberta. O próximo passo é o depósito.")
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Não foi possível abrir a custódia.")

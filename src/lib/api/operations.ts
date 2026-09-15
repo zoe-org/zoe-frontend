@@ -145,11 +145,27 @@ export type CampaignBriefingInput = Partial<{
   defaultAuditThreshold: number
 }>
 
+/** Convite da campanha, com a proposta — é o que o novo contrato herda. */
+export type CampaignInvite = {
+  inviteId: string
+  influencerId: string
+  influencerName: string
+  email: string
+  accepted: boolean
+  expired: boolean
+  createdAt: string
+  feeCents: number | null
+  expectedDeliverables: string | null
+  deliveryDeadline: string | null
+}
+
 export type CampaignDetail = Omit<CampaignSummary, "contractCount"> & {
   notes: string | null
   briefing: CampaignBriefing
   contracts: CampaignContract[]
   deliveries: CampaignDelivery[]
+  /** Do mais novo ao mais antigo. */
+  invites?: CampaignInvite[]
 }
 
 export type CreateCampaignBody = {

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { Loader2, Wallet, AlertTriangle, Clock, X } from "lucide-react"
 import { toast } from "sonner"
+import { useEscapeKey } from "@/lib/useEscapeKey"
 import { ApiError } from "@/lib/api"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { RoleGate } from "@/features/auth/RoleGate"
@@ -323,6 +324,7 @@ function EscrowRow({
 
 function EscrowDrawer({ e, onClose }: { e: EscrowSummary; onClose: () => void }) {
   const { apply } = useEscrowMutations()
+  useEscapeKey(onClose)
 
   const can = (action: EscrowAction) => e.allowedTriggers.includes(ESCROW_ACTION_TRIGGER[action])
 

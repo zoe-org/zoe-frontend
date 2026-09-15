@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react"
 import { X, Loader2, Copy, Check } from "lucide-react"
 import { toast } from "sonner"
+import { useEscapeKey } from "@/lib/useEscapeKey"
+import { parseBRLToCents } from "@/lib/money"
 import { ApiError } from "@/lib/api"
 import { Input } from "@/components/ui/input"
 import { tEnum } from "@/i18n/enums"
@@ -57,6 +59,7 @@ export function InviteCreatorModal({
   const [copied, setCopied] = useState(false)
   /** O convite da tela final foi reenviado, não criado. */
   const [reenviado, setReenviado] = useState(false)
+  useEscapeKey(onClose)
   /**
    * Convite recusado por já existir. Fica dentro do modal, junto do que a pessoa preencheu: um
    * toast some em segundos e não diz o que fazer.
@@ -94,7 +97,11 @@ export function InviteCreatorModal({
 
   const submit = async () => {
     try {
-      const cents = fee.trim() ? Math.round(Number(fee.replace(",", ".")) * 100) : undefined
+      const cents = fee.trim() ? parseBRLToCents(fee) : undefined
+      if (cents === null) {
+        toast.error("Cachê inválido — use o formato 12.000,00.")
+        return
+      }
 
       const res = await invite.mutateAsync({
         campaignId: campaignId || undefined,
@@ -338,7 +345,7 @@ export function InviteCreatorModal({
                         onChange={(e) => setFee(e.target.value)}
                         disabled={isBarter}
                         inputMode="decimal"
-                        placeholder={isBarter ? "permuta" : "12000"}
+                        placeholder={isBarter ? "permuta" : "12.000,00"}
                       />
                     </Field>
                     <Field label="Prazo de entrega">

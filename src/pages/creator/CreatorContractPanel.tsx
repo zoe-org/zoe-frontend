@@ -60,9 +60,15 @@ const ESCROW_NOTE: Record<string, string> = {
  * depois o que foi combinado só neste contrato, e por último as cláusulas — que são o
  * texto padrão da modalidade e o que menos distingue um contrato do outro.</p>
  */
-export function CreatorContractPanel({ engagements }: { engagements: CreatorEngagement[] }) {
+export function CreatorContractPanel({
+  engagements, initialContractId,
+}: {
+  engagements: CreatorEngagement[]
+  /** Contrato aberto ao entrar — quando a pessoa chega por "Assinar o contrato". */
+  initialContractId?: string | null
+}) {
   const [selected, setSelected] = useState<string | null>(
-    engagements[0]?.contractId ?? null)
+    initialContractId ?? engagements[0]?.contractId ?? null)
 
   if (engagements.length === 0) {
     return (

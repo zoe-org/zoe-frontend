@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import { DeliveryDrafts } from "@/pages/operations/DeliveryDrafts"
-import { Link } from "react-router-dom"
+import { Link, useSearchParams } from "react-router-dom"
 import {
   X, Loader2, Play, Check, RotateCcw, Ban, ExternalLink, Clock, AlertTriangle,
 } from "lucide-react"
@@ -117,11 +117,24 @@ function PublishedQueue({
   onRetry: () => void
 }) {
   const wide = useIsWide()
-  const [aba, setAba] = useState<Aba>("pending")
+  // Vindo do detalhe da campanha, a fila já abre filtrada por ela — e no contrato clicado.
+  const [params] = useSearchParams()
+  const contratoInicial = params.get("contrato")
+  const [abaEscolhida, setAba] = useState<Aba | null>(null)
   const [busca, setBusca] = useState("")
-  const [campanha, setCampanha] = useState("")
+  const [campanha, setCampanha] = useState(() => params.get("campanha") ?? "")
   /** Por contrato, não por entrega: o reenvio do criador continua selecionado. */
-  const [selected, setSelected] = useState<string | null>(null)
+  const [selected, setSelected] = useState<string | null>(contratoInicial)
+
+  // Sem escolha da pessoa, "Aguardando" — a menos que o que veio pelo link não tenha nada
+  // esperando: abrir numa aba vazia fazia o "Ver todas" da campanha parecer quebrado.
+  const aba: Aba = abaEscolhida ?? (
+    (campanha || contratoInicial) && !grupos.some((g) =>
+      PENDENTE.has(g.current.status)
+      && (!campanha || (g.current.campaignId ?? SEM_CAMPANHA) === campanha)
+      && (!contratoInicial || g.current.contractId === contratoInicial))
+      ? "all"
+      : "pending")
 
   const counts = useMemo(
     () => Object.fromEntries(
@@ -207,7 +220,7 @@ function PublishedQueue({
         </div>
         {hasItems && (
           <div className="flex gap-2 flex-wrap items-center">
-            {campanhas.length > 1 && (
+            {(campanhas.length > 1 || campanha) && (
               <select
                 value={campanha}
                 onChange={(e) => setCampanha(e.target.value)}

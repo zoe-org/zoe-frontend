@@ -1,8 +1,8 @@
 import { useState } from "react"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import {
-  Loader2, LogOut, Upload, Wallet, ExternalLink, AlertCircle, Play, FileText, Megaphone,
-  UserRoundPen,
+  Loader2, LogOut, Upload, ExternalLink, AlertCircle, Play, FileText, Megaphone,
+  UserRoundPen, ListChecks,
 } from "lucide-react"
 import { toast } from "sonner"
 import { ApiError } from "@/lib/api"
@@ -19,6 +19,7 @@ import {
 } from "@/lib/api/creator"
 import { CreatorContractPanel } from "@/pages/creator/CreatorContractPanel"
 import { CreatorDraftUpload } from "@/pages/creator/CreatorDraftUpload"
+import { proximosPassos, type ProximoPasso } from "@/pages/creator/nextSteps"
 import ZoeLogo from "@/assets/zoe-logo.svg?react"
 
 const DELIVERY_COLOR: Record<string, string> = {
@@ -68,7 +69,8 @@ function TaxIdCard({ current }: { current: string | null }) {
   return (
     <form
       onSubmit={submit}
-      className="rounded-xl border border-border-soft p-5 mb-4"
+      id="documento"
+      className="rounded-xl border border-border-soft p-5 mb-4 scroll-mt-6"
       style={{ background: "var(--surface)" }}
     >
       <div className="flex items-start gap-2.5 mb-1">
@@ -109,6 +111,28 @@ export default function CreatorHomePage() {
   const { user, signOut } = useAuth()
   const workspace = useCreatorWorkspace()
   const [tab, setTab] = useState<"campanhas" | "contratos">("campanhas")
+  const navigate = useNavigate()
+  /** Contrato que "Assinar o contrato" pediu para abrir na aba de contratos. */
+  const [focoContrato, setFocoContrato] = useState<string | null>(null)
+
+  const rolarAte = (id: string) =>
+    // Depois da troca de aba: o card de destino só existe no próximo render.
+    setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 60)
+
+  const irPara = (p: ProximoPasso) => {
+    const destino = p.destino
+    if ("rota" in destino) {
+      navigate(destino.rota)
+    } else if ("ancora" in destino) {
+      rolarAte(destino.ancora)
+    } else if (destino.aba === "contratos") {
+      setFocoContrato(destino.contractId)
+      setTab("contratos")
+    } else {
+      setTab("campanhas")
+      rolarAte(`trabalho-${destino.contractId}`)
+    }
+  }
 
   const d = workspace.data
 
@@ -166,30 +190,13 @@ export default function CreatorHomePage() {
                 : `Você tem ${d.engagements.length} ${d.engagements.length === 1 ? "contrato" : "contratos"}.`}
             </p>
 
-            {!d.canReceivePayout && d.payoutBlockedReason && (
-              <div
-                className="rounded-xl border border-border-soft p-4 mb-6 flex items-start gap-3"
-                style={{ background: "#D9770610" }}
-              >
-                <Wallet className="w-4 h-4 mt-0.5 shrink-0" style={{ color: "#D97706" }} />
-                <div>
-                  <div className="text-[13px] font-medium mb-0.5" style={{ color: "#D97706" }}>
-                    Conta de recebimento pendente
-                  </div>
-                  <p className="text-[12.5px] text-ink-muted m-0">{d.payoutBlockedReason}</p>
-                  {/* O texto anterior dizia "você não precisa fazer nada agora", verdade
-                      enquanto o Connect não existia. Agora existe, e mandar o criador
-                      esperar seria travar o pagamento dele por informação velha. */}
-                  <Link
-                    to="/criador/recebimento"
-                    className="inline-flex items-center gap-1.5 text-[12.5px] font-medium mt-2"
-                    style={{ color: "#D97706" }}
-                  >
-                    Conectar conta de recebimento <ExternalLink className="w-3 h-3" />
-                  </Link>
-                </div>
-              </div>
-            )}
+            {/* A conta de recebimento vive no card de próximos passos. Existia um banner só
+                para ela logo acima, e os dois diziam a mesma coisa um embaixo do outro. */}
+            <ProximosPassosCard
+              passos={proximosPassos(d)}
+              temTrabalho={d.engagements.length > 0}
+              onIr={irPara}
+            />
 
             {/* Duas abas, como o time definiu: acompanhar o trabalho e ler o contrato
                 são momentos diferentes, e misturá-los numa lista só faz o contrato
@@ -200,14 +207,19 @@ export default function CreatorHomePage() {
                 onClick={() => setTab("campanhas")}
                 icon={<Megaphone className="w-3.5 h-3.5" />}
                 label="Campanhas"
-                count={d.engagements.length}
+                badge={String(d.engagements.length)}
               />
+              {/* As duas abas mostravam o mesmo número — são o mesmo conjunto de trabalhos.
+                  Em contratos, o que vale contar é o que espera a assinatura dele. */}
               <TabButton
                 active={tab === "contratos"}
                 onClick={() => setTab("contratos")}
                 icon={<FileText className="w-3.5 h-3.5" />}
                 label="Contratos"
-                count={d.engagements.length}
+                badge={(() => {
+                  const n = d.engagements.filter((e) => e.contractStatus === "SentForSignature").length
+                  return n > 0 ? `${n} para assinar` : undefined
+                })()}
               />
             </div>
 
@@ -247,7 +259,11 @@ export default function CreatorHomePage() {
                 ))}
               </div>
             ) : (
-              <CreatorContractPanel engagements={d.engagements} />
+              <CreatorContractPanel
+                key={focoContrato ?? "inicio"}
+                engagements={d.engagements}
+                initialContractId={focoContrato}
+              />
             )}
           </>
         ) : null}
@@ -256,14 +272,73 @@ export default function CreatorHomePage() {
   )
 }
 
+/**
+ * O que depende do criador agora, no topo da área. Pensado para o celular: é a primeira coisa
+ * que aparece, e cada linha leva direto ao lugar de fazer.
+ */
+function ProximosPassosCard({
+  passos, temTrabalho, onIr,
+}: {
+  passos: ProximoPasso[]
+  temTrabalho: boolean
+  onIr: (p: ProximoPasso) => void
+}) {
+  if (passos.length === 0) {
+    if (!temTrabalho) return null
+    return (
+      <div
+        className="rounded-xl border border-border-soft p-4 mb-4 text-[13px] text-ink-muted"
+        style={{ background: "var(--surface)" }}
+      >
+        Nada pendente com você agora — a próxima etapa é da marca.
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className="rounded-xl border p-4 mb-4"
+      style={{ background: "var(--surface)", borderColor: "var(--color-teal-500)" }}
+    >
+      <div className="flex items-center gap-2 mb-2">
+        <ListChecks className="w-4 h-4" style={{ color: "var(--color-teal-500)" }} />
+        <div className="text-[13.5px] font-semibold" style={{ color: "var(--ink)" }}>
+          O que você precisa fazer agora
+        </div>
+      </div>
+      <ol className="m-0 p-0 list-none flex flex-col gap-0.5">
+        {passos.map((p, i) => (
+          <li key={p.chave}>
+            <button
+              onClick={() => onIr(p)}
+              className="w-full text-left flex items-start gap-2.5 rounded-lg px-2 py-2 hover:bg-[#FAFBFC] dark:hover:bg-[#181B28] transition-colors"
+            >
+              <span
+                className="w-5 h-5 rounded-full grid place-items-center text-[11px] font-semibold text-white shrink-0 mt-0.5"
+                style={{ background: "var(--color-teal-500)" }}
+              >
+                {i + 1}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[13px] font-medium" style={{ color: "var(--ink)" }}>{p.titulo}</span>
+                <span className="block text-[12px] text-ink-muted">{p.detalhe}</span>
+              </span>
+            </button>
+          </li>
+        ))}
+      </ol>
+    </div>
+  )
+}
+
 function TabButton({
-  active, onClick, icon, label, count,
+  active, onClick, icon, label, badge,
 }: {
   active: boolean
   onClick: () => void
   icon: React.ReactNode
   label: string
-  count: number
+  badge?: string
 }) {
   return (
     <button
@@ -275,7 +350,7 @@ function TabButton({
     >
       {icon}
       {label}
-      <span className="font-normal" style={{ opacity: 0.75 }}>({count})</span>
+      {badge && <span className="font-normal" style={{ opacity: 0.75 }}>({badge})</span>}
     </button>
   )
 }
@@ -303,7 +378,11 @@ function EngagementCard({ e }: { e: CreatorEngagement }) {
   }
 
   return (
-    <div className="rounded-xl border border-border-soft p-5" style={{ background: "var(--surface)" }}>
+    <div
+      id={`trabalho-${e.contractId}`}
+      className="rounded-xl border border-border-soft p-5 scroll-mt-6"
+      style={{ background: "var(--surface)" }}
+    >
       <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
         <div>
           <div className="eyebrow mb-1">{e.brandName}</div>

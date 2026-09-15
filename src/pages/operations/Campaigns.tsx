@@ -5,6 +5,8 @@ import {
   Pencil, Play, CheckCircle2, Ban,
 } from "lucide-react"
 import { toast } from "sonner"
+import { useEscapeKey } from "@/lib/useEscapeKey"
+import { parseBRLToCents, centsToBRLInput } from "@/lib/money"
 import { ApiError } from "@/lib/api"
 import { Input } from "@/components/ui/input"
 import { EmptyBlock } from "@/components/ui/empty-block"
@@ -342,14 +344,25 @@ function CampaignDetailPanel({ campaignId }: { campaignId: string }) {
 
       {/* Entregas */}
       <div className="rounded-xl border border-border-soft p-5" style={{ background: "var(--surface)" }}>
-        <div className="eyebrow mb-3.5">Entregas ({d.deliveries.length})</div>
+        <div className="flex items-center justify-between mb-3.5">
+          <div className="eyebrow">Entregas ({d.deliveries.length})</div>
+          <Link
+            to={`/operations/deliveries?campanha=${campaignId}`}
+            className="text-[12.5px]"
+            style={{ color: "var(--color-teal-500)" }}
+          >
+            Ver todas →
+          </Link>
+        </div>
         {d.deliveries.length === 0 ? (
           <div className="text-[12.5px] text-ink-muted">Nenhuma entrega ainda.</div>
         ) : (
           d.deliveries.map((dl, i) => (
-            <div
+            // Cada linha abre a fila já no contrato dela, como a linha de contrato abre o contrato.
+            <Link
               key={dl.deliveryId}
-              className="flex items-center gap-3 py-2.5"
+              to={`/operations/deliveries?campanha=${campaignId}&contrato=${dl.contractId}`}
+              className="flex items-center gap-3 py-2.5 hover:opacity-80 transition-opacity"
               style={{ borderTop: i === 0 ? undefined : "1px solid var(--border-soft)" }}
             >
               <span className="flex-1 text-[13px] truncate" style={{ color: "var(--ink)" }}>
@@ -359,7 +372,7 @@ function CampaignDetailPanel({ campaignId }: { campaignId: string }) {
                 <span className="text-[11px]" style={{ color: "#D97706" }}>prazo vencido</span>
               )}
               <span className="chip text-[10.5px]">{tEnum("deliveryStatus", dl.status)}</span>
-            </div>
+            </Link>
           ))
         )}
       </div>
@@ -508,6 +521,7 @@ function ConfirmCancel({
   onConfirm: () => void
   onClose: () => void
 }) {
+  useEscapeKey(onClose)
   return (
     <div
       className="fixed inset-0 z-[90] flex items-center justify-center p-4"
@@ -577,8 +591,9 @@ function EditCampaignModal({
   const [startsAt, setStartsAt] = useState(campaign.startsAt?.slice(0, 10) ?? "")
   const [endsAt, setEndsAt] = useState(campaign.endsAt?.slice(0, 10) ?? "")
   const [budget, setBudget] = useState(
-    campaign.budgetCents > 0 ? String(campaign.budgetCents / 100) : "")
+    campaign.budgetCents > 0 ? centsToBRLInput(campaign.budgetCents) : "")
   const [notes, setNotes] = useState(campaign.notes ?? "")
+  useEscapeKey(onClose)
 
   // Briefing: texto separado por vírgula na tela, lista na API. É o formato que as pessoas
   // já usam para listar palavras, e evita um editor de tags só para isto.
@@ -609,11 +624,16 @@ function EditCampaignModal({
   }
 
   const submit = () => {
+    const budgetCents = budget.trim() ? parseBRLToCents(budget) : 0
+    if (budgetCents === null) {
+      toast.error("Orçamento inválido — use o formato 15.000,00.")
+      return
+    }
     update.mutate({
       name: name.trim(),
       startsAt: startsAt || undefined,
       endsAt: endsAt || undefined,
-      budgetCents: budget ? Math.round(Number(budget) * 100) : 0,
+      budgetCents,
       notes: notes.trim() || undefined,
       briefing,
     }, {
@@ -667,9 +687,11 @@ function EditCampaignModal({
             </Field>
           </div>
           <Field label="Orçamento (R$)" hint="Deixe vazio em permuta.">
+            {/* Texto, não número: o campo de número recusa "15.000,00" e devolvia vazio, e o
+                orçamento ia como zero sem ninguém ver. */}
             <Input
-              type="number"
-              min="0"
+              inputMode="decimal"
+              placeholder="15.000,00"
               value={budget}
               onChange={(e) => setBudget(e.target.value)}
             />
@@ -821,6 +843,7 @@ function AllowanceModal({
   onBack: () => void
   onClose: () => void
 }) {
+  useEscapeKey(onClose)
   return (
     <div
       className="fixed inset-0 z-[90] flex items-center justify-center p-4"
@@ -902,6 +925,7 @@ function CreateCampaignModal({ onClose }: { onClose: () => void }) {
   const [endsAt, setEndsAt] = useState("")
   const [budget, setBudget] = useState("")
   const [limit, setLimit] = useState<Allowance | null>(null)
+  useEscapeKey(onClose)
 
   const brandList = useMemo(() => brands.data?.items ?? [], [brands.data])
   const useBrandPicker = hasIntelligence && brandList.length > 0
@@ -910,6 +934,11 @@ function CreateCampaignModal({ onClose }: { onClose: () => void }) {
 
   const submit = () => {
     if (!canSubmit) return
+    const budgetCents = budget.trim() ? parseBRLToCents(budget) : 0
+    if (budgetCents === null) {
+      toast.error("Orçamento inválido — use o formato 15.000,00.")
+      return
+    }
     const body: CreateCampaignBody = {
       name: name.trim(),
       modality,
@@ -917,7 +946,7 @@ function CreateCampaignModal({ onClose }: { onClose: () => void }) {
       brandLabel: !useBrandPicker && brandLabel.trim() ? brandLabel.trim() : undefined,
       startsAt: startsAt || undefined,
       endsAt: endsAt || undefined,
-      budgetCents: budget ? Math.round(Number(budget) * 100) : 0,
+      budgetCents,
     }
     create.mutate(body, {
       onSuccess: (res) => {
@@ -1033,7 +1062,7 @@ function CreateCampaignModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <Field label="Orçamento (R$)" hint="Zero para permuta.">
-            <Input type="number" min={0} step="0.01" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="0,00" />
+            <Input inputMode="decimal" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="15.000,00" />
           </Field>
         </div>
 

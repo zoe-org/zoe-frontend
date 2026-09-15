@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react"
 import { Plus, X, Loader2, FileText, ShieldAlert, Trash2 } from "lucide-react"
 import { toast } from "sonner"
+import { useEscapeKey } from "@/lib/useEscapeKey"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { ApiError } from "@/lib/api"
 import { Input } from "@/components/ui/input"
@@ -13,9 +14,9 @@ import {
   Field, Select, TableSkeleton, ErrorState, SearchBox, NoResults,
 } from "@/pages/operations/shared"
 import {
-  useContracts, useContractMutations, useRoster, useCampaigns,
+  useContracts, useContractMutations, useRoster, useCampaigns, useCampaign, fmtCents,
   supportsEscrow, escrowRejectionReason, CONTRACT_MODALITIES,
-  type ContractSummary, type CreateContractBody,
+  type ContractSummary, type CreateContractBody, type CampaignInvite, type RosterItem,
 } from "@/lib/api/operations"
 
 const STATUS_COLOR: Record<string, string> = {
@@ -294,8 +295,47 @@ function CreateContractModal({ onClose }: { onClose: () => void }) {
   const [autoAdvance, setAutoAdvance] = useState(true)
   const [reviewSlaDays, setReviewSlaDays] = useState("7")
   const [maxResubmissions, setMaxResubmissions] = useState("2")
+  useEscapeKey(onClose)
 
   const people = useMemo(() => roster.data?.items ?? [], [roster.data])
+
+  // Com campanha escolhida, quem foi convidado para ela vem primeiro — é para quem o contrato
+  // costuma ser — e a proposta aparece antes de criar, em vez de só depois, no rascunho.
+  const campanhaDetalhe = useCampaign(campaignId || undefined)
+  const convitePorCriador = useMemo(() => {
+    const m = new Map<string, CampaignInvite>()
+    // A lista vem do mais novo: o primeiro de cada pessoa fica, a menos que um aceito apareça.
+    for (const i of campanhaDetalhe.data?.invites ?? []) {
+      const atual = m.get(i.influencerId)
+      if (!atual || (!atual.accepted && i.accepted)) m.set(i.influencerId, i)
+    }
+    return m
+  }, [campanhaDetalhe.data])
+
+  // Aceito, pendente, vencido: vencido não some — a proposta dele ainda é a última conversa
+  // com essa pessoa —, mas não pode parecer à espera de resposta.
+  const situacaoConvite = (i: CampaignInvite) =>
+    i.accepted ? "aceitou o convite" : i.expired ? "convite vencido" : "convite pendente"
+  const ordemConvite = (i: CampaignInvite) => (i.accepted ? 0 : i.expired ? 2 : 1)
+
+  const convidados = campaignId
+    ? people
+      .filter((p) => convitePorCriador.has(p.influencerId))
+      .sort((a, b) => ordemConvite(convitePorCriador.get(a.influencerId)!)
+        - ordemConvite(convitePorCriador.get(b.influencerId)!))
+    : []
+  const demais = convidados.length > 0
+    ? people.filter((p) => !convitePorCriador.has(p.influencerId))
+    : people
+  const conviteEscolhido = influencerId ? convitePorCriador.get(influencerId) : undefined
+  const temProposta = (i: CampaignInvite) =>
+    i.feeCents != null || Boolean(i.expectedDeliverables?.trim()) || i.deliveryDeadline != null
+
+  const opcao = (p: RosterItem, sufixo: string) => (
+    <option key={p.influencerId} value={p.influencerId}>
+      {p.displayName || p.fullName} — {sufixo}
+    </option>
+  )
 
   const repetidos = useMemo(
     () => campaignId && influencerId
@@ -455,13 +495,48 @@ function CreateContractModal({ onClose }: { onClose: () => void }) {
               <Field label="Criador">
                 <Select value={influencerId} onChange={setInfluencerId}>
                   <option value="">Selecione…</option>
-                  {people.map((p) => (
-                    <option key={p.influencerId} value={p.influencerId}>
-                      {p.displayName || p.fullName} — {p.email}
-                    </option>
-                  ))}
+                  {convidados.length > 0 ? (
+                    <>
+                      <optgroup label="Convidados para esta campanha">
+                        {convidados.map((p) => opcao(p, situacaoConvite(convitePorCriador.get(p.influencerId)!)))}
+                      </optgroup>
+                      {demais.length > 0 && (
+                        <optgroup label="Resto do elenco">
+                          {demais.map((p) => opcao(p, p.email))}
+                        </optgroup>
+                      )}
+                    </>
+                  ) : (
+                    demais.map((p) => opcao(p, p.email))
+                  )}
                 </Select>
               </Field>
+
+              {conviteEscolhido && temProposta(conviteEscolhido) && (
+                <div
+                  className="rounded-lg border border-border-soft p-3 text-[12px]"
+                  style={{ background: "var(--bg, #F9FAFB)" }}
+                >
+                  <div className="text-[11px] text-ink-muted mb-1">
+                    Proposta do convite{" "}
+                    {conviteEscolhido.accepted
+                      ? "(aceita)"
+                      : conviteEscolhido.expired ? "(convite vencido, não aceito)" : "(ainda não aceita)"}
+                  </div>
+                  <div style={{ color: "var(--ink)" }}>
+                    {[
+                      conviteEscolhido.feeCents != null && `Cachê ${fmtCents(conviteEscolhido.feeCents)}`,
+                      conviteEscolhido.expectedDeliverables?.trim(),
+                      conviteEscolhido.deliveryDeadline && `prazo ${fmtDate(conviteEscolhido.deliveryDeadline)}`,
+                    ].filter(Boolean).join(" · ")}
+                  </div>
+                  <div className="text-[11px] text-ink-muted mt-1">
+                    {repetidos.length > 0
+                      ? "Cada proposta vale para um contrato: se o existente já a usou, este nasce sem ela — o rascunho avisa."
+                      : "Entra no rascunho marcada como vinda da proposta."}
+                  </div>
+                </div>
+              )}
 
               {/* Com o rascunho nascendo no aceite do convite, criar pela tela duplicava sem
                   ninguém perceber. Não bloqueia: dois trabalhos na mesma campanha existem. */}
