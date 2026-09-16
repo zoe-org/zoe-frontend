@@ -6,6 +6,7 @@ import LoginPage from "@/pages/Login"
 import RegisterPage from "@/pages/Register"
 import ForgotPasswordPage from "@/pages/ForgotPassword"
 import AcceptInvitePage from "@/pages/AcceptInvite"
+import AuthCallbackPage from "@/pages/AuthCallback"
 import OnboardingTenantPage from "@/pages/OnboardingTenant"
 import DashboardPage from "@/pages/Dashboard"
 import MonitoringPage from "@/pages/intelligence/Monitoring"
@@ -25,6 +26,9 @@ export const router = createBrowserRouter([
   { path: "/register", element: <RegisterPage /> },
   { path: "/forgot-password", element: <ForgotPasswordPage /> },
   { path: "/invite/:token", element: <AcceptInvitePage /> },
+  // Retorno do login com Google/Microsoft (ADR-064). URLs registradas no client do Cognito.
+  { path: "/auth/callback", element: <AuthCallbackPage /> },
+  { path: "/auth/logout", element: <Navigate to="/login" replace /> },
   {
     path: "/onboarding/tenant",
     element: <ProtectedRoute><OnboardingTenantPage /></ProtectedRoute>,
