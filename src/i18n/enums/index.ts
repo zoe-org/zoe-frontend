@@ -4,10 +4,22 @@
 // não traduzido não pode crashar a UI.
 
 export type EnumKind =
-  | "classification" | "sentiment" | "nerMode" | "pipelinePath"
-  | "kycStatus" | "rosterStatus"
-  | "contractModality" | "contractStatus" | "escrowState" | "campaignStatus"
-  | "deliveryStatus" | "briefingSentiment" | "auditCriterion" | "relationshipStatus"
+  | "classification"
+  | "sentiment"
+  | "nerMode"
+  | "pipelinePath"
+  | "channelRelation"
+  | "transcriptionSource"
+  | "kycStatus"
+  | "relationshipStatus"
+  | "rosterStatus"
+  | "contractModality"
+  | "campaignStatus"
+  | "contractStatus"
+  | "escrowState"
+  | "auditCriterion"
+  | "briefingSentiment"
+  | "deliveryStatus"
 
 type LocaleDictionaries = Record<EnumKind, Record<string, string>>
 
@@ -35,8 +47,25 @@ const dictionaries: Record<string, LocaleDictionaries> = {
     pipelinePath: {
       Full: "Análise completa",
       VideoCaption: "Análise completa",
+      // ADR-046: áudio-only é o caminho PADRÃO, não uma degradação. Sem esta
+      // entrada a coluna "Cobertura" do CSV exportava a string crua "AudioOnly".
+      AudioOnly: "Análise completa",
       CaptionFallback: "Legenda + comentários",
       CommentsOnly: "Apenas comentários",
+      // ADR-035. Rótulos escolhidos pra não colidir com os degradados acima:
+      // "Apenas comentários" (CommentsOnly) é falha de download; estes são
+      // POLÍTICA. Mesmo número de confiança, significados opostos (doc 05 §4).
+      OwnedComments: "Conteúdo próprio",
+      OwnedNoSignal: "Comentários desativados",
+    },
+    channelRelation: {
+      Owned: "Conteúdo próprio",
+      ThirdParty: "Terceiros",
+    },
+    // De onde veio o texto da transcrição (ADR-027: áudio-first, legenda é fallback).
+    transcriptionSource: {
+      Whisper: "Áudio",
+      Caption: "Legenda",
     },
     // Operations. KYC é do domínio do criador (InfluencerKycStatus) e vale na
     // plataforma toda; o status do elenco (TenantInfluencerStatus) é do vínculo

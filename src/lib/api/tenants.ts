@@ -38,6 +38,12 @@ export type CreateInviteInput = {
   brandIds?: string[]
   message?: string
 }
+/**
+ * Resultado do envio do e-mail de convite. `Failed`/`Disabled` não invalidam o
+ * convite — só significam que o link copiável deixa de ser redundante.
+ */
+export type EmailDeliveryStatus = "Sent" | "Failed" | "Disabled"
+
 export type CreateInviteResponse = {
   id: string
   tenantId: string
@@ -45,6 +51,16 @@ export type CreateInviteResponse = {
   role: TenantRole
   token: string
   expiresAt: string
+  emailDelivery: EmailDeliveryStatus
+}
+
+/** Reenvio rotaciona o token — o `token` aqui é novo e o anterior morreu. */
+export type ResendInviteResponse = {
+  id: string
+  email: string
+  token: string
+  expiresAt: string
+  emailDelivery: EmailDeliveryStatus
 }
 
 // Convite pendente (aba "Convites"). Espelha PendingInviteDto do backend.
@@ -77,6 +93,10 @@ export const tenantsApi = {
 
   createInvite: (tenantId: string, input: CreateInviteInput) =>
     apiClient.post<CreateInviteResponse>(`/api/tenants/${tenantId}/invites`, input, { tenantId }),
+
+  resendInvite: (tenantId: string, inviteId: string) =>
+    apiClient.post<ResendInviteResponse>(
+      `/api/tenants/${tenantId}/invites/${inviteId}/resend`, undefined, { tenantId }),
 
   revokeInvite: (tenantId: string, inviteId: string) =>
     apiClient.delete(`/api/tenants/${tenantId}/invites/${inviteId}`, { tenantId }),
@@ -126,6 +146,11 @@ export function useTeamMutations() {
     }),
     createInvite: useMutation({
       mutationFn: (input: CreateInviteInput) => tenantsApi.createInvite(activeTenantId!, input),
+      onSuccess: invalidateInvites,
+    }),
+    resendInvite: useMutation({
+      mutationFn: (inviteId: string) => tenantsApi.resendInvite(activeTenantId!, inviteId),
+      // Invalida porque o reenvio renova a validade — a flag `expired` da lista muda.
       onSuccess: invalidateInvites,
     }),
     revokeInvite: useMutation({

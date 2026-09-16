@@ -32,8 +32,27 @@ export type SovBrand = {
   deltaPp: number
   /** Cor escolhida pelo tenant (hex) ou null → o front deriva do id. */
   color: string | null
+  /**
+   * Sentimento médio no período, escala [0,1] — neutro é 0,5. Null quando nenhuma
+   * análise do recorte trouxe score.
+   *
+   * Vem junto do share porque ler os dois separados engana: share alto com
+   * sentimento baixo é exposição, não vantagem.
+   */
+  avgScore: number | null
 }
-export type ShareOfVoice = { brands: SovBrand[] }
+export type SovOwnBrand = { brandId: string; name: string }
+
+/**
+ * `selectedOwnBrandId` null = há mais de uma marca própria e nenhuma foi escolhida.
+ * Nesse caso `brands` vem vazio de propósito: a API não chuta a primeira, porque um
+ * SoV plausível para a pergunta errada é pior que nenhum (ADR-044).
+ */
+export type ShareOfVoice = {
+  brands: SovBrand[]
+  ownBrands: SovOwnBrand[]
+  selectedOwnBrandId: string | null
+}
 
 export type SovTrendSeries = {
   brandId: string
@@ -54,6 +73,19 @@ export type SovTopicShare = {
 }
 export type SovTopic = { topic: string; volume: number; shares: SovTopicShare[] }
 export type SovByTopic = { topics: SovTopic[] }
+
+/**
+ * Mapa dia-da-semana × hora das menções. `cells[dia][hora]` é CONTAGEM crua — a
+ * normalização é de apresentação e fica aqui, para o tooltip poder mostrar o número
+ * real. Linha 0 = segunda; coluna 0 = 0h, no fuso que `timeZone` declara.
+ */
+export type MentionActivity = {
+  cells: number[][]
+  maxCount: number
+  total: number
+  timeZone: string
+  asOf: string
+}
 
 export type TopVideo = {
   analysisId: string
@@ -117,6 +149,14 @@ export type Influencers = { items: Influencer[]; totals: InfluencerTotals }
 
 type Opts = { signal?: AbortSignal }
 
+/** Monta `days` e `ownBrandId` sem deixar `&` solto quando um dos dois falta. */
+const sovQuery = (days?: number, ownBrandId?: string | null) => {
+  const q = new URLSearchParams()
+  if (days != null) q.set("days", String(days))
+  if (ownBrandId) q.set("ownBrandId", ownBrandId)
+  return q.toString()
+}
+
 const qs = (brandId: string) => `brandId=${encodeURIComponent(brandId)}`
 // days == null → backend usa o padrão (30). Cuidado: 0 (todo o período) é válido
 // e falsy, então testa `!= null`, nunca `if (days)`.
@@ -140,12 +180,18 @@ export const dashboardApi = {
   // SoV é tenant-level (sem brandId) e gated pela feature `sov`: sem ela o
   // backend devolve 403 e a página mostra o upsell. `_tenantId` fica só pra
   // isolar a cache key no hook.
-  sov: (_tenantId: string, days?: number, opts?: Opts): Promise<ShareOfVoice> =>
-    apiClient.get(`/api/dashboard/sov?${days != null ? `days=${days}` : ""}`, { signal: opts?.signal }),
-  sovTrend: (_tenantId: string, weeks: number, opts?: Opts): Promise<SovTrend> =>
-    apiClient.get(`/api/dashboard/sov/trend?weeks=${weeks}`, { signal: opts?.signal }),
-  sovTopics: (_tenantId: string, days?: number, opts?: Opts): Promise<SovByTopic> =>
-    apiClient.get(`/api/dashboard/sov/topics?${days != null ? `days=${days}` : ""}`, { signal: opts?.signal }),
+  sov: (_tenantId: string, days?: number, ownBrandId?: string | null, opts?: Opts): Promise<ShareOfVoice> =>
+    apiClient.get(`/api/dashboard/sov?${sovQuery(days, ownBrandId)}`, { signal: opts?.signal }),
+  sovTrend: (_tenantId: string, weeks: number, ownBrandId?: string | null, opts?: Opts): Promise<SovTrend> =>
+    apiClient.get(
+      `/api/dashboard/sov/trend?weeks=${weeks}${ownBrandId ? `&ownBrandId=${ownBrandId}` : ""}`,
+      { signal: opts?.signal }),
+  activity: (brandId: string, days?: number, opts?: Opts): Promise<MentionActivity> =>
+    apiClient.get(
+      `/api/dashboard/activity?brandId=${brandId}${days != null ? `&days=${days}` : ""}`,
+      { signal: opts?.signal }),
+  sovTopics: (_tenantId: string, days?: number, ownBrandId?: string | null, opts?: Opts): Promise<SovByTopic> =>
+    apiClient.get(`/api/dashboard/sov/topics?${sovQuery(days, ownBrandId)}`, { signal: opts?.signal }),
 }
 
 // ── hooks (tenantId na key = isolamento por tenant) ────────────────────────
@@ -210,6 +256,16 @@ export function useTopicSentiments(brandId: string | null, days?: number) {
   })
 }
 
+export function useMentionActivity(brandId: string | null, days?: number) {
+  const { activeTenantId } = useAuth()
+  return useQuery({
+    queryKey: ["dashboard-activity", activeTenantId, brandId, days ?? null],
+    queryFn: ({ signal }) => dashboardApi.activity(brandId!, days, { signal }),
+    enabled: Boolean(activeTenantId && brandId),
+    staleTime: 5 * 60_000,
+  })
+}
+
 export function useInfluencers(brandId: string | null) {
   const { activeTenantId } = useAuth()
   return useQuery({
@@ -221,35 +277,38 @@ export function useInfluencers(brandId: string | null) {
 }
 
 /**
- * Share of Voice (tenant-level). `enabled` deve refletir a feature `sov` — a
- * página não deve nem chamar quando gated; o backend também retorna 403, tratado
- * como upsell na página (a UI não depende só de si).
+ * Share of Voice de UMA marca própria (ADR-044). `enabled` deve refletir a feature
+ * `sov` — a página não deve nem chamar quando gated; o backend também retorna 403,
+ * tratado como upsell na página (a UI não depende só de si).
+ *
+ * `ownBrandId` entra na chave: trocar de marca é outro recorte, não a mesma pergunta
+ * com outro filtro, e compartilhar cache entre os dois mostraria o número da anterior.
  */
-export function useShareOfVoice(enabled: boolean, days?: number) {
+export function useShareOfVoice(enabled: boolean, days?: number, ownBrandId?: string | null) {
   const { activeTenantId } = useAuth()
   return useQuery({
-    queryKey: ["dashboard-sov", activeTenantId, days ?? null],
-    queryFn: ({ signal }) => dashboardApi.sov(activeTenantId!, days, { signal }),
+    queryKey: ["dashboard-sov", activeTenantId, days ?? null, ownBrandId ?? null],
+    queryFn: ({ signal }) => dashboardApi.sov(activeTenantId!, days, ownBrandId, { signal }),
     enabled: Boolean(activeTenantId && enabled),
     staleTime: 60_000,
   })
 }
 
-export function useSovTrend(enabled: boolean, weeks = 12) {
+export function useSovTrend(enabled: boolean, weeks = 12, ownBrandId?: string | null) {
   const { activeTenantId } = useAuth()
   return useQuery({
-    queryKey: ["dashboard-sov-trend", activeTenantId, weeks],
-    queryFn: ({ signal }) => dashboardApi.sovTrend(activeTenantId!, weeks, { signal }),
+    queryKey: ["dashboard-sov-trend", activeTenantId, weeks, ownBrandId ?? null],
+    queryFn: ({ signal }) => dashboardApi.sovTrend(activeTenantId!, weeks, ownBrandId, { signal }),
     enabled: Boolean(activeTenantId && enabled),
     staleTime: 60_000,
   })
 }
 
-export function useSovByTopic(enabled: boolean, days?: number) {
+export function useSovByTopic(enabled: boolean, days?: number, ownBrandId?: string | null) {
   const { activeTenantId } = useAuth()
   return useQuery({
-    queryKey: ["dashboard-sov-topics", activeTenantId, days ?? null],
-    queryFn: ({ signal }) => dashboardApi.sovTopics(activeTenantId!, days, { signal }),
+    queryKey: ["dashboard-sov-topics", activeTenantId, days ?? null, ownBrandId ?? null],
+    queryFn: ({ signal }) => dashboardApi.sovTopics(activeTenantId!, days, ownBrandId, { signal }),
     enabled: Boolean(activeTenantId && enabled),
     staleTime: 60_000,
   })

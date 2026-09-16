@@ -5,13 +5,25 @@ import { formatDistanceToNow } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { MentionDrawer } from "@/components/features/MentionDrawer"
 import { EmptyState } from "@/components/ui/empty-state"
+import { BlockedFeedNotice } from "@/components/coverage/BlockedFeedNotice"
 import { ConfidenceBadge } from "@/components/ui/confidence-badge"
+import { coverageSaysOwnedContent } from "@/components/ui/coverage-labels"
 import { VideoThumb } from "@/components/ui/video-thumb"
 import { SelectFilterChip } from "@/components/ui/select-filter-chip"
 import { useActiveBrand } from "@/features/brands/context"
 import { toCsv, downloadCsv } from "@/lib/csv"
-import { useVideosFeed, useVideosSummary, type VideoFilters, type VideoListItem, type VideoSort } from "@/lib/api/videos"
+import { startOfToday, windowFrom } from "@/lib/date-window"
+import {
+  useVideosFeed,
+  useVideosSummary,
+  hasSelfMeasuredScore,
+  parseChannelRelation,
+  type VideoFilters,
+  type VideoListItem,
+  type VideoSort,
+} from "@/lib/api/videos"
 import { tEnum } from "@/i18n/enums"
+import { classificationChip } from "@/lib/chip"
 
 /** 1234 → "1,2 mil"; 1_234_567 → "1,2 mi". Compacto pt-BR para views. */
 function compactNumber(n: number): string {
@@ -37,6 +49,17 @@ const PERIODS = [
   { key: "90", label: "Últimos 90 dias" },
 ] as const
 
+// ADR-035, D4. Filtro de VIEW: vive na URL como os demais, some quando o usuário
+// sai. NÃO existe equivalente em /configuracoes de propósito — flag persistida
+// faria a mesma marca ter dois SoVs dependendo de quem olha, quebraria a série
+// temporal no dia em que alguém virasse a chave, e tornaria incomparáveis
+// relatórios exportados em datas diferentes.
+const CHANNEL_RELATIONS = [
+  { key: "", label: "Terceiros" },
+  { key: "owned", label: "Meu conteúdo" },
+  { key: "all", label: "Tudo" },
+] as const
+
 const MIN_SCORES = [
   { key: "", label: "Qualquer score" },
   { key: "0.5", label: "Score ≥ 0,50" },
@@ -51,11 +74,28 @@ const SORT_OPTIONS = [
   { key: "score", label: "Maior score" },
 ] as const
 
-function classificationClass(cls: string | null): string {
-  if (cls === "Positive") return "text-[#16A34A] bg-[#F0FDF4]"
-  if (cls === "Negative") return "text-[#DC2626] bg-[#FEF2F2]"
-  return "text-[#6B7280] bg-[#F3F4F6]"
+/**
+ * Score exibido na listagem. Em vídeo owned pelo path pesado o número existe mas
+ * não é leitura de audiência (doc 05 §4.1) — exibi-lo ao lado dos earned convida
+ * a comparação que a ADR-035 existe pra impedir. O badge ao lado explica.
+ */
+function scoreLabel(m: VideoListItem): string {
+  if (hasSelfMeasuredScore(m)) return "—"
+  return m.score != null ? m.score.toFixed(2) : "—"
 }
+
+/** Marca visual do conteúdo próprio na listagem (doc 05 §2). */
+function OwnedTag() {
+  return (
+    <span
+      className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium"
+      style={{ color: "var(--teal-fg)", background: "var(--teal-bg)" }}
+    >
+      Conteúdo próprio
+    </span>
+  )
+}
+
 
 export default function MonitoringPage() {
   const navigate = useNavigate()
@@ -80,6 +120,12 @@ export default function MonitoringPage() {
   const min = params.get("min") ?? ""
   const q = params.get("q") ?? ""
   const sort = (params.get("sort") ?? "") as VideoSort
+  // "" na URL = earned (o default). Manter o default fora da URL deixa o link
+  // limpo no caso comum e explícito quando o usuário mudou de propósito.
+  const rel = params.get("rel") ?? ""
+  // Fallback em earned pra qualquer coisa que não seja "owned"/"all" — ver
+  // parseChannelRelation. URL é compartilhável; valor inválido não pode virar "all".
+  const channelRelation = parseChannelRelation(rel)
   // Na URL junto com os filtros: a preferência de visualização sobrevive ao
   // refresh e viaja no link compartilhado.
   const view = params.get("view") === "grid" ? "grid" : "list"
@@ -93,9 +139,12 @@ export default function MonitoringPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchInput])
 
+  // Mesma âncora de dia das telas owned: janela estável e igual entre usuários.
+  const [anchor] = useState(startOfToday)
+
   const filters: VideoFilters | null = useMemo(() => {
     if (!brandId) return null
-    const from = period ? new Date(Date.now() - Number(period) * 86_400_000).toISOString() : undefined
+    const from = windowFrom(period, anchor)
     return {
       brandId,
       classificacao: sent || undefined,
@@ -103,12 +152,14 @@ export default function MonitoringPage() {
       from,
       minScore: min ? Number(min) : undefined,
       sort: sort || undefined,
+      channelRelation,
     }
-  }, [brandId, sent, q, period, min, sort])
+  }, [brandId, sent, q, period, min, sort, channelRelation, anchor])
 
   const feed = useVideosFeed(filters)
   const summary = useVideosSummary(filters)
   const items = feed.data?.pages.flatMap((p) => p.items) ?? []
+  const blockedCount = feed.data?.pages[0]?.blockedCount ?? 0
 
   // Contagem por aba. Enquanto a summary não chega, undefined → não renderiza
   // número (melhor do que mostrar 0 e piscar pro valor real).
@@ -144,10 +195,16 @@ export default function MonitoringPage() {
       { header: "Canal", value: (m) => m.channelName },
       { header: "Publicado em", value: (m) => new Date(m.publishedAt).toLocaleDateString("pt-BR") },
       { header: "Views", value: (m) => m.views ?? "" },
+      { header: "Comentários analisados", value: (m) => m.commentsCount ?? "" },
       { header: "Classificação", value: (m) => (m.classificacao ? tEnum("classification", m.classificacao) : "") },
-      { header: "Score", value: (m) => (m.score != null ? m.score.toFixed(2) : "") },
+      // Score vazio em owned pelo path pesado, pelo mesmo motivo da tela: o número
+      // não mede audiência, e numa planilha ele perde o badge que explicava isso.
+      { header: "Score", value: (m) => (hasSelfMeasuredScore(m) || m.score == null ? "" : m.score.toFixed(2)) },
       { header: "Confiança", value: (m) => (m.confidence != null ? m.confidence.toFixed(2) : "") },
       { header: "Cobertura", value: (m) => tEnum("pipelinePath", m.pipelinePath) },
+      // Coluna explícita: exportação que mistura owned e earned sem declarar qual
+      // é qual é a forma mais fácil de a distinção se perder fora do produto.
+      { header: "Origem", value: (m) => tEnum("channelRelation", m.channelRelation) },
       { header: "URL", value: (m) => `https://www.youtube.com/watch?v=${m.youtubeVideoId}` },
     ])
     const brandSlug = brand.active?.brandSlug ?? "marca"
@@ -223,6 +280,10 @@ export default function MonitoringPage() {
           value={min} onChange={(v) => setParam("min", v)}
           options={MIN_SCORES} placeholder="Qualquer score"
         />
+        <SelectFilterChip
+          value={rel} onChange={(v) => setParam("rel", v)}
+          options={CHANNEL_RELATIONS} placeholder="Terceiros"
+        />
       </section>
 
       {/* Tabs de classificação (filtro server-side) + toggle de visualização */}
@@ -292,17 +353,24 @@ export default function MonitoringPage() {
         </div>
       </section>
 
+      {blockedCount > 0 && brand.active && (
+        <BlockedFeedNotice blockedCount={blockedCount} tenantBrandId={brand.active.tenantBrandId} />
+      )}
+
       {/* Feed */}
       {feed.isLoading ? (
         <FeedSkeleton />
       ) : feed.isError ? (
         <ErrorState onRetry={() => feed.refetch()} />
       ) : items.length === 0 ? (
+        // Lista vazia com bloqueado não é "não há vídeo": há, fora da cobertura.
         <EmptyState
-          title="Nenhum vídeo encontrado"
-          description={q || sent || period || min
-            ? "Nenhum resultado para os filtros atuais. Tente ampliar o período ou limpar os filtros."
-            : "Ainda não há vídeos analisados para esta marca. Assim que o pipeline processar, eles aparecem aqui."}
+          title={blockedCount > 0 ? "Nenhum vídeo visível neste período" : "Nenhum vídeo encontrado"}
+          description={blockedCount > 0
+            ? "Há vídeos deste período, mas fora da sua cobertura. Veja o aviso acima."
+            : q || sent || period || min
+              ? "Nenhum resultado para os filtros atuais. Tente ampliar o período ou limpar os filtros."
+              : "Ainda não há vídeos analisados para esta marca. Assim que o pipeline processar, eles aparecem aqui."}
         />
       ) : (
         <section>
@@ -322,7 +390,7 @@ export default function MonitoringPage() {
                       playSize={34}
                     />
                     {m.classificacao && (
-                      <span className={`absolute top-2 left-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${classificationClass(m.classificacao)}`}>
+                      <span className={`absolute top-2 left-2 ${classificationChip(m.classificacao)}`}>
                         {tEnum("classification", m.classificacao)}
                       </span>
                     )}
@@ -339,15 +407,27 @@ export default function MonitoringPage() {
                           <span className="font-mono-zoe shrink-0">{compactNumber(m.views)} views</span>
                         </>
                       )}
+                      {/* Comentários ANALISADOS. Sem agregado (ou zero) não mostra
+                          nada: "0 comentários" é ruído, não informação. */}
+                      {m.commentsCount != null && m.commentsCount > 0 && (
+                        <>
+                          <span>·</span>
+                          <span className="font-mono-zoe shrink-0">{compactNumber(m.commentsCount)} coment.</span>
+                        </>
+                      )}
                       <span>·</span>
                       <span className="shrink-0">
                         {formatDistanceToNow(new Date(m.publishedAt), { addSuffix: true, locale: ptBR })}
                       </span>
                     </div>
                     <div className="flex items-center justify-between gap-2">
-                      <ConfidenceBadge pipelinePath={m.pipelinePath} confidence={m.confidence} />
+                      <ConfidenceBadge
+                        pipelinePath={m.pipelinePath}
+                        confidence={m.confidence}
+                        selfMeasured={hasSelfMeasuredScore(m)}
+                      />
                       <span className="font-mono-zoe text-[12px] shrink-0" style={{ color: "var(--ink)" }}>
-                        {m.score != null ? m.score.toFixed(2) : "—"}
+                        {scoreLabel(m)}
                       </span>
                     </div>
                   </div>
@@ -379,21 +459,42 @@ export default function MonitoringPage() {
                         <span className="font-mono-zoe">{compactNumber(m.views)} views</span>
                       </>
                     )}
+                    {m.commentsCount != null && m.commentsCount > 0 && (
+                      <>
+                        <span>·</span>
+                        <span className="font-mono-zoe">
+                          {compactNumber(m.commentsCount)} {m.commentsCount === 1 ? "comentário" : "comentários"}
+                        </span>
+                      </>
+                    )}
                     <span>·</span>
                     <span>{formatDistanceToNow(new Date(m.publishedAt), { addSuffix: true, locale: ptBR })}</span>
                   </div>
                 </div>
-                <div><ConfidenceBadge pipelinePath={m.pipelinePath} confidence={m.confidence} /></div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <ConfidenceBadge
+                    pipelinePath={m.pipelinePath}
+                    confidence={m.confidence}
+                    selfMeasured={hasSelfMeasuredScore(m)}
+                  />
+                  {/* Dois selos, duas perguntas: cobertura ("como foi analisado") e
+                      origem ("de quem é o canal"). Em vídeo owned os dois caíam no
+                      mesmo texto e a etiqueta aparecia repetida — quem cede é a
+                      origem, porque o de cobertura carrega o tooltip. */}
+                  {m.channelRelation === "Owned"
+                    && !coverageSaysOwnedContent(m.pipelinePath, hasSelfMeasuredScore(m))
+                    && <OwnedTag />}
+                </div>
                 <div>
                   {m.classificacao && (
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${classificationClass(m.classificacao)}`}>
+                    <span className={classificationChip(m.classificacao)}>
                       {tEnum("classification", m.classificacao)}
                     </span>
                   )}
                 </div>
                 <div className="text-right">
                   <div className="font-mono-zoe text-[13px]" style={{ color: "var(--ink)" }}>
-                    {m.score != null ? m.score.toFixed(2) : "—"}
+                    {scoreLabel(m)}
                   </div>
                   <div className="text-[10px] text-ink-muted-2">score</div>
                 </div>
@@ -455,7 +556,7 @@ function FeedSkeleton() {
 function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <AlertCircle className="w-10 h-10 text-[#DC2626] mb-3" />
+      <AlertCircle className="w-10 h-10 text-neg mb-3" />
       <h3 className="text-lg font-semibold text-midnight dark:text-[#E6E8EF] mb-1">Não foi possível carregar</h3>
       <p className="text-sm text-[#6B7280] mb-4">Tente novamente em instantes.</p>
       <button onClick={onRetry} className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors">

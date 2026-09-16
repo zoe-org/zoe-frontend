@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { useNavigate } from "react-router-dom"
-import { Search, Plus, X, Check, AlertCircle, ExternalLink, ShieldCheck, Clock, Loader2 } from "lucide-react"
+import { useNavigate, useSearchParams } from "react-router-dom"
+import {
+  Search, Plus, X, Check, AlertCircle, ExternalLink, ShieldCheck, Clock, Loader2, ChevronDown, Archive, RotateCcw,
+} from "lucide-react"
 import { useAuth } from "@/features/auth/context"
 import { ApiError } from "@/lib/api"
 import { apiMessage } from "@/lib/api-error"
@@ -8,10 +10,17 @@ import { EmptyState } from "@/components/ui/empty-state"
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
+import { useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
+import { notifyError, notifySuccess } from "@/lib/feedback"
+import { useConfirm } from "@/features/confirm/context"
+import { CoverageCard } from "@/components/coverage/CoverageCard"
 import {
   useTenantBrands, useBrandKeywords, useBrandMutations, useSubscribeFlow,
-  resolveOutcome, brandsApi, type TenantBrandSummary,
+  useBrandCompetitors, useCompetitorMutations,
+  resolveOutcome, brandsApi, type TenantBrandSummary, type SubscribeResult,
 } from "@/lib/api/brands"
+import { isArchived, partitionBrands } from "@/lib/brands"
 import { useDashboardSummary } from "@/lib/api/dashboard"
 import { useActiveBrand } from "@/features/brands/context"
 
@@ -108,6 +117,10 @@ const RELATIONSHIPS = [
   { value: "Competitor", label: "Concorrente" },
   { value: "Partner", label: "Parceira" },
 ]
+const relationshipLabel = (value: string) =>
+  RELATIONSHIPS.find((r) => r.value === value)?.label ?? value
+
+// Sem "Archived": arquivar é o "deixar de monitorar", e a arquivada tem painel próprio.
 const STATUSES = [
   { value: "Active", label: "Ativa" },
   { value: "Paused", label: "Pausada" },
@@ -123,17 +136,26 @@ export default function BrandsPage() {
   const items = useMemo(() => brands.data?.items ?? [], [brands.data])
 
   const [query, setQuery] = useState("")
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  // `?marca=` chega do aviso de cobertura do Monitoramento: abre direto na marca.
+  const [params] = useSearchParams()
+  const [selectedId, setSelectedId] = useState<string | null>(() => params.get("marca"))
   const [newOpen, setNewOpen] = useState(false)
+  // Arquivadas começam recolhidas: são histórico, não o trabalho do dia.
+  const [showArchived, setShowArchived] = useState(false)
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    if (!q) return items
-    return items.filter((b) => (b.displayName ?? b.brandName).toLowerCase().includes(q))
-  }, [items, query])
+  const { monitored, archived } = useMemo(() => partitionBrands(items, query), [items, query])
+  const monitoredCount = items.filter((b) => !isArchived(b)).length
 
-  const selected = items.find((b) => b.tenantBrandId === selectedId) ?? filtered[0] ?? items[0] ?? null
+  const selected = items.find((b) => b.tenantBrandId === selectedId) ?? monitored[0] ?? archived[0] ?? null
   const totalVideos = items.reduce((a, b) => a + b.videoCount30d, 0)
+
+  // A selecionada nunca fica escondida numa seção recolhida.
+  const selectedArchived = selected != null && isArchived(selected)
+  const archivedOpen = showArchived || selectedArchived
+  const toggleArchived = () => {
+    if (archivedOpen && selectedArchived) setSelectedId(null)
+    setShowArchived(!archivedOpen)
+  }
 
   if (brands.isLoading) return <PageSkeleton />
   if (brands.isError) return <ErrorState onRetry={() => brands.refetch()} />
@@ -164,7 +186,7 @@ export default function BrandsPage() {
             <div className="eyebrow mb-2.5">Gestão · Workspace</div>
             <h1 className="font-display m-0" style={{ fontSize: 34, lineHeight: 1.1, color: "var(--ink)" }}>Marcas</h1>
             <div className="text-[14px] text-ink-muted mt-1.5 max-w-140">
-              {items.length} {items.length === 1 ? "marca monitorada" : "marcas monitoradas"} ·{" "}
+              {monitoredCount} {monitoredCount === 1 ? "marca monitorada" : "marcas monitoradas"} ·{" "}
               <span className="font-mono-zoe">{totalVideos}</span> vídeos analisados nos últimos 30 dias.
             </div>
           </div>
@@ -193,55 +215,181 @@ export default function BrandsPage() {
             </div>
           </div>
 
-          {filtered.length === 0 ? (
+          {monitored.length === 0 && archived.length === 0 ? (
             <div className="px-4 py-10 text-center text-[13px] text-ink-muted">Nenhuma marca encontrada.</div>
           ) : (
-            filtered.map((b) => {
-              const active = selected?.tenantBrandId === b.tenantBrandId
-              return (
-                <button
+            <>
+              {monitored.map((b) => (
+                <BrandRow
                   key={b.tenantBrandId}
-                  onClick={() => setSelectedId(b.tenantBrandId)}
-                  className="block w-full text-left px-4 py-3.5 border-b border-border-soft transition-colors hover:bg-[#FAFBFC] dark:hover:bg-[#181B28]"
-                  style={{
-                    background: active ? "var(--color-teal-50)" : "transparent",
-                    borderLeft: `3px solid ${active ? "var(--color-teal-500)" : "transparent"}`,
-                  }}
-                >
-                  <div className="flex items-center gap-3">
-                    <Avatar name={b.brandName} slug={b.brandSlug} color={b.color} size={36} radius={8} font={14} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[13.5px] font-semibold truncate" style={{ color: "var(--ink)" }}>
-                          {b.displayName ?? b.brandName}
-                        </span>
-                        {b.status !== "Active" && <span className="chip chip-warn text-[10px]">pausada</span>}
-                      </div>
-                      <div className="flex items-center gap-2 text-[11.5px] text-ink-muted mt-0.5">
-                        <span className="font-mono-zoe">{b.videoCount30d} vídeos</span>
-                        {!b.brandVerified && <span className="chip text-[10px]">em verificação</span>}
-                      </div>
-                    </div>
-                  </div>
-                </button>
-              )
-            })
+                  brand={b}
+                  active={selected?.tenantBrandId === b.tenantBrandId}
+                  onSelect={() => setSelectedId(b.tenantBrandId)}
+                />
+              ))}
+              {monitored.length === 0 && (
+                <div className="px-4 py-6 text-center text-[13px] text-ink-muted">
+                  {query.trim() ? "Nenhuma marca monitorada com esse nome." : "Nenhuma marca monitorada no momento."}
+                </div>
+              )}
+
+              {archived.length > 0 && (
+                <>
+                  <button
+                    onClick={toggleArchived}
+                    aria-expanded={archivedOpen}
+                    className="flex w-full items-center justify-between px-4 py-2.5 border-b border-border-soft text-left bg-[#FAFBFC] dark:bg-[#151824] hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D] transition-colors"
+                  >
+                    <span className="eyebrow">Arquivadas · {archived.length}</span>
+                    <ChevronDown
+                      className={`w-3.5 h-3.5 text-ink-muted transition-transform ${archivedOpen ? "rotate-180" : ""}`}
+                    />
+                  </button>
+                  {archivedOpen && archived.map((b) => (
+                    <BrandRow
+                      key={b.tenantBrandId}
+                      brand={b}
+                      active={selected?.tenantBrandId === b.tenantBrandId}
+                      onSelect={() => setSelectedId(b.tenantBrandId)}
+                    />
+                  ))}
+                </>
+              )}
+            </>
           )}
         </div>
 
         {/* Detalhe */}
-        {selected && (
+        {selected && (selectedArchived ? (
+          <ArchivedBrandDetail key={selected.tenantBrandId} brand={selected} canManage={canManage} />
+        ) : (
           <BrandDetail
             key={selected.tenantBrandId}
             brand={selected}
             canManage={canManage}
-            onOpenDashboard={() => { setBrand(selected.brandId); navigate("/dashboard") }}
-            onUnsubscribed={() => setSelectedId(null)}
+            // Concorrente também vira marca ativa (ADR-063): o Dashboard marca que os
+            // números são dele, o seletor do topo o lista com etiqueta, e a reação nos
+            // canais oficiais aparece num card próprio.
+            onOpenDashboard={() => {
+              setBrand(selected.brandId)
+              navigate("/dashboard")
+            }}
+            // Fica selecionada: o painel vira o de arquivada, que é a confirmação visível
+            // do que aconteceu e o caminho de volta.
+            onUnsubscribed={() => { setSelectedId(selected.tenantBrandId); setShowArchived(true) }}
           />
-        )}
+        ))}
       </div>
 
       <BrandModal open={newOpen} onClose={() => setNewOpen(false)} />
+    </div>
+  )
+}
+
+// ── Linha da lista ──────────────────────────────────────────────────────
+
+function BrandRow({ brand: b, active, onSelect }: {
+  brand: TenantBrandSummary
+  active: boolean
+  onSelect: () => void
+}) {
+  const archived = isArchived(b)
+  return (
+    <button
+      onClick={onSelect}
+      className="block w-full text-left px-4 py-3.5 border-b border-border-soft transition-colors hover:bg-[#FAFBFC] dark:hover:bg-[#181B28]"
+      style={{
+        background: active ? "var(--teal-bg)" : "transparent",
+        borderLeft: `3px solid ${active ? "var(--color-teal-500)" : "transparent"}`,
+      }}
+    >
+      <div className={`flex items-center gap-3 ${archived ? "opacity-60" : ""}`}>
+        <Avatar name={b.brandName} slug={b.brandSlug} color={b.color} size={36} radius={8} font={14} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[13.5px] font-semibold truncate" style={{ color: "var(--ink)" }}>
+              {b.displayName ?? b.brandName}
+            </span>
+            {b.status === "Paused" && <span className="chip chip-warn text-[10px]">pausada</span>}
+          </div>
+          <div className="flex items-center gap-2 text-[11.5px] text-ink-muted mt-0.5">
+            {archived ? (
+              <span>{relationshipLabel(b.relationship)}</span>
+            ) : (
+              <>
+                <span className="font-mono-zoe">{b.videoCount30d} vídeos</span>
+                {!b.brandVerified && <span className="chip text-[10px]">em verificação</span>}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </button>
+  )
+}
+
+// ── Marca arquivada ─────────────────────────────────────────────────────
+
+/**
+ * "Deixar de monitorar" arquiva. Voltar usa o mesmo link da assinatura: a API
+ * recadastra na mesma linha e confere a vaga do plano antes.
+ */
+function ArchivedBrandDetail({ brand, canManage }: { brand: TenantBrandSummary; canManage: boolean }) {
+  const flow = useSubscribeFlow()
+  const name = brand.displayName ?? brand.brandName
+
+  const reativar = () =>
+    flow.link.mutate(
+      { brandId: brand.brandId, relationship: brand.relationship },
+      {
+        onSuccess: () => notifySuccess(`${name} voltou a ser monitorada.`),
+        onError: (e) => notifyError(e, "Não foi possível voltar a monitorar a marca."),
+      },
+    )
+
+  return (
+    <div className="p-8 overflow-y-auto">
+      <div className="flex items-center gap-4 mb-7">
+        <div className="opacity-60">
+          <Avatar name={brand.brandName} slug={brand.brandSlug} color={brand.color} size={64} radius={14} font={26} />
+        </div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <h2 className="font-display m-0" style={{ fontSize: 28, lineHeight: 1, color: "var(--ink)" }}>{name}</h2>
+            <span className="chip">{relationshipLabel(brand.relationship)}</span>
+            <span className="chip"><Archive className="w-3 h-3" /> arquivada</span>
+          </div>
+          <div className="text-[13px] text-ink-muted">{brand.brandSlug}</div>
+        </div>
+      </div>
+
+      <div className="border border-border-soft rounded-xl p-5 max-w-160">
+        <div className="eyebrow mb-2">Fora do monitoramento</div>
+        <p className="text-[13px] text-ink-muted leading-relaxed">
+          A Zoe não analisa mais os vídeos desta marca para o seu workspace, e ela não ocupa
+          vaga do plano. As análises de antes saíram dos painéis, mas nada foi apagado:
+          elas voltam junto com as palavras-chave, a cor e o teto se você voltar a monitorar.
+        </p>
+        {canManage ? (
+          <>
+            <button
+              onClick={reativar}
+              disabled={flow.link.isPending}
+              className="mt-4 inline-flex items-center gap-1.5 h-9 px-4 text-[13px] font-medium rounded-md text-white bg-teal-500 hover:bg-teal-600 transition-colors disabled:opacity-50"
+            >
+              {flow.link.isPending
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <RotateCcw className="w-3.5 h-3.5" />}
+              {flow.link.isPending ? "Reativando..." : "Voltar a monitorar"}
+            </button>
+            <p className="text-[11.5px] text-ink-muted-2 mt-2">Ela volta a ocupar uma vaga do plano.</p>
+          </>
+        ) : (
+          <p className="text-[12px] text-ink-muted-2 mt-3">
+            Só Owner ou Admin do workspace podem voltar a monitorar esta marca.
+          </p>
+        )}
+      </div>
     </div>
   )
 }
@@ -257,6 +405,7 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
   const summary = useDashboardSummary(brand.brandId)
   const keywords = useBrandKeywords(brand.tenantBrandId)
   const m = useBrandMutations(brand.tenantBrandId)
+  const confirm = useConfirm()
   const [newKeyword, setNewKeyword] = useState("")
 
   const s = summary.data
@@ -273,6 +422,18 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
     if (!k) return
     m.addKeyword.mutate(k, { onSuccess: () => setNewKeyword("") })
   }
+
+  const removeKeyword = (id: string, keyword: string) =>
+    m.removeKeyword.mutate(id, {
+      onSuccess: () => notifySuccess(`“${keyword}” saiu das palavras-chave.`),
+      onError: (e) => notifyError(e, "Não foi possível remover a palavra-chave."),
+    })
+
+  const updateSubscription = (input: Parameters<typeof m.update.mutate>[0], what: string) =>
+    m.update.mutate(input, {
+      onSuccess: () => notifySuccess(what),
+      onError: (e) => notifyError(e, "Não foi possível atualizar a assinatura."),
+    })
 
   return (
     <div className="p-8 overflow-y-auto">
@@ -303,7 +464,8 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
           onClick={onOpenDashboard}
           className="inline-flex items-center gap-1.5 h-8 px-3 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors shrink-0"
         >
-          Ver no dashboard <ExternalLink className="w-3.5 h-3.5" />
+          Ver no dashboard
+          <ExternalLink className="w-3.5 h-3.5" />
         </button>
       </div>
 
@@ -342,9 +504,10 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
                   {k.isNegative && <span className="chip chip-neg text-[9.5px]">neg</span>}
                   {canManage && (
                     <button
-                      onClick={() => m.removeKeyword.mutate(k.id)}
+                      onClick={() => removeKeyword(k.id, k.keyword)}
+                      disabled={m.removeKeyword.isPending}
                       aria-label={`Remover ${k.keyword}`}
-                      className="text-ink-muted hover:text-neg transition-colors"
+                      className="text-ink-muted hover:text-neg transition-colors disabled:opacity-50"
                     >
                       <X className="w-3 h-3" />
                     </button>
@@ -375,7 +538,9 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
             </form>
           )}
           {m.addKeyword.isError && (
-            <p className="text-[12px] text-neg mt-2">Não foi possível adicionar. Tente outro termo.</p>
+            <p className="text-[12px] text-neg mt-2">
+              {apiMessage(m.addKeyword.error, "Não foi possível adicionar a palavra-chave.")}
+            </p>
           )}
         </div>
 
@@ -386,8 +551,8 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
             <Field label="Relacionamento">
               <Select
                 value={brand.relationship}
-                disabled={!canManage}
-                onValueChange={(v) => m.update.mutate({ relationship: v })}
+                disabled={!canManage || m.update.isPending}
+                onValueChange={(v) => updateSubscription({ relationship: v }, "Relacionamento atualizado.")}
               >
                 <SelectTrigger className="h-8 text-[12.5px] w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -398,20 +563,26 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
             <Field label="Status">
               <Select
                 value={brand.status}
-                disabled={!canManage}
-                onValueChange={(v) => m.update.mutate({ status: v })}
+                disabled={!canManage || m.update.isPending}
+                onValueChange={(v) => updateSubscription({ status: v }, "Status atualizado.")}
               >
                 <SelectTrigger className="h-8 text-[12.5px] w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {STATUSES.map((st) => <SelectItem key={st.value} value={st.value}>{st.label}</SelectItem>)}
                 </SelectContent>
               </Select>
+              {brand.status === "Paused" && (
+                <p className="text-[11.5px] text-ink-muted mt-1.5">
+                  Sem coleta de vídeos novos. O histórico continua nos painéis, e a marca segue
+                  ocupando a vaga do plano.
+                </p>
+              )}
             </Field>
             <Field label="Cor de identificação">
               <ColorSwatches
                 value={brandColor(brand)}
-                onChange={(c) => m.update.mutate({ color: c })}
-                disabled={!canManage}
+                onChange={(c) => updateSubscription({ color: c }, "Cor atualizada.")}
+                disabled={!canManage || m.update.isPending}
                 size={24}
               />
             </Field>
@@ -421,20 +592,159 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
             <>
               <div className="h-px bg-border-soft my-4" />
               <button
-                onClick={() => {
-                  if (confirm(`Deixar de monitorar "${brand.displayName ?? brand.brandName}"?`)) {
-                    m.unsubscribe.mutate(undefined, { onSuccess: onUnsubscribed })
-                  }
+                onClick={async () => {
+                  const name = brand.displayName ?? brand.brandName
+                  const ok = await confirm({
+                    title: `Deixar de monitorar ${name}?`,
+                    description:
+                      "A Zoe para de analisar os vídeos dela, o histórico sai dos painéis e a vaga do " +
+                      "plano fica livre. A marca vai para Arquivadas, e dá para voltar a monitorar depois. " +
+                      "Para só parar a coleta e manter o histórico, pause a marca.",
+                    confirmLabel: "Deixar de monitorar",
+                    tone: "danger",
+                  })
+                  if (!ok) return
+                  m.unsubscribe.mutate(undefined, {
+                    onSuccess: () => {
+                      notifySuccess(`${name} saiu do monitoramento.`)
+                      onUnsubscribed()
+                    },
+                    onError: (e) => notifyError(e, "Não foi possível deixar de monitorar a marca."),
+                  })
                 }}
                 disabled={m.unsubscribe.isPending}
                 className="text-[12.5px] text-neg hover:underline disabled:opacity-50"
               >
-                {m.unsubscribe.isPending ? "Removendo..." : "Deixar de monitorar esta marca"}
+                {m.unsubscribe.isPending ? "Arquivando..." : "Deixar de monitorar esta marca"}
               </button>
             </>
           )}
         </div>
       </div>
+
+      <CoverageCard
+        tenantBrandId={brand.tenantBrandId}
+        brandName={brand.displayName ?? brand.brandName}
+        canManage={canManage}
+      />
+
+      {/* Conjunto competitivo (ADR-044) — só de marca própria. */}
+      {brand.relationship === "OwnBrand" && (
+        <CompetitiveSetCard brand={brand} canManage={canManage} />
+      )}
+    </div>
+  )
+}
+
+/**
+ * Concorrentes DESTA marca própria (ADR-044).
+ *
+ * Antes o conjunto era implícito e por tenant: quem fosse `Competitor` disputava
+ * share com todas as marcas próprias ao mesmo tempo. Num tenant com duas marcas de
+ * categorias diferentes isso dava SoV errado nos dois sentidos — e o cliente não
+ * tinha onde corrigir, porque não havia o que declarar.
+ */
+function CompetitiveSetCard({ brand, canManage }: {
+  brand: TenantBrandSummary
+  canManage: boolean
+}) {
+  const set = useBrandCompetitors(brand.tenantBrandId)
+  const m = useCompetitorMutations(brand.tenantBrandId)
+  const [picking, setPicking] = useState("")
+
+  const data = set.data
+  const competitors = data?.competitors ?? []
+  const available = data?.availableToAdd ?? []
+
+  const add = (competitorTenantBrandId: string) => {
+    setPicking("")
+    const name = available.find((b) => b.tenantBrandId === competitorTenantBrandId)?.name ?? "O concorrente"
+    m.add.mutate(competitorTenantBrandId, {
+      onSuccess: () => notifySuccess(`${name} entrou no conjunto competitivo.`),
+      onError: (e) => notifyError(e, "Não foi possível incluir o concorrente."),
+    })
+  }
+
+  return (
+    <div className="border border-border-soft rounded-xl p-5 mt-5">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <div className="eyebrow mb-1.5">Conjunto competitivo</div>
+          <p className="text-[12.5px] text-ink-muted max-w-140 leading-relaxed">
+            Contra quem o Share of Voice desta marca é calculado. Cada marca própria tem
+            o seu — a mesma concorrente pode estar em mais de um.
+          </p>
+        </div>
+        {canManage && available.length > 0 && (
+          <Select value={picking} onValueChange={add} disabled={m.add.isPending}>
+            <SelectTrigger className="h-8 text-[12.5px] w-56">
+              <SelectValue placeholder="adicionar concorrente…" />
+            </SelectTrigger>
+            <SelectContent>
+              {available.map((b) => (
+                <SelectItem key={b.tenantBrandId} value={b.tenantBrandId}>{b.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+
+      <div className="mt-4">
+        {set.isLoading ? (
+          <div className="h-8 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D] animate-pulse" />
+        ) : competitors.length === 0 ? (
+          // RN-I-064 por conjunto: sem concorrente declarado o SoV não tem denominador,
+          // e mostrar 100% seria pior que dizer que falta montar.
+          <div className="text-[13px] text-ink-muted leading-relaxed max-w-140">
+            Nenhum concorrente no conjunto ainda. Sem pelo menos um, o Share of Voice
+            desta marca não tem com o que comparar.
+            {available.length === 0 && (
+              <> Assine uma marca como concorrente para poder incluí-la aqui.</>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {competitors.map((c) => (
+              <span
+                key={c.brandId}
+                className="inline-flex items-center gap-2 pl-2 pr-2.5 py-1.5 rounded-md text-[12.5px] bg-[#F3F4F6] dark:bg-[#1A1D2D]"
+                style={{ color: "var(--ink-2)" }}
+              >
+                <span
+                  className="w-2 h-2 rounded-full shrink-0"
+                  style={{ background: c.color ?? "var(--ink-muted-2)" }}
+                />
+                {c.name}
+                {canManage && (
+                  <button
+                    onClick={() => m.remove.mutate(c.brandId, {
+                      onSuccess: () => notifySuccess(`${c.name} saiu do conjunto competitivo.`),
+                      onError: (e) => notifyError(e, "Não foi possível tirar o concorrente."),
+                    })}
+                    disabled={m.remove.isPending}
+                    aria-label={`Tirar ${c.name} do conjunto`}
+                    className="text-ink-muted hover:text-neg transition-colors disabled:opacity-50"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {(m.add.isError || m.remove.isError) && (
+        <p className="text-[12px] text-neg mt-3">Não foi possível alterar o conjunto. Tente de novo.</p>
+      )}
+
+      {competitors.length > 0 && canManage && (
+        // A confusão previsível: tirar do conjunto parece "parar de monitorar".
+        <p className="text-[11.5px] text-ink-muted-2 mt-3">
+          Tirar do conjunto não cancela a assinatura da marca — ela continua sendo
+          monitorada e o histórico dela permanece.
+        </p>
+      )}
     </div>
   )
 }
@@ -449,9 +759,19 @@ const STEPS = ["Identidade", "Vincular", "Palavras-chave"] as const
 
 function BrandModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const flow = useSubscribeFlow()
+  const qc = useQueryClient()
+  const minhas = useTenantBrands()
+  const ownBrands = (minhas.data?.items ?? []).filter(
+    (b) => b.relationship === "OwnBrand" && b.status === "Active",
+  )
   const [step, setStep] = useState(0)
   const [name, setName] = useState("")
   const [relationship, setRelationship] = useState("OwnBrand")
+  // Marca própria de quem este concorrente é rival (ADR-044). Perguntado AQUI porque
+  // é aqui que a intenção existe: quem acabou de marcar "Concorrente" sabe de quem.
+  // Deixar para depois transforma o conjunto competitivo numa segunda tarefa que
+  // ninguém lembra de fazer — e sem ele o SoV não sai do lugar.
+  const [competeWith, setCompeteWith] = useState("")
   const [category, setCategory] = useState("")
   const [color, setColor] = useState(PALETTE[0])
   const [channels, setChannels] = useState<string[]>([])
@@ -478,6 +798,7 @@ function BrandModal({ open, onClose }: { open: boolean; onClose: () => void }) {
     setCategory(""); setColor(PALETTE[0]); setChannels([]); setChannelDraft(""); setChannelError(null)
     setChannelTitles({}); setResolvingChannel(false)
     setKeywords([]); setDraft("")
+    setCompeteWith("")
     flow.resolve.reset(); flow.link.reset(); flow.create.reset()
     onClose()
   }, [flow, onClose])
@@ -547,14 +868,36 @@ function BrandModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const submitting = flow.link.isPending || flow.create.isPending
   const isLast = step === STEPS.length - 1
 
+  /**
+   * A aresta é escrita DEPOIS da assinatura, e a falha dela não desfaz a assinatura:
+   * a marca passou a ser monitorada de verdade, e reverter isso por causa do conjunto
+   * competitivo perderia o trabalho principal por causa do acessório. Se falhar, a
+   * marca fica assinada sem conjunto — estado que a tela de Marcas sinaliza e resolve.
+   */
+  const concluir = async (res: SubscribeResult) => {
+    if (relationship === "Competitor" && competeWith) {
+      try {
+        await brandsApi.addCompetitor(competeWith, res.tenantBrandId)
+        qc.invalidateQueries({ queryKey: ["brand-competitors"] })
+        qc.invalidateQueries({ queryKey: ["dashboard-sov"] })
+      } catch {
+        toast.warning(
+          "Marca assinada, mas não deu para incluí-la no conjunto competitivo. " +
+          "Você pode adicioná-la em Marcas.",
+        )
+      }
+    }
+    close()
+  }
+
   const finish = () => {
     const payload = { relationship, monitoredKeywords: keywords, color }
     // `category` só no create: no link a brand global já existe e seu segmento
     // é verdade compartilhada — quem assina não redefine.
-    if (pick && pick !== "new") flow.link.mutate({ brandId: pick, ...payload }, { onSuccess: close })
+    if (pick && pick !== "new") flow.link.mutate({ brandId: pick, ...payload }, { onSuccess: concluir })
     else flow.create.mutate(
       { name: name.trim(), ...payload, category: category || undefined, officialChannelIds: channels },
-      { onSuccess: close })
+      { onSuccess: concluir })
   }
 
   const canAdvance =
@@ -672,6 +1015,36 @@ function BrandModal({ open, onClose }: { open: boolean; onClose: () => void }) {
                         Concorrentes entram no Share of Voice; marcas próprias, no seu painel principal.
                       </p>
                     </Field>
+
+                    {relationship === "Competitor" && (
+                      <Field label="Concorrente de qual marca sua?">
+                        {ownBrands.length === 0 ? (
+                          <p className="text-[12px] text-ink-muted leading-relaxed">
+                            Você ainda não tem marca própria assinada. Assine a sua primeiro —
+                            é dela que o conjunto competitivo é.
+                          </p>
+                        ) : (
+                          <>
+                            <Select value={competeWith} onValueChange={setCompeteWith}>
+                              <SelectTrigger className="h-10 w-full text-[14px]">
+                                <SelectValue placeholder="Escolha a marca própria" />
+                              </SelectTrigger>
+                              <SelectContent className={SELECT_IN_MODAL_Z}>
+                                {ownBrands.map((b) => (
+                                  <SelectItem key={b.tenantBrandId} value={b.tenantBrandId}>
+                                    {b.displayName ?? b.brandName}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <p className="text-[11.5px] text-ink-muted mt-1.5">
+                              O Share of Voice é calculado dentro do conjunto de cada marca própria.
+                              Dá para incluir em outras depois, em Marcas.
+                            </p>
+                          </>
+                        )}
+                      </Field>
+                    )}
                     <Field label="Categoria">
                       <Select value={category || "none"} onValueChange={(v) => setCategory(v === "none" ? "" : v)}>
                         <SelectTrigger className="h-10 w-full text-[14px]">

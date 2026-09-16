@@ -18,6 +18,11 @@ import { tenantsApi } from "@/lib/api/tenants"
 import { ApiError } from "@/lib/api"
 import ZoeLogo from "@/assets/zoe-logo.svg?react"
 
+const MODULES = [
+  { code: "intelligence", name: "Intelligence", hint: "Monitorar marcas em vídeo" },
+  { code: "operations", name: "Operations", hint: "Gerir campanhas e contratos" },
+]
+
 const SLUG_PREFIX = "zoe.ai/"
 
 const schema = z.object({
@@ -45,6 +50,10 @@ export default function OnboardingTenantPage() {
   const [error, setError] = useState("")
   const [slugTouched, setSlugTouched] = useState(false)
 
+  // O intent do cadastro só serve como sugestão inicial: para o segundo workspace ele
+  // está velho, e antes disso a escolha era herdada em silêncio.
+  const [modules, setModules] = useState<string[]>(() => featuresForIntent(getOnboardingIntent()))
+
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: { name: "", slug: "" },
@@ -67,10 +76,7 @@ export default function OnboardingTenantPage() {
   const onSubmit = form.handleSubmit(async (data) => {
     setError("")
     try {
-      // Intent vem do StepIntentionLarge do Register (persistido em localStorage).
-      // Sem intent (ex.: reload no meio do fluxo) cai no default = todas as features.
-      const features = featuresForIntent(getOnboardingIntent())
-      await tenantsApi.create({ ...data, features })
+      await tenantsApi.create({ ...data, features: modules })
       clearOnboardingIntent()
       await refresh()
       nav("/dashboard", { replace: true })
@@ -196,11 +202,43 @@ export default function OnboardingTenantPage() {
                 )}
               </div>
 
+              <div className="space-y-1.5">
+                <Label>Módulos deste workspace</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {MODULES.map((m) => {
+                    const on = modules.includes(m.code)
+                    return (
+                      <button
+                        key={m.code}
+                        type="button"
+                        onClick={() =>
+                          setModules((prev) =>
+                            prev.includes(m.code)
+                              ? prev.filter((c) => c !== m.code)
+                              : [...prev, m.code],
+                          )
+                        }
+                        aria-pressed={on}
+                        className={`text-left rounded-md border px-3 py-2.5 transition-colors ${
+                          on ? "border-ring bg-[#F0FDFB]" : "border-input hover:bg-[#FBFCFD]"
+                        }`}
+                      >
+                        <span className="block text-sm font-medium">{m.name}</span>
+                        <span className="block text-[11px] text-[#6B7280] mt-0.5">{m.hint}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+                {modules.length === 0 && (
+                  <p className="text-xs text-neg">Escolha ao menos um módulo.</p>
+                )}
+              </div>
+
               {error && <p className="text-xs text-neg">{error}</p>}
 
               <Button
                 type="submit"
-                disabled={form.formState.isSubmitting}
+                disabled={form.formState.isSubmitting || modules.length === 0}
                 className="w-full bg-teal-500 hover:bg-teal-500/90 text-white"
               >
                 {form.formState.isSubmitting ? "Criando workspace..." : "Criar workspace"}

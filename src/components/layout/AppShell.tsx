@@ -2,16 +2,24 @@ import { useState, useEffect, useRef } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { NavLink, Link, Outlet, useLocation, useNavigate } from "react-router-dom"
 import {
-  House, Brain, Settings, Bell, Handshake,
+  House, Brain, Settings, Handshake,
   ChevronDown, ChevronUp, Search, PanelLeftClose, PanelLeftOpen, ChevronsUpDown,
-  Sun, Moon, LogOut, Check, Plus, ShieldCheck,
+  Sun, Moon, LogOut, Check, Plus, ShieldCheck, AlertCircle,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useAuth } from "@/features/auth/context"
 import { useFeature } from "@/features/auth/useFeature"
+import { useAlertUnreadCount } from "@/lib/api/alerts"
+import { useSubscription } from "@/lib/api/billing"
+import { useRealtimeConnection } from "@/lib/realtime"
 import { Breadcrumb } from "@/components/ui/breadcrumb"
 import { BrandSwitcher } from "@/components/layout/BrandSwitcher"
+import { NotificationBell } from "@/components/layout/NotificationBell"
+import { SettingsDialog } from "@/components/settings/SettingsDialog"
+import { UpgradeDialog } from "@/components/UpgradeDialog"
+import { BackfillReturn } from "@/components/coverage/BackfillReturn"
+import { useOpenSettings } from "@/components/settings/useSettings"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
@@ -31,6 +39,22 @@ function getInitialOpenState(key: string): boolean {
   }
 }
 
+
+/**
+ * Contador real de alertas não lidos (WS-F2) — era um "3" fixo do mock.
+ * Silencioso por design: enquanto carrega, ou se a chamada falhar, não renderiza
+ * nada. Um badge de erro na sidebar chamaria atenção para um problema que o
+ * usuário não pode resolver dali.
+ */
+const AlertsBadge = () => {
+  const { data } = useAlertUnreadCount()
+  if (!data) return null
+  return (
+    <span className="bg-ember text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+      {data > 99 ? "99+" : data}
+    </span>
+  )
+}
 
 const SubNavItem = ({ to, children, badge, end }: { to: string, children: React.ReactNode, badge?: React.ReactNode, end?: boolean }) => (
   <NavLink
@@ -71,6 +95,9 @@ function tenantColor(id: string) {
 export function AppShell() {
   const { user, role, signOut, activeTenantId, memberships, switchTenant, isZoeAdmin } = useAuth()
   const queryClient = useQueryClient()
+  // WS-F3 — mantém a conexão de tempo real viva pro app inteiro logado (não só
+  // Alertas: é daqui que o badge da sidebar recebe o "novo" sem precisar navegar).
+  useRealtimeConnection()
   const hasIntelligence = useFeature("intelligence")
   const hasOperations = useFeature("operations")
   const hasSov = useFeature("sov")
@@ -85,6 +112,7 @@ export function AppShell() {
   const userContext = [planLabel, role].filter(Boolean).join(" · ")
   const location = useLocation()
   const navigate = useNavigate()
+  const openSettings = useOpenSettings()
   const { resolvedTheme, setTheme } = useTheme()
   const isDark = resolvedTheme === "dark"
 
@@ -163,6 +191,8 @@ export function AppShell() {
           </button>
         </div>
 
+        {sidebarOpen && <TrialBadge />}
+
         {/* Navigation */}
         <nav className={`flex-1 py-2 space-y-1 overflow-y-auto ${sidebarOpen ? "pl-2 pr-4" : "px-2"}`}>
           <NavLink
@@ -197,7 +227,7 @@ export function AppShell() {
                   <SubNavItem to="/intelligence/sentiment">Sentimento</SubNavItem>
                   {hasSov && <SubNavItem to="/intelligence/sov">Share of Voice</SubNavItem>}
                   <SubNavItem to="/intelligence/influencers">Influenciadores</SubNavItem>
-                  <SubNavItem to="/alerts" badge={<span className="bg-ember text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">3</span>}>Alertas</SubNavItem>
+                  <SubNavItem to="/alerts" badge={<AlertsBadge />}>Alertas</SubNavItem>
                 </div>
               )}
             </>
@@ -248,6 +278,8 @@ export function AppShell() {
                 <div className="ml-[21px] border-l-2 border-[#E5E7EB] dark:border-[#1C1F2E] flex flex-col mt-0 mb-2">
                   {hasIntelligence && <SubNavItem to="/brands">Marcas</SubNavItem>}
                   {hasReports && <SubNavItem to="/reports">Relatórios</SubNavItem>}
+                  {/* Consumo e Plano saíram daqui: contrato e fatura não são trabalho
+                      do dia, e agora vivem no diálogo de configurações. */}
                   <SubNavItem to="/users">Usuários</SubNavItem>
                 </div>
               )}
@@ -335,10 +367,11 @@ export function AppShell() {
                 </>
               )}
 
-              <DropdownMenuItem asChild>
-                <Link to="/settings" className="flex items-center gap-2 text-sm cursor-pointer">
-                  <Settings className="w-4 h-4" /> Configurações
-                </Link>
+              <DropdownMenuItem
+                className="flex items-center gap-2 text-sm cursor-pointer"
+                onSelect={() => openSettings()}
+              >
+                <Settings className="w-4 h-4" /> Configurações
               </DropdownMenuItem>
               <DropdownMenuSeparator />
 
@@ -377,21 +410,152 @@ export function AppShell() {
           >
             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
-          <button className=" text-[#6B7280] p-2 rounded-md hover:text-ink hover:bg-muted dark:hover:text-[#E6E8EF] transition-colors cursor-pointer">
-            <div className="relative">
-              <span className="absolute -top-1 -right-0.5 w-1.5 h-1.5 bg-[#DC2626] rounded-full" />
-            </div>
-            <Bell className="w-4 h-4" />
-          </button>
+          <NotificationBell />
         </header>
 
         {/* Content */}
         <main className="flex-1 p-6 overflow-y-auto">
+          <BillingStateBanner />
+          <TrialBanner />
           <Outlet />
         </main>
       </div>
+
+      {/* Fora do <main>: o diálogo é da aplicação, não da rota — e é o que permite
+          abrir Plano por cima de qualquer tela sem perder o lugar. */}
+      <SettingsDialog />
+      <UpgradeDialog />
+      {/* Volta do Stripe do backfill: vale para qualquer rota, então mora no shell. */}
+      <BackfillReturn />
     </div>
   )
 }
 
+// ── Período de teste ───────────────────────────────────────────────────────
 
+/**
+ * Dias até o fim do teste, ou null fora dele. Conta contra o `asOf` da resposta — o
+ * relógio do servidor —, não contra o do navegador: render puro e sem depender da
+ * hora local estar certa.
+ */
+function useTrialDaysLeft(): number | null {
+  const { data } = useSubscription()
+  if (!data || data.status !== "Trialing" || !data.trialEndsAt) return null
+
+  const ms = new Date(data.trialEndsAt).getTime() - new Date(data.asOf).getTime()
+  return Math.max(0, Math.ceil(ms / 86_400_000))
+}
+
+function TrialBadge() {
+  const days = useTrialDaysLeft()
+  const openSettings = useOpenSettings()
+  if (days === null) return null
+
+  return (
+    <button
+      onClick={() => openSettings("plano")}
+      className="mx-3 mb-1 flex w-[calc(100%-1.5rem)] items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-[12px] transition-colors hover:opacity-80"
+      style={{ background: "var(--teal-bg)", color: "var(--teal-fg)" }}
+    >
+      <span className="font-medium">Período de teste</span>
+      <span className="font-mono-zoe">{days === 1 ? "1 dia" : `${days} dias`}</span>
+    </button>
+  )
+}
+
+/**
+ * Cobrança em estado ruim: pagamento pendente ou acesso já degradado (RN-I-012).
+ *
+ * <p><b>Permanente de propósito</b>, ao contrário do aviso de teste. Ali o prazo faz
+ * o trabalho e faixa fixa viraria ruído; aqui não há prazo — o estado só sai quando
+ * o cliente age, e escondê-lo faria o produto degradar sem explicar por quê.</p>
+ *
+ * <p>O texto diz explicitamente que <b>o histórico continua acessível e exportável</b>.
+ * Cliente que acha que perdeu o dado não volta, e é justamente nesse momento que ele
+ * decide se paga ou vai embora.</p>
+ */
+function BillingStateBanner() {
+  const { data } = useSubscription()
+  const openSettings = useOpenSettings()
+
+  if (!data) return null
+  const pendente = data.status === "PastDue"
+  if (!pendente && !data.readOnly) return null
+
+  const tom = pendente
+    ? { bg: "#FFFBEB", border: "rgba(217,119,6,.32)", color: "var(--color-warn)" }
+    : { bg: "#FEF2F2", border: "rgba(220,38,38,.32)", color: "var(--color-neg)" }
+
+  return (
+    <div
+      className="mb-5 flex items-start gap-3 rounded-[14px] border px-4 py-3.5"
+      style={{ background: tom.bg, borderColor: tom.border }}
+    >
+      <AlertCircle className="w-[17px] h-[17px] shrink-0 mt-0.5" style={{ color: tom.color }} />
+      <div className="flex-1">
+        <div className="text-[14px] font-semibold" style={{ color: tom.color }}>
+          {pendente
+            ? "Pagamento pendente"
+            : "Assinatura encerrada — acesso somente leitura"}
+        </div>
+        <div className="text-[13px] mt-1 leading-relaxed" style={{ color: "var(--ink-2)" }}>
+          {pendente ? (
+            <>
+              A última cobrança não foi concluída. O acesso segue completo enquanto o
+              provedor tenta de novo; se as tentativas se esgotarem, o workspace fica
+              somente leitura.
+            </>
+          ) : (
+            <>
+              A coleta de vídeos novos está pausada.{" "}
+              <strong>Nenhum dado foi apagado</strong> — marcas, análises, histórico e
+              relatórios continuam acessíveis e exportáveis, e voltam a receber coleta
+              assim que a assinatura for reativada.
+            </>
+          )}
+        </div>
+      </div>
+      <button
+        onClick={() => openSettings("plano")}
+        className="shrink-0 h-8 px-3 inline-flex items-center rounded-lg text-[12.5px] font-medium text-white"
+        style={{ background: "var(--color-teal-500)" }}
+      >
+        {pendente ? "Revisar cobrança" : "Reativar assinatura"}
+      </button>
+    </div>
+  )
+}
+
+/** Só nos últimos dias: faixa permanente vira ruído e para de ser lida. */
+function TrialBanner() {
+  const days = useTrialDaysLeft()
+  const openSettings = useOpenSettings()
+  if (days === null || days > 3) return null
+
+  return (
+    <div
+      className="mb-5 flex items-start gap-3 rounded-[14px] border px-4 py-3.5"
+      style={{ background: "#FFFBEB", borderColor: "rgba(217,119,6,.32)" }}
+    >
+      <AlertCircle className="w-[17px] h-[17px] shrink-0 mt-0.5" style={{ color: "var(--color-warn)" }} />
+      <div className="flex-1">
+        <div className="text-[14px] font-semibold" style={{ color: "var(--color-warn)" }}>
+          {days === 0
+            ? "Seu período de teste termina hoje"
+            : `Seu período de teste termina em ${days === 1 ? "1 dia" : `${days} dias`}`}
+        </div>
+        <div className="text-[13px] mt-1 leading-relaxed" style={{ color: "var(--ink-2)" }}>
+          Sem um método de pagamento, a assinatura é cancelada e o acesso fica somente
+          leitura. Nenhum dado é apagado.
+        </div>
+      </div>
+      <button
+        onClick={() => openSettings("plano")}
+        className="shrink-0 h-8 px-3 inline-flex items-center rounded-lg text-[12.5px] font-medium text-white"
+        style={{ background: "var(--color-teal-500)" }}
+      >
+        Escolher plano
+      </button>
+    </div>
+  )
+}

@@ -1,14 +1,15 @@
 import { useMemo, useState } from "react"
-import { Plus, Trash2, Copy, X, Mail, AlertCircle, Loader2, Check, Tag } from "lucide-react"
-import { toast } from "sonner"
+import { Plus, Trash2, Copy, X, Mail, AlertCircle, Loader2, Check, Tag, Send } from "lucide-react"
+import { notifyError, notifySuccess } from "@/lib/feedback"
+import { useConfirm } from "@/features/confirm/context"
 import { useAuth } from "@/features/auth/context"
-import { ApiError } from "@/lib/api"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import {
   useMembers, useInvites, useTeamMutations,
-  type TenantRole, type TenantMember, type PendingInvite,
+  type TenantRole, type TenantMember, type PendingInvite, type EmailDeliveryStatus,
 } from "@/lib/api/tenants"
 import { useTenantBrands } from "@/lib/api/brands"
+import { monitoredBrands } from "@/lib/brands"
 
 type Tab = "pessoas" | "papeis" | "convites"
 
@@ -95,11 +96,15 @@ export default function UsersPage() {
 
   const members = useMembers()
   const invites = useInvites(isAdmin)
-  const { removeMember, revokeInvite, changeMemberRole } = useTeamMutations()
+  const { removeMember, revokeInvite, resendInvite, changeMemberRole } = useTeamMutations()
 
   const [tab, setTab] = useState<Tab>("pessoas")
   const [inviteOpen, setInviteOpen] = useState(false)
   const [editingBrands, setEditingBrands] = useState<TenantMember | null>(null)
+  // Só é preenchido quando o reenvio NÃO conseguiu mandar o e-mail — aí o link
+  // volta a ser o caminho principal e precisa aparecer pra ser copiado.
+  const [resentLink, setResentLink] = useState<string | null>(null)
+  const confirm = useConfirm()
 
   const memberList = useMemo(() => members.data ?? [], [members.data])
   const inviteList = useMemo(() => invites.data ?? [], [invites.data])
@@ -110,31 +115,61 @@ export default function UsersPage() {
     return c
   }, [memberList])
 
-  const handleRemove = (m: TenantMember) => {
-    if (!window.confirm(`Remover ${m.name || m.email} do workspace?`)) return
+  const handleRemove = async (m: TenantMember) => {
+    const ok = await confirm({
+      title: `Remover ${m.name || m.email} do workspace?`,
+      description: "A pessoa perde o acesso a este workspace. Para voltar, precisa de um convite novo.",
+      confirmLabel: "Remover",
+      tone: "danger",
+    })
+    if (!ok) return
     removeMember.mutate(m.userId, {
-      onSuccess: () => toast.success("Membro removido."),
-      onError: (e) => toast.error(e instanceof ApiError ? e.message : "Não foi possível remover."),
+      onSuccess: () => notifySuccess("Membro removido."),
+      onError: (e) => notifyError(e, "Não foi possível remover."),
     })
   }
 
-  const handleRoleChange = (m: TenantMember, nextRole: TenantRole) => {
+  const handleRoleChange = async (m: TenantMember, nextRole: TenantRole) => {
     if (nextRole === m.role) return
     const who = m.name || m.email
-    if (!window.confirm(`Alterar o papel de ${who} para ${nextRole}?`)) return
+    const ok = await confirm({
+      title: `Alterar o papel de ${who}?`,
+      description: `${who} passa de ${m.role} para ${nextRole}. ${ROLE_META[nextRole].desc}`,
+      confirmLabel: "Alterar papel",
+    })
+    if (!ok) return
     changeMemberRole.mutate(
       { userId: m.userId, role: nextRole },
       {
-        onSuccess: () => toast.success("Papel atualizado."),
-        onError: (e) => toast.error(e instanceof ApiError ? e.message : "Não foi possível alterar o papel."),
+        onSuccess: () => notifySuccess("Papel atualizado."),
+        onError: (e) => notifyError(e, "Não foi possível alterar o papel."),
       },
     )
   }
 
   const handleRevoke = (inv: PendingInvite) => {
     revokeInvite.mutate(inv.id, {
-      onSuccess: () => toast.success("Convite revogado."),
-      onError: (e) => toast.error(e instanceof ApiError ? e.message : "Não foi possível revogar."),
+      onSuccess: () => notifySuccess("Convite revogado."),
+      onError: (e) => notifyError(e, "Não foi possível revogar."),
+    })
+  }
+
+  const handleResend = async (inv: PendingInvite) => {
+    // O reenvio invalida o link anterior — quem já compartilhou o antigo à mão
+    // precisa saber disso antes, não depois.
+    const ok = await confirm({
+      title: `Reenviar o convite para ${inv.email}?`,
+      description: "Um link novo será gerado e o anterior deixará de funcionar.",
+      confirmLabel: "Reenviar",
+    })
+    if (!ok) return
+
+    resendInvite.mutate(inv.id, {
+      onSuccess: (res) => {
+        if (res.emailDelivery === "Sent") notifySuccess(`Convite reenviado para ${res.email}.`)
+        else setResentLink(`${window.location.origin}/invite/${res.token}`)
+      },
+      onError: (e) => notifyError(e, "Não foi possível reenviar."),
     })
   }
 
@@ -145,7 +180,7 @@ export default function UsersPage() {
   ]
 
   return (
-    <div className="-m-6 border-t border-border-soft" style={{ color: "var(--ink)" }}>
+    <div className="-m-6 min-h-[calc(100dvh-3.75rem)] flex flex-col border-t border-border-soft" style={{ color: "var(--ink)" }}>
       {/* Hero */}
       <section className="px-8 pt-7 pb-5 border-b border-border-soft" style={{ background: "var(--surface)" }}>
         <div className="flex items-start justify-between gap-6 flex-wrap">
@@ -232,7 +267,7 @@ export default function UsersPage() {
                         <td className="px-8 py-3.5">
                           <div className="flex items-center gap-3">
                             <div
-                              className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center font-display text-white text-[12px]"
+                              className="w-9 h-9 rounded-lg shrink-0 flex items-center justify-center font-display text-white text-[12px]"
                               style={{ background: `hsl(${i * 47 + 200}, 45%, 60%)` }}
                             >
                               {initials(m.name, m.email)}
@@ -266,7 +301,7 @@ export default function UsersPage() {
                               onClick={() => handleRemove(m)}
                               disabled={removeMember.isPending}
                               title="Remover do workspace"
-                              className="inline-flex items-center gap-1 text-[12px] text-ink-muted hover:text-[var(--color-neg)] transition-colors disabled:opacity-50"
+                              className="inline-flex items-center gap-1 text-[12px] text-ink-muted hover:text-neg transition-colors disabled:opacity-50"
                             >
                               <Trash2 className="w-3.5 h-3.5" /> Remover
                             </button>
@@ -283,7 +318,7 @@ export default function UsersPage() {
       )}
 
       {tab === "papeis" && (
-        <section className="p-7 bg-[#F9FAFB] dark:bg-[#0B0D18]">
+        <section className="flex-1 p-7 bg-[#F9FAFB] dark:bg-[#0B0D18]">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {ROLE_ORDER.map((r) => {
               const meta = ROLE_META[r]
@@ -295,7 +330,7 @@ export default function UsersPage() {
                     {count} {count === 1 ? "usuário" : "usuários"}
                   </div>
                   <div className="h-px bg-border-soft my-3.5" />
-                  <div className="text-[12.5px] text-ink-2 leading-[1.5]">{meta.desc}</div>
+                  <div className="text-[12.5px] text-ink-2 leading-normal">{meta.desc}</div>
                 </div>
               )
             })}
@@ -334,9 +369,16 @@ export default function UsersPage() {
                   </div>
                   <RoleChip role={inv.role} />
                   <button
+                    onClick={() => handleResend(inv)}
+                    disabled={resendInvite.isPending}
+                    className="inline-flex items-center gap-1 text-[12px] px-2.5 py-1.5 rounded-lg text-ink-muted hover:text-ink transition-colors disabled:opacity-50"
+                  >
+                    <Send className="w-3.5 h-3.5" /> Reenviar
+                  </button>
+                  <button
                     onClick={() => handleRevoke(inv)}
                     disabled={revokeInvite.isPending}
-                    className="inline-flex items-center gap-1 text-[12px] px-2.5 py-1.5 rounded-lg text-ink-muted hover:text-[var(--color-neg)] transition-colors disabled:opacity-50"
+                    className="inline-flex items-center gap-1 text-[12px] px-2.5 py-1.5 rounded-lg text-ink-muted hover:text-neg transition-colors disabled:opacity-50"
                   >
                     <X className="w-3.5 h-3.5" /> Revogar
                   </button>
@@ -348,6 +390,7 @@ export default function UsersPage() {
       )}
 
       {inviteOpen && <InviteModal isOwner={isOwner} onClose={() => setInviteOpen(false)} />}
+      {resentLink && <ResentLinkModal link={resentLink} onClose={() => setResentLink(null)} />}
       {editingBrands && (
         <AssignBrandsModal member={editingBrands} onClose={() => setEditingBrands(null)} />
       )}
@@ -371,7 +414,7 @@ function BrandsCell({ member, canEdit, onEdit }: { member: TenantMember; canEdit
   ) : (
     <div className="flex items-center gap-1 flex-wrap">
       {shown.map((b) => (
-        <span key={b.brandId} className="chip text-[10.5px] max-w-[120px] truncate">{b.name}</span>
+        <span key={b.brandId} className="chip text-[10.5px] max-w-30 truncate">{b.name}</span>
       ))}
       {extra > 0 && <span className="text-[11px] text-ink-muted">+{extra}</span>}
     </div>
@@ -396,7 +439,7 @@ function BrandsCell({ member, canEdit, onEdit }: { member: TenantMember; canEdit
 function AssignBrandsModal({ member, onClose }: { member: TenantMember; onClose: () => void }) {
   const brandsQuery = useTenantBrands()
   const { setMemberBrands } = useTeamMutations()
-  const brands = useMemo(() => brandsQuery.data?.items ?? [], [brandsQuery.data])
+  const brands = useMemo(() => monitoredBrands(brandsQuery.data?.items ?? []), [brandsQuery.data])
 
   const [selected, setSelected] = useState<Set<string>>(
     () => new Set((member.brands ?? []).map((b) => b.brandId)),
@@ -412,21 +455,22 @@ function AssignBrandsModal({ member, onClose }: { member: TenantMember; onClose:
 
   const save = () => {
     setMemberBrands.mutate(
-      { userId: member.userId, brandIds: [...selected] },
+      // Atribuição antiga a marca arquivada faria a API recusar o conjunto todo.
+      { userId: member.userId, brandIds: [...selected].filter((id) => brands.some((b) => b.brandId === id)) },
       {
         onSuccess: () => {
-          toast.success("Marcas atualizadas.")
+          notifySuccess("Marcas atualizadas.")
           onClose()
         },
         onError: (e) =>
-          toast.error(e instanceof ApiError ? e.message : "Não foi possível salvar."),
+          notifyError(e, "Não foi possível salvar."),
       },
     )
   }
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-center justify-center p-4"
+      className="fixed inset-0 z-90 flex items-center justify-center p-4"
       style={{ background: "rgba(7,9,26,0.32)", backdropFilter: "blur(2px)" }}
       onClick={onClose}
     >
@@ -534,7 +578,7 @@ const BASE_INVITE_ROLES: TenantRole[] = ["Admin", "Manager", "Viewer"]
 function InviteModal({ isOwner, onClose }: { isOwner: boolean; onClose: () => void }) {
   const { createInvite } = useTeamMutations()
   const brandsQuery = useTenantBrands()
-  const brands = useMemo(() => brandsQuery.data?.items ?? [], [brandsQuery.data])
+  const brands = useMemo(() => monitoredBrands(brandsQuery.data?.items ?? []), [brandsQuery.data])
 
   const inviteRoles = useMemo<TenantRole[]>(
     () => (isOwner ? ["Owner", ...BASE_INVITE_ROLES] : BASE_INVITE_ROLES),
@@ -546,6 +590,7 @@ function InviteModal({ isOwner, onClose }: { isOwner: boolean; onClose: () => vo
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [message, setMessage] = useState("")
   const [link, setLink] = useState<string | null>(null)
+  const [delivery, setDelivery] = useState<EmailDeliveryStatus>("Disabled")
   const [copied, setCopied] = useState(false)
 
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
@@ -569,14 +614,15 @@ function InviteModal({ isOwner, onClose }: { isOwner: boolean; onClose: () => vo
       },
       {
         onSuccess: (res) => {
-          // Entrega é por link (sem envio de e-mail garantido no MVP); a rota
-          // /invite/:token já existe. O escopo de marcas/mensagem foi persistido
-          // no convite e é aplicado no aceite.
+          // O e-mail é o caminho normal (ADR-032), mas o link continua exposto:
+          // é o que salva quando o provider está fora ou o ambiente não tem chave.
+          // O escopo de marcas/mensagem foi persistido e é aplicado no aceite.
           setLink(`${window.location.origin}/invite/${res.token}`)
-          toast.success("Convite criado.")
+          setDelivery(res.emailDelivery)
+          notifySuccess(res.emailDelivery === "Sent" ? "Convite enviado." : "Convite criado.")
         },
         onError: (e) =>
-          toast.error(e instanceof ApiError ? e.message : "Não foi possível criar o convite."),
+          notifyError(e, "Não foi possível criar o convite."),
       },
     )
   }
@@ -588,13 +634,13 @@ function InviteModal({ isOwner, onClose }: { isOwner: boolean; onClose: () => vo
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     } catch {
-      toast.error("Não foi possível copiar.")
+      notifyError(null, "Não foi possível copiar.")
     }
   }
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-center justify-center p-4"
+      className="fixed inset-0 z-90 flex items-center justify-center p-4"
       style={{ background: "rgba(7,9,26,0.32)", backdropFilter: "blur(2px)" }}
       onClick={onClose}
     >
@@ -636,10 +682,19 @@ function InviteModal({ isOwner, onClose }: { isOwner: boolean; onClose: () => vo
                 <Check className="w-6 h-6" style={{ color: "var(--color-pos)" }} strokeWidth={2.5} />
               </div>
               <h3 className="font-display m-0 mb-1" style={{ fontSize: 18, color: "var(--ink)" }}>
-                Convite criado!
+                {delivery === "Sent" ? "Convite enviado!" : "Convite criado!"}
               </h3>
               <p className="text-[13px] text-ink-muted mb-4 max-w-sm">
-                Compartilhe o link abaixo com <span className="font-mono-zoe">{email.trim()}</span> — ele expira em 7 dias.
+                {delivery === "Sent" ? (
+                  <>
+                    Enviamos um e-mail para <span className="font-mono-zoe">{email.trim()}</span>.
+                    Se preferir, o link direto está abaixo — ele expira em 7 dias.
+                  </>
+                ) : (
+                  <>
+                    Compartilhe o link abaixo com <span className="font-mono-zoe">{email.trim()}</span> — ele expira em 7 dias.
+                  </>
+                )}
               </p>
             </div>
             <div className="flex items-center gap-2 p-2 rounded-lg border border-border-soft bg-[#FAFBFC] dark:bg-[#181B28]">
@@ -779,6 +834,84 @@ function InviteModal({ isOwner, onClose }: { isOwner: boolean; onClose: () => vo
   )
 }
 
+// ── Link do reenvio ────────────────────────────────────────────────────────
+// Aparece só quando o e-mail do reenvio não saiu (provider fora do ar ou ambiente
+// sem chave). O convite existe; o que falta é entregar o link.
+
+function ResentLinkModal({ link, onClose }: { link: string; onClose: () => void }) {
+  const [copied, setCopied] = useState(false)
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(link)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      notifyError(null, "Não foi possível copiar.")
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-90 flex items-center justify-center p-4"
+      style={{ background: "rgba(7,9,26,0.32)", backdropFilter: "blur(2px)" }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg rounded-xl border border-border-soft shadow-2xl overflow-hidden"
+        style={{ background: "var(--surface)" }}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Link do convite"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-7 pt-6 pb-4 flex items-start justify-between">
+          <div>
+            <div className="eyebrow mb-1.5">Gestão · Equipe</div>
+            <h2 className="font-display m-0" style={{ fontSize: 22, color: "var(--ink)" }}>
+              Convite renovado
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D]"
+          >
+            <X className="w-4.5 h-4.5" />
+          </button>
+        </div>
+
+        <div className="px-7 pb-7">
+          <p className="text-[13px] text-ink-muted mb-4">
+            O e-mail não pôde ser enviado agora, mas o convite foi renovado. Compartilhe o
+            link abaixo — ele expira em 7 dias.
+          </p>
+          <div className="flex items-center gap-2 p-2 rounded-lg border border-border-soft bg-[#FAFBFC] dark:bg-[#181B28]">
+            <span className="flex-1 font-mono-zoe text-[12px] truncate" style={{ color: "var(--ink)" }}>
+              {link}
+            </span>
+            <button
+              onClick={copy}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[12px] font-medium text-white shrink-0"
+              style={{ background: "var(--color-teal-500)" }}
+            >
+              {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+              {copied ? "Copiado" : "Copiar"}
+            </button>
+          </div>
+          <div className="flex justify-end mt-5">
+            <button
+              onClick={onClose}
+              className="px-3.5 py-2 rounded-lg text-[13px] font-medium border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D]"
+            >
+              Concluir
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Estados ────────────────────────────────────────────────────────────
 
 function TableSkeleton() {
@@ -794,7 +927,7 @@ function TableSkeleton() {
 function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <AlertCircle className="w-10 h-10 text-[#DC2626] mb-3" />
+      <AlertCircle className="w-10 h-10 text-neg mb-3" />
       <h3 className="text-lg font-semibold text-midnight dark:text-[#E6E8EF] mb-1">Não foi possível carregar</h3>
       <p className="text-sm text-[#6B7280] mb-4">Tente novamente em instantes.</p>
       <button onClick={onRetry} className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors">

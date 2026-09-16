@@ -20,9 +20,80 @@ export type VideoListItem = {
   pipelinePath: string
   /** Views do YouTube na captura mais recente. null = ainda não coletado. */
   views: number | null
+  /** ADR-035: "Owned" (canal oficial da marca) ou "ThirdParty". */
+  channelRelation: ChannelRelation
+  /**
+   * Comentários ANALISADOS (roll-up da análise), não o contador do YouTube — o
+   * snapshot de metadados grava 0 na ingestão. É o mesmo número do drawer.
+   * null = análise sem agregado; a lista não mostra nada nesse caso.
+   */
+  commentsCount: number | null
 }
 
-export type ListVideosResponse = { items: VideoListItem[]; nextCursor: string | null }
+/** Serializado pelo nome do enum C# (PascalCase), como os demais enums do read-API. */
+export type ChannelRelation = "Owned" | "ThirdParty"
+
+/**
+ * Filtro de view do Monitoramento (ADR-035, D4). É EFÊMERO — vive no estado da
+ * sessão, nunca em configuração de tenant: métrica cuja definição muda por
+ * configuração deixa de ser comparável entre tenants e ao longo do tempo.
+ */
+export type ChannelRelationFilter = "earned" | "owned" | "all"
+
+export const DEFAULT_CHANNEL_RELATION: ChannelRelationFilter = "earned"
+
+/**
+ * Lê o filtro de um valor de URL, com fallback SEMPRE em earned.
+ *
+ * O default seguro importa porque a URL é compartilhável e sobrevive em bookmark:
+ * link antigo, typo ou param renomeado não podem escorregar para `all` e passar a
+ * mostrar conteúdo próprio dentro de uma contagem sem o usuário pedir. Mesmo
+ * raciocínio do `ThirdParty = 0` no backend — na dúvida, o bucket que já é o
+ * comportamento atual.
+ *
+ * Deliberadamente estrito: só os três valores conhecidos passam, e o default fica
+ * FORA da URL (`""` → earned) pra manter o link limpo no caso comum.
+ */
+export function parseChannelRelation(raw: string | null | undefined): ChannelRelationFilter {
+  return raw === "owned" || raw === "all" ? raw : DEFAULT_CHANNEL_RELATION
+}
+
+/**
+ * Um vídeo owned analisado pelo path pesado (`Full`/`VideoCaption`) tem score
+ * contaminado: 30% roteiro escrito pela própria marca + 20% logo garantido em
+ * quadro. São reais e vão continuar aparecendo — as análises do backfill e tudo
+ * que chegar antes de o zoe-ai-engine rotear owned.
+ *
+ * Nesses casos o número NÃO é leitura de audiência e o ConfidenceBadge diria
+ * "análise completa, alta confiança" (doc 05 §4.1). A tela usa isto pra não
+ * exibir o score como se medisse reação.
+ */
+export function hasSelfMeasuredScore(item: VideoListItem): boolean {
+  return item.channelRelation === "Owned" && !AUDIENCE_ONLY_PATHS.has(item.pipelinePath)
+}
+
+/**
+ * Paths cujo score é 100% comentários — a única leitura limpa em vídeo owned.
+ *
+ * Definido por INCLUSÃO e não por exclusão de propósito: listar os contaminados
+ * deixaria um path novo passar como limpo por omissão, que é o pior default. Aqui
+ * um path desconhecido cai automaticamente em "contaminado" quando o vídeo é owned.
+ *
+ * `CaptionFallback` NÃO está na lista: é legenda(0.30) + comentários(0.50), e em
+ * vídeo owned a legenda é o roteiro da própria marca — mesma contaminação de `Full`,
+ * só que com um componente a menos.
+ *
+ * `CommentsOnly` está: apesar de ser o path DEGRADADO, sua composição é comentário
+ * puro. O badge comunica a degradação; o número em si é leitura honesta de audiência.
+ */
+const AUDIENCE_ONLY_PATHS = new Set(["CommentsOnly", "OwnedComments", "OwnedNoSignal"])
+
+export type ListVideosResponse = {
+  items: VideoListItem[]
+  nextCursor: string | null
+  /** Análises do período fora da cobertura (ADR-054 D1). Respeita o período, não os filtros de conteúdo. */
+  blockedCount: number
+}
 
 // Espelha VideosSummaryResponse (GET /api/videos/summary).
 export type VideosSummary = {
@@ -45,6 +116,8 @@ export type VideoFilters = {
   search?: string
   sort?: VideoSort
   limit?: number
+  /** Default earned. Filtro de sessão, nunca persistido (ADR-035, D4). */
+  channelRelation?: ChannelRelationFilter
 }
 
 function buildQuery(f: VideoFilters, cursor?: string): string {
@@ -57,6 +130,7 @@ function buildQuery(f: VideoFilters, cursor?: string): string {
   if (f.search) p.set("search", f.search)
   if (f.sort) p.set("sort", f.sort)
   if (f.limit) p.set("limit", String(f.limit))
+  if (f.channelRelation) p.set("channelRelation", f.channelRelation)
   if (cursor) p.set("cursor", cursor)
   return p.toString()
 }
@@ -70,6 +144,9 @@ function buildSummaryQuery(f: VideoFilters): string {
   if (f.to) p.set("to", f.to)
   if (f.minScore != null) p.set("minScore", String(f.minScore))
   if (f.search) p.set("search", f.search)
+  // TEM que espelhar o filtro da lista: são os contadores DAQUELE feed. Omitir
+  // aqui produz aba dizendo "42" sobre uma lista que mostra 38.
+  if (f.channelRelation) p.set("channelRelation", f.channelRelation)
   return p.toString()
 }
 
@@ -87,6 +164,27 @@ export type VideoDetail = {
   transcript: TranscriptPreview | null
 }
 
+/**
+ * Transcrição completa (`GET /api/videos/{id}/transcript`). Vem do S3, não do
+ * Postgres: o `transcript` do detalhe é a prévia de 300 caracteres que o pipeline
+ * grava no banco. `complete: false` significa que o arquivo não pôde ser lido e o
+ * que voltou é a prévia — a UI TEM que dizer isso em vez de chamar de "completa".
+ */
+export type TranscriptSegment = {
+  startSeconds: number
+  endSeconds: number
+  text: string
+}
+export type TranscriptFull = {
+  source: string
+  language: string
+  text: string
+  truncated: boolean
+  complete: boolean
+  /** Vazio quando a fonte não tem timestamp por frase (ver o handler). */
+  segments: TranscriptSegment[]
+}
+
 export const videosApi = {
   list: (f: VideoFilters, cursor?: string, opts?: { signal?: AbortSignal }) =>
     apiClient.get<ListVideosResponse>(`/api/videos?${buildQuery(f, cursor)}`, { signal: opts?.signal }),
@@ -95,6 +193,10 @@ export const videosApi = {
   detail: (videoId: string, brandId: string, opts?: { signal?: AbortSignal }) =>
     apiClient.get<VideoDetail>(
       `/api/videos/${videoId}?brandId=${encodeURIComponent(brandId)}`, { signal: opts?.signal }),
+  transcript: (videoId: string, brandId: string, opts?: { signal?: AbortSignal }) =>
+    apiClient.get<TranscriptFull>(
+      `/api/videos/${videoId}/transcript?brandId=${encodeURIComponent(brandId)}`,
+      { signal: opts?.signal }),
 }
 
 /**
@@ -130,6 +232,21 @@ export function useVideoDetail(videoId: string | null, brandId: string | null) {
 }
 
 /**
+ * Transcrição completa, só quando o modal abre. Fica FORA do `useVideoDetail` de
+ * propósito: é uma leitura de S3 por chamada, e a maioria dos cliques no drawer
+ * nunca abre a transcrição.
+ */
+export function useVideoTranscript(videoId: string | null, brandId: string | null) {
+  const { activeTenantId } = useAuth()
+  return useQuery({
+    queryKey: ["video-transcript", activeTenantId, videoId, brandId],
+    queryFn: ({ signal }) => videosApi.transcript(videoId!, brandId!, { signal }),
+    enabled: Boolean(activeTenantId && videoId && brandId),
+    staleTime: 5 * 60_000,
+  })
+}
+
+/**
  * Contadores por sentimento (abas + total do cabeçalho). Separado do feed porque
  * NÃO depende da classificação ativa — trocar de aba não deve refazer a contagem.
  * Por isso a key omite `classificacao`.
@@ -137,7 +254,16 @@ export function useVideoDetail(videoId: string | null, brandId: string | null) {
 export function useVideosSummary(filters: VideoFilters | null) {
   const { activeTenantId } = useAuth()
   const key = filters
-    ? { brandId: filters.brandId, from: filters.from, to: filters.to, minScore: filters.minScore, search: filters.search }
+    ? {
+        brandId: filters.brandId,
+        from: filters.from,
+        to: filters.to,
+        minScore: filters.minScore,
+        search: filters.search,
+        // RN-I-066: channelRelation entra na key. Sem isto, trocar o filtro serve
+        // a contagem do filtro anterior — o bug de "42 vs 38" pela via do cache.
+        channelRelation: filters.channelRelation,
+      }
     : null
   return useQuery({
     queryKey: ["videos-summary", activeTenantId, key],

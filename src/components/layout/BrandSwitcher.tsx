@@ -23,7 +23,19 @@ function brandColor(color: string | null, slug: string): string {
 export function BrandSwitcher() {
   const { brands, brandId, active, setBrand } = useActiveBrand()
 
-  if (brands.length === 0) return null
+  // Concorrente ENTRA na lista. O dado dele já foi pago em minutos e ele consome
+  // slot de marca — esconder a análise tirava valor sem ganhar nada. O que o WS-F4
+  // queria evitar era o ENQUADRAMENTO: um dashboard que diz "sua marca" sobre um
+  // concorrente. Isso agora é resolvido na copy (ver `brandVoice`), não no acesso.
+  //
+  // Próprias primeiro: é o caso comum, e a marca do cliente não pode ficar embaixo
+  // da lista de rivais.
+  const selecionaveis = [
+    ...brands.filter((b) => b.relationship !== "Competitor"),
+    ...brands.filter((b) => b.relationship === "Competitor"),
+  ]
+
+  if (selecionaveis.length === 0) return null
 
   const label = active ? (active.displayName ?? active.brandName) : "Selecione uma marca"
   const dot = active ? brandColor(active.color, active.brandSlug) : "#9AA1AE"
@@ -46,7 +58,7 @@ export function BrandSwitcher() {
           Marcas monitoradas
         </DropdownMenuLabel>
 
-        {brands.map((b) => {
+        {selecionaveis.map((b) => {
           const isActive = b.brandId === brandId
           return (
             <DropdownMenuItem
@@ -56,7 +68,16 @@ export function BrandSwitcher() {
             >
               <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: brandColor(b.color, b.brandSlug) }} />
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium truncate">{b.displayName ?? b.brandName}</div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-medium truncate">{b.displayName ?? b.brandName}</span>
+                  {/* Marcado, não escondido: quem troca precisa saber que está olhando
+                      um concorrente antes de ler os números. */}
+                  {b.relationship === "Competitor" && (
+                    <span className="text-[9.5px] uppercase tracking-wide font-semibold text-[#6B7280] shrink-0">
+                      concorrente
+                    </span>
+                  )}
+                </div>
                 <div className="text-[11px] text-[#6B7280] truncate">
                   {b.videoCount30d} {b.videoCount30d === 1 ? "vídeo" : "vídeos"} · 30d
                 </div>

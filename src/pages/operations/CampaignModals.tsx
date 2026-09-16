@@ -343,7 +343,7 @@ function AllowanceModal({
           {/* Não existe fluxo de upgrade self-service: mandar para as configurações é o
               caminho honesto, em vez de um botão que não faz nada. */}
           <Link
-            to="/settings"
+            to="/plan"
             className="flex-1 inline-flex items-center justify-center px-4 py-2.5 rounded-lg text-[13.5px] font-medium text-white"
             style={{ background: "var(--color-teal-500)" }}
           >

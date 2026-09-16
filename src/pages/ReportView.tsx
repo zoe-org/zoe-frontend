@@ -41,7 +41,7 @@ export default function ReportViewPage() {
   if (query.isError || !query.data) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
-        <AlertCircle className="w-10 h-10 text-[#DC2626] mb-3" />
+        <AlertCircle className="w-10 h-10 text-neg mb-3" />
         <h3 className="text-lg font-semibold mb-1" style={{ color: "var(--ink)" }}>
           Relatório não encontrado
         </h3>

@@ -12,8 +12,11 @@ import {
 import { EmptyState } from "@/components/ui/empty-state"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { useActiveBrand } from "@/features/brands/context"
+import { CoverageNotice } from "@/components/coverage/CoverageNotice"
+import { brandVoice } from "@/features/brands/voice"
 import { useInfluencers, type Influencer } from "@/lib/api/dashboard"
 import { toCsv, downloadCsv } from "@/lib/csv"
+import { useTheme } from "next-themes"
 
 const trendIcons = { up: TrendingUp, down: TrendingDown, stable: Minus }
 
@@ -38,21 +41,32 @@ const tierLabel: Record<Exclude<Tier, "all">, string> = {
   micro: "Micro",
 }
 
-// Cores por tier vindas do design (Mega laranja, Macro azul, Micro teal).
-const tierChipStyle: Record<Exclude<Tier, "all">, { bg: string; fg: string }> = {
-  mega: { bg: "#FFF7ED", fg: "#C2410C" },
-  macro: { bg: "#EFF6FF", fg: "#1D4ED8" },
-  micro: { bg: "#F0FDFB", fg: "#006B60" },
+/**
+ * Cores por tier (Mega laranja, Macro azul, Micro teal — do design).
+ *
+ * O par claro do design era fixo: fundo quase branco com texto escuro. No modo
+ * escuro isso vira um adesivo claro sobre a superfície escura, e o contraste do
+ * texto some. Aqui o fundo é o MATIZ com alfa e o texto é a versão clara dele —
+ * a mesma técnica que `.chip-primary` já usava no dark.
+ */
+const tierChipStyle: Record<Exclude<Tier, "all">, { hue: string; light: string; dark: string }> = {
+  mega: { hue: "249, 115, 22", light: "#C2410C", dark: "#FDBA74" },
+  macro: { hue: "59, 130, 246", light: "#1D4ED8", dark: "#93C5FD" },
+  micro: { hue: "0, 167, 153", light: "#006B60", dark: "#5DE0D4" },
 }
 
 function TierChip({ tier }: { tier: Exclude<Tier, "all"> }) {
   const c = tierChipStyle[tier]
+  const { resolvedTheme } = useTheme()
+  const isDark = resolvedTheme === "dark"
+
   return (
     <span
       className="font-semibold"
       style={{
-        fontSize: 10.5, padding: "1px 7px", borderRadius: 4,
-        background: c.bg, color: c.fg, letterSpacing: "0.04em",
+        fontSize: 10.5, padding: "1px 7px", borderRadius: 4, letterSpacing: "0.04em",
+        background: `rgba(${c.hue}, ${isDark ? 0.18 : 0.12})`,
+        color: isDark ? c.dark : c.light,
       }}
     >
       {tierLabel[tier].toUpperCase()}
@@ -83,6 +97,7 @@ const SORTS: { key: SortKey; label: string }[] = [
 export default function InfluencersPage() {
   const navigate = useNavigate()
   const brand = useActiveBrand()
+  const voice = brandVoice(brand.active)
   const inf = useInfluencers(brand.brandId)
 
   const [sortKey, setSortKey] = useState<SortKey>("reach")
@@ -182,12 +197,20 @@ export default function InfluencersPage() {
               Influenciadores
             </h1>
             <div className="text-[14px] text-ink-muted mt-1.5 max-w-140">
-              Criadores que mencionaram sua marca nos últimos 30 dias.{" "}
+              Criadores que mencionaram {voice.aMarca} nos últimos 30 dias.{" "}
               <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>
                 {influencers.length} {influencers.length === 1 ? "perfil" : "perfis"}
               </span>{" "}
               {influencers.length === 1 ? "identificado" : "identificados"}.
             </div>
+            {/* ADR-035, D4: o canal da própria marca é excluído por definição —
+                sem isto ele apareceria como o maior "influenciador" sobre si mesma,
+                que era exatamente o sintoma que a ADR corrigiu. Não há controle
+                para incluir: seria mudar a definição da métrica, não filtrá-la. */}
+            <p className="text-[11.5px] text-ink-muted-2 mt-2 leading-snug max-w-140">
+              Apenas canais de terceiros. {voice.isOwn ? "O seu próprio canal" : `O canal da ${voice.name}`}
+              {" "}não entra neste mapa — ele não é um influenciador sobre {voice.aMarca}.
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -200,6 +223,8 @@ export default function InfluencersPage() {
           </div>
         </div>
       </section>
+
+      <CoverageNotice tenantBrandIds={[brand.active?.tenantBrandId]} className="mx-8 mt-4" />
 
       {inf.isError ? (
         <ErrorState onRetry={() => inf.refetch()} />
@@ -222,7 +247,7 @@ export default function InfluencersPage() {
                 <span className="chip chip-pos text-[10px]">+ positivo</span>
               </div>
               {advocates.length === 0 ? (
-                <div className="text-[13px] text-muted py-6">
+                <div className="text-[13px] text-ink-muted py-6">
                   Nenhum advogado forte neste período.
                 </div>
               ) : (
@@ -240,7 +265,7 @@ export default function InfluencersPage() {
                 <span className="chip chip-neg text-[10px]">monitorar</span>
               </div>
               {attention.length === 0 ? (
-                <div className="text-[13px] text-muted py-6">
+                <div className="text-[13px] text-ink-muted py-6">
                   Nenhum influenciador em risco neste período.
                 </div>
               ) : (
@@ -368,7 +393,7 @@ export default function InfluencersPage() {
                       className="border-b border-border-soft hover:bg-[#FAFBFC] dark:hover:bg-[#181B28] transition-colors"
                     >
                       <td className="px-8 py-3.5">
-                        <span className="font-mono-zoe text-[11.5px] text-muted-2">
+                        <span className="font-mono-zoe text-[11.5px] text-ink-muted-2">
                           {String(idx + 1).padStart(2, "0")}
                         </span>
                       </td>
@@ -423,7 +448,7 @@ export default function InfluencersPage() {
                 })}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-8 py-16 text-center text-muted text-sm">
+                    <td colSpan={8} className="px-8 py-16 text-center text-ink-muted text-sm">
                       Nenhum influenciador neste tier.
                     </td>
                   </tr>
@@ -443,7 +468,7 @@ function HighlightRow({
   const TrendIcon = trendIcons[inf.trend]
   return (
     <div className={`flex items-center gap-3 py-2.5 ${index === 0 ? "" : "border-t border-border-soft"}`}>
-      <span className="font-mono-zoe text-[11px] text-muted-2 w-[18px]">
+      <span className="font-mono-zoe text-[11px] text-ink-muted-2 w-[18px]">
         {String(index + 1).padStart(2, "0")}
       </span>
       <div
@@ -454,7 +479,7 @@ function HighlightRow({
       </div>
       <div className="flex-1 min-w-0">
         <div className="text-[13px] font-medium truncate">{inf.name || "Canal sem nome"}</div>
-        <div className="flex items-center gap-1 font-mono-zoe text-[10.5px] text-muted truncate">
+        <div className="flex items-center gap-1 font-mono-zoe text-[10.5px] text-ink-muted truncate">
           <span>{inf.mentions} {inf.mentions === 1 ? "menção" : "menções"}</span>
           {showTrend && (
             <TrendIcon
@@ -477,7 +502,7 @@ function OverviewStat({ value, label, color }: { value: string; label: string; c
       <div className="font-display leading-none" style={{ fontSize: 32, color: color ?? "var(--ink)" }}>
         {value}
       </div>
-      <div className="text-[11.5px] text-muted mt-1.5">{label}</div>
+      <div className="text-[11.5px] text-ink-muted mt-1.5">{label}</div>
     </div>
   )
 }
@@ -537,9 +562,9 @@ function TableSkeleton() {
 function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <AlertCircle className="w-10 h-10 text-[#DC2626] mb-3" />
+      <AlertCircle className="w-10 h-10 text-neg mb-3" />
       <h3 className="text-lg font-semibold text-midnight dark:text-[#E6E8EF] mb-1">Não foi possível carregar</h3>
-      <p className="text-sm text-[#6B7280] mb-4">Tente novamente em instantes.</p>
+      <p className="text-sm text-ink-muted mb-4">Tente novamente em instantes.</p>
       <button
         onClick={onRetry}
         className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors"
