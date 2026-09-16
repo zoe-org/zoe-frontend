@@ -27,7 +27,6 @@ export type KeywordItem = {
   id: string
   keyword: string
   matchType: string
-  isNegative: boolean
   source: string
   createdAt: string
 }
