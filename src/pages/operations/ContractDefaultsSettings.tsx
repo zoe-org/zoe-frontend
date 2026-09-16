@@ -114,14 +114,15 @@ export function ContractDefaultsTab({ isAdmin }: { isAdmin: boolean }) {
   }
 
   return (
-    <div className="max-w-4xl">
-      <div className="flex items-start justify-between gap-4 flex-wrap mb-5">
+    <div>
+      {/* Sem título próprio: o cabeçalho do diálogo de configurações já diz de que seção
+          isto é, e um segundo <h2> logo abaixo dele competia com o primeiro. */}
+      <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
         <div>
-          <div className="eyebrow mb-1.5">Padrões de contrato</div>
-          <h2 className="font-display m-0" style={{ fontSize: 22, color: "var(--ink)" }}>
-            Escreva uma vez, use em todo contrato
-          </h2>
-          <p className="text-[13px] text-ink-muted mt-1.5 mb-0 max-w-[600px]">
+          <div className="text-[13.5px] font-medium" style={{ color: "var(--ink)" }}>
+            Padrões de contrato
+          </div>
+          <p className="text-[12.5px] text-ink-muted mt-0.5 mb-0 max-w-[600px]">
             Todo contrato novo nasce com estes valores, e dá para trocar em cada um. Contratos
             já criados não mudam — alguém pode ter ajustado o texto de propósito.
           </p>
