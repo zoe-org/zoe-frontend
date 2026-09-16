@@ -525,6 +525,12 @@ export type ContractDetail = {
   declaredTotalCents?: number | null
   /** Rascunho que ficou sem a proposta do convite porque outro contrato a levou — é este. */
   proposalUsedByContractId?: string | null
+  /**
+   * O que a marca paga se a custódia abrir com o valor declarado: criador + taxa +
+   * processamento. Vem do servidor, com a tabela do provedor — a tela não refaz a conta.
+   * Nulo sem custódia, sem valor legível ou sem taxa.
+   */
+  chargePreview?: ChargePreview | null
   /** Custódia já aberta. Nulo com usesEscrow = a tela oferece abrir. */
   escrowAccountId: string | null
   escrowState: string | null
@@ -614,6 +620,7 @@ export const operationsApi = {
       amountCents: number
       takeRateCents: number
       netToInfluencerCents: number
+      processingFeeCents: number
     }>("/api/operations/escrow", body),
 
   applyEscrowAction: (escrowAccountId: string, action: EscrowAction) =>
@@ -1137,6 +1144,15 @@ export function useDeliveryMutations() {
   }
 }
 
+/** Composição do que a marca paga numa custódia. O criador recebe `contractValueCents` inteiro. */
+export type ChargePreview = {
+  takeRateBps: number
+  contractValueCents: number
+  takeRateCents: number
+  processingFeeCents: number
+  totalCents: number
+}
+
 export type EscrowSummary = {
   escrowAccountId: string
   contractId: string
@@ -1153,6 +1169,8 @@ export type EscrowSummary = {
   takeRateBps: number
   takeRateCents: number
   netToInfluencerCents: number
+  /** Processamento repassado à marca. Zero nas custódias anteriores à cobrança por cima. */
+  processingFeeCents: number
   authorizationExpiresAt: string | null
   isAuthorizationExpired: boolean
   /**

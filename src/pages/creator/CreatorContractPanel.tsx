@@ -270,22 +270,33 @@ function HeaderCard({
         </div>
       )}
 
-      {/* O criador tem direito de ver quanto a plataforma retém — é o que a cláusula de
-          sistema declara às partes, então a tela não pode esconder. */}
+      {/* O criador tem direito de ver como a plataforma é paga — é o que a cláusula de
+          sistema declara às partes, então a tela não pode esconder. Desde a cobrança por cima
+          ele recebe o contrato inteiro e a taxa sai da marca; custódia anterior ainda descontava
+          dele, e a tela mostra o que vale para cada uma. */}
       {c.amountCents != null && (
         <div
           className="mt-5 rounded-xl border border-border-soft overflow-hidden"
           style={{ background: "var(--bg, #FAFBFC)" }}
         >
-          <div className="grid grid-cols-1 sm:grid-cols-3">
-            <Money label="Valor do contrato" value={c.amountCents} />
-            <Money
-              label={`Taxa da plataforma${c.takeRateBps ? ` (${(c.takeRateBps / 100).toFixed(0)}%)` : ""}`}
-              value={c.takeRateCents ?? 0}
-              muted
-            />
-            <Money label="Você recebe" value={c.netToInfluencerCents ?? 0} highlight />
-          </div>
+          {taxaDescontadaDoCriador(c) ? (
+            <div className="grid grid-cols-1 sm:grid-cols-3">
+              <Money label="Valor do contrato" value={c.amountCents} />
+              <Money
+                label={`Taxa da plataforma${c.takeRateBps ? ` (${(c.takeRateBps / 100).toFixed(0)}%)` : ""}`}
+                value={c.takeRateCents ?? 0}
+                muted
+              />
+              <Money label="Você recebe" value={c.netToInfluencerCents ?? 0} highlight />
+            </div>
+          ) : (
+            <div className="px-4 py-3">
+              <Money label="Você recebe — o valor inteiro do contrato" value={c.netToInfluencerCents ?? 0} highlight />
+              <p className="text-[11.5px] text-ink-muted m-0 mt-1">
+                A taxa da plataforma{c.takeRateBps ? ` (${(c.takeRateBps / 100).toFixed(0)}%)` : ""} é paga pela marca, por fora do seu valor.
+              </p>
+            </div>
+          )}
 
           {/* Onde o dinheiro está, em uma frase. É a pergunta que o criador realmente traz
               para esta tela, e o rótulo do estado sozinho não responde. */}
@@ -480,6 +491,15 @@ function splitClauseBody(body: string): { marker: string | null; text: string }[
       const m = /^(\d{1,2}\.\d{1,2}\.)\s*([\s\S]*)$/.exec(part)
       return m ? { marker: m[1], text: m[2] } : { marker: null, text: part }
     })
+}
+
+/**
+ * Regra antiga: a cobrança era o valor do contrato e fechava exatamente com taxa + líquido. Na
+ * cobrança por cima ela é maior que os dois somados, porque inclui o processamento.
+ */
+function taxaDescontadaDoCriador(c: { amountCents: number | null; takeRateCents: number | null; netToInfluencerCents: number | null }) {
+  return c.amountCents != null
+    && c.amountCents === (c.takeRateCents ?? 0) + (c.netToInfluencerCents ?? 0)
 }
 
 function Money({

@@ -11,13 +11,13 @@ import { Input } from "@/components/ui/input"
 import { RoleGate } from "@/features/auth/RoleGate"
 import { tEnum } from "@/i18n/enums"
 import { fmtDate } from "@/pages/operations/format"
-import { TableSkeleton } from "@/pages/operations/shared"
+import { ChargeBreakdown, TableSkeleton } from "@/pages/operations/shared"
 import { ContractTimeline } from "@/pages/operations/ContractTimeline"
 import {
   useContract, useContractDetailMutations, useEscrowMutations, useCustomClauseMutations,
   CUSTOM_CONTRACTS_UPGRADE_CODE,
   fieldInputKind, contractProgress, FIELD_SOURCE_LABEL, useUpdateContractDefaults, useContractDefaults,
-  type ContractField, type ContractDetail, type ContractClause,
+  type ContractField, type ContractDetail, type ContractClause, type ChargePreview,
 } from "@/lib/api/operations"
 
 
@@ -599,6 +599,7 @@ function SignaturePanel({
               contractId={data.contractId}
               automationStalled={data.autoAdvanceEscrow}
               declaredTotalCents={data.declaredTotalCents ?? null}
+              chargePreview={data.chargePreview ?? null}
             />
           )
       )}
@@ -647,8 +648,13 @@ const brl = (cents: number) =>
   (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
 
 function OpenEscrowPanel({
-  contractId, automationStalled = false, declaredTotalCents = null,
-}: { contractId: string; automationStalled?: boolean; declaredTotalCents?: number | null }) {
+  contractId, automationStalled = false, declaredTotalCents = null, chargePreview = null,
+}: {
+  contractId: string
+  automationStalled?: boolean
+  declaredTotalCents?: number | null
+  chargePreview?: ChargePreview | null
+}) {
   const { open } = useEscrowMutations()
   const [amount, setAmount] = useState("")
 
@@ -697,7 +703,7 @@ function OpenEscrowPanel({
             </div>
           ) : (
             <div className="flex-1 min-w-[160px]">
-              <div className="text-[11px] text-ink-muted mb-1.5">Valor bruto do contrato</div>
+              <div className="text-[11px] text-ink-muted mb-1.5">Valor do contrato (o que o criador recebe)</div>
               <MoneyInput value={amount} onChange={setAmount} placeholder="15.000,00" />
             </div>
           )}
@@ -708,14 +714,20 @@ function OpenEscrowPanel({
             style={{ background: "var(--color-teal-500)" }}
           >
             {open.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            {temValorDoContrato ? `Abrir custódia de ${brl(declaredTotalCents!)}` : "Abrir custódia"}
+            {chargePreview ? `Reservar ${brl(chargePreview.totalCents)}` : "Abrir custódia"}
           </button>
         </div>
 
+        {chargePreview && (
+          <div className="mt-3">
+            <ChargeBreakdown {...chargePreview} format={brl} />
+          </div>
+        )}
+
         <p className="text-[11.5px] text-ink-muted mt-2 mb-0">
           {temValorDoContrato
-            ? "Valor e taxa vêm do contrato assinado e não mudam depois da assinatura."
-            : "O contrato não tem valor total legível — informe o valor combinado. A taxa da plataforma vem do contrato."}
+            ? "O criador recebe o valor do contrato inteiro. Taxa e processamento são cobrados da marca, por cima, e não mudam depois da assinatura."
+            : "O contrato não tem valor total legível — informe o valor combinado. Taxa da plataforma e processamento são acrescentados ao que a marca paga."}
         </p>
       </div>
     </RoleGate>

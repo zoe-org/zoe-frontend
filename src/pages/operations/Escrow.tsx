@@ -340,10 +340,15 @@ function EscrowDrawer({ e, onClose }: { e: EscrowSummary; onClose: () => void })
     }
   }
 
+  // Na ordem da conta: o criador recebe o valor do contrato, e taxa e processamento vão por
+  // cima. Custódia anterior a essa regra não repassou processamento — a linha não aparece.
   const rows: [string, string][] = [
-    ["Valor bruto", fmtCents(e.amountCents)],
-    [`Take rate (${(e.takeRateBps / 100).toFixed(0)}%)`, fmtCents(e.takeRateCents)],
-    ["Líquido ao criador", fmtCents(e.netToInfluencerCents)],
+    ["Ao criador", fmtCents(e.netToInfluencerCents)],
+    [`Taxa da plataforma (${(e.takeRateBps / 100).toFixed(0)}%)`, fmtCents(e.takeRateCents)],
+    ...(e.processingFeeCents > 0
+      ? [["Processamento do pagamento", fmtCents(e.processingFeeCents)] as [string, string]]
+      : []),
+    ["A marca paga", fmtCents(e.amountCents)],
   ]
 
   return (

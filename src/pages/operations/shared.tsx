@@ -152,3 +152,44 @@ export function PlatformCover({ platform, compact = false }: { platform: string;
     </div>
   )
 }
+
+/**
+ * O que a marca paga numa custódia, em linhas: o criador recebe o valor do contrato inteiro,
+ * e taxa da plataforma e processamento do pagamento vão por cima.
+ *
+ * Sem a composição à vista o total parece errado — "o contrato é de R$ 10.000 e a cobrança
+ * foi de R$ 10.832,62?" — e essa é exatamente a pergunta que chega ao suporte.
+ */
+export function ChargeBreakdown({
+  contractValueCents, takeRateCents, processingFeeCents, totalCents, takeRateBps, format,
+}: {
+  contractValueCents: number
+  takeRateCents: number
+  processingFeeCents: number
+  totalCents: number
+  takeRateBps?: number | null
+  format: (cents: number) => string
+}) {
+  const rows: [string, number][] = [
+    ["Ao criador", contractValueCents],
+    [`Taxa da plataforma${takeRateBps ? ` (${(takeRateBps / 100).toLocaleString("pt-BR")}%)` : ""}`, takeRateCents],
+  ]
+  // Custódia anterior à cobrança por cima não repassou processamento: a linha zerada só
+  // confundiria.
+  if (processingFeeCents > 0) rows.push(["Processamento do pagamento", processingFeeCents])
+
+  return (
+    <div className="rounded-lg border border-border-soft overflow-hidden text-[12.5px]">
+      {rows.map(([label, cents]) => (
+        <div key={label} className="flex items-center justify-between px-3 py-1.5 border-b border-border-soft">
+          <span className="text-ink-muted">{label}</span>
+          <span className="font-mono-zoe tabular-nums" style={{ color: "var(--ink)" }}>{format(cents)}</span>
+        </div>
+      ))}
+      <div className="flex items-center justify-between px-3 py-2" style={{ background: "var(--bg, #FAFBFC)" }}>
+        <span className="font-medium" style={{ color: "var(--ink)" }}>A marca paga</span>
+        <span className="font-mono-zoe tabular-nums font-semibold" style={{ color: "var(--ink)" }}>{format(totalCents)}</span>
+      </div>
+    </div>
+  )
+}
