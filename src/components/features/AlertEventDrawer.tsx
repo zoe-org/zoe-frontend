@@ -101,8 +101,19 @@ export function AlertEventDrawer({
             <div>
               <div className="eyebrow mb-2.5">O que a regra viu</div>
               <div className="rounded-lg border border-border-soft divide-y divide-border-soft">
+                {/* Em owned, a regra comparou os comentários: mostrar só o score da
+                    análise faria a tela dizer um número e o motivo, outro (D6). */}
+                {snapshot.commentsScore != null && (
+                  <SnapshotRow
+                    label="Sentimento dos comentários"
+                    value={snapshot.commentsScore.toFixed(2)}
+                  />
+                )}
                 {snapshot.score != null && (
-                  <SnapshotRow label="Score da análise" value={snapshot.score.toFixed(2)} />
+                  <SnapshotRow
+                    label={origin === "owned" ? "Score do vídeo (inclui a marca falando)" : "Score da análise"}
+                    value={snapshot.score.toFixed(2)}
+                  />
                 )}
                 {snapshot.classification && (
                   <SnapshotRow label="Classificação" value={tEnum("classification", snapshot.classification)} />

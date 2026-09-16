@@ -104,6 +104,12 @@ export type AlertSnapshot = {
   pipelinePath?: string | null
   /** `"Owned"` | `"ThirdParty"`. Ausente em disparo anterior a 2026-08-09. */
   channelRelation?: string | null
+  /**
+   * Componente de comentários. Em vídeo do canal próprio é ele que a regra de
+   * sentimento compara (D6), e não o `score` — que ali inclui a fala da marca.
+   * Ausente em disparo anterior a 2026-09-16 e em vídeo de terceiro.
+   */
+  commentsScore?: number | null
 }
 
 /**
