@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useMemo, useState, Fragment } from "react"
 import { DELIVERY_STATUS_COLOR } from "@/pages/operations/statusColors"
 import { DeliveryDrafts } from "@/pages/operations/DeliveryDrafts"
 import { Link, useSearchParams } from "react-router-dom"
@@ -16,14 +16,15 @@ import { fmtDate, matches, campanhaLabel } from "@/pages/operations/format"
 import {
   TableSkeleton, ErrorState, SearchBox, NoResults, PlatformCover,
 } from "@/pages/operations/shared"
-import { QueueLayout, QueueRow } from "@/pages/operations/ReviewQueue"
+import { QueueLayout, QueueRow, QueueSection } from "@/pages/operations/ReviewQueue"
+import { secoesPorCampanha, itensVisiveis } from "@/pages/operations/queueSections"
 import { ContractTimeline } from "@/pages/operations/ContractTimeline"
 import { useIsWide, useQueueKeys, esperaLabel } from "@/pages/operations/queueNavigation"
 import {
   agruparPorContrato, ordenarFila, PENDENTE, type DeliveryGroup,
 } from "@/pages/operations/deliveryQueue"
 import {
-  useDeliveries, useDeliveryDrafts, useDeliveryMutations, fmtCents, deliveryThumb, deliveryLink,
+  useDeliveries, useDeliveryDrafts, useDeliveryMutations, fmtCents, useDeliveryThumb, deliveryLink,
   PLATFORM_LABEL,
   type DeliverySummary, type DeliveryDecision, type DeliveryAudit, type ReworkScope,
 } from "@/lib/api/operations"
@@ -161,10 +162,31 @@ function PublishedQueue({
     [grupos, aba, campanha, busca],
   )
 
-  const ids = filtrados.map((g) => g.current.contractId)
+  // Sem campanha escolhida e com mais de uma na fila, a lista vira seções por campanha — a do item
+  // mais urgente no topo. Teclado e "próximo depois de decidir" seguem a mesma ordem da tela.
+  const [recolhidas, setRecolhidas] = useState<ReadonlySet<string>>(() => new Set())
+  const secoes = useMemo(
+    () => secoesPorCampanha(
+      filtrados,
+      (g) => ({ id: g.current.campaignId, nome: g.current.campaignName }),
+      (g) => PENDENTE.has(g.current.status),
+      campanhaLabel,
+    ),
+    [filtrados],
+  )
+  const agrupar = !campanha && secoes.length > 1
+  const visiveis = agrupar ? itensVisiveis(secoes, recolhidas) : filtrados
+  const alternarSecao = (chave: string) => setRecolhidas((atuais) => {
+    const proximas = new Set(atuais)
+    if (proximas.has(chave)) proximas.delete(chave)
+    else proximas.add(chave)
+    return proximas
+  })
+
+  const ids = visiveis.map((g) => g.current.contractId)
   // Na tela larga sempre há um item aberto: o detalhe vazio ao lado da lista era espaço perdido.
-  const atual = filtrados.find((g) => g.current.contractId === selected)
-    ?? (wide ? filtrados[0] : undefined)
+  const atual = visiveis.find((g) => g.current.contractId === selected)
+    ?? (wide ? visiveis[0] : undefined)
     ?? null
 
   // Decidiu em "Aguardando": o item sai da aba, e o próximo abre sozinho em vez de a pessoa
@@ -182,6 +204,26 @@ function PublishedQueue({
     onClose: wide ? undefined : () => setSelected(null),
     notesId: "review-notes",
   })
+
+  const linha = (g: DeliveryGroup) => {
+    const d = g.current
+    return (
+      <QueueRow
+        key={d.contractId}
+        id={d.contractId}
+        active={atual?.current.contractId === d.contractId}
+        onSelect={setSelected}
+        thumb={<RowThumb d={d} />}
+        // O título é quem entregou. Pela campanha, todo contrato avulso virava
+        // "Sem campanha" e o nome da pessoa ficava em letra miúda.
+        title={d.influencerName}
+        subtitle={`${campanhaLabel(d.campaignName)}${d.submissionAttempt > 1 ? ` · ${d.submissionAttempt}ª tentativa` : ""}`}
+        status={<DeliveryChip status={d.status} small />}
+        meta={esperaLabel(d.submittedAt)}
+        alert={d.isReviewOverdue && PENDENTE.has(d.status) ? "prazo vencido" : null}
+      />
+    )
+  }
 
   return (
     <>
@@ -259,36 +301,20 @@ function PublishedQueue({
           detailTitle="Revisão da entrega"
           onCloseDetail={() => setSelected(null)}
           hint="↑ ↓ ou J K andam pela fila · C escreve as observações"
-          list={filtrados.map((g) => {
-            const d = g.current
-            const thumb = deliveryThumb(d)
-            return (
-              <QueueRow
-                key={d.contractId}
-                id={d.contractId}
-                active={atual?.current.contractId === d.contractId}
-                onSelect={setSelected}
-                thumb={thumb
-                  ? (
-                    <img
-                      src={thumb}
-                      alt=""
-                      loading="lazy"
-                      className="absolute inset-0 w-full h-full object-cover"
-                      onError={(e) => { e.currentTarget.style.visibility = "hidden" }}
-                    />
-                  )
-                  : <PlatformCover platform={d.platform} compact />}
-                // O título é quem entregou. Pela campanha, todo contrato avulso virava
-                // "Sem campanha" e o nome da pessoa ficava em letra miúda.
-                title={d.influencerName}
-                subtitle={`${campanhaLabel(d.campaignName)}${d.submissionAttempt > 1 ? ` · ${d.submissionAttempt}ª tentativa` : ""}`}
-                status={<DeliveryChip status={d.status} small />}
-                meta={esperaLabel(d.submittedAt)}
-                alert={d.isReviewOverdue && PENDENTE.has(d.status) ? "prazo vencido" : null}
-              />
-            )
-          })}
+          list={agrupar
+            ? secoes.map((sec) => (
+              <Fragment key={sec.chave}>
+                <QueueSection
+                  label={sec.rotulo}
+                  count={sec.itens.length}
+                  pending={sec.pendentes}
+                  collapsed={recolhidas.has(sec.chave)}
+                  onToggle={() => alternarSecao(sec.chave)}
+                />
+                {!recolhidas.has(sec.chave) && sec.itens.map(linha)}
+              </Fragment>
+            ))
+            : filtrados.map(linha)}
           detail={atual && (
             <ReviewPanel
               key={atual.current.deliveryId}
@@ -410,8 +436,26 @@ function sugestaoDeEscopo(audit: DeliveryAudit | null): ReworkScope {
   return soPublicacao ? "Publication" : "Content"
 }
 
+/** Capa da linha da fila. Componente porque a miniatura do TikTok é buscada, e hook não cabe em `linha`. */
+function RowThumb({ d }: { d: DeliverySummary }) {
+  const thumb = useDeliveryThumb(d)
+  return thumb
+    ? (
+      <img
+        src={thumb}
+        alt=""
+        loading="lazy"
+        className="absolute inset-0 w-full h-full object-cover"
+        onError={(e) => { e.currentTarget.style.visibility = "hidden" }}
+      />
+    )
+    : <PlatformCover platform={d.platform} compact />
+}
+
 /** O vídeo, dentro da tela quando é do YouTube — sair para outra aba a cada entrega cansava. */
 function VideoPreview({ d }: { d: DeliverySummary }) {
+  // Antes do retorno do YouTube: hook não pode ficar atrás de condição.
+  const thumb = useDeliveryThumb(d)
   if (d.youtubeVideoId) {
     return (
       <div className="relative aspect-video rounded-lg overflow-hidden bg-[#111827] mb-4">
@@ -434,9 +478,9 @@ function VideoPreview({ d }: { d: DeliverySummary }) {
       rel="noreferrer noopener"
       className="block relative aspect-video rounded-lg overflow-hidden bg-[#111827] mb-4"
     >
-      {deliveryThumb(d) ? (
+      {thumb ? (
         <img
-          src={deliveryThumb(d)!}
+          src={thumb}
           alt=""
           className="absolute inset-0 w-full h-full object-cover"
           onError={(e) => { e.currentTarget.style.visibility = "hidden" }}

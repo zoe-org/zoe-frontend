@@ -631,6 +631,12 @@ export const operationsApi = {
       { signal: opts?.signal },
     ),
 
+  deliveryThumbnail: (deliveryId: string, opts?: { signal?: AbortSignal }) =>
+    apiClient.get<DeliveryThumbnail>(
+      `/api/operations/deliveries/${deliveryId}/thumbnail`,
+      { signal: opts?.signal },
+    ),
+
   submitDelivery: (body: { contractId: string; submittedUrl: string }) =>
     apiClient.post<{ deliveryId: string; status: DeliveryStatus }>(
       "/api/operations/deliveries", body),
@@ -1031,8 +1037,8 @@ export const PLATFORM_LABEL: Record<string, string> = {
 type DeliveryLinkish = { platform?: string | null; youtubeVideoId: string | null; submittedUrl: string }
 
 /**
- * Miniatura da entrega. Só o YouTube expõe imagem pública pelo id do vídeo; nas outras a
- * tela mostra uma capa com o nome da plataforma.
+ * Miniatura montada sem rede. Só o YouTube expõe imagem pública pelo id do vídeo; a do TikTok vem
+ * da API (`useDeliveryThumb`), e o Instagram fica com a capa com o nome da plataforma.
  */
 export const deliveryThumb = (d: Omit<DeliveryLinkish, "submittedUrl">): string | null =>
   (d.platform ?? "YouTube") === "YouTube" && d.youtubeVideoId ? youtubeThumb(d.youtubeVideoId) : null
@@ -1040,6 +1046,52 @@ export const deliveryThumb = (d: Omit<DeliveryLinkish, "submittedUrl">): string 
 /** Onde abrir a entrega: a URL canônica no YouTube, e o próprio link enviado nas outras. */
 export const deliveryLink = (d: DeliveryLinkish): string =>
   (d.platform ?? "YouTube") === "YouTube" && d.youtubeVideoId ? youtubeWatch(d.youtubeVideoId) : d.submittedUrl
+
+export type DeliveryThumbnail = { thumbnailUrl: string | null }
+
+/**
+ * Quanto a miniatura buscada vale na tela. A URL do TikTok é assinada e vence em cerca de dois dias;
+ * o servidor a guarda por até 12 h, então 6 h aqui não chegam perto do vencimento.
+ */
+const THUMB_STALE = 6 * 60 * 60_000
+
+/**
+ * Miniatura em qualquer plataforma: YouTube sai do id do vídeo, sem rede; TikTok é pedido à API, que
+ * consulta o oEmbed (a imagem é assinada e expira, então não dá para montar nem gravar); Instagram
+ * segue sem imagem. Uma consulta por entrega, só para as linhas que aparecem.
+ *
+ * Genérico no `fetchThumb` porque marca e criador leem por rotas diferentes — com tenant e sem.
+ */
+export function useRemoteDeliveryThumb(
+  d: Omit<DeliveryLinkish, "submittedUrl"> & { deliveryId: string },
+  scope: readonly unknown[],
+  fetchThumb: (deliveryId: string, signal: AbortSignal) => Promise<DeliveryThumbnail>,
+  enabled = true,
+): string | null {
+  const local = deliveryThumb(d)
+  const remota = !local && d.platform === "TikTok"
+  const { data } = useQuery({
+    queryKey: ["delivery-thumb", ...scope, d.deliveryId],
+    queryFn: ({ signal }) => fetchThumb(d.deliveryId, signal),
+    enabled: enabled && remota,
+    staleTime: THUMB_STALE,
+    gcTime: THUMB_STALE,
+    // Sem imagem a tela já tem a capa da plataforma; insistir não muda nada para quem olha.
+    retry: false,
+  })
+  return local ?? (remota ? data?.thumbnailUrl ?? null : null)
+}
+
+/** Miniatura de uma entrega na fila da marca. */
+export function useDeliveryThumb(d: Omit<DeliveryLinkish, "submittedUrl"> & { deliveryId: string }) {
+  const { activeTenantId } = useAuth()
+  return useRemoteDeliveryThumb(
+    d,
+    ["operations", activeTenantId],
+    (id, signal) => operationsApi.deliveryThumbnail(id, { signal }),
+    Boolean(activeTenantId),
+  )
+}
 
 export function useDeliveries(status?: string) {
   const { activeTenantId } = useAuth()

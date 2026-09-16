@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useMemo, useState, Fragment } from "react"
 import { DRAFT_STATUS_COLOR } from "@/pages/operations/statusColors"
 import { Loader2, Check, RotateCcw, Film } from "lucide-react"
 import { toast } from "sonner"
@@ -9,7 +9,8 @@ import { fmtDate, matches, campanhaLabel } from "@/pages/operations/format"
 import {
   ErrorState, TableSkeleton, SearchBox, NoResults,
 } from "@/pages/operations/shared"
-import { QueueLayout, QueueRow } from "@/pages/operations/ReviewQueue"
+import { QueueLayout, QueueRow, QueueSection } from "@/pages/operations/ReviewQueue"
+import { secoesPorCampanha, itensVisiveis } from "@/pages/operations/queueSections"
 import { useIsWide, useQueueKeys, esperaLabel } from "@/pages/operations/queueNavigation"
 import {
   useDeliveryDrafts, useDeliveryDraftMutations, type DeliveryDraftItem,
@@ -79,13 +80,34 @@ export function DeliveryDrafts() {
     [todos, filter, busca, campanha],
   )
 
+  // Mesmas seções da fila de entregas: sem campanha escolhida e com mais de uma, uma seção por
+  // campanha, na ordem da fila. Teclado e "próximo" seguem a ordem da tela.
+  const [recolhidas, setRecolhidas] = useState<ReadonlySet<string>>(() => new Set())
+  const secoes = useMemo(
+    () => secoesPorCampanha(
+      items,
+      (d) => ({ id: d.campaignId, nome: d.campaignName }),
+      (d) => d.status === "AwaitingReview",
+      campanhaLabel,
+    ),
+    [items],
+  )
+  const agrupar = !campanha && secoes.length > 1
+  const visiveis = agrupar ? itensVisiveis(secoes, recolhidas) : items
+  const alternarSecao = (chave: string) => setRecolhidas((atuais) => {
+    const proximas = new Set(atuais)
+    if (proximas.has(chave)) proximas.delete(chave)
+    else proximas.add(chave)
+    return proximas
+  })
+
   const contagem = {
     AwaitingReview: todos.filter((d) => d.status === "AwaitingReview").length,
     todos: todos.length,
   }
 
-  const ids = items.map((d) => d.draftId)
-  const atual = items.find((d) => d.draftId === selected) ?? (wide ? items[0] : undefined) ?? null
+  const ids = visiveis.map((d) => d.draftId)
+  const atual = visiveis.find((d) => d.draftId === selected) ?? (wide ? visiveis[0] : undefined) ?? null
 
   const aposDecidir = (draftId: string) => {
     if (filter !== "AwaitingReview") return
@@ -100,6 +122,19 @@ export function DeliveryDrafts() {
     onClose: wide ? undefined : () => setSelected(null),
     notesId: "draft-notes",
   })
+
+  const linha = (d: DeliveryDraftItem) => (
+    <QueueRow
+      key={d.draftId}
+      id={d.draftId}
+      active={atual?.draftId === d.draftId}
+      onSelect={setSelected}
+      title={d.influencerName}
+      subtitle={`${campanhaLabel(d.campaignName)}${d.revision > 1 ? ` · revisão ${d.revision}` : ""}`}
+      status={<DraftChip status={d.status} />}
+      meta={esperaLabel(d.submittedAt)}
+    />
+  )
 
   return (
     <>
@@ -182,18 +217,20 @@ export function DeliveryDrafts() {
           detailTitle="Revisão do corte"
           onCloseDetail={() => setSelected(null)}
           hint="↑ ↓ ou J K andam pela fila · C escreve o que mudar"
-          list={items.map((d) => (
-            <QueueRow
-              key={d.draftId}
-              id={d.draftId}
-              active={atual?.draftId === d.draftId}
-              onSelect={setSelected}
-              title={d.influencerName}
-              subtitle={`${campanhaLabel(d.campaignName)}${d.revision > 1 ? ` · revisão ${d.revision}` : ""}`}
-              status={<DraftChip status={d.status} />}
-              meta={esperaLabel(d.submittedAt)}
-            />
-          ))}
+          list={agrupar
+            ? secoes.map((sec) => (
+              <Fragment key={sec.chave}>
+                <QueueSection
+                  label={sec.rotulo}
+                  count={sec.itens.length}
+                  pending={sec.pendentes}
+                  collapsed={recolhidas.has(sec.chave)}
+                  onToggle={() => alternarSecao(sec.chave)}
+                />
+                {!recolhidas.has(sec.chave) && sec.itens.map(linha)}
+              </Fragment>
+            ))
+            : items.map(linha)}
           detail={atual && (
             // A revisão entra na chave: o reenvio do criador reaproveita o mesmo corte, e o
             // texto digitado para a versão anterior não pode ficar pendurado na nova.

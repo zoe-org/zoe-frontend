@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react"
-import { X } from "lucide-react"
+import { ChevronDown, X } from "lucide-react"
 import { useFocusTrap } from "@/lib/useFocusTrap"
 
 /*
@@ -134,6 +134,42 @@ export function QueueRow({
           )}
         </div>
       </div>
+    </button>
+  )
+}
+
+/**
+ * Cabeçalho de uma seção da fila: a campanha, quantos esperam decisão e quantos itens há. Recolhe e
+ * abre; fica preso no alto enquanto a lista rola, para a pessoa não perder de qual campanha é a linha.
+ */
+export function QueueSection({
+  label, count, pending, collapsed, onToggle,
+}: {
+  label: string
+  count: number
+  pending: number
+  collapsed: boolean
+  onToggle: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={!collapsed}
+      className="w-full flex items-center gap-2 px-3.5 py-2 text-left border-b border-border-soft sticky top-0 z-[1]"
+      style={{ background: "var(--bg, #F9FAFB)" }}
+    >
+      <ChevronDown
+        className="w-3.5 h-3.5 text-ink-muted shrink-0 transition-transform"
+        style={{ transform: collapsed ? "rotate(-90deg)" : undefined }}
+      />
+      <span className="text-[11.5px] font-semibold truncate flex-1" style={{ color: "var(--ink)" }}>{label}</span>
+      {pending > 0 && (
+        <span className="text-[10.5px] font-medium shrink-0" style={{ color: "#B45309" }}>
+          {pending} {pending === 1 ? "esperando" : "esperando"}
+        </span>
+      )}
+      <span className="text-[10.5px] font-mono-zoe text-ink-muted shrink-0">{count}</span>
     </button>
   )
 }

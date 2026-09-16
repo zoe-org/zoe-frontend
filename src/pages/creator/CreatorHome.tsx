@@ -12,10 +12,10 @@ import { StatusChip } from "@/components/ui/status-chip"
 import { useAuth } from "@/features/auth/context"
 import { tEnum } from "@/i18n/enums"
 import { fmtDate, initials } from "@/pages/operations/format"
-import { fmtCents, deliveryThumb, deliveryLink } from "@/lib/api/operations"
+import { fmtCents, deliveryLink } from "@/lib/api/operations"
 import { PlatformCover } from "@/pages/operations/shared"
 import {
-  useCreatorWorkspace, useCreatorMutations, useSetCreatorTaxId, trabalhoLabel,
+  useCreatorWorkspace, useCreatorMutations, useSetCreatorTaxId, useCreatorDeliveryThumb, trabalhoLabel,
   type CreatorEngagement, type CreatorDelivery,
 } from "@/lib/api/creator"
 import { CreatorContractPanel } from "@/pages/creator/CreatorContractPanel"
@@ -466,6 +466,7 @@ function EngagementCard({ e }: { e: CreatorEngagement }) {
 }
 
 function DeliveryRow({ dl }: { dl: CreatorDelivery }) {
+  const thumb = useCreatorDeliveryThumb(dl)
   return (
     <div className="flex items-start gap-3 rounded-lg border border-border-soft p-2.5">
       <a
@@ -474,9 +475,9 @@ function DeliveryRow({ dl }: { dl: CreatorDelivery }) {
         rel="noreferrer noopener"
         className="relative w-[92px] aspect-video rounded overflow-hidden bg-[#111827] shrink-0"
       >
-        {deliveryThumb(dl) ? (
+        {thumb ? (
           <img
-            src={deliveryThumb(dl)!}
+            src={thumb}
             alt=""
             loading="lazy"
             className="absolute inset-0 w-full h-full object-cover"

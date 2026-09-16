@@ -5,11 +5,12 @@ import {
 import { toast } from "sonner"
 import { Input } from "@/components/ui/input"
 import { fmtDate } from "@/pages/operations/format"
-import { useDraftUpload, type CreatorEngagement } from "@/lib/api/creator"
+import { useDraftUpload, LIMITE_PUT_UNICO, type CreatorEngagement } from "@/lib/api/creator"
 
 /**
- * Teto de um PUT único no S3. Acima disso o storage recusa depois de a pessoa esperar o arquivo
- * inteiro subir — melhor dizer antes de começar.
+ * Teto do corte. Nasceu do limite de um PUT único no S3; com o envio em partes o storage aceitaria
+ * mais, mas o limite não pode depender do caminho que o navegador escolheu — e 5 GB já é um corte
+ * enorme. Dito antes de começar, ninguém espera o arquivo inteiro subir para ouvir não.
  */
 const LIMITE_BYTES = 5 * 1024 ** 3
 
@@ -273,6 +274,13 @@ export function CreatorDraftUpload({ engagement }: { engagement: CreatorEngageme
                       ? "Finalizando…"
                       : `${Math.round(progresso * 100)}% enviado${restanteMs != null ? ` · faltam ${fmtRestante(restanteMs)}` : ""} — não feche esta aba até terminar.`}
                   </p>
+                  {/* Arquivo grande sobe em partes. Dizer isso aqui muda o que a pessoa faz quando
+                      a conexão cai: escolher o mesmo arquivo em vez de desistir do envio. */}
+                  {file && file.size > LIMITE_PUT_UNICO && (
+                    <p className="text-[11px] text-ink-muted m-0">
+                      Se a conexão cair, escolha o mesmo arquivo e envie de novo: continua de onde parou.
+                    </p>
+                  )}
                 </div>
               )}
             </div>

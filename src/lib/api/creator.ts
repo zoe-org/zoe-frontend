@@ -1,7 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient, apiBlob } from "@/lib/api"
+import {
+  enviarEmPartes, guardaEmLocalStorage, type MultipartApi, type PutParte,
+} from "@/lib/upload/multipartUpload"
 import { useAuth } from "@/features/auth/context"
-import type { DeliveryStatus, EscrowState } from "@/lib/api/operations"
+import {
+  useRemoteDeliveryThumb, type DeliveryStatus, type DeliveryThumbnail, type EscrowState,
+} from "@/lib/api/operations"
 
 /**
  * Área do criador. Módulo separado de `operations.ts` de propósito: aqui **nada** leva
@@ -268,6 +273,29 @@ export const creatorApi = {
     apiClient.post<{ uploadUrl: string; mediaKey: string; expiresAt: string }>(
       "/api/creator/deliveries/draft-upload", body, { noTenant: true }),
 
+  /**
+   * Envio em partes, para arquivo grande: abrir, assinar as próximas partes e juntar no fim. A
+   * confirmação continua sendo a mesma do PUT único, com a mesma chave.
+   */
+  startDraftMultipart: (body: {
+    contractId: string; fileName: string; contentType: string; sizeBytes: number
+  }) =>
+    apiClient.post<{ mediaKey: string; uploadId: string; partSizeBytes: number; partCount: number }>(
+      "/api/creator/deliveries/draft-upload/multipart", body, { noTenant: true }),
+
+  signDraftParts: (body: {
+    contractId: string; mediaKey: string; uploadId: string; partNumbers: number[]
+  }) =>
+    apiClient.post<{ parts: { partNumber: number; url: string }[]; expiresAt: string }>(
+      "/api/creator/deliveries/draft-upload/multipart/parts", body, { noTenant: true }),
+
+  completeDraftMultipart: (body: {
+    contractId: string; mediaKey: string; uploadId: string
+    parts: { partNumber: number; eTag: string }[]
+  }) =>
+    apiClient.post<{ mediaKey: string }>(
+      "/api/creator/deliveries/draft-upload/multipart/complete", body, { noTenant: true }),
+
   /** Passo 3: confirma que subiu e põe na fila de revisão da marca. */
   submitDraft: (body: {
     contractId: string
@@ -312,6 +340,12 @@ export const creatorApi = {
       signal: opts?.signal,
     }),
 
+  deliveryThumbnail: (deliveryId: string, opts?: { signal?: AbortSignal }) =>
+    apiClient.get<DeliveryThumbnail>(`/api/creator/deliveries/${deliveryId}/thumbnail`, {
+      noTenant: true,
+      signal: opts?.signal,
+    }),
+
   /**
    * PDF do contrato. Buscado como blob e não por link direto: `<a href>` não carrega o
    * cabeçalho de autorização, e o endpoint é protegido.
@@ -339,6 +373,17 @@ export function useCreatorWorkspace() {
   })
 }
 
+/** Miniatura de uma entrega do criador — a mesma regra da fila da marca, pela rota sem tenant. */
+export function useCreatorDeliveryThumb(dl: CreatorDelivery) {
+  const { isAuthenticated, isCreator } = useAuth()
+  return useRemoteDeliveryThumb(
+    dl,
+    ["creator"],
+    (id, signal) => creatorApi.deliveryThumbnail(id, { signal }),
+    isAuthenticated && isCreator,
+  )
+}
+
 export function useCreatorContract(contractId: string | null) {
   const { isAuthenticated, isCreator } = useAuth()
   return useQuery({
@@ -348,6 +393,80 @@ export function useCreatorContract(contractId: string | null) {
     staleTime: 60_000,
     retry: false,
   })
+}
+
+/**
+ * Acima disto o corte sobe em partes; abaixo, num PUT só.
+ *
+ * Um arquivo pequeno termina rápido o bastante para a queda de conexão ser rara, e cada parte tem
+ * custo próprio — uma ida à API para assinar e uma requisição para subir.
+ */
+export const LIMITE_PUT_UNICO = 16 * 1024 * 1024
+
+const FALHA_DE_REDE =
+  "O arquivo não subiu. Verifique sua conexão e tente de novo — o que já subiu fica guardado."
+
+/**
+ * Sobe um corpo por PUT com progresso.
+ *
+ * XMLHttpRequest em vez de fetch por UM motivo: progresso. Vídeo de campanha sobe por minutos numa
+ * conexão doméstica, e um botão parado em "enviando…" durante cinco minutos é indistinguível de
+ * travado — a pessoa cancela e tenta de novo, que é o pior desfecho possível para um upload grande.
+ */
+function subirComProgresso(
+  url: string,
+  corpo: Blob,
+  onProgress: (bytes: number) => void,
+  contentType?: string,
+): Promise<XMLHttpRequest> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open("PUT", url)
+
+    // O Content-Type tem de bater com o que foi assinado: o storage recusa a escrita se divergir, e
+    // a mensagem dele não diria que o problema é esse. Na parte de um envio múltiplo ele NÃO é
+    // assinado — mandá-lo ali só arriscaria barrar no CORS.
+    if (contentType) xhr.setRequestHeader("Content-Type", contentType)
+
+    xhr.upload.onprogress = (ev) => { if (ev.lengthComputable) onProgress(ev.loaded) }
+
+    xhr.onload = () =>
+      xhr.status >= 200 && xhr.status < 300 ? resolve(xhr) : reject(new Error(FALHA_DE_REDE))
+
+    xhr.onerror = () => reject(new Error(FALHA_DE_REDE))
+
+    xhr.send(corpo)
+  })
+}
+
+/** Sobe uma parte e devolve o ETag — é ele que identifica a parte na hora de juntar tudo. */
+const putParte: PutParte = async (url, corpo, onProgress) => {
+  const xhr = await subirComProgresso(url, corpo, onProgress)
+  const etag = xhr.getResponseHeader("ETag")
+  if (!etag) {
+    // Sem `ExposeHeaders: ETag` no CORS do bucket o navegador esconde o cabeçalho, e sem ele não há
+    // como concluir o envio. Falha explícita: em silêncio viraria "subiu tudo e sumiu".
+    throw new Error("O storage não identificou a parte enviada. Avise o suporte.")
+  }
+  return etag
+}
+
+const multipartApi: MultipartApi = {
+  start: (v) => creatorApi.startDraftMultipart(v),
+  signParts: (v) => creatorApi.signDraftParts(v),
+  complete: (v) => creatorApi.completeDraftMultipart(v),
+}
+
+async function enviarEmPutUnico(
+  contractId: string,
+  file: File,
+  contentType: string,
+  onProgress?: (fracao: number) => void,
+): Promise<string> {
+  const auth = await creatorApi.requestDraftUpload({ contractId, fileName: file.name, contentType })
+  await subirComProgresso(
+    auth.uploadUrl, file, (bytes) => onProgress?.(bytes / (file.size || 1)), contentType)
+  return auth.mediaKey
 }
 
 /**
@@ -369,43 +488,23 @@ export function useDraftUpload() {
     }) => {
       const contentType = v.file.type || "video/mp4"
 
-      const auth = await creatorApi.requestDraftUpload({
-        contractId: v.contractId,
-        fileName: v.file.name,
-        contentType,
-      })
-
-      // XMLHttpRequest em vez de fetch por UM motivo: progresso. Vídeo de campanha sobe
-      // por minutos numa conexão doméstica, e um botão parado em "enviando…" durante
-      // cinco minutos é indistinguível de travado — a pessoa cancela e tenta de novo,
-      // que é o pior desfecho possível para um upload grande.
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest()
-        xhr.open("PUT", auth.uploadUrl)
-
-        // O Content-Type tem de bater com o que foi assinado: o storage recusa a escrita
-        // se divergir, e a mensagem dele não diria que o problema é esse.
-        xhr.setRequestHeader("Content-Type", contentType)
-
-        xhr.upload.onprogress = (ev) => {
-          if (ev.lengthComputable) v.onProgress?.(ev.loaded / ev.total)
-        }
-
-        xhr.onload = () =>
-          xhr.status >= 200 && xhr.status < 300
-            ? resolve()
-            : reject(new Error(
-                "O arquivo não subiu. Verifique sua conexão e tente de novo — nada foi perdido."))
-
-        xhr.onerror = () => reject(new Error(
-          "O arquivo não subiu. Verifique sua conexão e tente de novo — nada foi perdido."))
-
-        xhr.send(v.file)
-      })
+      // Arquivo grande vai em partes: a queda de conexão custa só a parte em curso, e escolher o
+      // mesmo arquivo de novo continua de onde parou em vez de recomeçar do zero.
+      const mediaKey = v.file.size > LIMITE_PUT_UNICO
+        ? await enviarEmPartes({
+          contractId: v.contractId,
+          file: v.file,
+          contentType,
+          api: multipartApi,
+          putParte,
+          storage: guardaEmLocalStorage(),
+          onProgress: v.onProgress,
+        })
+        : await enviarEmPutUnico(v.contractId, v.file, contentType, v.onProgress)
 
       return creatorApi.submitDraft({
         contractId: v.contractId,
-        mediaKey: auth.mediaKey,
+        mediaKey,
         fileName: v.file.name,
         sizeBytes: v.file.size,
         creatorNotes: v.notes?.trim() || undefined,
