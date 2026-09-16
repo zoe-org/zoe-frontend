@@ -501,7 +501,6 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
                   style={{ color: "var(--ink-2)" }}
                 >
                   “{k.keyword}”
-                  {k.isNegative && <span className="chip chip-neg text-[9.5px]">neg</span>}
                   {canManage && (
                     <button
                       onClick={() => removeKeyword(k.id, k.keyword)}
