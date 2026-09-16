@@ -30,11 +30,17 @@ import OperationsEscrowPage from "@/pages/operations/Escrow"
 import OperationsRosterPage from "@/pages/operations/Roster"
 import UsersPage from "@/pages/Users"
 import AdminBrandsPage from "@/pages/admin/AdminBrands"
+import TermsPage from "@/pages/legal/Terms"
+import PrivacyPage from "@/pages/legal/Privacy"
 
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
   { path: "/register", element: <RegisterPage /> },
   { path: "/forgot-password", element: <ForgotPasswordPage /> },
+  // Documentos legais: públicos, porque são lidos antes de existir conta — no cadastro e no
+  // convite de criador, que é quando a pessoa aceita.
+  { path: "/termos", element: <TermsPage /> },
+  { path: "/privacidade", element: <PrivacyPage /> },
   { path: "/invite/:token", element: <AcceptInvitePage /> },
   // Convite de criador. Rota separada de /invite porque é outro convite: aqui não
   // nasce membership no workspace do contratante — nasce um criador com conta própria.

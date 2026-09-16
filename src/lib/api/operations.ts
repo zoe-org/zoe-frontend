@@ -299,6 +299,8 @@ export type InfluencerInvitePreview = {
   isBarter: boolean
   /** Os critérios contra os quais a entrega vai ser medida. Nulo se a campanha ainda não tem briefing. */
   briefing: InviteBriefing | null
+  /** Versão dos Termos e da Política que o aceite deve levar. Vem do backend, que é quem valida. */
+  termsVersion: string
 }
 
 export type InviteBriefing = {
@@ -707,9 +709,9 @@ export const operationsApi = {
     apiClient.get<InfluencerInvitePreview>(
       `/api/influencer-invites/${encodeURIComponent(token)}`, { noTenant: true }),
 
-  acceptInfluencerInvite: (token: string) =>
+  acceptInfluencerInvite: (token: string, acceptedTermsVersion: string) =>
     apiClient.post<AcceptInfluencerInviteResponse>(
-      "/api/influencer-invites/accept", { token }, { noTenant: true }),
+      "/api/influencer-invites/accept", { token, acceptedTermsVersion }, { noTenant: true }),
 
   createContract: (body: CreateContractBody) =>
     apiClient.post<CreateContractResponse>("/api/operations/contracts", body),

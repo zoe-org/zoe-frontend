@@ -322,8 +322,9 @@ function StepAccount({ onNext, defaultEmail = "", emailLocked = false }: { onNex
             <input type="checkbox" {...form.register("terms")} className="mt-0.5 rounded border-[#E5E7EB] accent-teal-500" />
             <span>
               Ao criar conta, você aceita os{" "}
-              <a href="#" className="text-teal-500 font-medium hover:underline">termos de uso</a> e a{" "}
-              <a href="#" className="text-teal-500 font-medium hover:underline">política de privacidade</a>.
+              {/* Nova aba: o formulário preenchido não pode se perder para ler o documento. */}
+              <a href="/termos" target="_blank" rel="noopener" className="text-teal-500 font-medium hover:underline">termos de uso</a> e a{" "}
+              <a href="/privacidade" target="_blank" rel="noopener" className="text-teal-500 font-medium hover:underline">política de privacidade</a>.
             </span>
           </label>
           {form.formState.errors.terms && <p className="text-xs text-destructive">{form.formState.errors.terms.message}</p>}
@@ -505,7 +506,10 @@ function StepVerification({
         // para clicar em "Aceitar" era um passo a mais, e era nele que o fluxo se perdia.
         clearPendingInviteEmail()
         try {
-          await operationsApi.acceptInfluencerInvite(creatorToken)
+          // O aceite dos termos é o checkbox obrigatório deste formulário, que abre os mesmos
+          // documentos. A versão vem da prévia do convite — o backend é quem diz qual vale.
+          const { termsVersion } = await operationsApi.previewInfluencerInvite(creatorToken)
+          await operationsApi.acceptInfluencerInvite(creatorToken, termsVersion)
           clearPendingInfluencerInviteToken()
           // O refresh vem DEPOIS do aceite: é o aceite que torna a conta de criador. Antes
           // dele a sessão diria "conta comum sem workspace", e a guarda de rota mandaria

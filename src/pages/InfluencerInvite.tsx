@@ -59,7 +59,7 @@ export default function InfluencerInvitePage() {
   const accept = async () => {
     setAccepting(true)
     try {
-      const res = await operationsApi.acceptInfluencerInvite(token)
+      const res = await operationsApi.acceptInfluencerInvite(token, preview.data!.termsVersion)
       clearPendingInfluencerInviteToken()
       // O aceite muda o TIPO da conta no backend — ela vira criadora. Sem recarregar a
       // sessão, o app continuava achando que era uma conta comum sem workspace: o botão
@@ -116,6 +116,9 @@ function Preview({
   onAccept: () => void
 }) {
   const blocked = data.expired || data.accepted
+  // É o aceite do convite que cria a conta de criador e começa o tratamento do dado pessoal —
+  // o aceite dos termos precisa ser aqui, marcado pela pessoa, e o backend grava a versão.
+  const [termsAccepted, setTermsAccepted] = useState(false)
 
   return (
     <>
@@ -205,15 +208,31 @@ function Preview({
       )}
 
       {!blocked && (isAuthenticated ? (
+        <>
+        <label className="flex items-start gap-2 text-[12.5px] text-ink-muted mb-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={termsAccepted}
+            onChange={(e) => setTermsAccepted(e.target.checked)}
+            className="mt-0.5 accent-[var(--color-teal-500)]"
+          />
+          <span>
+            Li e aceito os{" "}
+            <a href="/termos" target="_blank" rel="noopener" className="text-teal-500 font-medium hover:underline">Termos de Uso</a>{" "}
+            e a{" "}
+            <a href="/privacidade" target="_blank" rel="noopener" className="text-teal-500 font-medium hover:underline">Política de Privacidade</a>.
+          </span>
+        </label>
         <button
           onClick={onAccept}
-          disabled={accepting}
+          disabled={accepting || !termsAccepted}
           className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[14px] font-medium text-white disabled:opacity-50"
           style={{ background: "var(--color-teal-500)" }}
         >
           {accepting && <Loader2 className="w-4 h-4 animate-spin" />}
           Aceitar convite
         </button>
+        </>
       ) : (
         <>
           {/* O aceite exige conta: é ela que assume o registro do criador. O e-mail

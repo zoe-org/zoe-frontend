@@ -267,6 +267,12 @@ export type PayoutStatus = {
   disabledReason: string | null
 }
 
+export type DataDeletionResult = {
+  requestedAt: string
+  erased: string[]
+  retained: string[]
+}
+
 export const creatorApi = {
   /** Passo 1 do envio: autoriza a subida e devolve para onde mandar o arquivo. */
   requestDraftUpload: (body: { contractId: string; fileName: string; contentType: string }) =>
@@ -327,6 +333,14 @@ export const creatorApi = {
   // provedor sem avisar ninguém, então alguém precisa perguntar.
   syncPayoutStatus: () =>
     apiClient.post<PayoutStatus>("/api/creator/payout-account/sync", {}, { noTenant: true }),
+
+  /** Tudo o que a Zoe guarda sobre o criador (LGPD, art. 18, II e V). */
+  exportMyData: () =>
+    apiClient.get<unknown>("/api/creator/my-data", { noTenant: true }),
+
+  /** Pedido de exclusão (art. 18, VI). A resposta diz o que saiu e o que ficou, e por quê. */
+  requestDataDeletion: () =>
+    apiClient.post<DataDeletionResult>("/api/creator/data-deletion", {}, { noTenant: true }),
 
   workspace: (opts?: { signal?: AbortSignal }) =>
     apiClient.get<CreatorWorkspace>("/api/creator/workspace", {

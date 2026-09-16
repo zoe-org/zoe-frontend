@@ -19,6 +19,7 @@ import {
   type CreatorEngagement, type CreatorDelivery,
 } from "@/lib/api/creator"
 import { CreatorContractPanel } from "@/pages/creator/CreatorContractPanel"
+import { CreatorPrivacyCard } from "@/pages/creator/CreatorPrivacyCard"
 import { CreatorDraftUpload } from "@/pages/creator/CreatorDraftUpload"
 import { proximosPassos, type ProximoPasso } from "@/pages/creator/nextSteps"
 import ZoeLogo from "@/assets/zoe-logo.svg?react"
@@ -260,6 +261,8 @@ export default function CreatorHomePage() {
                 initialContractId={focoContrato}
               />
             )}
+
+            <CreatorPrivacyCard />
           </>
         ) : null}
       </main>
