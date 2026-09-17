@@ -10,6 +10,7 @@ import InfluencerInvitePage from "@/pages/InfluencerInvite"
 import CreatorHomePage from "@/pages/creator/CreatorHome"
 import CreatorOnboardingPage from "@/pages/creator/CreatorOnboarding"
 import CreatorPayoutPage from "@/pages/creator/CreatorPayout"
+import AuthCallbackPage from "@/pages/AuthCallback"
 import OnboardingTenantPage from "@/pages/OnboardingTenant"
 import DashboardPage from "@/pages/Dashboard"
 import MonitoringPage from "@/pages/intelligence/Monitoring"
@@ -61,6 +62,9 @@ export const router = createBrowserRouter([
     path: "/creator/payout",
     element: <ProtectedRoute><CreatorPayoutPage /></ProtectedRoute>,
   },
+  // Retorno do login com Google/Microsoft (ADR-064). URLs registradas no client do Cognito.
+  { path: "/auth/callback", element: <AuthCallbackPage /> },
+  { path: "/auth/logout", element: <Navigate to="/login" replace /> },
   {
     path: "/onboarding/tenant",
     element: <ProtectedRoute><OnboardingTenantPage /></ProtectedRoute>,
