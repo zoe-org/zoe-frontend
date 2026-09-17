@@ -45,23 +45,23 @@ function EscrowCell({ item }: { item: ContractSummary }) {
 export default function OperationsContractsPage() {
   const contracts = useContracts()
   const [createOpen, setCreateOpen] = useState(false)
-  const [busca, setBusca] = useState("")
+  const [search, setSearch] = useState("")
   // Vem do "Ver todos" da campanha. Na URL, e não em estado, para o voltar do navegador e o
   // link copiado levarem à mesma lista.
   const [params, setParams] = useSearchParams()
-  const campanhaFiltro = params.get("campaign")
+  const campaignFilter = params.get("campaign")
   // "?new=1" abre o modal; com "campaign" e "creator" ele já vem escolhido — é o "Criar
   // contrato" do funil da campanha.
-  const abrirPorLink = params.get("new") === "1"
+  const openedFromLink = params.get("new") === "1"
 
-  const todos = useMemo(() => contracts.data?.items ?? [], [contracts.data])
+  const allContracts = useMemo(() => contracts.data?.items ?? [], [contracts.data])
   // O nome vem da lista de campanhas, não dos contratos: campanha sem contrato nenhum também
   // precisa de nome no selo, e a lista de contratos ainda carregando dizia "Campanha: campanha".
-  const campanhas = useCampaigns()
-  const nomeCampanhaFiltro = campanhaFiltro
-    ? campanhas.data?.items.find((c) => c.campaignId === campanhaFiltro)?.name ?? "…"
+  const campaigns = useCampaigns()
+  const campaignFilterName = campaignFilter
+    ? campaigns.data?.items.find((c) => c.campaignId === campaignFilter)?.name ?? "…"
     : null
-  const limparCampanha = () => setParams((p) => {
+  const clearCampaignFilter = () => setParams((p) => {
     p.delete("campaign")
     return p
   })
@@ -69,10 +69,10 @@ export default function OperationsContractsPage() {
   // Criador e campanha sao o que se procura; status e modalidade entram porque "assinado"
   // e "publipost" sao termos que a pessoa digita sem pensar que sao filtros.
   const items = useMemo(
-    () => todos.filter((c) => (!campanhaFiltro || c.campaignId === campanhaFiltro) && matches(
-      busca, c.influencerName, c.campaignName, tEnum("contractStatus", c.status),
+    () => allContracts.filter((c) => (!campaignFilter || c.campaignId === campaignFilter) && matches(
+      search, c.influencerName, c.campaignName, tEnum("contractStatus", c.status),
       c.modality ? tEnum("contractModality", c.modality) : c.hybridCode)),
-    [todos, busca, campanhaFiltro],
+    [allContracts, search, campaignFilter],
   )
 
   return (
@@ -86,27 +86,27 @@ export default function OperationsContractsPage() {
             </h1>
             <div className="text-[14px] text-ink-muted mt-1.5 max-w-140">
               <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>
-                {todos.length} {todos.length === 1 ? "contrato" : "contratos"}
+                {allContracts.length} {allContracts.length === 1 ? "contrato" : "contratos"}
               </span>{" "}
               neste workspace. O documento é montado a partir do template da modalidade —
               você preenche os valores, as cláusulas vêm prontas.
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            {nomeCampanhaFiltro && (
+            {campaignFilterName && (
               <button
-                onClick={limparCampanha}
+                onClick={clearCampaignFilter}
                 title="Mostrar os contratos de todas as campanhas"
                 className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[12px] font-medium"
                 style={{ background: "var(--color-teal-50, #F0FDFB)", color: "var(--color-teal-500)" }}
               >
-                Campanha: {nomeCampanhaFiltro} <X className="w-3 h-3" />
+                Campanha: {campaignFilterName} <X className="w-3 h-3" />
               </button>
             )}
-            {todos.length > 0 && (
+            {allContracts.length > 0 && (
               <SearchBox
-                value={busca}
-                onChange={setBusca}
+                value={search}
+                onChange={setSearch}
                 placeholder="Buscar por criador, campanha…"
               />
             )}
@@ -128,10 +128,10 @@ export default function OperationsContractsPage() {
           <TableSkeleton />
         ) : contracts.isError ? (
           <ErrorState onRetry={() => contracts.refetch()} />
-        ) : items.length === 0 && (busca || nomeCampanhaFiltro) ? (
+        ) : items.length === 0 && (search || campaignFilterName) ? (
           <NoResults
-            query={busca || nomeCampanhaFiltro || ""}
-            onClear={() => { setBusca(""); limparCampanha() }}
+            query={search || campaignFilterName || ""}
+            onClear={() => { setSearch(""); clearCampaignFilter() }}
           />
         ) : items.length === 0 ? (
           <EmptyBlock
@@ -206,7 +206,7 @@ export default function OperationsContractsPage() {
                       <RoleGate allow={["Owner", "Admin"]}>
                         {/* Só rascunho: a partir do envio existe envelope no provedor e
                             talvez quem ja' assinou, e apagar aqui nao desfaz nada disso. */}
-                        {it.status === "Draft" && <ExcluirRascunho item={it} />}
+                        {it.status === "Draft" && <DeleteDraftButton item={it} />}
                       </RoleGate>
                     </td>
                   </tr>
@@ -217,13 +217,13 @@ export default function OperationsContractsPage() {
         )}
       </section>
 
-      {(createOpen || abrirPorLink) && (
+      {(createOpen || openedFromLink) && (
         <CreateContractModal
-          initialCampaignId={abrirPorLink ? campanhaFiltro ?? undefined : undefined}
-          initialInfluencerId={abrirPorLink ? params.get("creator") ?? undefined : undefined}
+          initialCampaignId={openedFromLink ? campaignFilter ?? undefined : undefined}
+          initialInfluencerId={openedFromLink ? params.get("creator") ?? undefined : undefined}
           onClose={() => {
             setCreateOpen(false)
-            if (abrirPorLink) {
+            if (openedFromLink) {
               setParams((p) => {
                 p.delete("new")
                 p.delete("creator")
@@ -245,11 +245,11 @@ export default function OperationsContractsPage() {
  * mais do que protege. O que ele protege e' o clique errado, e um segundo clique explicito
  * ja' resolve.</p>
  */
-function ExcluirRascunho({ item }: { item: ContractSummary }) {
+function DeleteDraftButton({ item }: { item: ContractSummary }) {
   const { remove } = useContractMutations()
-  const [confirmando, setConfirmando] = useState(false)
+  const [confirming, setConfirming] = useState(false)
 
-  const excluir = async () => {
+  const deleteDraft = async () => {
     try {
       await remove.mutateAsync(item.contractId)
       notifySuccess("Rascunho excluído.")
@@ -258,10 +258,10 @@ function ExcluirRascunho({ item }: { item: ContractSummary }) {
     }
   }
 
-  if (!confirmando) {
+  if (!confirming) {
     return (
       <button
-        onClick={() => setConfirmando(true)}
+        onClick={() => setConfirming(true)}
         title="Excluir rascunho"
         aria-label={`Excluir rascunho de ${item.influencerName}`}
         className="p-1.5 rounded-md text-ink-muted hover:text-[#DC2626] transition-colors"
@@ -274,7 +274,7 @@ function ExcluirRascunho({ item }: { item: ContractSummary }) {
   return (
     <span className="inline-flex items-center gap-1.5">
       <button
-        onClick={excluir}
+        onClick={deleteDraft}
         disabled={remove.isPending}
         className="text-[12px] font-medium px-2 py-1 rounded-md disabled:opacity-50"
         style={{ background: "#DC262615", color: "#DC2626" }}
@@ -282,7 +282,7 @@ function ExcluirRascunho({ item }: { item: ContractSummary }) {
         {remove.isPending ? "Excluindo…" : "Confirmar"}
       </button>
       <button
-        onClick={() => setConfirmando(false)}
+        onClick={() => setConfirming(false)}
         className="text-[12px] text-ink-muted px-1.5 py-1"
       >
         Cancelar
@@ -302,7 +302,7 @@ function CreateContractModal({
   const campaigns = useCampaigns()
   const { create } = useContractMutations()
   const navigate = useNavigate()
-  const contratosExistentes = useContracts()
+  const existingContracts = useContracts()
 
   const [campaignId, setCampaignId] = useState(initialCampaignId ?? "")
   /** Modalidade do avulso. Ignorada quando há campanha — lá ela é quem manda. */
@@ -321,8 +321,8 @@ function CreateContractModal({
    * marca e o pedido vai sem o campo, para o servidor aplicar o mesmo padrão.
    */
   const [autoRelease, setAutoRelease] = useState<boolean | null>(null)
-  const padroesMarca = useContractDefaults()
-  const liberaPorPrazo = autoRelease ?? padroesMarca.data?.autoReleaseOnTimeout ?? true
+  const tenantDefaults = useContractDefaults()
+  const autoReleaseValue = autoRelease ?? tenantDefaults.data?.autoReleaseOnTimeout ?? true
   useEscapeKey(onClose)
   const dialogRef = useFocusTrap<HTMLDivElement>()
 
@@ -330,48 +330,48 @@ function CreateContractModal({
 
   // Com campanha escolhida, quem foi convidado para ela vem primeiro — é para quem o contrato
   // costuma ser — e a proposta aparece antes de criar, em vez de só depois, no rascunho.
-  const campanhaDetalhe = useCampaign(campaignId || undefined)
-  const convitePorCriador = useMemo(() => {
+  const campaignDetail = useCampaign(campaignId || undefined)
+  const inviteByCreator = useMemo(() => {
     const m = new Map<string, CampaignInvite>()
     // A lista vem do mais novo: o primeiro de cada pessoa fica, a menos que um aceito apareça.
-    for (const i of campanhaDetalhe.data?.invites ?? []) {
-      const atual = m.get(i.influencerId)
-      if (!atual || (!atual.accepted && i.accepted)) m.set(i.influencerId, i)
+    for (const i of campaignDetail.data?.invites ?? []) {
+      const existing = m.get(i.influencerId)
+      if (!existing || (!existing.accepted && i.accepted)) m.set(i.influencerId, i)
     }
     return m
-  }, [campanhaDetalhe.data])
+  }, [campaignDetail.data])
 
   // Aceito, pendente, vencido: vencido não some — a proposta dele ainda é a última conversa
   // com essa pessoa —, mas não pode parecer à espera de resposta.
-  const situacaoConvite = (i: CampaignInvite) =>
+  const inviteStatus = (i: CampaignInvite) =>
     i.accepted ? "aceitou o convite" : i.expired ? "convite vencido" : "convite pendente"
-  const ordemConvite = (i: CampaignInvite) => (i.accepted ? 0 : i.expired ? 2 : 1)
+  const inviteOrder = (i: CampaignInvite) => (i.accepted ? 0 : i.expired ? 2 : 1)
 
-  const convidados = campaignId
+  const invitedCreators = campaignId
     ? people
-      .filter((p) => convitePorCriador.has(p.influencerId))
-      .sort((a, b) => ordemConvite(convitePorCriador.get(a.influencerId)!)
-        - ordemConvite(convitePorCriador.get(b.influencerId)!))
+      .filter((p) => inviteByCreator.has(p.influencerId))
+      .sort((a, b) => inviteOrder(inviteByCreator.get(a.influencerId)!)
+        - inviteOrder(inviteByCreator.get(b.influencerId)!))
     : []
-  const demais = convidados.length > 0
-    ? people.filter((p) => !convitePorCriador.has(p.influencerId))
+  const otherCreators = invitedCreators.length > 0
+    ? people.filter((p) => !inviteByCreator.has(p.influencerId))
     : people
-  const conviteEscolhido = influencerId ? convitePorCriador.get(influencerId) : undefined
-  const temProposta = (i: CampaignInvite) =>
+  const selectedInvite = influencerId ? inviteByCreator.get(influencerId) : undefined
+  const hasProposal = (i: CampaignInvite) =>
     i.feeCents != null || Boolean(i.expectedDeliverables?.trim()) || i.deliveryDeadline != null
 
-  const opcao = (p: RosterItem, sufixo: string) => (
+  const renderOption = (p: RosterItem, suffix: string) => (
     <option key={p.influencerId} value={p.influencerId}>
-      {p.displayName || p.fullName} — {sufixo}
+      {p.displayName || p.fullName} — {suffix}
     </option>
   )
 
-  const repetidos = useMemo(
+  const duplicates = useMemo(
     () => campaignId && influencerId
-      ? (contratosExistentes.data?.items ?? []).filter(
+      ? (existingContracts.data?.items ?? []).filter(
         (c) => c.campaignId === campaignId && c.influencerId === influencerId && c.status !== "Cancelled")
       : [],
-    [contratosExistentes.data, campaignId, influencerId],
+    [existingContracts.data, campaignId, influencerId],
   )
   // Campanha encerrada não recebe contrato — o domínio recusa, então nem oferecemos.
   const openCampaigns = useMemo(
@@ -386,21 +386,21 @@ function CreateContractModal({
   const modality = campaign?.modality ?? (campaignId === "" ? avulsaModality : "")
   const escrowBlocked = modality ? escrowRejectionReason(modality) : null
 
-  const desligaEscrowSeNaoSuporta = (m: string) => {
+  const disableEscrowIfUnsupported = (m: string) => {
     if (m && !supportsEscrow(m)) setUsesEscrow(false)
   }
 
   // Trocar de campanha pode desligar a custódia, porque troca a modalidade junto.
   const changeCampaign = (next: string) => {
     setCampaignId(next)
-    if (next === "") desligaEscrowSeNaoSuporta(avulsaModality)
-    else desligaEscrowSeNaoSuporta(
+    if (next === "") disableEscrowIfUnsupported(avulsaModality)
+    else disableEscrowIfUnsupported(
       openCampaigns.find((c) => c.campaignId === next)?.modality ?? "")
   }
 
   const changeModality = (next: string) => {
     setAvulsaModality(next)
-    desligaEscrowSeNaoSuporta(next)
+    disableEscrowIfUnsupported(next)
   }
 
   // Sem campanha a modalidade passa a ser obrigatória: é ela que resolve o template.
@@ -528,43 +528,43 @@ function CreateContractModal({
               <Field label="Criador">
                 <Select value={influencerId} onChange={setInfluencerId}>
                   <option value="">Selecione…</option>
-                  {convidados.length > 0 ? (
+                  {invitedCreators.length > 0 ? (
                     <>
                       <optgroup label="Convidados para esta campanha">
-                        {convidados.map((p) => opcao(p, situacaoConvite(convitePorCriador.get(p.influencerId)!)))}
+                        {invitedCreators.map((p) => renderOption(p, inviteStatus(inviteByCreator.get(p.influencerId)!)))}
                       </optgroup>
-                      {demais.length > 0 && (
+                      {otherCreators.length > 0 && (
                         <optgroup label="Resto do elenco">
-                          {demais.map((p) => opcao(p, p.email))}
+                          {otherCreators.map((p) => renderOption(p, p.email))}
                         </optgroup>
                       )}
                     </>
                   ) : (
-                    demais.map((p) => opcao(p, p.email))
+                    otherCreators.map((p) => renderOption(p, p.email))
                   )}
                 </Select>
               </Field>
 
-              {conviteEscolhido && temProposta(conviteEscolhido) && (
+              {selectedInvite && hasProposal(selectedInvite) && (
                 <div
                   className="rounded-lg border border-border-soft p-3 text-[12px]"
                   style={{ background: "var(--bg, #F9FAFB)" }}
                 >
                   <div className="text-[11px] text-ink-muted mb-1">
                     Proposta do convite{" "}
-                    {conviteEscolhido.accepted
+                    {selectedInvite.accepted
                       ? "(aceita)"
-                      : conviteEscolhido.expired ? "(convite vencido, não aceito)" : "(ainda não aceita)"}
+                      : selectedInvite.expired ? "(convite vencido, não aceito)" : "(ainda não aceita)"}
                   </div>
                   <div style={{ color: "var(--ink)" }}>
                     {[
-                      conviteEscolhido.feeCents != null && `Cachê ${fmtCents(conviteEscolhido.feeCents)}`,
-                      conviteEscolhido.expectedDeliverables?.trim(),
-                      conviteEscolhido.deliveryDeadline && `prazo ${fmtDate(conviteEscolhido.deliveryDeadline)}`,
+                      selectedInvite.feeCents != null && `Cachê ${fmtCents(selectedInvite.feeCents)}`,
+                      selectedInvite.expectedDeliverables?.trim(),
+                      selectedInvite.deliveryDeadline && `prazo ${fmtDate(selectedInvite.deliveryDeadline)}`,
                     ].filter(Boolean).join(" · ")}
                   </div>
                   <div className="text-[11px] text-ink-muted mt-1">
-                    {repetidos.length > 0
+                    {duplicates.length > 0
                       ? "Cada proposta vale para um contrato: se o existente já a usou, este nasce sem ela — o rascunho avisa."
                       : "Entra no rascunho marcada como vinda da proposta."}
                   </div>
@@ -573,14 +573,14 @@ function CreateContractModal({
 
               {/* Com o rascunho nascendo no aceite do convite, criar pela tela duplicava sem
                   ninguém perceber. Não bloqueia: dois trabalhos na mesma campanha existem. */}
-              {repetidos.length > 0 && (
+              {duplicates.length > 0 && (
                 <div className="rounded-lg p-3 text-[12px]" style={{ background: "#D9770615", color: "#B45309" }}>
-                  Este criador já tem {repetidos.length === 1 ? "um contrato" : `${repetidos.length} contratos`} nesta
-                  campanha ({repetidos.map((c) => tEnum("contractStatus", c.status).toLowerCase()).join(", ")}).{" "}
+                  Este criador já tem {duplicates.length === 1 ? "um contrato" : `${duplicates.length} contratos`} nesta
+                  campanha ({duplicates.map((c) => tEnum("contractStatus", c.status).toLowerCase()).join(", ")}).{" "}
                   <button
                     type="button"
                     className="underline"
-                    onClick={() => { onClose(); navigate(`/operations/contracts/${repetidos[0].contractId}`) }}
+                    onClick={() => { onClose(); navigate(`/operations/contracts/${duplicates[0].contractId}`) }}
                   >
                     Abrir o existente
                   </button>
@@ -660,7 +660,7 @@ function CreateContractModal({
               >
                 <input
                   type="checkbox"
-                  checked={liberaPorPrazo}
+                  checked={autoReleaseValue}
                   onChange={(e) => setAutoRelease(e.target.checked)}
                   className="mt-0.5 accent-[var(--color-teal-500)]"
                 />

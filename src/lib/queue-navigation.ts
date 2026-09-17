@@ -16,7 +16,7 @@ export function useIsWide(): boolean {
 }
 
 /** Há quanto tempo o item espera — é o que ordena a fila e o que a pessoa quer saber de relance. */
-export function esperaLabel(iso: string, now: number = Date.now()): string {
+export function waitingLabel(iso: string, now: number = Date.now()): string {
   const min = Math.max(0, Math.floor((now - Date.parse(iso)) / 60_000))
   if (min < 2) return "agora"
   if (min < 60) return `há ${min} min`
@@ -26,7 +26,7 @@ export function esperaLabel(iso: string, now: number = Date.now()): string {
   return d === 1 ? "há 1 dia" : `há ${d} dias`
 }
 
-function digitando(target: EventTarget | null): boolean {
+function isTyping(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null
   if (!el?.tagName) return false
   return el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable
@@ -52,7 +52,7 @@ export function useQueueKeys({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return
-      if (digitando(e.target)) {
+      if (isTyping(e.target)) {
         // Esc no campo só tira o foco: fechar a gaveta levaria junto o que foi digitado.
         if (e.key === "Escape") (e.target as HTMLElement).blur()
         return

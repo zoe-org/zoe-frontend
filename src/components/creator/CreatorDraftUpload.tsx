@@ -5,18 +5,18 @@ import {
 import { notifyError, notifySuccess } from "@/lib/feedback"
 import { Input } from "@/components/ui/input"
 import { fmtDate } from "@/lib/operations-format"
-import { useDraftUpload, LIMITE_PUT_UNICO, type CreatorEngagement } from "@/lib/api/creator"
+import { useDraftUpload, SINGLE_PUT_LIMIT, type CreatorEngagement } from "@/lib/api/creator"
 
 /**
  * Teto do corte. Nasceu do limite de um PUT único no S3; com o envio em partes o storage aceitaria
  * mais, mas o limite não pode depender do caminho que o navegador escolheu — e 5 GB já é um corte
  * enorme. Dito antes de começar, ninguém espera o arquivo inteiro subir para ouvir não.
  */
-const LIMITE_BYTES = 5 * 1024 ** 3
+const MAX_BYTES = 5 * 1024 ** 3
 
-const FORMATOS = ["video/mp4", "video/quicktime", "video/x-matroska", "video/webm"]
+const ACCEPTED_FORMATS = ["video/mp4", "video/quicktime", "video/x-matroska", "video/webm"]
 
-function fmtRestante(ms: number): string {
+function fmtRemaining(ms: number): string {
   if (ms < 60_000) return "menos de 1 min"
   return `~${Math.ceil(ms / 60_000)} min`
 }
@@ -38,26 +38,26 @@ export function CreatorDraftUpload({ engagement }: { engagement: CreatorEngageme
   const inputRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [notes, setNotes] = useState("")
-  const [arrastando, setArrastando] = useState(false)
-  const [progresso, setProgresso] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const [progress, setProgress] = useState(0)
   /** Estimativa pelo ritmo até agora. Nulo no começo, quando o ritmo ainda não diz nada. */
-  const [restanteMs, setRestanteMs] = useState<number | null>(null)
-  const inicio = useRef(0)
+  const [remainingMs, setRemainingMs] = useState<number | null>(null)
+  const startedAt = useRef(0)
 
   // Tamanho e formato conferidos na escolha: a recusa do servidor chegava só depois de o
   // arquivo inteiro subir.
-  const escolher = (f: File | null) => {
-    const recusar = (motivo: string) => {
-      notifyError(null, motivo)
+  const chooseFile = (f: File | null) => {
+    const reject = (reason: string) => {
+      notifyError(null, reason)
       if (inputRef.current) inputRef.current.value = ""
     }
-    if (f && f.size > LIMITE_BYTES) {
-      recusar(`O arquivo tem ${(f.size / 1024 ** 3).toFixed(1)} GB — o limite é 5 GB. Exporte com resolução ou bitrate menor.`)
+    if (f && f.size > MAX_BYTES) {
+      reject(`O arquivo tem ${(f.size / 1024 ** 3).toFixed(1)} GB — o limite é 5 GB. Exporte com resolução ou bitrate menor.`)
       return
     }
     // Tipo vazio acontece com .mkv em alguns sistemas: passa, e o servidor decide.
-    if (f && f.type && !FORMATOS.includes(f.type)) {
-      recusar("Formato não aceito. Envie o vídeo em MP4, MOV, MKV ou WebM.")
+    if (f && f.type && !ACCEPTED_FORMATS.includes(f.type)) {
+      reject("Formato não aceito. Envie o vídeo em MP4, MOV, MKV ou WebM.")
       return
     }
     setFile(f)
@@ -71,21 +71,21 @@ export function CreatorDraftUpload({ engagement }: { engagement: CreatorEngageme
   const send = async () => {
     if (!file) return
     try {
-      setProgresso(0)
-      setRestanteMs(null)
-      inicio.current = Date.now()
+      setProgress(0)
+      setRemainingMs(null)
+      startedAt.current = Date.now()
       await upload.mutateAsync({
         contractId: engagement.contractId,
         file,
         notes,
-        onProgress: (fracao) => {
-          setProgresso(fracao)
-          if (fracao > 0.02) setRestanteMs(((Date.now() - inicio.current) / fracao) * (1 - fracao))
+        onProgress: (fraction) => {
+          setProgress(fraction)
+          if (fraction > 0.02) setRemainingMs(((Date.now() - startedAt.current) / fraction) * (1 - fraction))
         },
       })
       setFile(null)
       setNotes("")
-      setProgresso(0)
+      setProgress(0)
       if (inputRef.current) inputRef.current.value = ""
       notifySuccess("Corte enviado. A marca vai revisar antes de você publicar.")
     } catch (e) {
@@ -174,7 +174,7 @@ export function CreatorDraftUpload({ engagement }: { engagement: CreatorEngageme
                 ref={inputRef}
                 type="file"
                 accept="video/mp4,video/quicktime,video/x-matroska,video/webm"
-                onChange={(e) => escolher(e.target.files?.[0] ?? null)}
+                onChange={(e) => chooseFile(e.target.files?.[0] ?? null)}
                 className="hidden"
               />
 
@@ -182,23 +182,23 @@ export function CreatorDraftUpload({ engagement }: { engagement: CreatorEngageme
                 <button
                   type="button"
                   onClick={() => inputRef.current?.click()}
-                  onDragOver={(e) => { e.preventDefault(); setArrastando(true) }}
-                  onDragLeave={() => setArrastando(false)}
+                  onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+                  onDragLeave={() => setDragging(false)}
                   onDrop={(e) => {
                     e.preventDefault()
-                    setArrastando(false)
+                    setDragging(false)
                     const f = e.dataTransfer.files?.[0]
-                    if (f) escolher(f)
+                    if (f) chooseFile(f)
                   }}
                   className="rounded-lg border-2 border-dashed px-4 py-6 text-center transition-colors"
                   style={{
-                    borderColor: arrastando ? "var(--color-teal-500)" : "var(--border-soft)",
-                    background: arrastando ? "#00A79908" : undefined,
+                    borderColor: dragging ? "var(--color-teal-500)" : "var(--border-soft)",
+                    background: dragging ? "#00A79908" : undefined,
                   }}
                 >
                   <Upload
                     className="w-5 h-5 mx-auto mb-2"
-                    style={{ color: arrastando ? "var(--color-teal-500)" : "var(--ink-muted)" }}
+                    style={{ color: dragging ? "var(--color-teal-500)" : "var(--ink-muted)" }}
                   />
                   <div className="text-[13px] font-medium" style={{ color: "var(--ink)" }}>
                     Arraste o vídeo aqui ou clique para escolher
@@ -264,19 +264,19 @@ export function CreatorDraftUpload({ engagement }: { engagement: CreatorEngageme
                     <div
                       className="h-full rounded-full transition-[width] duration-200"
                       style={{
-                        width: `${Math.round(progresso * 100)}%`,
+                        width: `${Math.round(progress * 100)}%`,
                         background: "var(--color-teal-500)",
                       }}
                     />
                   </div>
                   <p className="text-[11.5px] text-ink-muted m-0">
-                    {progresso >= 1
+                    {progress >= 1
                       ? "Finalizando…"
-                      : `${Math.round(progresso * 100)}% enviado${restanteMs != null ? ` · faltam ${fmtRestante(restanteMs)}` : ""} — não feche esta aba até terminar.`}
+                      : `${Math.round(progress * 100)}% enviado${remainingMs != null ? ` · faltam ${fmtRemaining(remainingMs)}` : ""} — não feche esta aba até terminar.`}
                   </p>
                   {/* Arquivo grande sobe em partes. Dizer isso aqui muda o que a pessoa faz quando
                       a conexão cai: escolher o mesmo arquivo em vez de desistir do envio. */}
-                  {file && file.size > LIMITE_PUT_UNICO && (
+                  {file && file.size > SINGLE_PUT_LIMIT && (
                     <p className="text-[11px] text-ink-muted m-0">
                       Se a conexão cair, escolha o mesmo arquivo e envie de novo: continua de onde parou.
                     </p>

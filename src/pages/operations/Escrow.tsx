@@ -8,7 +8,7 @@ import { useFocusTrap } from "@/lib/useFocusTrap"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { RoleGate } from "@/features/auth/RoleGate"
 import { tEnum } from "@/i18n/enums"
-import { fmtDate, matches, campanhaLabel } from "@/lib/operations-format"
+import { fmtDate, matches, campaignLabel } from "@/lib/operations-format"
 import {
   TableSkeleton, ErrorState, SearchBox, NoResults,
 } from "@/components/operations/shared"
@@ -45,10 +45,10 @@ export default function OperationsEscrowPage() {
 
   const items = escrow.data?.items ?? NO_ITEMS
   const totals = escrow.data?.totals
-  const [filtro, setFiltro] = useState<string | null>(null)
-  const [busca, setBusca] = useState("")
+  const [stateFilter, setStateFilter] = useState<string | null>(null)
+  const [search, setSearch] = useState("")
 
-  const contagem = useMemo(() => {
+  const counts = useMemo(() => {
     const c: Record<string, number> = {}
     for (const s of ESCROW_STATES) c[s] = 0
     for (const e of items) c[e.state] = (c[e.state] ?? 0) + 1
@@ -57,8 +57,8 @@ export default function OperationsEscrowPage() {
 
   // Ordena por URGENCIA, nao por data: numa tela de dinheiro o que precisa de alguem tem
   // de vir primeiro. Reserva caida e' o pior caso — o valor deixou de estar separado.
-  const lista = useMemo(() => {
-    const peso = (e: EscrowSummary) =>
+  const visible = useMemo(() => {
+    const priority = (e: EscrowSummary) =>
       e.authorizationLapsedAt ? 0
       : e.isAuthorizationExpired ? 1
       : e.payoutAccountMissing && !e.isTerminal ? 2
@@ -68,11 +68,11 @@ export default function OperationsEscrowPage() {
       : 5
 
     return items
-      .filter((e) => (filtro ? e.state === filtro : true))
-      .filter((e) => matches(busca, e.influencerName, e.campaignName))
+      .filter((e) => (stateFilter ? e.state === stateFilter : true))
+      .filter((e) => matches(search, e.influencerName, e.campaignName))
       .slice()
-      .sort((a, b) => peso(a) - peso(b) || b.amountCents - a.amountCents)
-  }, [items, filtro, busca])
+      .sort((a, b) => priority(a) - priority(b) || b.amountCents - a.amountCents)
+  }, [items, stateFilter, search])
 
   const current = items.find((e) => e.escrowAccountId === selected) ?? null
 
@@ -150,47 +150,47 @@ export default function OperationsEscrowPage() {
       ) : (
         <>
           <div className="flex justify-end">
-            <SearchBox value={busca} onChange={setBusca} placeholder="Buscar por criador, campanha…" />
+            <SearchBox value={search} onChange={setSearch} placeholder="Buscar por criador, campanha…" />
           </div>
 
           {/* Trilha de estados: o panorama do kanban sem a largura dele. Quebra em varias
               linhas em vez de rolar, e serve de filtro. */}
           <div className="flex flex-wrap gap-1.5">
-            <TrilhaChip
-              rotulo="Todas"
+            <StateChip
+              label="Todas"
               n={items.length}
-              cor="var(--ink-muted)"
-              ativo={filtro === null}
-              onClick={() => setFiltro(null)}
+              color="var(--ink-muted)"
+              active={stateFilter === null}
+              onClick={() => setStateFilter(null)}
             />
             {ESCROW_STATES.map((st) => (
-              <TrilhaChip
+              <StateChip
                 key={st}
-                rotulo={tEnum("escrowState", st)}
-                n={contagem[st]}
-                cor={COLUMN_COLOR[st]}
-                ativo={filtro === st}
+                label={tEnum("escrowState", st)}
+                n={counts[st]}
+                color={COLUMN_COLOR[st]}
+                active={stateFilter === st}
                 // Estado vazio nao vira botao morto: continua visivel para o panorama,
                 // mas nao convida a um clique que leva a lugar nenhum.
-                onClick={contagem[st] ? () => setFiltro(st) : undefined}
+                onClick={counts[st] ? () => setStateFilter(st) : undefined}
               />
             ))}
           </div>
 
-          {lista.length === 0 && busca ? (
-            <NoResults query={busca} onClear={() => setBusca("")} />
-          ) : lista.length === 0 ? (
+          {visible.length === 0 && search ? (
+            <NoResults query={search} onClear={() => setSearch("")} />
+          ) : visible.length === 0 ? (
             <EmptyBlock message="Nenhuma custódia neste estado." />
           ) : (
             <div
               className="rounded-xl border border-border-soft overflow-hidden"
               style={{ background: "var(--surface)" }}
             >
-              {lista.map((e, i) => (
+              {visible.map((e, i) => (
                 <EscrowRow
                   key={e.escrowAccountId}
                   e={e}
-                  primeira={i === 0}
+                  first={i === 0}
                   onOpen={() => setSelected(e.escrowAccountId)}
                 />
               ))}
@@ -204,16 +204,16 @@ export default function OperationsEscrowPage() {
   )
 }
 
-function TrilhaChip({
-  rotulo, n, cor, ativo, onClick,
+function StateChip({
+  label, n, color, active, onClick,
 }: {
-  rotulo: string
+  label: string
   n: number
-  cor: string
-  ativo: boolean
+  color: string
+  active: boolean
   onClick?: () => void
 }) {
-  const vazio = n === 0
+  const isEmpty = n === 0
 
   return (
     <button
@@ -221,14 +221,14 @@ function TrilhaChip({
       disabled={!onClick}
       className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[12px] border transition-colors disabled:cursor-default"
       style={{
-        background: ativo ? "var(--ink)" : "var(--surface)",
-        color: ativo ? "var(--surface)" : vazio ? "var(--ink-muted-2)" : "var(--ink-2)",
-        borderColor: ativo ? "var(--ink)" : "var(--border-soft)",
-        opacity: vazio && !ativo ? 0.55 : 1,
+        background: active ? "var(--ink)" : "var(--surface)",
+        color: active ? "var(--surface)" : isEmpty ? "var(--ink-muted-2)" : "var(--ink-2)",
+        borderColor: active ? "var(--ink)" : "var(--border-soft)",
+        opacity: isEmpty && !active ? 0.55 : 1,
       }}
     >
-      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: cor }} />
-      {rotulo}
+      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: color }} />
+      {label}
       <span className="font-mono-zoe text-[11px] tabular-nums">{n}</span>
     </button>
   )
@@ -242,34 +242,34 @@ function TrilhaChip({
  * problema, que e' exatamente o trabalho que a tela deveria poupar.</p>
  */
 function EscrowRow({
-  e, primeira, onOpen,
+  e, first, onOpen,
 }: {
   e: EscrowSummary
-  primeira: boolean
+  first: boolean
   onOpen: () => void
 }) {
   // Caduca e' pior que vencida: vencida e' a data ter passado, caduca e' a renovacao ter
   // falhado — o dinheiro NAO esta' mais reservado e a liberacao vai recusar.
   // Custódia encerrada (liberada, devolvida) não tem mais reserva a vencer: o alerta ali
   // assustaria sobre um dinheiro que já foi pago.
-  const alerta =
+  const warning =
     e.authorizationLapsedAt && !e.isTerminal
-      ? { icone: AlertTriangle, texto: "reserva caiu — refinanciar", cor: "#DC2626", forte: true }
+      ? { icon: AlertTriangle, text: "reserva caiu — refinanciar", color: "#DC2626", strong: true }
       : e.isAuthorizationExpired && !e.isTerminal
-        ? { icone: Clock, texto: "autorização vencida", cor: "#D97706", forte: false }
+        ? { icon: Clock, text: "autorização vencida", color: "#D97706", strong: false }
         : e.payoutAccountMissing && !e.isTerminal
-          ? { icone: Wallet, texto: "criador sem conta de recebimento", cor: "#D97706", forte: false }
+          ? { icon: Wallet, text: "criador sem conta de recebimento", color: "#D97706", strong: false }
           : e.payoutAccountUnverified && !e.isTerminal
-            ? { icone: Wallet, texto: "aguardando verificação da conta do criador", cor: "#D97706", forte: false }
+            ? { icon: Wallet, text: "aguardando verificação da conta do criador", color: "#D97706", strong: false }
             : null
 
-  const Icone = alerta?.icone
+  const WarningIcon = warning?.icon
 
   return (
     <button
       onClick={onOpen}
       className="w-full text-left px-4 py-3.5 flex items-center gap-4 hover:bg-[var(--surface-2,#FAFBFC)] transition-colors"
-      style={{ borderTop: primeira ? undefined : "1px solid var(--border-soft)" }}
+      style={{ borderTop: first ? undefined : "1px solid var(--border-soft)" }}
     >
       <span
         className="w-1 self-stretch rounded-full shrink-0"
@@ -280,14 +280,14 @@ function EscrowRow({
         <div className="text-[13.5px] font-medium truncate" style={{ color: "var(--ink)" }}>
           {e.influencerName}
         </div>
-        <div className="text-[12px] text-ink-muted truncate">{campanhaLabel(e.campaignName)}</div>
+        <div className="text-[12px] text-ink-muted truncate">{campaignLabel(e.campaignName)}</div>
 
-        {alerta && Icone && (
+        {warning && WarningIcon && (
           <div
             className="flex items-center gap-1 text-[11.5px] mt-1"
-            style={{ color: alerta.cor, fontWeight: alerta.forte ? 600 : 400 }}
+            style={{ color: warning.color, fontWeight: warning.strong ? 600 : 400 }}
           >
-            <Icone className="w-3 h-3 shrink-0" /> {alerta.texto}
+            <WarningIcon className="w-3 h-3 shrink-0" /> {warning.text}
           </div>
         )}
       </div>
@@ -382,7 +382,7 @@ function EscrowDrawer({ e, onClose }: { e: EscrowSummary; onClose: () => void })
             {e.influencerName}
           </h2>
           <div className="text-[12.5px] text-ink-muted">
-            {campanhaLabel(e.campaignName)} · aberta em {fmtDate(e.createdAt)}
+            {campaignLabel(e.campaignName)} · aberta em {fmtDate(e.createdAt)}
           </div>
 
           <div className="rounded-lg border border-border-soft mt-5">

@@ -14,7 +14,7 @@ import {
  * Sugestões mostradas como exemplo no campo vazio. Nunca são gravadas: texto jurídico é
  * decisão da marca, e um valor que ninguém escolheu não pode ir para o contrato sozinho.
  */
-const EXEMPLO: Record<string, string> = {
+const EXAMPLES: Record<string, string> = {
   jurisdiction: "Ex.: Foro da Comarca de São Paulo/SP",
   applicable_law: "Ex.: Legislação brasileira",
   digital_signature: "Ex.: Assinatura eletrônica via Clicksign",
@@ -33,63 +33,63 @@ const EXEMPLO: Record<string, string> = {
  */
 export function ContractDefaultsTab({ isAdmin }: { isAdmin: boolean }) {
   const defaults = useContractDefaults()
-  const salvar = useUpdateContractDefaults()
-  const salvarLiberacao = useSetAutoReleaseDefault()
+  const save = useUpdateContractDefaults()
+  const saveAutoRelease = useSetAutoReleaseDefault()
 
   const [edits, setEdits] = useState<Record<string, string>>({})
-  const [mostrarTodos, setMostrarTodos] = useState(false)
-  const [busca, setBusca] = useState("")
-  const [todasModalidades, setTodasModalidades] = useState(false)
+  const [showAll, setShowAll] = useState(false)
+  const [search, setSearch] = useState("")
+  const [allModalities, setAllModalities] = useState(false)
 
   // Modalidades que a marca de fato usa, pelas campanhas e contratos. O catálogo traz campos de
   // todos os templates publicados, e quem só faz publipost rolava dezenas de campos de permuta
   // e eventos que nunca vão aparecer num contrato seu.
-  const campanhas = useCampaigns()
-  const contratos = useContracts()
-  const usadas = useMemo(() => new Set<string>([
-    ...(campanhas.data?.items ?? []).map((c) => c.modality),
-    ...(contratos.data?.items ?? []).map((c) => c.modality).filter((m): m is string => Boolean(m)),
-  ]), [campanhas.data, contratos.data])
+  const campaigns = useCampaigns()
+  const contracts = useContracts()
+  const usedModalities = useMemo(() => new Set<string>([
+    ...(campaigns.data?.items ?? []).map((c) => c.modality),
+    ...(contracts.data?.items ?? []).map((c) => c.modality).filter((m): m is string => Boolean(m)),
+  ]), [campaigns.data, contracts.data])
 
-  const campos = useMemo(() => defaults.data?.fields ?? [], [defaults.data])
+  const fields = useMemo(() => defaults.data?.fields ?? [], [defaults.data])
 
-  const essenciais = useMemo(() => {
-    const porNome = new Map(campos.map((c) => [c.placeholder, c]))
+  const essentials = useMemo(() => {
+    const byPlaceholder = new Map(fields.map((c) => [c.placeholder, c]))
     return ESSENTIAL_CONTRACT_DEFAULTS
-      .map((p) => porNome.get(p))
+      .map((p) => byPlaceholder.get(p))
       .filter((c): c is ContractDefaultField => Boolean(c))
-  }, [campos])
+  }, [fields])
 
-  const naoEssenciais = useMemo(() => {
-    const essenciaisSet = new Set<string>(ESSENTIAL_CONTRACT_DEFAULTS)
-    return campos.filter((c) => !essenciaisSet.has(c.placeholder))
-  }, [campos])
+  const nonEssentials = useMemo(() => {
+    const essentialSet = new Set<string>(ESSENTIAL_CONTRACT_DEFAULTS)
+    return fields.filter((c) => !essentialSet.has(c.placeholder))
+  }, [fields])
 
   // Sem modalidade conhecida (marca nova, nada criado ainda) mostra tudo: esconder por falta de
   // dado faria o catálogo parecer vazio.
-  const daMarca = naoEssenciais.filter((c) => !c.modalities?.length || c.modalities.some((m) => usadas.has(m)))
-  const visiveis = usadas.size > 0 && !todasModalidades ? daMarca : naoEssenciais
-  const outros = visiveis.filter((c) => matches(busca, c.label, c.helpText, c.placeholder))
+  const relevantToBrand = nonEssentials.filter((c) => !c.modalities?.length || c.modalities.some((m) => usedModalities.has(m)))
+  const visible = usedModalities.size > 0 && !allModalities ? relevantToBrand : nonEssentials
+  const filtered = visible.filter((c) => matches(search, c.label, c.helpText, c.placeholder))
 
-  const definidos = campos.filter((c) => (c.value ?? "").trim()).length
+  const definedCount = fields.filter((c) => (c.value ?? "").trim()).length
   const dirty = Object.keys(edits).length > 0
 
-  const valorDe = (c: ContractDefaultField) =>
+  const currentValue = (c: ContractDefaultField) =>
     c.placeholder in edits ? edits[c.placeholder] : (c.value ?? "")
 
-  const mudar = (c: ContractDefaultField, v: string) =>
-    setEdits((atual) => {
-      const proximo = { ...atual }
+  const change = (c: ContractDefaultField, v: string) =>
+    setEdits((current) => {
+      const next = { ...current }
       // Voltou ao valor salvo: sai da lista de alterações, senão o botão ficaria ativo por
       // uma mudança que não existe mais.
-      if (v === (c.value ?? "")) delete proximo[c.placeholder]
-      else proximo[c.placeholder] = v
-      return proximo
+      if (v === (c.value ?? "")) delete next[c.placeholder]
+      else next[c.placeholder] = v
+      return next
     })
 
-  const enviar = async () => {
+  const submit = async () => {
     try {
-      await salvar.mutateAsync(edits)
+      await save.mutateAsync(edits)
       const n = Object.keys(edits).length
       setEdits({})
       notifySuccess(n === 1
@@ -126,19 +126,19 @@ export function ContractDefaultsTab({ isAdmin }: { isAdmin: boolean }) {
             já criados não mudam — alguém pode ter ajustado o texto de propósito.
           </p>
           <p className="text-[12px] text-ink-muted mt-1.5 mb-0">
-            <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>{definidos}</span>{" "}
-            {definidos === 1 ? "padrão definido" : "padrões definidos"}
+            <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>{definedCount}</span>{" "}
+            {definedCount === 1 ? "padrão definido" : "padrões definidos"}
           </p>
         </div>
 
         {isAdmin && (
           <button
-            onClick={enviar}
-            disabled={!dirty || salvar.isPending}
+            onClick={submit}
+            disabled={!dirty || save.isPending}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-medium text-white disabled:opacity-45"
             style={{ background: "var(--color-teal-500)" }}
           >
-            {salvar.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+            {save.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
             {dirty ? `Salvar ${Object.keys(edits).length}` : "Salvar"}
           </button>
         )}
@@ -157,8 +157,8 @@ export function ContractDefaultsTab({ isAdmin }: { isAdmin: boolean }) {
           <input
             type="checkbox"
             checked={defaults.data?.autoReleaseOnTimeout ?? true}
-            disabled={!isAdmin || salvarLiberacao.isPending}
-            onChange={(e) => salvarLiberacao.mutate(e.target.checked, {
+            disabled={!isAdmin || saveAutoRelease.isPending}
+            onChange={(e) => saveAutoRelease.mutate(e.target.checked, {
               onSuccess: (res) => notifySuccess(res.autoReleaseOnTimeout === false
                 ? "Contratos novos passam a esperar a revisão mesmo depois do prazo."
                 : "Contratos novos passam a aprovar a entrega quando o prazo de revisão vencer."),
@@ -182,62 +182,62 @@ export function ContractDefaultsTab({ isAdmin }: { isAdmin: boolean }) {
         className="rounded-xl border border-border-soft p-5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5"
         style={{ background: "var(--surface)" }}
       >
-        {essenciais.map((c) => (
-          <CampoPadrao
+        {essentials.map((c) => (
+          <DefaultFieldRow
             key={c.placeholder}
-            campo={c}
-            valor={valorDe(c)}
-            onChange={(v) => mudar(c, v)}
+            field={c}
+            value={currentValue(c)}
+            onChange={(v) => change(c, v)}
             readOnly={!isAdmin}
-            alterado={c.placeholder in edits}
+            changed={c.placeholder in edits}
           />
         ))}
       </div>
 
-      {campos.length > essenciais.length && (
+      {fields.length > essentials.length && (
         <div className="mt-5">
           <button
-            onClick={() => setMostrarTodos((v) => !v)}
+            onClick={() => setShowAll((v) => !v)}
             className="inline-flex items-center gap-1.5 text-[13px] font-medium"
             style={{ color: "var(--color-teal-500)" }}
-            aria-expanded={mostrarTodos}
+            aria-expanded={showAll}
           >
             <ChevronDown
               className="w-3.5 h-3.5 transition-transform"
-              style={{ transform: mostrarTodos ? "rotate(180deg)" : undefined }}
+              style={{ transform: showAll ? "rotate(180deg)" : undefined }}
             />
-            {mostrarTodos ? "Esconder os demais campos" : `Mostrar os demais campos (${visiveis.length})`}
+            {showAll ? "Esconder os demais campos" : `Mostrar os demais campos (${visible.length})`}
           </button>
 
-          {mostrarTodos && (
+          {showAll && (
             <div
               className="mt-3 rounded-xl border border-border-soft p-5"
               style={{ background: "var(--surface)" }}
             >
-              <SearchBox value={busca} onChange={setBusca} placeholder="Buscar campo…" className="w-full sm:max-w-[320px] mb-3" />
-              {usadas.size > 0 && naoEssenciais.length > daMarca.length && (
+              <SearchBox value={search} onChange={setSearch} placeholder="Buscar campo…" className="w-full sm:max-w-[320px] mb-3" />
+              {usedModalities.size > 0 && nonEssentials.length > relevantToBrand.length && (
                 <label className="flex items-center gap-2 text-[12px] text-ink-muted mb-4 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={todasModalidades}
-                    onChange={(e) => setTodasModalidades(e.target.checked)}
+                    checked={allModalities}
+                    onChange={(e) => setAllModalities(e.target.checked)}
                     className="accent-[var(--color-teal-500)]"
                   />
-                  Incluir campos de modalidades que você não usa ({naoEssenciais.length - daMarca.length})
+                  Incluir campos de modalidades que você não usa ({nonEssentials.length - relevantToBrand.length})
                 </label>
               )}
-              {outros.length === 0 ? (
+              {filtered.length === 0 ? (
                 <p className="text-[12.5px] text-ink-muted m-0">Nenhum campo com esse nome.</p>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
-                  {outros.map((c) => (
-                    <CampoPadrao
+                  {filtered.map((c) => (
+                    <DefaultFieldRow
                       key={c.placeholder}
-                      campo={c}
-                      valor={valorDe(c)}
-                      onChange={(v) => mudar(c, v)}
+                      field={c}
+                      value={currentValue(c)}
+                      onChange={(v) => change(c, v)}
                       readOnly={!isAdmin}
-                      alterado={c.placeholder in edits}
+                      changed={c.placeholder in edits}
                     />
                   ))}
                 </div>
@@ -250,29 +250,29 @@ export function ContractDefaultsTab({ isAdmin }: { isAdmin: boolean }) {
   )
 }
 
-function CampoPadrao({
-  campo, valor, onChange, readOnly, alterado,
+function DefaultFieldRow({
+  field, value, onChange, readOnly, changed,
 }: {
-  campo: ContractDefaultField
-  valor: string
+  field: ContractDefaultField
+  value: string
   onChange: (v: string) => void
   readOnly: boolean
-  alterado: boolean
+  changed: boolean
 }) {
-  const longo = campo.dataType === "FreeText"
+  const isLong = field.dataType === "FreeText"
 
   return (
-    <label className={`flex flex-col gap-1.5 ${longo ? "md:col-span-2" : ""}`}>
+    <label className={`flex flex-col gap-1.5 ${isLong ? "md:col-span-2" : ""}`}>
       <span className="text-[12.5px] font-medium flex items-center gap-1.5" style={{ color: "var(--ink)" }}>
-        {campo.label}
-        {alterado && <span className="chip text-[10px]">não salvo</span>}
+        {field.label}
+        {changed && <span className="chip text-[10px]">não salvo</span>}
       </span>
 
-      {campo.dataType === "Boolean" ? (
+      {field.dataType === "Boolean" ? (
         // Três estados de propósito: "sem padrão" é diferente de "não". Um checkbox não
         // distinguiria a marca que decidiu "sem NDA" da que ainda não pensou nisso.
         <select
-          value={valor}
+          value={value}
           disabled={readOnly}
           onChange={(e) => onChange(e.target.value)}
           className="h-9 w-full max-w-[220px] rounded-lg border border-input bg-transparent px-2.5 text-[13px] outline-none disabled:opacity-60"
@@ -282,28 +282,28 @@ function CampoPadrao({
           <option value="true">Sim</option>
           <option value="false">Não</option>
         </select>
-      ) : longo ? (
+      ) : isLong ? (
         <textarea
-          value={valor}
+          value={value}
           disabled={readOnly}
           onChange={(e) => onChange(e.target.value)}
           rows={2}
           maxLength={4000}
-          placeholder={EXEMPLO[campo.placeholder] ?? ""}
+          placeholder={EXAMPLES[field.placeholder] ?? ""}
           className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-[13px] outline-none transition-colors focus-visible:border-ring resize-y disabled:opacity-60"
           style={{ color: "var(--ink)" }}
         />
       ) : (
         <Input
-          value={valor}
+          value={value}
           disabled={readOnly}
           onChange={(e) => onChange(e.target.value)}
-          inputMode={campo.dataType === "Currency" || campo.dataType === "Percentage" ? "decimal" : undefined}
-          placeholder={EXEMPLO[campo.placeholder] ?? ""}
+          inputMode={field.dataType === "Currency" || field.dataType === "Percentage" ? "decimal" : undefined}
+          placeholder={EXAMPLES[field.placeholder] ?? ""}
         />
       )}
 
-      {campo.helpText && <span className="text-[11.5px] text-ink-muted">{campo.helpText}</span>}
+      {field.helpText && <span className="text-[11.5px] text-ink-muted">{field.helpText}</span>}
     </label>
   )
 }

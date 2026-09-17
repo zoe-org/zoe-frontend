@@ -11,7 +11,7 @@ import { StatusChip } from "@/components/ui/status-chip"
 import { RoleGate } from "@/features/auth/RoleGate"
 import { tEnum } from "@/i18n/enums"
 import { CAMPAIGN_STATUS_COLOR } from "@/lib/status-colors"
-import { funilDaCampanha, type TomFunil } from "@/lib/campaign-funnel"
+import { campaignFunnel, type FunnelTone } from "@/lib/campaign-funnel"
 import { fmtDate } from "@/lib/operations-format"
 import { InviteCreatorModal } from "@/components/operations/InviteCreatorModal"
 import { EditCampaignModal } from "@/components/operations/CampaignModals"
@@ -37,15 +37,15 @@ export const CampaignChip = (p: { status: string; small?: boolean }) => (
  * Campanha ativa com prazo no passado. Não conclui sozinha — pode haver entrega atrasada em
  * andamento —, mas avisa: senão ela segue recebendo contrato e convite com datas vencidas.
  */
-function prazoEncerrado(d: { status: string; endsAt: string | null }): boolean {
+function isPastEndDate(d: { status: string; endsAt: string | null }): boolean {
   if (d.status !== "Active" || !d.endsAt) return false
-  const hoje = new Date()
-  hoje.setHours(0, 0, 0, 0)
-  return new Date(d.endsAt) < hoje
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return new Date(d.endsAt) < today
 }
 
 /** Zero só é "Permuta" quando a modalidade é permuta; nas outras é orçamento não definido. */
-function orcamentoLabel(budgetCents: number, modality: string): string {
+function budgetLabel(budgetCents: number, modality: string): string {
   if (budgetCents > 0) return fmtCents(budgetCents)
   return modality === "Barter" ? "Permuta" : "Não definido"
 }
@@ -72,7 +72,7 @@ export function CampaignDetailPanel({ campaignId }: { campaignId: string }) {
   const kpis = [
     { label: "Criadores", value: String(d.influencerCount) },
     { label: "Entregas", value: String(d.deliveryCount) },
-    { label: "Orçamento", value: orcamentoLabel(d.budgetCents, d.modality) },
+    { label: "Orçamento", value: budgetLabel(d.budgetCents, d.modality) },
     { label: "GMV em custódia", value: d.escrowGmvCents > 0 ? fmtCents(d.escrowGmvCents) : "—" },
   ]
 
@@ -83,7 +83,7 @@ export function CampaignDetailPanel({ campaignId }: { campaignId: string }) {
           <div className="flex items-center gap-2 mb-1.5">
             <h2 className="font-display m-0" style={{ fontSize: 26, color: "var(--ink)" }}>{d.name}</h2>
             <CampaignChip status={d.status} />
-            {prazoEncerrado(d) && (
+            {isPastEndDate(d) && (
               <span
                 className="chip text-[10.5px]"
                 style={{ color: "#B45309", background: "#D9770615" }}
@@ -154,7 +154,7 @@ export function CampaignDetailPanel({ campaignId }: { campaignId: string }) {
             { label: "Marca", value: d.brandName ?? "—" },
             { label: "Modalidade", value: tEnum("contractModality", d.modality) },
             { label: "Período", value: d.startsAt ? `${fmtDate(d.startsAt)} → ${d.endsAt ? fmtDate(d.endsAt) : "aberto"}` : "—" },
-            { label: "Orçamento", value: orcamentoLabel(d.budgetCents, d.modality) },
+            { label: "Orçamento", value: budgetLabel(d.budgetCents, d.modality) },
           ].map((f) => (
             <div key={f.label}>
               <div className="text-[11px] text-ink-muted mb-0.5">{f.label}</div>
@@ -451,10 +451,10 @@ function ConfirmCancel({
   )
 }
 
-const COR_TOM: Record<TomFunil, string> = {
-  alerta: "#DC2626",
-  atencao: "#B45309",
-  neutro: "var(--ink-muted)",
+const TONE_COLOR: Record<FunnelTone, string> = {
+  alert: "#DC2626",
+  attention: "#B45309",
+  neutral: "var(--ink-muted)",
   ok: "#00A799",
 }
 
@@ -467,23 +467,23 @@ function CampaignFunnel({ d }: { d: CampaignDetail }) {
   // A situação da conta vem do elenco: o detalhe da campanha não a traz, e sem ela custódia
   // liberável de quem ainda não pode receber virava pendência da marca.
   const roster = useRoster()
-  const contaNaoPronta = new Set(
+  const payoutNotReady = new Set(
     (roster.data?.items ?? []).filter((r) => !canReceivePayout(r)).map((r) => r.influencerId))
-  const linhas = funilDaCampanha(d, contaNaoPronta)
-  if (linhas.length === 0) return null
-  const comVoce = linhas.filter((l) => l.tom === "alerta" || l.tom === "atencao").length
+  const rows = campaignFunnel(d, payoutNotReady)
+  if (rows.length === 0) return null
+  const needsBrand = rows.filter((l) => l.tone === "alert" || l.tone === "attention").length
 
   return (
     <div className="rounded-xl border border-border-soft p-5" style={{ background: "var(--surface)" }}>
       <div className="flex items-center justify-between mb-3.5 gap-2 flex-wrap">
-        <div className="eyebrow">Funil por criador ({linhas.length})</div>
-        {comVoce > 0 && (
+        <div className="eyebrow">Funil por criador ({rows.length})</div>
+        {needsBrand > 0 && (
           <span className="text-[11.5px] font-medium" style={{ color: "#B45309" }}>
-            {comVoce} {comVoce === 1 ? "precisa" : "precisam"} de você
+            {needsBrand} {needsBrand === 1 ? "precisa" : "precisam"} de você
           </span>
         )}
       </div>
-      {linhas.map((l, i) => (
+      {rows.map((l, i) => (
         <div
           key={l.influencerId}
           className="flex items-center gap-x-3 gap-y-1 py-2.5 flex-wrap"
@@ -494,28 +494,28 @@ function CampaignFunnel({ d }: { d: CampaignDetail }) {
             className="flex-1 min-w-[130px] text-[13px] truncate hover:underline"
             style={{ color: "var(--ink)" }}
           >
-            {l.nome}
+            {l.creatorName}
           </Link>
-          {l.outrosContratos > 0 && (
+          {l.otherContracts > 0 && (
             <Link
               to={`/operations/contracts?campaign=${d.campaignId}`}
               className="text-[11px] text-ink-muted hover:underline whitespace-nowrap"
               title="A linha mostra o contrato que mais precisa de você; os outros estão na lista de contratos."
             >
-              +{l.outrosContratos} {l.outrosContratos === 1 ? "contrato" : "contratos"}
+              +{l.otherContracts} {l.otherContracts === 1 ? "contrato" : "contratos"}
             </Link>
           )}
-          <span className="text-[12px] inline-flex items-center gap-1.5" style={{ color: COR_TOM[l.tom] }}>
-            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: COR_TOM[l.tom] }} />
-            {l.etapa}
+          <span className="text-[12px] inline-flex items-center gap-1.5" style={{ color: TONE_COLOR[l.tone] }}>
+            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: TONE_COLOR[l.tone] }} />
+            {l.stage}
           </span>
-          {l.acao && (
+          {l.action && (
             <Link
-              to={l.acao.to}
+              to={l.action.to}
               className="text-[12px] font-medium px-2.5 py-1 rounded-md border border-border-soft whitespace-nowrap"
               style={{ color: "var(--color-teal-500)" }}
             >
-              {l.acao.label} →
+              {l.action.label} →
             </Link>
           )}
         </div>

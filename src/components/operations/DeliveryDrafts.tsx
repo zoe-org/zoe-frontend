@@ -4,13 +4,13 @@ import { Loader2, Check, RotateCcw, Film } from "lucide-react"
 import { notifyError, notifySuccess } from "@/lib/feedback"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { RoleGate } from "@/features/auth/RoleGate"
-import { fmtDate, matches, campanhaLabel } from "@/lib/operations-format"
+import { fmtDate, matches, campaignLabel } from "@/lib/operations-format"
 import {
   ErrorState, TableSkeleton, SearchBox, NoResults,
 } from "@/components/operations/shared"
 import { QueueLayout, QueueRow, QueueSection } from "@/components/operations/ReviewQueue"
-import { secoesPorCampanha, itensVisiveis } from "@/lib/queue-sections"
-import { useIsWide, useQueueKeys, esperaLabel } from "@/lib/queue-navigation"
+import { sectionsByCampaign, visibleItems } from "@/lib/queue-sections"
+import { useIsWide, useQueueKeys, waitingLabel } from "@/lib/queue-navigation"
 import {
   useDeliveryDrafts, useDeliveryDraftMutations, type DeliveryDraftItem,
 } from "@/lib/api/operations"
@@ -24,7 +24,7 @@ const STATUS_LABEL: Record<string, string> = {
 const STATUS_COLOR = DRAFT_STATUS_COLOR
 
 /** Valor do filtro de campanha para contrato avulso — "" já significa "todas". */
-const SEM_CAMPANHA = "avulso"
+const NO_CAMPAIGN = "avulso"
 
 const DraftChip = ({ status }: { status: string }) => (
   <span
@@ -48,8 +48,8 @@ const DraftChip = ({ status }: { status: string }) => (
 export function DeliveryDrafts() {
   const wide = useIsWide()
   const [filter, setFilter] = useState<string>("AwaitingReview")
-  const [busca, setBusca] = useState("")
-  const [campanha, setCampanha] = useState("")
+  const [search, setSearch] = useState("")
+  const [campaignFilter, setCampaignFilter] = useState("")
   const [selected, setSelected] = useState<string | null>(null)
 
   // Busca SEM filtro e separa em memoria, como Entregas e Custodia ja' faziam. Mandar o
@@ -57,58 +57,58 @@ export function DeliveryDrafts() {
   // uma ida ao servidor, e a tela em branco ate a resposta voltar.
   const { data, isLoading, isError, refetch } = useDeliveryDrafts()
 
-  const todos = useMemo(() => data?.items ?? [], [data])
+  const all = useMemo(() => data?.items ?? [], [data])
 
   // Mesmo filtro das entregas publicadas: com várias campanhas ao mesmo tempo, a fila de cortes
   // misturava trabalhos de marcas e prazos diferentes numa lista só.
-  const campanhas = useMemo(() => {
+  const campaignOptions = useMemo(() => {
     const m = new Map<string, string>()
-    for (const d of todos) m.set(d.campaignId ?? SEM_CAMPANHA, campanhaLabel(d.campaignName))
+    for (const d of all) m.set(d.campaignId ?? NO_CAMPAIGN, campaignLabel(d.campaignName))
     return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1], "pt-BR"))
-  }, [todos])
+  }, [all])
 
   // Aguardando: quem chegou antes no topo, que é a ordem de trabalho. Todos: mais recentes.
   const items = useMemo(
-    () => todos
+    () => all
       .filter((d) => (!filter || d.status === filter)
-        && (!campanha || (d.campaignId ?? SEM_CAMPANHA) === campanha)
-        && matches(busca, d.influencerName, d.campaignName, d.fileName))
+        && (!campaignFilter || (d.campaignId ?? NO_CAMPAIGN) === campaignFilter)
+        && matches(search, d.influencerName, d.campaignName, d.fileName))
       .sort((a, b) => filter
         ? Date.parse(a.submittedAt) - Date.parse(b.submittedAt)
         : Date.parse(b.submittedAt) - Date.parse(a.submittedAt)),
-    [todos, filter, busca, campanha],
+    [all, filter, search, campaignFilter],
   )
 
   // Mesmas seções da fila de entregas: sem campanha escolhida e com mais de uma, uma seção por
   // campanha, na ordem da fila. Teclado e "próximo" seguem a ordem da tela.
-  const [recolhidas, setRecolhidas] = useState<ReadonlySet<string>>(() => new Set())
-  const secoes = useMemo(
-    () => secoesPorCampanha(
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set())
+  const sections = useMemo(
+    () => sectionsByCampaign(
       items,
-      (d) => ({ id: d.campaignId, nome: d.campaignName }),
+      (d) => ({ id: d.campaignId, name: d.campaignName }),
       (d) => d.status === "AwaitingReview",
-      campanhaLabel,
+      campaignLabel,
     ),
     [items],
   )
-  const agrupar = !campanha && secoes.length > 1
-  const visiveis = agrupar ? itensVisiveis(secoes, recolhidas) : items
-  const alternarSecao = (chave: string) => setRecolhidas((atuais) => {
-    const proximas = new Set(atuais)
-    if (proximas.has(chave)) proximas.delete(chave)
-    else proximas.add(chave)
-    return proximas
+  const grouped = !campaignFilter && sections.length > 1
+  const visible = grouped ? visibleItems(sections, collapsed) : items
+  const toggleSection = (key: string) => setCollapsed((current) => {
+    const next = new Set(current)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    return next
   })
 
-  const contagem = {
-    AwaitingReview: todos.filter((d) => d.status === "AwaitingReview").length,
-    todos: todos.length,
+  const counts = {
+    AwaitingReview: all.filter((d) => d.status === "AwaitingReview").length,
+    all: all.length,
   }
 
-  const ids = visiveis.map((d) => d.draftId)
-  const atual = visiveis.find((d) => d.draftId === selected) ?? (wide ? visiveis[0] : undefined) ?? null
+  const ids = visible.map((d) => d.draftId)
+  const selectedDraft = visible.find((d) => d.draftId === selected) ?? (wide ? visible[0] : undefined) ?? null
 
-  const aposDecidir = (draftId: string) => {
+  const afterDecision = (draftId: string) => {
     if (filter !== "AwaitingReview") return
     const i = ids.indexOf(draftId)
     setSelected(ids[i + 1] ?? ids[i - 1] ?? null)
@@ -116,22 +116,22 @@ export function DeliveryDrafts() {
 
   useQueueKeys({
     ids,
-    selected: atual?.draftId ?? null,
+    selected: selectedDraft?.draftId ?? null,
     onSelect: setSelected,
     onClose: wide ? undefined : () => setSelected(null),
     notesId: "draft-notes",
   })
 
-  const linha = (d: DeliveryDraftItem) => (
+  const renderRow = (d: DeliveryDraftItem) => (
     <QueueRow
       key={d.draftId}
       id={d.draftId}
-      active={atual?.draftId === d.draftId}
+      active={selectedDraft?.draftId === d.draftId}
       onSelect={setSelected}
       title={d.influencerName}
-      subtitle={`${campanhaLabel(d.campaignName)}${d.revision > 1 ? ` · revisão ${d.revision}` : ""}`}
+      subtitle={`${campaignLabel(d.campaignName)}${d.revision > 1 ? ` · revisão ${d.revision}` : ""}`}
       status={<DraftChip status={d.status} />}
-      meta={esperaLabel(d.submittedAt)}
+      meta={waitingLabel(d.submittedAt)}
     />
   )
 
@@ -170,26 +170,26 @@ export function DeliveryDrafts() {
                   ? { background: "#ffffff28" }
                   : { background: "var(--border-soft)" }}
               >
-                {id ? contagem.AwaitingReview : contagem.todos}
+                {id ? counts.AwaitingReview : counts.all}
               </span>
             </button>
           ))}
         </div>
-        {todos.length > 0 && (
+        {all.length > 0 && (
           <div className="flex gap-2 flex-wrap items-center">
-            {campanhas.length > 1 && (
+            {campaignOptions.length > 1 && (
               <select
-                value={campanha}
-                onChange={(e) => setCampanha(e.target.value)}
+                value={campaignFilter}
+                onChange={(e) => setCampaignFilter(e.target.value)}
                 aria-label="Filtrar por campanha"
                 className="h-9 px-2.5 rounded-lg border border-border-soft text-[12.5px] bg-transparent max-w-[220px]"
                 style={{ color: "var(--ink)" }}
               >
                 <option value="">Todas as campanhas</option>
-                {campanhas.map(([id, nome]) => <option key={id} value={id}>{nome}</option>)}
+                {campaignOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
               </select>
             )}
-            <SearchBox value={busca} onChange={setBusca} placeholder="Buscar por criador, campanha…" />
+            <SearchBox value={search} onChange={setSearch} placeholder="Buscar por criador, campanha…" />
           </div>
         )}
       </div>
@@ -198,10 +198,10 @@ export function DeliveryDrafts() {
         <TableSkeleton />
       ) : isError ? (
         <ErrorState onRetry={() => refetch()} />
-      ) : items.length === 0 && (busca || campanha) ? (
+      ) : items.length === 0 && (search || campaignFilter) ? (
         <NoResults
-          query={busca || campanhas.find(([id]) => id === campanha)?.[1] || ""}
-          onClear={() => { setBusca(""); setCampanha("") }}
+          query={search || campaignOptions.find(([id]) => id === campaignFilter)?.[1] || ""}
+          onClear={() => { setSearch(""); setCampaignFilter("") }}
         />
       ) : items.length === 0 ? (
         <EmptyBlock
@@ -216,27 +216,27 @@ export function DeliveryDrafts() {
           detailTitle="Revisão do corte"
           onCloseDetail={() => setSelected(null)}
           hint="↑ ↓ ou J K andam pela fila · C escreve o que mudar"
-          list={agrupar
-            ? secoes.map((sec) => (
-              <Fragment key={sec.chave}>
+          list={grouped
+            ? sections.map((sec) => (
+              <Fragment key={sec.key}>
                 <QueueSection
-                  label={sec.rotulo}
-                  count={sec.itens.length}
-                  pending={sec.pendentes}
-                  collapsed={recolhidas.has(sec.chave)}
-                  onToggle={() => alternarSecao(sec.chave)}
+                  label={sec.label}
+                  count={sec.items.length}
+                  pending={sec.pendingCount}
+                  collapsed={collapsed.has(sec.key)}
+                  onToggle={() => toggleSection(sec.key)}
                 />
-                {!recolhidas.has(sec.chave) && sec.itens.map(linha)}
+                {!collapsed.has(sec.key) && sec.items.map(renderRow)}
               </Fragment>
             ))
-            : items.map(linha)}
-          detail={atual && (
+            : items.map(renderRow)}
+          detail={selectedDraft && (
             // A revisão entra na chave: o reenvio do criador reaproveita o mesmo corte, e o
             // texto digitado para a versão anterior não pode ficar pendurado na nova.
             <DraftPanel
-              key={`${atual.draftId}-${atual.revision}`}
-              draft={atual}
-              onDecided={() => aposDecidir(atual.draftId)}
+              key={`${selectedDraft.draftId}-${selectedDraft.revision}`}
+              draft={selectedDraft}
+              onDecided={() => afterDecision(selectedDraft.draftId)}
             />
           )}
         />
@@ -297,14 +297,14 @@ function DraftPanel({ draft, onDecided }: { draft: DeliveryDraftItem; onDecided:
         <DraftChip status={draft.status} />
       </div>
       <div className="text-[12.5px] text-ink-muted mb-3">
-        {campanhaLabel(draft.campaignName)}
+        {campaignLabel(draft.campaignName)}
         {draft.revision > 1 && ` · revisão ${draft.revision}`}
       </div>
 
       <div className="text-[11.5px] text-ink-muted mb-3">
         {draft.fileName ?? "Arquivo"}
         {draft.sizeBytes && ` · ${(draft.sizeBytes / 1024 / 1024).toFixed(1)} MB`}
-        {` · enviado em ${fmtDate(draft.submittedAt)} (${esperaLabel(draft.submittedAt)})`}
+        {` · enviado em ${fmtDate(draft.submittedAt)} (${waitingLabel(draft.submittedAt)})`}
       </div>
 
       {draft.creatorNotes && (

@@ -15,13 +15,13 @@ import { fmtDate, initials } from "@/lib/operations-format"
 import { fmtCents, deliveryLink } from "@/lib/api/operations"
 import { PlatformCover } from "@/components/operations/shared"
 import {
-  useCreatorWorkspace, useCreatorMutations, useSetCreatorTaxId, useCreatorDeliveryThumb, trabalhoLabel,
+  useCreatorWorkspace, useCreatorMutations, useSetCreatorTaxId, useCreatorDeliveryThumb, workLabel,
   type CreatorEngagement, type CreatorDelivery,
 } from "@/lib/api/creator"
 import { CreatorContractPanel } from "@/components/creator/CreatorContractPanel"
 import { CreatorPrivacyCard } from "@/components/creator/CreatorPrivacyCard"
 import { CreatorDraftUpload } from "@/components/creator/CreatorDraftUpload"
-import { proximosPassos, type ProximoPasso } from "@/lib/creator-next-steps"
+import { nextSteps, type NextStep } from "@/lib/creator-next-steps"
 import ZoeLogo from "@/assets/zoe-logo.svg?react"
 
 const DELIVERY_COLOR = DELIVERY_STATUS_COLOR
@@ -105,27 +105,27 @@ function TaxIdCard({ current }: { current: string | null }) {
 export default function CreatorHomePage() {
   const { user, signOut } = useAuth()
   const workspace = useCreatorWorkspace()
-  const [tab, setTab] = useState<"campanhas" | "contratos">("campanhas")
+  const [tab, setTab] = useState<"campaigns" | "contracts">("campaigns")
   const navigate = useNavigate()
   /** Contrato que "Assinar o contrato" pediu para abrir na aba de contratos. */
-  const [focoContrato, setFocoContrato] = useState<string | null>(null)
+  const [focusedContract, setFocusedContract] = useState<string | null>(null)
 
-  const rolarAte = (id: string) =>
+  const scrollToId = (id: string) =>
     // Depois da troca de aba: o card de destino só existe no próximo render.
     setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 60)
 
-  const irPara = (p: ProximoPasso) => {
-    const destino = p.destino
-    if ("rota" in destino) {
-      navigate(destino.rota)
-    } else if ("ancora" in destino) {
-      rolarAte(destino.ancora)
-    } else if (destino.aba === "contratos") {
-      setFocoContrato(destino.contractId)
-      setTab("contratos")
+  const goToStep = (p: NextStep) => {
+    const target = p.target
+    if ("route" in target) {
+      navigate(target.route)
+    } else if ("anchor" in target) {
+      scrollToId(target.anchor)
+    } else if (target.tab === "contracts") {
+      setFocusedContract(target.contractId)
+      setTab("contracts")
     } else {
-      setTab("campanhas")
-      rolarAte(`trabalho-${destino.contractId}`)
+      setTab("campaigns")
+      scrollToId(`trabalho-${target.contractId}`)
     }
   }
 
@@ -187,10 +187,10 @@ export default function CreatorHomePage() {
 
             {/* A conta de recebimento vive no card de próximos passos. Existia um banner só
                 para ela logo acima, e os dois diziam a mesma coisa um embaixo do outro. */}
-            <ProximosPassosCard
-              passos={proximosPassos(d)}
-              temTrabalho={d.engagements.length > 0}
-              onIr={irPara}
+            <NextStepsCard
+              steps={nextSteps(d)}
+              hasWork={d.engagements.length > 0}
+              onGoTo={goToStep}
             />
 
             {/* Duas abas, como o time definiu: acompanhar o trabalho e ler o contrato
@@ -198,8 +198,8 @@ export default function CreatorHomePage() {
                 desaparecer embaixo das entregas. */}
             <div className="flex gap-1 mb-5">
               <TabButton
-                active={tab === "campanhas"}
-                onClick={() => setTab("campanhas")}
+                active={tab === "campaigns"}
+                onClick={() => setTab("campaigns")}
                 icon={<Megaphone className="w-3.5 h-3.5" />}
                 label="Campanhas"
                 badge={String(d.engagements.length)}
@@ -207,8 +207,8 @@ export default function CreatorHomePage() {
               {/* As duas abas mostravam o mesmo número — são o mesmo conjunto de trabalhos.
                   Em contratos, o que vale contar é o que espera a assinatura dele. */}
               <TabButton
-                active={tab === "contratos"}
-                onClick={() => setTab("contratos")}
+                active={tab === "contracts"}
+                onClick={() => setTab("contracts")}
                 icon={<FileText className="w-3.5 h-3.5" />}
                 label="Contratos"
                 badge={(() => {
@@ -247,7 +247,7 @@ export default function CreatorHomePage() {
               </Link>
             )}
 
-            {tab === "campanhas" ? (
+            {tab === "campaigns" ? (
               <div className="flex flex-col gap-4">
                 {d.engagements.map((e) => (
                   <EngagementCard key={e.contractId} e={e} />
@@ -255,9 +255,9 @@ export default function CreatorHomePage() {
               </div>
             ) : (
               <CreatorContractPanel
-                key={focoContrato ?? "inicio"}
+                key={focusedContract ?? "inicio"}
                 engagements={d.engagements}
-                initialContractId={focoContrato}
+                initialContractId={focusedContract}
               />
             )}
 
@@ -273,15 +273,15 @@ export default function CreatorHomePage() {
  * O que depende do criador agora, no topo da área. Pensado para o celular: é a primeira coisa
  * que aparece, e cada linha leva direto ao lugar de fazer.
  */
-function ProximosPassosCard({
-  passos, temTrabalho, onIr,
+function NextStepsCard({
+  steps, hasWork, onGoTo,
 }: {
-  passos: ProximoPasso[]
-  temTrabalho: boolean
-  onIr: (p: ProximoPasso) => void
+  steps: NextStep[]
+  hasWork: boolean
+  onGoTo: (p: NextStep) => void
 }) {
-  if (passos.length === 0) {
-    if (!temTrabalho) return null
+  if (steps.length === 0) {
+    if (!hasWork) return null
     return (
       <div
         className="rounded-xl border border-border-soft p-4 mb-4 text-[13px] text-ink-muted"
@@ -304,10 +304,10 @@ function ProximosPassosCard({
         </div>
       </div>
       <ol className="m-0 p-0 list-none flex flex-col gap-0.5">
-        {passos.map((p, i) => (
-          <li key={p.chave}>
+        {steps.map((p, i) => (
+          <li key={p.key}>
             <button
-              onClick={() => onIr(p)}
+              onClick={() => onGoTo(p)}
               className="w-full text-left flex items-start gap-2.5 rounded-lg px-2 py-2 hover:bg-[#FAFBFC] dark:hover:bg-[#181B28] transition-colors"
             >
               <span
@@ -317,8 +317,8 @@ function ProximosPassosCard({
                 {i + 1}
               </span>
               <span className="min-w-0">
-                <span className="block text-[13px] font-medium" style={{ color: "var(--ink)" }}>{p.titulo}</span>
-                <span className="block text-[12px] text-ink-muted">{p.detalhe}</span>
+                <span className="block text-[13px] font-medium" style={{ color: "var(--ink)" }}>{p.title}</span>
+                <span className="block text-[12px] text-ink-muted">{p.detail}</span>
               </span>
             </button>
           </li>
@@ -361,8 +361,8 @@ function EngagementCard({ e }: { e: CreatorEngagement }) {
 
   // A última tentativa decide o recado: com o corte reaberto a marca pediu vídeo novo; com o
   // corte ainda aprovado, só ajuste na postagem.
-  const ultimaEntrega = [...e.deliveries].sort((a, b) => b.submissionAttempt - a.submissionAttempt)[0]
-  const correcaoPedida = ultimaEntrega?.status === "ReworkRequested"
+  const latestDelivery = [...e.deliveries].sort((a, b) => b.submissionAttempt - a.submissionAttempt)[0]
+  const reworkRequested = latestDelivery?.status === "ReworkRequested"
 
   const send = async () => {
     try {
@@ -384,7 +384,7 @@ function EngagementCard({ e }: { e: CreatorEngagement }) {
         <div>
           <div className="eyebrow mb-1">{e.brandName}</div>
           <h2 className="font-display m-0" style={{ fontSize: 19, color: "var(--ink)" }}>
-            {trabalhoLabel(e.campaignName)}
+            {workLabel(e.campaignName)}
           </h2>
           <div className="text-[12.5px] text-ink-muted mt-1">
             {tEnum("contractModality", e.modality)}
@@ -403,7 +403,7 @@ function EngagementCard({ e }: { e: CreatorEngagement }) {
         </div>
       </div>
 
-      {correcaoPedida && (
+      {reworkRequested && (
         <div className="rounded-lg p-3 text-[12.5px] mb-4" style={{ background: "#D9770612", color: "#B45309" }}>
           <div className="font-medium mb-0.5">A marca pediu uma correção</div>
           {e.draft?.status === "ChangesRequested"

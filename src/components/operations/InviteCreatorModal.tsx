@@ -60,16 +60,16 @@ export function InviteCreatorModal({
   const [sent, setSent] = useState<InviteInfluencerResponse | null>(null)
   const [copied, setCopied] = useState(false)
   /** O convite da tela final foi reenviado, não criado. */
-  const [reenviado, setReenviado] = useState(false)
+  const [resent, setResent] = useState(false)
   /** No reenvio, trocar a proposta pelos valores do formulário. Ligado: é por isso que se reenvia. */
-  const [atualizarProposta, setAtualizarProposta] = useState(true)
+  const [updateProposal, setUpdateProposal] = useState(true)
   useEscapeKey(onClose)
   const dialogRef = useFocusTrap<HTMLDivElement>()
   /**
    * Convite recusado por já existir. Fica dentro do modal, junto do que a pessoa preencheu: um
    * toast some em segundos e não diz o que fazer.
    */
-  const [conflito, setConflito] = useState<{ code: string; message: string } | null>(null)
+  const [conflict, setConflict] = useState<{ code: string; message: string } | null>(null)
 
   const { data: rosterData } = useRoster()
   const people = useMemo(() => rosterData?.items ?? [], [rosterData])
@@ -97,7 +97,7 @@ export function InviteCreatorModal({
   const pick = (p: RosterItem) => {
     setEmail(p.email)
     setFullName(p.fullName)
-    setConflito(null)
+    setConflict(null)
   }
 
   const submit = async () => {
@@ -124,7 +124,7 @@ export function InviteCreatorModal({
       if (res.emailDelivery === "Sent") notifySuccess(`Convite enviado para ${res.email}.`)
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) {
-        setConflito({ code: e.code ?? "conflict", message: e.message })
+        setConflict({ code: e.code ?? "conflict", message: e.message })
         return
       }
       notifyError(e, "Não foi possível convidar.")
@@ -133,9 +133,9 @@ export function InviteCreatorModal({
 
   // A saída do convite pendente: mesmo convite, link novo. Sem este botão a mensagem mandava
   // "reenviar o link" e não havia onde clicar.
-  const temProposta = Boolean(campaignId) && Boolean(deliverables.trim() || fee.trim() || deadline)
+  const hasProposal = Boolean(campaignId) && Boolean(deliverables.trim() || fee.trim() || deadline)
 
-  const reenviar = async () => {
+  const resend = async () => {
     try {
       const cents = fee.trim() && !isBarter ? parseBRLToCents(fee) : undefined
       if (cents === null) {
@@ -145,7 +145,7 @@ export function InviteCreatorModal({
       const res = await resendInvite.mutateAsync({
         email: email.trim(),
         campaignId: campaignId || undefined,
-        proposta: temProposta && atualizarProposta
+        proposal: hasProposal && updateProposal
           ? {
             expectedDeliverables: deliverables.trim() || undefined,
             feeCents: cents,
@@ -153,8 +153,8 @@ export function InviteCreatorModal({
           }
           : undefined,
       })
-      setConflito(null)
-      setReenviado(true)
+      setConflict(null)
+      setResent(true)
       setSent(res)
       if (res.emailDelivery === "Sent") notifySuccess(`Convite reenviado para ${res.email}.`)
     } catch (e) {
@@ -191,7 +191,7 @@ export function InviteCreatorModal({
           <div>
             <div className="eyebrow mb-1">Proposta de trabalho</div>
             <h2 className="font-display m-0" style={{ fontSize: 20, color: "var(--ink)" }}>
-              {sent ? (reenviado ? "Convite reenviado" : "Convite criado") : "Convidar influenciador"}
+              {sent ? (resent ? "Convite reenviado" : "Convite criado") : "Convidar influenciador"}
             </h2>
             {!sent && (
               <p className="text-[12.5px] text-ink-muted m-0 mt-1">
@@ -323,7 +323,7 @@ export function InviteCreatorModal({
                     label="E-mail"
                     hint="Ela ainda não está na Zoe — vai receber um convite para se cadastrar e ver a proposta."
                   >
-                    <Input value={email} onChange={(e) => { setEmail(e.target.value); setConflito(null) }}
+                    <Input value={email} onChange={(e) => { setEmail(e.target.value); setConflict(null) }}
                            type="email" placeholder="criador@email.com" />
                   </Field>
                 </>
@@ -331,7 +331,7 @@ export function InviteCreatorModal({
 
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Campanha" hint="Em branco convida só para o elenco.">
-                  <Select value={campaignId} onChange={(v) => { setCampaignId(v); setConflito(null) }}>
+                  <Select value={campaignId} onChange={(v) => { setCampaignId(v); setConflict(null) }}>
                     <option value="">Sem campanha</option>
                     {campaigns.map((c) => (
                       <option key={c.campaignId} value={c.campaignId}>{c.name}</option>
@@ -383,25 +383,25 @@ export function InviteCreatorModal({
               </Field>
             </div>
 
-            {conflito && (
+            {conflict && (
               <div
                 className="rounded-lg p-3 text-[12.5px] mt-5"
                 style={{ background: "#D9770615", color: "#B45309" }}
                 role="alert"
               >
                 <div className="font-medium mb-0.5">
-                  {conflito.code === "influencer_already_invited" ? "Essa pessoa já aceitou" : "Já existe um convite pendente"}
+                  {conflict.code === "influencer_already_invited" ? "Essa pessoa já aceitou" : "Já existe um convite pendente"}
                 </div>
-                <div>{conflito.message}</div>
-                {conflito.code === "influencer_already_invited" && (
+                <div>{conflict.message}</div>
+                {conflict.code === "influencer_already_invited" && (
                   <a href="/operations/influencers" className="inline-block mt-1.5 underline">
                     Ver no elenco
                   </a>
                 )}
-                {conflito.code === "influencer_invite_pending" && (
+                {conflict.code === "influencer_invite_pending" && (
                   <div className="mt-2.5">
                     <button
-                      onClick={reenviar}
+                      onClick={resend}
                       disabled={resendInvite.isPending}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-medium text-white disabled:opacity-50"
                       style={{ background: "#D97706" }}
@@ -411,12 +411,12 @@ export function InviteCreatorModal({
                     </button>
                     {/* Quem reenviou quase sempre ajustou a proposta: sem esta opção, o novo cachê
                         digitado era descartado e o convite seguia com o antigo. */}
-                    {temProposta && (
+                    {hasProposal && (
                       <label className="flex items-center gap-2 text-[12px] mt-2 cursor-pointer">
                         <input
                           type="checkbox"
-                          checked={atualizarProposta}
-                          onChange={(e) => setAtualizarProposta(e.target.checked)}
+                          checked={updateProposal}
+                          onChange={(e) => setUpdateProposal(e.target.checked)}
                           className="accent-[#D97706]"
                         />
                         Atualizar a proposta com os valores deste formulário
@@ -424,7 +424,7 @@ export function InviteCreatorModal({
                     )}
                     <div className="text-[11.5px] mt-1.5" style={{ opacity: 0.9 }}>
                       Gera um link novo para o mesmo convite
-                      {temProposta && atualizarProposta ? ", com a proposta deste formulário" : ", com a proposta enviada antes"}.
+                      {hasProposal && updateProposal ? ", com a proposta deste formulário" : ", com a proposta enviada antes"}.
                       O link anterior deixa de valer.
                     </div>
                   </div>

@@ -12,23 +12,23 @@
  * pelo mínimo de `File` que interessa. É o que deixa a lógica de retomada testável.
  */
 
-export type ArquivoEnviavel = Pick<File, "name" | "size" | "lastModified" | "slice">
+export type UploadableFile = Pick<File, "name" | "size" | "lastModified" | "slice">
 
-export type ParteAssinada = { partNumber: number; url: string }
+export type SignedPart = { partNumber: number; url: string }
 
-export type ParteEnviada = { partNumber: number; eTag: string }
+export type UploadedPart = { partNumber: number; eTag: string }
 
 export type MultipartApi = {
   start: (v: { contractId: string; fileName: string; contentType: string; sizeBytes: number })
     => Promise<{ mediaKey: string; uploadId: string; partSizeBytes: number; partCount: number }>
   signParts: (v: { contractId: string; mediaKey: string; uploadId: string; partNumbers: number[] })
-    => Promise<{ parts: ParteAssinada[] }>
-  complete: (v: { contractId: string; mediaKey: string; uploadId: string; parts: ParteEnviada[] })
+    => Promise<{ parts: SignedPart[] }>
+  complete: (v: { contractId: string; mediaKey: string; uploadId: string; parts: UploadedPart[] })
     => Promise<unknown>
 }
 
 /** O que sobrevive ao fechamento da aba: onde o envio está e o que já subiu. */
-export type EnvioGuardado = {
+export type StoredUpload = {
   mediaKey: string
   uploadId: string
   partSizeBytes: number
@@ -37,173 +37,173 @@ export type EnvioGuardado = {
   etags: Record<number, string>
 }
 
-export type GuardaDeEnvio = {
-  ler: (chave: string) => EnvioGuardado | null
-  gravar: (chave: string, envio: EnvioGuardado) => void
-  limpar: (chave: string) => void
+export type UploadStore = {
+  read: (key: string) => StoredUpload | null
+  write: (key: string, upload: StoredUpload) => void
+  clear: (key: string) => void
 }
 
 /** Sobe uma parte e devolve o ETag que o storage respondeu. */
-export type PutParte = (
+export type PutPart = (
   url: string,
-  corpo: Blob,
-  onProgress: (bytesDaParte: number) => void,
+  body: Blob,
+  onProgress: (partBytes: number) => void,
 ) => Promise<string>
 
 /**
  * Identidade do arquivo para retomar. Nome, tamanho e data de modificação juntos: escolher outro
  * arquivo (ou reexportar o mesmo vídeo) tem de começar um envio novo, nunca colar partes de dois.
  */
-export const chaveDeRetomada = (contractId: string, file: ArquivoEnviavel) =>
+export const resumeKey = (contractId: string, file: UploadableFile) =>
   `zoe-draft-upload:${contractId}:${file.name}:${file.size}:${file.lastModified}`
 
 /** Guarda em `localStorage`, que pode estar indisponível (aba anônima, storage cheio). */
-export function guardaEmLocalStorage(): GuardaDeEnvio {
+export function localStorageUploadStore(): UploadStore {
   return {
-    ler: (chave) => {
+    read: (key) => {
       try {
-        const cru = localStorage.getItem(chave)
-        return cru ? (JSON.parse(cru) as EnvioGuardado) : null
+        const raw = localStorage.getItem(key)
+        return raw ? (JSON.parse(raw) as StoredUpload) : null
       } catch {
         return null
       }
     },
-    gravar: (chave, envio) => {
-      try { localStorage.setItem(chave, JSON.stringify(envio)) } catch { /* storage indisponível */ }
+    write: (key, upload) => {
+      try { localStorage.setItem(key, JSON.stringify(upload)) } catch { /* storage indisponível */ }
     },
-    limpar: (chave) => {
-      try { localStorage.removeItem(chave) } catch { /* storage indisponível */ }
+    clear: (key) => {
+      try { localStorage.removeItem(key) } catch { /* storage indisponível */ }
     },
   }
 }
 
-const esperarPadrao = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+const defaultWait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
-export type EnvioEmPartes = {
+export type MultipartUploadOptions = {
   contractId: string
-  file: ArquivoEnviavel
+  file: UploadableFile
   contentType: string
   api: MultipartApi
-  putParte: PutParte
-  storage: GuardaDeEnvio
+  putPart: PutPart
+  storage: UploadStore
   /** 0 a 1, contando o que já estava enviado de antes. */
-  onProgress?: (fracao: number) => void
+  onProgress?: (fraction: number) => void
   /** Partes em paralelo. Três: o suficiente para usar a banda sem afogar conexão doméstica. */
-  concorrencia?: number
+  concurrency?: number
   /** Tentativas por parte antes de desistir do envio inteiro. */
-  tentativasPorParte?: number
-  esperar?: (ms: number) => Promise<void>
+  attemptsPerPart?: number
+  wait?: (ms: number) => Promise<void>
 }
 
 /**
  * Sobe o arquivo e conclui o envio. Devolve a chave do objeto, que é o que a confirmação do corte
  * manda para a API.
  */
-export async function enviarEmPartes({
-  contractId, file, contentType, api, putParte, storage,
-  onProgress, concorrencia = 3, tentativasPorParte = 3, esperar = esperarPadrao,
-}: EnvioEmPartes): Promise<string> {
-  const chave = chaveDeRetomada(contractId, file)
+export async function uploadInParts({
+  contractId, file, contentType, api, putPart, storage,
+  onProgress, concurrency = 3, attemptsPerPart = 3, wait = defaultWait,
+}: MultipartUploadOptions): Promise<string> {
+  const key = resumeKey(contractId, file)
 
-  let envio = storage.ler(chave)
-  if (!envio || !envio.uploadId || !envio.mediaKey) {
-    const aberto = await api.start({
+  let upload = storage.read(key)
+  if (!upload || !upload.uploadId || !upload.mediaKey) {
+    const started = await api.start({
       contractId, fileName: file.name, contentType, sizeBytes: file.size,
     })
-    envio = { ...aberto, etags: {} }
-    storage.gravar(chave, envio)
+    upload = { ...started, etags: {} }
+    storage.write(key, upload)
   }
 
-  const guardado = envio
-  const pendentes = Array.from({ length: guardado.partCount }, (_, i) => i + 1)
-    .filter((n) => !guardado.etags[n])
+  const stored = upload
+  const pending = Array.from({ length: stored.partCount }, (_, i) => i + 1)
+    .filter((n) => !stored.etags[n])
 
-  const tamanhoDaParte = (n: number) =>
-    Math.min(n * guardado.partSizeBytes, file.size) - (n - 1) * guardado.partSizeBytes
+  const partSize = (n: number) =>
+    Math.min(n * stored.partSizeBytes, file.size) - (n - 1) * stored.partSizeBytes
 
   // Progresso conta o que já estava enviado: retomar não pode voltar a barra para zero.
-  const enviado: Record<number, number> = {}
-  for (const n of Object.keys(guardado.etags).map(Number)) enviado[n] = tamanhoDaParte(n)
+  const uploadedBytes: Record<number, number> = {}
+  for (const n of Object.keys(stored.etags).map(Number)) uploadedBytes[n] = partSize(n)
 
-  const avisar = () => {
+  const reportProgress = () => {
     if (!onProgress) return
-    const total = Object.values(enviado).reduce((a, b) => a + b, 0)
+    const total = Object.values(uploadedBytes).reduce((a, b) => a + b, 0)
     onProgress(file.size > 0 ? Math.min(total / file.size, 1) : 1)
   }
-  avisar()
+  reportProgress()
 
   const urls = new Map<number, string>()
-  const fila = [...pendentes]
+  const queue = [...pending]
 
-  const assinar = async (numero: number) => {
+  const signBatch = async (partNumber: number) => {
     // Assina em lote: a partir da parte pedida, as próximas que ainda não têm URL. Todas de uma vez
     // seria pior — cada URL vale 30 minutos, e um arquivo grande em conexão lenta passa disso.
-    const lote = fila.concat(numero)
+    const batch = queue.concat(partNumber)
       .filter((n) => !urls.has(n))
       .sort((a, b) => a - b)
       .slice(0, 20)
-    if (!lote.includes(numero)) lote.push(numero)
+    if (!batch.includes(partNumber)) batch.push(partNumber)
 
     const { parts } = await api.signParts({
       contractId,
-      mediaKey: guardado.mediaKey,
-      uploadId: guardado.uploadId,
-      partNumbers: lote,
+      mediaKey: stored.mediaKey,
+      uploadId: stored.uploadId,
+      partNumbers: batch,
     })
     for (const p of parts) urls.set(p.partNumber, p.url)
   }
 
-  const enviarParte = async (numero: number) => {
-    const inicio = (numero - 1) * guardado.partSizeBytes
-    const corpo = file.slice(inicio, Math.min(inicio + guardado.partSizeBytes, file.size))
+  const uploadPart = async (partNumber: number) => {
+    const start = (partNumber - 1) * stored.partSizeBytes
+    const body = file.slice(start, Math.min(start + stored.partSizeBytes, file.size))
 
-    for (let tentativa = 1; ; tentativa++) {
+    for (let attempt = 1; ; attempt++) {
       try {
-        if (!urls.has(numero)) await assinar(numero)
-        const etag = await putParte(urls.get(numero)!, corpo, (bytes) => {
-          enviado[numero] = bytes
-          avisar()
+        if (!urls.has(partNumber)) await signBatch(partNumber)
+        const etag = await putPart(urls.get(partNumber)!, body, (bytes) => {
+          uploadedBytes[partNumber] = bytes
+          reportProgress()
         })
 
-        guardado.etags[numero] = etag
-        enviado[numero] = tamanhoDaParte(numero)
-        storage.gravar(chave, guardado)
-        avisar()
+        stored.etags[partNumber] = etag
+        uploadedBytes[partNumber] = partSize(partNumber)
+        storage.write(key, stored)
+        reportProgress()
         return
       } catch (e) {
         // Pode ter sido a URL vencendo no meio do caminho: joga fora e assina de novo na próxima.
-        urls.delete(numero)
-        enviado[numero] = 0
-        if (tentativa >= tentativasPorParte) throw e
-        await esperar(300 * 2 ** tentativa)
+        urls.delete(partNumber)
+        uploadedBytes[partNumber] = 0
+        if (attempt >= attemptsPerPart) throw e
+        await wait(300 * 2 ** attempt)
       }
     }
   }
 
-  const trabalhador = async () => {
-    for (let numero = fila.shift(); numero !== undefined; numero = fila.shift()) {
-      await enviarParte(numero)
+  const worker = async () => {
+    for (let partNumber = queue.shift(); partNumber !== undefined; partNumber = queue.shift()) {
+      await uploadPart(partNumber)
     }
   }
 
   await Promise.all(
-    Array.from({ length: Math.max(1, Math.min(concorrencia, pendentes.length || 1)) }, trabalhador))
+    Array.from({ length: Math.max(1, Math.min(concurrency, pending.length || 1)) }, worker))
 
-  const partes: ParteEnviada[] = Object.entries(guardado.etags)
-    .map(([numero, eTag]) => ({ partNumber: Number(numero), eTag }))
+  const parts: UploadedPart[] = Object.entries(stored.etags)
+    .map(([partNumber, eTag]) => ({ partNumber: Number(partNumber), eTag }))
     .sort((a, b) => a.partNumber - b.partNumber)
 
   try {
     await api.complete({
-      contractId, mediaKey: guardado.mediaKey, uploadId: guardado.uploadId, parts: partes,
+      contractId, mediaKey: stored.mediaKey, uploadId: stored.uploadId, parts,
     })
   } catch (e) {
     // Conclusão recusada significa envio vencido ou parte que não bate: retomar isto nunca vai dar
     // certo, e insistir com o estado velho prenderia a pessoa num erro que se repete.
-    storage.limpar(chave)
+    storage.clear(key)
     throw e
   }
 
-  storage.limpar(chave)
-  return guardado.mediaKey
+  storage.clear(key)
+  return stored.mediaKey
 }

@@ -687,12 +687,12 @@ export const operationsApi = {
 
   // Reenvio do convite pendente: o mesmo convite com link novo. A proposta enviada não muda.
   // Com `proposta`, a proposta do convite é trocada antes do reenvio (só em convite de campanha).
-  resendInfluencerInvite: (email: string, campaignId?: string, proposta?: ResendProposal) =>
+  resendInfluencerInvite: (email: string, campaignId?: string, proposal?: ResendProposal) =>
     apiClient.post<InviteInfluencerResponse>(
       campaignId
         ? `/api/operations/campaigns/${campaignId}/invites/resend`
         : "/api/operations/influencers/invites/resend",
-      { email, ...(campaignId && proposta ? { ...proposta, reviseProposal: true } : {}) }),
+      { email, ...(campaignId && proposal ? { ...proposal, reviseProposal: true } : {}) }),
 
   // Lembrete ao criador de conectar ou concluir a conta de recebimento. Limitado no servidor.
   remindPayoutAccount: (influencerId: string) =>
@@ -849,14 +849,14 @@ export function useContractMutations() {
  * periódica) e, com pagamento automático, a custódia abrindo e reservando — ela vai buscar.
  * Antes dizia "atualize em instantes" e dependia de F5.</p>
  */
-export function intervaloDeEspera(d: ContractDetail | undefined, now: number = Date.now()): number | false {
+export function pollInterval(d: ContractDetail | undefined, now: number = Date.now()): number | false {
   if (!d) return false
   if (d.status === "SentForSignature") return 30_000
 
-  const abrindoCustodia = d.status === "Signed" && d.usesEscrow && Boolean(d.autoAdvanceEscrow)
+  const openingEscrow = d.status === "Signed" && d.usesEscrow && Boolean(d.autoAdvanceEscrow)
     && (!d.escrowAccountId || d.escrowState === "PendingDeposit")
   // Janela curta: passado isso, algo impediu a abertura e a tela já oferece fazer à mão.
-  if (abrindoCustodia && d.signedAt && now - Date.parse(d.signedAt) < 10 * 60_000) return 4_000
+  if (openingEscrow && d.signedAt && now - Date.parse(d.signedAt) < 10 * 60_000) return 4_000
 
   return false
 }
@@ -867,7 +867,7 @@ export function useContract(contractId: string | undefined) {
     queryKey: ["operations-contract", activeTenantId, contractId],
     queryFn: ({ signal }) => operationsApi.getContract(contractId!, { signal }),
     enabled: Boolean(activeTenantId && contractId),
-    refetchInterval: (query) => intervaloDeEspera(query.state.data),
+    refetchInterval: (query) => pollInterval(query.state.data),
   })
 }
 
@@ -1078,17 +1078,17 @@ export function useRemoteDeliveryThumb(
   enabled = true,
 ): string | null {
   const local = deliveryThumb(d)
-  const remota = !local && d.platform === "TikTok"
+  const remote = !local && d.platform === "TikTok"
   const { data } = useQuery({
     queryKey: ["delivery-thumb", ...scope, d.deliveryId],
     queryFn: ({ signal }) => fetchThumb(d.deliveryId, signal),
-    enabled: enabled && remota,
+    enabled: enabled && remote,
     staleTime: THUMB_STALE,
     gcTime: THUMB_STALE,
     // Sem imagem a tela já tem a capa da plataforma; insistir não muda nada para quem olha.
     retry: false,
   })
-  return local ?? (remota ? data?.thumbnailUrl ?? null : null)
+  return local ?? (remote ? data?.thumbnailUrl ?? null : null)
 }
 
 /** Miniatura de uma entrega na fila da marca. */
@@ -1343,8 +1343,8 @@ export function useRosterMutations() {
     }),
     // Nada a invalidar: reenviar não muda elenco, contagem nem proposta — só o link.
     resendInvite: useMutation({
-      mutationFn: (v: { email: string; campaignId?: string; proposta?: ResendProposal }) =>
-        operationsApi.resendInfluencerInvite(v.email, v.campaignId, v.proposta),
+      mutationFn: (v: { email: string; campaignId?: string; proposal?: ResendProposal }) =>
+        operationsApi.resendInfluencerInvite(v.email, v.campaignId, v.proposal),
     }),
     remindPayout: useMutation({
       mutationFn: (influencerId: string) => operationsApi.remindPayoutAccount(influencerId),

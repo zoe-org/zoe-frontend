@@ -11,16 +11,16 @@ import { StatusChip } from "@/components/ui/status-chip"
 import { ConfidenceBadge } from "@/components/ui/confidence-badge"
 import { RoleGate } from "@/features/auth/RoleGate"
 import { tEnum } from "@/i18n/enums"
-import { fmtDate, matches, campanhaLabel } from "@/lib/operations-format"
+import { fmtDate, matches, campaignLabel } from "@/lib/operations-format"
 import {
   TableSkeleton, ErrorState, SearchBox, NoResults, PlatformCover,
 } from "@/components/operations/shared"
 import { QueueLayout, QueueRow, QueueSection } from "@/components/operations/ReviewQueue"
-import { secoesPorCampanha, itensVisiveis } from "@/lib/queue-sections"
+import { sectionsByCampaign, visibleItems } from "@/lib/queue-sections"
 import { ContractTimeline } from "@/components/operations/ContractTimeline"
-import { useIsWide, useQueueKeys, esperaLabel } from "@/lib/queue-navigation"
+import { useIsWide, useQueueKeys, waitingLabel } from "@/lib/queue-navigation"
 import {
-  agruparPorContrato, ordenarFila, PENDENTE, type DeliveryGroup,
+  groupByContract, sortQueue, PENDING_STATUSES, type DeliveryGroup,
 } from "@/lib/delivery-queue"
 import {
   useDeliveries, useDeliveryDrafts, useDeliveryMutations, fmtCents, useDeliveryThumb, deliveryLink,
@@ -39,9 +39,9 @@ const NO_DELIVERIES: DeliverySummary[] = []
 type Gate = "drafts" | "published"
 
 /** Aguardando junta "enviada" e "em revisão": para quem abre a fila, os dois esperam por ela. */
-type Aba = "pending" | "ReworkRequested" | "Approved" | "Rejected" | "all"
+type QueueTab = "pending" | "ReworkRequested" | "Approved" | "Rejected" | "all"
 
-const ABAS: [Aba, string][] = [
+const TABS: [QueueTab, string][] = [
   ["pending", "Aguardando"],
   ["ReworkRequested", "Correção"],
   ["Approved", "Aprovadas"],
@@ -49,11 +49,11 @@ const ABAS: [Aba, string][] = [
   ["all", "Todas"],
 ]
 
-const naAba = (aba: Aba, status: string) =>
-  aba === "all" ? true : aba === "pending" ? PENDENTE.has(status) : status === aba
+const inTab = (tab: QueueTab, status: string) =>
+  tab === "all" ? true : tab === "pending" ? PENDING_STATUSES.has(status) : status === tab
 
 /** Valor do filtro de campanha para contrato avulso — "" já significa "todas". */
-const SEM_CAMPANHA = "avulso"
+const NO_CAMPAIGN = "avulso"
 
 /**
  * Entregas — os dois portões de revisão.
@@ -79,13 +79,13 @@ export default function OperationsDeliveriesPage() {
 
   // Referência estável: um `?? []` inline nasce novo a cada render e invalidaria os useMemo.
   const items = deliveries.data?.items ?? NO_DELIVERIES
-  const grupos = useMemo(() => agruparPorContrato(items), [items])
+  const groups = useMemo(() => groupByContract(items), [items])
 
   // O contador vai no botão do portão: sem ele era preciso lembrar de abrir as duas abas para
   // saber se havia algo esperando.
   const counts = {
     drafts: (drafts.data?.items ?? []).filter((d) => d.status === "AwaitingReview").length,
-    published: grupos.filter((g) => PENDENTE.has(g.current.status)).length,
+    published: groups.filter((g) => PENDING_STATUSES.has(g.current.status)).length,
   }
 
   return (
@@ -95,7 +95,7 @@ export default function OperationsDeliveriesPage() {
         ? <DeliveryDrafts />
         : (
           <PublishedQueue
-            grupos={grupos}
+            groups={groups}
             hasItems={items.length > 0}
             isLoading={deliveries.isLoading}
             isError={deliveries.isError}
@@ -107,9 +107,9 @@ export default function OperationsDeliveriesPage() {
 }
 
 function PublishedQueue({
-  grupos, hasItems, isLoading, isError, onRetry,
+  groups, hasItems, isLoading, isError, onRetry,
 }: {
-  grupos: DeliveryGroup[]
+  groups: DeliveryGroup[]
   hasItems: boolean
   isLoading: boolean
   isError: boolean
@@ -118,108 +118,108 @@ function PublishedQueue({
   const wide = useIsWide()
   // Vindo do detalhe da campanha, a fila já abre filtrada por ela — e no contrato clicado.
   const [params] = useSearchParams()
-  const contratoInicial = params.get("contract")
-  const [abaEscolhida, setAba] = useState<Aba | null>(null)
-  const [busca, setBusca] = useState("")
-  const [campanha, setCampanha] = useState(() => params.get("campaign") ?? "")
+  const initialContractId = params.get("contract")
+  const [chosenTab, setChosenTab] = useState<QueueTab | null>(null)
+  const [search, setSearch] = useState("")
+  const [campaignFilter, setCampaignFilter] = useState(() => params.get("campaign") ?? "")
   /** Por contrato, não por entrega: o reenvio do criador continua selecionado. */
-  const [selected, setSelected] = useState<string | null>(contratoInicial)
+  const [selected, setSelected] = useState<string | null>(initialContractId)
 
   // Sem escolha da pessoa, "Aguardando" — a menos que o que veio pelo link não tenha nada
   // esperando: abrir numa aba vazia fazia o "Ver todas" da campanha parecer quebrado.
-  const aba: Aba = abaEscolhida ?? (
-    (campanha || contratoInicial) && !grupos.some((g) =>
-      PENDENTE.has(g.current.status)
-      && (!campanha || (g.current.campaignId ?? SEM_CAMPANHA) === campanha)
-      && (!contratoInicial || g.current.contractId === contratoInicial))
+  const tab: QueueTab = chosenTab ?? (
+    (campaignFilter || initialContractId) && !groups.some((g) =>
+      PENDING_STATUSES.has(g.current.status)
+      && (!campaignFilter || (g.current.campaignId ?? NO_CAMPAIGN) === campaignFilter)
+      && (!initialContractId || g.current.contractId === initialContractId))
       ? "all"
       : "pending")
 
   const counts = useMemo(
     () => Object.fromEntries(
-      ABAS.map(([k]) => [k, grupos.filter((g) => naAba(k, g.current.status)).length]),
-    ) as Record<Aba, number>,
-    [grupos],
+      TABS.map(([k]) => [k, groups.filter((g) => inTab(k, g.current.status)).length]),
+    ) as Record<QueueTab, number>,
+    [groups],
   )
 
-  const campanhas = useMemo(() => {
+  const campaignOptions = useMemo(() => {
     const m = new Map<string, string>()
-    for (const g of grupos) m.set(g.current.campaignId ?? SEM_CAMPANHA, campanhaLabel(g.current.campaignName))
+    for (const g of groups) m.set(g.current.campaignId ?? NO_CAMPAIGN, campaignLabel(g.current.campaignName))
     return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1], "pt-BR"))
-  }, [grupos])
+  }, [groups])
 
   // A busca e a campanha vêm DEPOIS da aba: a aba diz em que fase olhar, os filtros dizem de
   // quem. Inverter faria a contagem das abas mudar conforme se digita.
-  const filtrados = useMemo(
-    () => ordenarFila(
-      grupos.filter((g) =>
-        naAba(aba, g.current.status)
-        && (!campanha || (g.current.campaignId ?? SEM_CAMPANHA) === campanha)
-        && matches(busca, g.current.influencerName, g.current.campaignName, g.current.submittedUrl)),
-      aba === "pending",
+  const filtered = useMemo(
+    () => sortQueue(
+      groups.filter((g) =>
+        inTab(tab, g.current.status)
+        && (!campaignFilter || (g.current.campaignId ?? NO_CAMPAIGN) === campaignFilter)
+        && matches(search, g.current.influencerName, g.current.campaignName, g.current.submittedUrl)),
+      tab === "pending",
     ),
-    [grupos, aba, campanha, busca],
+    [groups, tab, campaignFilter, search],
   )
 
   // Sem campanha escolhida e com mais de uma na fila, a lista vira seções por campanha — a do item
   // mais urgente no topo. Teclado e "próximo depois de decidir" seguem a mesma ordem da tela.
-  const [recolhidas, setRecolhidas] = useState<ReadonlySet<string>>(() => new Set())
-  const secoes = useMemo(
-    () => secoesPorCampanha(
-      filtrados,
-      (g) => ({ id: g.current.campaignId, nome: g.current.campaignName }),
-      (g) => PENDENTE.has(g.current.status),
-      campanhaLabel,
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set())
+  const sections = useMemo(
+    () => sectionsByCampaign(
+      filtered,
+      (g) => ({ id: g.current.campaignId, name: g.current.campaignName }),
+      (g) => PENDING_STATUSES.has(g.current.status),
+      campaignLabel,
     ),
-    [filtrados],
+    [filtered],
   )
-  const agrupar = !campanha && secoes.length > 1
-  const visiveis = agrupar ? itensVisiveis(secoes, recolhidas) : filtrados
-  const alternarSecao = (chave: string) => setRecolhidas((atuais) => {
-    const proximas = new Set(atuais)
-    if (proximas.has(chave)) proximas.delete(chave)
-    else proximas.add(chave)
-    return proximas
+  const grouped = !campaignFilter && sections.length > 1
+  const visible = grouped ? visibleItems(sections, collapsed) : filtered
+  const toggleSection = (key: string) => setCollapsed((current) => {
+    const next = new Set(current)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    return next
   })
 
-  const ids = visiveis.map((g) => g.current.contractId)
+  const ids = visible.map((g) => g.current.contractId)
   // Na tela larga sempre há um item aberto: o detalhe vazio ao lado da lista era espaço perdido.
-  const atual = visiveis.find((g) => g.current.contractId === selected)
-    ?? (wide ? visiveis[0] : undefined)
+  const selectedGroup = visible.find((g) => g.current.contractId === selected)
+    ?? (wide ? visible[0] : undefined)
     ?? null
 
   // Decidiu em "Aguardando": o item sai da aba, e o próximo abre sozinho em vez de a pessoa
   // voltar ao topo da lista para achar onde parou.
-  const aposDecidir = (contractId: string) => {
-    if (aba !== "pending") return
+  const afterDecision = (contractId: string) => {
+    if (tab !== "pending") return
     const i = ids.indexOf(contractId)
     setSelected(ids[i + 1] ?? ids[i - 1] ?? null)
   }
 
   useQueueKeys({
     ids,
-    selected: atual?.current.contractId ?? null,
+    selected: selectedGroup?.current.contractId ?? null,
     onSelect: setSelected,
     onClose: wide ? undefined : () => setSelected(null),
     notesId: "review-notes",
   })
 
-  const linha = (g: DeliveryGroup) => {
+  const renderRow = (g: DeliveryGroup) => {
     const d = g.current
     return (
       <QueueRow
         key={d.contractId}
         id={d.contractId}
-        active={atual?.current.contractId === d.contractId}
+        active={selectedGroup?.current.contractId === d.contractId}
         onSelect={setSelected}
         thumb={<RowThumb d={d} />}
         // O título é quem entregou. Pela campanha, todo contrato avulso virava
         // "Sem campanha" e o nome da pessoa ficava em letra miúda.
         title={d.influencerName}
-        subtitle={`${campanhaLabel(d.campaignName)}${d.submissionAttempt > 1 ? ` · ${d.submissionAttempt}ª tentativa` : ""}`}
+        subtitle={`${campaignLabel(d.campaignName)}${d.submissionAttempt > 1 ? ` · ${d.submissionAttempt}ª tentativa` : ""}`}
         status={<DeliveryChip status={d.status} small />}
-        meta={esperaLabel(d.submittedAt)}
-        alert={d.isReviewOverdue && PENDENTE.has(d.status) ? "prazo vencido" : null}
+        meta={waitingLabel(d.submittedAt)}
+        alert={d.isReviewOverdue && PENDING_STATUSES.has(d.status) ? "prazo vencido" : null}
       />
     )
   }
@@ -239,19 +239,19 @@ function PublishedQueue({
 
       <div className="flex gap-2 flex-wrap items-center justify-between">
         <div className="flex gap-1 flex-wrap">
-          {ABAS.map(([k, label]) => (
+          {TABS.map(([k, label]) => (
             <button
               key={k}
-              onClick={() => setAba(k)}
+              onClick={() => setChosenTab(k)}
               className="px-3 py-1.5 rounded-lg text-[12.5px] font-medium transition-colors inline-flex items-center gap-1.5"
-              style={aba === k
+              style={tab === k
                 ? { background: "var(--color-teal-500)", color: "#fff" }
                 : { color: "var(--ink-muted)", border: "1px solid var(--border-soft)" }}
             >
               {label}
               <span
                 className="text-[11px] font-mono-zoe px-1.5 rounded"
-                style={aba === k ? { background: "#ffffff28" } : { background: "var(--border-soft)" }}
+                style={tab === k ? { background: "#ffffff28" } : { background: "var(--border-soft)" }}
               >
                 {counts[k]}
               </span>
@@ -260,19 +260,19 @@ function PublishedQueue({
         </div>
         {hasItems && (
           <div className="flex gap-2 flex-wrap items-center">
-            {(campanhas.length > 1 || campanha) && (
+            {(campaignOptions.length > 1 || campaignFilter) && (
               <select
-                value={campanha}
-                onChange={(e) => setCampanha(e.target.value)}
+                value={campaignFilter}
+                onChange={(e) => setCampaignFilter(e.target.value)}
                 aria-label="Filtrar por campanha"
                 className="h-9 px-2.5 rounded-lg border border-border-soft text-[12.5px] bg-transparent max-w-[220px]"
                 style={{ color: "var(--ink)" }}
               >
                 <option value="">Todas as campanhas</option>
-                {campanhas.map(([id, nome]) => <option key={id} value={id}>{nome}</option>)}
+                {campaignOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
               </select>
             )}
-            <SearchBox value={busca} onChange={setBusca} placeholder="Buscar por criador, campanha…" />
+            <SearchBox value={search} onChange={setSearch} placeholder="Buscar por criador, campanha…" />
           </div>
         )}
       </div>
@@ -281,16 +281,16 @@ function PublishedQueue({
         <TableSkeleton rows={3} />
       ) : isError ? (
         <ErrorState onRetry={onRetry} />
-      ) : filtrados.length === 0 && (busca || campanha) ? (
+      ) : filtered.length === 0 && (search || campaignFilter) ? (
         <NoResults
-          query={busca || campanhas.find(([id]) => id === campanha)?.[1] || ""}
-          onClear={() => { setBusca(""); setCampanha("") }}
+          query={search || campaignOptions.find(([id]) => id === campaignFilter)?.[1] || ""}
+          onClear={() => { setSearch(""); setCampaignFilter("") }}
         />
-      ) : filtrados.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <EmptyBlock
           message={!hasItems
             ? "Nenhuma entrega ainda. Elas aparecem aqui quando o criador manda o link do vídeo publicado."
-            : aba === "pending"
+            : tab === "pending"
               ? "Nada esperando revisão agora."
               : "Nenhuma entrega neste estado."}
         />
@@ -300,25 +300,25 @@ function PublishedQueue({
           detailTitle="Revisão da entrega"
           onCloseDetail={() => setSelected(null)}
           hint="↑ ↓ ou J K andam pela fila · C escreve as observações"
-          list={agrupar
-            ? secoes.map((sec) => (
-              <Fragment key={sec.chave}>
+          list={grouped
+            ? sections.map((sec) => (
+              <Fragment key={sec.key}>
                 <QueueSection
-                  label={sec.rotulo}
-                  count={sec.itens.length}
-                  pending={sec.pendentes}
-                  collapsed={recolhidas.has(sec.chave)}
-                  onToggle={() => alternarSecao(sec.chave)}
+                  label={sec.label}
+                  count={sec.items.length}
+                  pending={sec.pendingCount}
+                  collapsed={collapsed.has(sec.key)}
+                  onToggle={() => toggleSection(sec.key)}
                 />
-                {!recolhidas.has(sec.chave) && sec.itens.map(linha)}
+                {!collapsed.has(sec.key) && sec.items.map(renderRow)}
               </Fragment>
             ))
-            : filtrados.map(linha)}
-          detail={atual && (
+            : filtered.map(renderRow)}
+          detail={selectedGroup && (
             <ReviewPanel
-              key={atual.current.deliveryId}
-              group={atual}
-              onDecided={() => aposDecidir(atual.current.contractId)}
+              key={selectedGroup.current.deliveryId}
+              group={selectedGroup}
+              onDecided={() => afterDecision(selectedGroup.current.contractId)}
             />
           )}
         />
@@ -428,11 +428,11 @@ function AuditCard({ audit }: { audit: DeliveryAudit | null }) {
  * Sugere o tipo de correção pelo que a auditoria reprovou. Identificação publicitária e hashtag
  * se resolvem editando a postagem; o resto mexe no vídeo. É sugestão — quem revisa escolhe.
  */
-function sugestaoDeEscopo(audit: DeliveryAudit | null): ReworkScope {
-  const falhas = audit?.checklist.filter((i) => !i.passed).map((i) => i.criterion.toLowerCase()) ?? []
-  if (falhas.length === 0) return "Content"
-  const soPublicacao = falhas.every((c) => c.includes("disclosure") || c.includes("hashtag") || c.includes("conar"))
-  return soPublicacao ? "Publication" : "Content"
+function suggestScope(audit: DeliveryAudit | null): ReworkScope {
+  const failures = audit?.checklist.filter((i) => !i.passed).map((i) => i.criterion.toLowerCase()) ?? []
+  if (failures.length === 0) return "Content"
+  const publicationOnly = failures.every((c) => c.includes("disclosure") || c.includes("hashtag") || c.includes("conar"))
+  return publicationOnly ? "Publication" : "Content"
 }
 
 /** Capa da linha da fila. Componente porque a miniatura do TikTok é buscada, e hook não cabe em `linha`. */
@@ -503,7 +503,7 @@ function ReviewPanel({ group, onDecided }: { group: DeliveryGroup; onDecided: ()
   const d = group.current
   const { decide } = useDeliveryMutations()
   const [notes, setNotes] = useState("")
-  const [escopo, setEscopo] = useState<ReworkScope>(() => sugestaoDeEscopo(d.audit))
+  const [scope, setScope] = useState<ReworkScope>(() => suggestScope(d.audit))
 
   const decideWith = async (decision: DeliveryDecision, ok: string) => {
     // Correção e recusa mudam o rumo do contrato: exigir o motivo é o mínimo para o
@@ -518,7 +518,7 @@ function ReviewPanel({ group, onDecided }: { group: DeliveryGroup; onDecided: ()
         deliveryId: d.deliveryId,
         decision,
         notes: notes.trim() || undefined,
-        scope: decision === "RequestRework" ? escopo : undefined,
+        scope: decision === "RequestRework" ? scope : undefined,
       })
       notifySuccess(ok)
       onDecided()
@@ -546,7 +546,7 @@ function ReviewPanel({ group, onDecided }: { group: DeliveryGroup; onDecided: ()
         {d.influencerName}
       </h2>
       <div className="text-[12.5px] text-ink-muted mb-1">
-        {campanhaLabel(d.campaignName)} · enviada em {fmtDate(d.submittedAt)} ({esperaLabel(d.submittedAt)})
+        {campaignLabel(d.campaignName)} · enviada em {fmtDate(d.submittedAt)} ({waitingLabel(d.submittedAt)})
       </div>
       <a
         href={deliveryLink(d)}
@@ -647,7 +647,7 @@ function ReviewPanel({ group, onDecided }: { group: DeliveryGroup; onDecided: ()
       {/* A história do contrato, recolhida: quem revisa a 2ª tentativa precisa ver o que foi
           pedido da outra vez, e o corte que passou antes. */}
       <div className="mt-4">
-        <ContractTimeline contractId={d.contractId} recolhivel />
+        <ContractTimeline contractId={d.contractId} collapsible />
       </div>
 
       <RoleGate minRole="Manager">
@@ -712,10 +712,10 @@ function ReviewPanel({ group, onDecided }: { group: DeliveryGroup; onDecided: ()
                   <button
                     key={id}
                     type="button"
-                    onClick={() => setEscopo(id)}
-                    aria-pressed={escopo === id}
+                    onClick={() => setScope(id)}
+                    aria-pressed={scope === id}
                     className="px-2.5 py-1.5 rounded-lg text-left border text-[12px] transition-colors"
-                    style={escopo === id
+                    style={scope === id
                       ? { borderColor: "#D97706", background: "#D9770612", color: "#B45309" }
                       : { borderColor: "var(--border-soft)", color: "var(--ink-muted)" }}
                   >
@@ -730,7 +730,7 @@ function ReviewPanel({ group, onDecided }: { group: DeliveryGroup; onDecided: ()
               <button
                 onClick={() => decideWith(
                   "RequestRework",
-                  escopo === "Publication"
+                  scope === "Publication"
                     ? "Pedido de ajuste na publicação enviado."
                     : "Pedido para refazer o vídeo enviado — o corte volta para aprovação.",
                 )}

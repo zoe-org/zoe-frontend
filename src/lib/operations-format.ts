@@ -28,11 +28,11 @@ export function norm(s: string | null | undefined): string {
 }
 
 /** Se todos os termos da busca aparecem em algum dos campos. */
-export function matches(query: string, ...campos: (string | null | undefined)[]): boolean {
-  const termos = norm(query).split(/\s+/).filter(Boolean)
-  if (termos.length === 0) return true
-  const alvo = campos.map(norm).join(" ")
-  return termos.every((t) => alvo.includes(t))
+export function matches(query: string, ...fields: (string | null | undefined)[]): boolean {
+  const terms = norm(query).split(/\s+/).filter(Boolean)
+  if (terms.length === 0) return true
+  const haystack = fields.map(norm).join(" ")
+  return terms.every((t) => haystack.includes(t))
 }
 
 /**
@@ -41,6 +41,6 @@ export function matches(query: string, ...campos: (string | null | undefined)[])
  * <p>Uma célula em branco lê como dado que faltou carregar. "Sem campanha" diz que o
  * contrato é assim de propósito — trabalho pontual, que não pertence a nenhuma ação.</p>
  */
-export function campanhaLabel(nome: string | null | undefined): string {
-  return nome?.trim() ? nome : "Sem campanha"
+export function campaignLabel(name: string | null | undefined): string {
+  return name?.trim() ? name : "Sem campanha"
 }

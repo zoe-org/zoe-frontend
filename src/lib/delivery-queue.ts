@@ -11,21 +11,21 @@ import type { DeliverySummary } from "@/lib/api/operations"
 export type DeliveryGroup = { current: DeliverySummary; previous: DeliverySummary[] }
 
 /** Estados em que a entrega espera decisão de quem revisa. */
-export const PENDENTE: ReadonlySet<string> = new Set(["Submitted", "UnderReview"])
+export const PENDING_STATUSES: ReadonlySet<string> = new Set(["Submitted", "UnderReview"])
 
-export function agruparPorContrato(items: readonly DeliverySummary[]): DeliveryGroup[] {
-  const porContrato = new Map<string, DeliverySummary[]>()
+export function groupByContract(items: readonly DeliverySummary[]): DeliveryGroup[] {
+  const byContract = new Map<string, DeliverySummary[]>()
   for (const d of items) {
-    const lista = porContrato.get(d.contractId)
-    if (lista) lista.push(d)
-    else porContrato.set(d.contractId, [d])
+    const list = byContract.get(d.contractId)
+    if (list) list.push(d)
+    else byContract.set(d.contractId, [d])
   }
 
-  return [...porContrato.values()].map((lista) => {
-    const ordenada = [...lista].sort((a, b) =>
+  return [...byContract.values()].map((list) => {
+    const sorted = [...list].sort((a, b) =>
       b.submissionAttempt - a.submissionAttempt
       || Date.parse(b.submittedAt) - Date.parse(a.submittedAt))
-    return { current: ordenada[0], previous: ordenada.slice(1) }
+    return { current: sorted[0], previous: sorted.slice(1) }
   })
 }
 
@@ -33,9 +33,9 @@ export function agruparPorContrato(items: readonly DeliverySummary[]): DeliveryG
  * Ordem da fila. Esperando decisão: prazo vencido primeiro, depois quem chegou antes — é a
  * ordem em que alguém deveria trabalhar. Nas demais abas, o mais recente no topo.
  */
-export function ordenarFila(groups: readonly DeliveryGroup[], pendentes: boolean): DeliveryGroup[] {
+export function sortQueue(groups: readonly DeliveryGroup[], pendingFirst: boolean): DeliveryGroup[] {
   return [...groups].sort((a, b) => {
-    if (pendentes) {
+    if (pendingFirst) {
       if (a.current.isReviewOverdue !== b.current.isReviewOverdue) return a.current.isReviewOverdue ? -1 : 1
       return Date.parse(a.current.submittedAt) - Date.parse(b.current.submittedAt)
     }

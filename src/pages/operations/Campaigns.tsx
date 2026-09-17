@@ -16,15 +16,15 @@ export default function OperationsCampaignsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
 
-  const [busca, setBusca] = useState("")
+  const [search, setSearch] = useState("")
 
-  const todas = useMemo(() => campaigns.data?.items ?? [], [campaigns.data])
+  const allCampaigns = useMemo(() => campaigns.data?.items ?? [], [campaigns.data])
 
   const items = useMemo(
-    () => todas.filter((c) => matches(
-      busca, c.name, c.brandName, tEnum("contractModality", c.modality),
+    () => allCampaigns.filter((c) => matches(
+      search, c.name, c.brandName, tEnum("contractModality", c.modality),
       tEnum("campaignStatus", c.status))),
-    [todas, busca],
+    [allCampaigns, search],
   )
 
   // A primeira da lista fica selecionada por padrão, como no protótipo. Derivado no
@@ -42,9 +42,9 @@ export default function OperationsCampaignsPage() {
               Campanhas
             </h1>
             <div className="text-[14px] text-ink-muted mt-1.5 max-w-140">
-              <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>{todas.length}</span>
-              {todas.length === 1 ? " campanha" : " campanhas"} ·{" "}
-              <span className="font-mono-zoe">{todas.filter((c) => c.status === "Active").length}</span>{" "}
+              <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>{allCampaigns.length}</span>
+              {allCampaigns.length === 1 ? " campanha" : " campanhas"} ·{" "}
+              <span className="font-mono-zoe">{allCampaigns.filter((c) => c.status === "Active").length}</span>{" "}
               ativas agora. A campanha é a porta de entrada: os contratos nascem dentro
               dela e herdam sua modalidade.
             </div>
@@ -67,7 +67,7 @@ export default function OperationsCampaignsPage() {
         <div style={{ background: "var(--surface)" }}>
           <ErrorState onRetry={() => campaigns.refetch()} />
         </div>
-      ) : todas.length === 0 ? (
+      ) : allCampaigns.length === 0 ? (
         <div style={{ background: "var(--surface)" }}>
           <EmptyBlock
             className="py-16"
@@ -82,14 +82,14 @@ export default function OperationsCampaignsPage() {
           <div className="border-r border-border-soft" style={{ background: "var(--surface)" }}>
             <div className="px-4 py-3 border-b border-border-soft">
               <SearchBox
-                value={busca}
-                onChange={setBusca}
+                value={search}
+                onChange={setSearch}
                 placeholder="Buscar campanha…"
                 className="w-full"
               />
             </div>
             {items.length === 0 && (
-              <NoResults query={busca} onClear={() => setBusca("")} />
+              <NoResults query={search} onClear={() => setSearch("")} />
             )}
             {items.map((c) => (
               <button

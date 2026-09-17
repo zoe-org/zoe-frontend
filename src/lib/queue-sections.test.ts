@@ -1,40 +1,40 @@
 import { describe, expect, it } from "vitest"
-import { itensVisiveis, secoesPorCampanha, SECAO_SEM_CAMPANHA } from "./queue-sections"
+import { visibleItems, sectionsByCampaign, NO_CAMPAIGN_SECTION } from "./queue-sections"
 
-type Item = { id: string; campanhaId: string | null; campanha: string | null; pendente: boolean }
+type Item = { id: string; campaignId: string | null; campaignName: string | null; pending: boolean }
 
-const item = (id: string, campanhaId: string | null, pendente = true): Item => ({
-  id, campanhaId, campanha: campanhaId ? `Campanha ${campanhaId}` : null, pendente,
+const item = (id: string, campaignId: string | null, pending = true): Item => ({
+  id, campaignId, campaignName: campaignId ? `Campanha ${campaignId}` : null, pending,
 })
 
-const secoes = (itens: Item[]) => secoesPorCampanha(
-  itens,
-  (i) => ({ id: i.campanhaId, nome: i.campanha }),
-  (i) => i.pendente,
-  (nome) => nome ?? "Sem campanha",
+const sections = (items: Item[]) => sectionsByCampaign(
+  items,
+  (i) => ({ id: i.campaignId, name: i.campaignName }),
+  (i) => i.pending,
+  (name) => name ?? "Sem campanha",
 )
 
 describe("secoesPorCampanha", () => {
   it("mantém a ordem da fila: a campanha do item mais urgente vem primeiro", () => {
-    const s = secoes([item("1", "b"), item("2", "a"), item("3", "b"), item("4", null)])
+    const s = sections([item("1", "b"), item("2", "a"), item("3", "b"), item("4", null)])
 
-    expect(s.map((x) => x.chave)).toEqual(["b", "a", SECAO_SEM_CAMPANHA])
-    expect(s[0].itens.map((x) => x.id)).toEqual(["1", "3"])
-    expect(s[2].rotulo).toBe("Sem campanha")
+    expect(s.map((x) => x.key)).toEqual(["b", "a", NO_CAMPAIGN_SECTION])
+    expect(s[0].items.map((x) => x.id)).toEqual(["1", "3"])
+    expect(s[2].label).toBe("Sem campanha")
   })
 
   it("conta só o que espera decisão", () => {
-    const [unica] = secoes([item("1", "a"), item("2", "a", false), item("3", "a")])
-    expect(unica).toMatchObject({ rotulo: "Campanha a", pendentes: 2 })
-    expect(unica.itens).toHaveLength(3)
+    const [single] = sections([item("1", "a"), item("2", "a", false), item("3", "a")])
+    expect(single).toMatchObject({ label: "Campanha a", pendingCount: 2 })
+    expect(single.items).toHaveLength(3)
   })
 })
 
 describe("itensVisiveis", () => {
   it("percorre na ordem das seções e pula as recolhidas", () => {
-    const s = secoes([item("1", "b"), item("2", "a"), item("3", "b")])
+    const s = sections([item("1", "b"), item("2", "a"), item("3", "b")])
 
-    expect(itensVisiveis(s, new Set()).map((x) => x.id)).toEqual(["1", "3", "2"])
-    expect(itensVisiveis(s, new Set(["b"])).map((x) => x.id)).toEqual(["2"])
+    expect(visibleItems(s, new Set()).map((x) => x.id)).toEqual(["1", "3", "2"])
+    expect(visibleItems(s, new Set(["b"])).map((x) => x.id)).toEqual(["2"])
   })
 })

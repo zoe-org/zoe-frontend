@@ -12,20 +12,20 @@ export function parseBRLToCents(input: string): number | null {
   const s = input.replace(/R\$/gi, "").replace(/\s/g, "")
   if (!s) return null
 
-  let normalizado: string
+  let normalized: string
   if (s.includes(",")) {
     if (!/^(\d{1,3}(\.\d{3})+|\d+),\d{1,2}$/.test(s)) return null
-    normalizado = s.replace(/\./g, "").replace(",", ".")
+    normalized = s.replace(/\./g, "").replace(",", ".")
   } else if (/^\d{1,3}(\.\d{3})+$/.test(s)) {
-    normalizado = s.replace(/\./g, "")
+    normalized = s.replace(/\./g, "")
   } else if (/^\d+(\.\d{1,2})?$/.test(s)) {
-    normalizado = s
+    normalized = s
   } else {
     return null
   }
 
-  const valor = Number(normalizado)
-  return Number.isFinite(valor) ? Math.round(valor * 100) : null
+  const value = Number(normalized)
+  return Number.isFinite(value) ? Math.round(value * 100) : null
 }
 
 /** Centavos no formato que o campo mostra e que {@link parseBRLToCents} lê de volta. */

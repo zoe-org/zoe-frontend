@@ -85,29 +85,29 @@ export default function CreatorPayoutPage() {
   // conta continuava vendo "cadastro pendente" como se nada tivesse acontecido. O estado
   // existe no dado — a tela é que não o lia.
   const kyc = d?.kycStatus ?? "NotStarted"
-  const semConta = kyc === "NotStarted"
-  const emVerificacao = kyc === "Pending"
-  const recusado = kyc === "Rejected"
+  const noAccount = kyc === "NotStarted"
+  const inVerification = kyc === "Pending"
+  const rejected = kyc === "Rejected"
 
-  const titulo = verified
+  const heading = verified
     ? "Recebimento liberado"
-    : emVerificacao ? "Conta criada — em verificação"
-    : recusado ? "O provedor pediu mais dados"
+    : inVerification ? "Conta criada — em verificação"
+    : rejected ? "O provedor pediu mais dados"
     : "Conta de recebimento não conectada"
 
-  const explicacao = verified
+  const explanation = verified
     ? "Sua conta está verificada. Entregas aprovadas caem aqui com o desconto da taxa."
-    : emVerificacao
+    : inVerification
       ? "Sua conta foi criada e está sendo verificada pelo provedor. Isso leva de alguns "
         + "minutos a alguns dias. Você pode assinar contrato e gravar normalmente — só o "
         + "repasse espera."
-      : recusado
+      : rejected
         ? (d?.payoutBlockedReason
            ?? "Faltou alguma informação no cadastro. Continue de onde parou para completar.")
         : "Conecte uma conta para receber. Você pode assinar contrato e gravar antes "
           + "disso — o bloqueio é só no pagamento."
 
-  const rotuloBotao = semConta ? "Conectar conta" : "Continuar cadastro"
+  const buttonLabel = noAccount ? "Conectar conta" : "Continuar cadastro"
   const busy = start.isPending || sync.isPending
 
   return (
@@ -170,18 +170,18 @@ export default function CreatorPayoutPage() {
               className="rounded-xl border p-5 mb-5"
               style={{
                 background: "var(--surface)",
-                borderColor: verified || emVerificacao
+                borderColor: verified || inVerification
                   ? "var(--color-teal-500)" : "var(--border-soft)",
               }}
             >
               <div className="flex items-start gap-3">
                 <div
                   className="w-9 h-9 rounded-lg grid place-items-center shrink-0"
-                  style={{ background: verified || emVerificacao ? "#00A79915" : "#D9770615" }}
+                  style={{ background: verified || inVerification ? "#00A79915" : "#D9770615" }}
                 >
                   {/* Em verificação usa o tom de progresso, não o de alerta: a pessoa fez
                       a parte dela, quem está devendo resposta é o provedor. */}
-                  {verified || emVerificacao
+                  {verified || inVerification
                     ? <ShieldCheck className="w-4.5 h-4.5" style={{ color: "var(--color-teal-500)" }} />
                     : <Wallet className="w-4.5 h-4.5" style={{ color: "#D97706" }} />}
                 </div>
@@ -189,13 +189,13 @@ export default function CreatorPayoutPage() {
                 <div className="min-w-0 flex-1">
                   <div
                     className="text-[14px] font-medium mb-1"
-                    style={{ color: verified || emVerificacao ? "var(--color-teal-500)" : "#D97706" }}
+                    style={{ color: verified || inVerification ? "var(--color-teal-500)" : "#D97706" }}
                   >
-                    {titulo}
+                    {heading}
                   </div>
 
                   <p className="text-[13px] text-ink-2 m-0 leading-relaxed">
-                    {explicacao}
+                    {explanation}
                   </p>
 
                   {!verified && (
@@ -215,7 +215,7 @@ export default function CreatorPayoutPage() {
                         {start.isPending
                           ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                           : <ExternalLink className="w-3.5 h-3.5" />}
-                        {rotuloBotao}
+                        {buttonLabel}
                       </button>
                     </>
                   )}

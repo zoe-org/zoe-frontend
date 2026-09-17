@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 
-const FOCAVEIS = [
+const FOCUSABLE_SELECTOR = [
   "a[href]",
   "button:not([disabled])",
   "textarea:not([disabled])",
@@ -9,7 +9,7 @@ const FOCAVEIS = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(",")
 
-const focadoAgora = () =>
+const currentFocus = () =>
   typeof document !== "undefined" && document.activeElement instanceof HTMLElement
     ? document.activeElement
     : null
@@ -30,7 +30,7 @@ export function useFocusTrap<T extends HTMLElement>(active = true) {
 
   // Capturado já no primeiro render: campo com autoFocus puxa o foco para dentro do modal antes de
   // qualquer efeito rodar, e aí "o que estava focado" já seria o próprio campo — que some ao fechar.
-  const [focoAoMontar] = useState(focadoAgora)
+  const [focusOnMount] = useState(currentFocus)
 
   useEffect(() => {
     if (!active) return
@@ -39,17 +39,17 @@ export function useFocusTrap<T extends HTMLElement>(active = true) {
 
     // Gaveta que abre e fecha com o componente montado (a fila de revisão no celular): vale o que
     // estava focado agora, fora dela. Modal com autoFocus: vale o capturado na montagem.
-    const agora = focadoAgora()
-    const anterior = agora && !el.contains(agora) ? agora : focoAoMontar
+    const focused = currentFocus()
+    const returnTarget = focused && !el.contains(focused) ? focused : focusOnMount
 
-    const focaveis = () => [...el.querySelectorAll<HTMLElement>(FOCAVEIS)]
+    const focusables = () => [...el.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)]
       .filter((f) => f.getClientRects().length > 0)
 
     if (!el.contains(document.activeElement)) {
-      const lista = focaveis()
-      const inicial = lista.find((f) => !(f.getAttribute("aria-label") ?? "").startsWith("Fechar")) ?? lista[0]
-      if (inicial) {
-        inicial.focus({ preventScroll: true })
+      const elements = focusables()
+      const initialTarget = elements.find((f) => !(f.getAttribute("aria-label") ?? "").startsWith("Fechar")) ?? elements[0]
+      if (initialTarget) {
+        initialTarget.focus({ preventScroll: true })
       } else {
         el.tabIndex = -1
         el.focus({ preventScroll: true })
@@ -58,28 +58,28 @@ export function useFocusTrap<T extends HTMLElement>(active = true) {
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Tab") return
-      const lista = focaveis()
-      if (lista.length === 0) return
+      const elements = focusables()
+      if (elements.length === 0) return
 
-      const primeiro = lista[0]
-      const ultimo = lista[lista.length - 1]
-      const dentro = el.contains(document.activeElement)
+      const first = elements[0]
+      const last = elements[elements.length - 1]
+      const inside = el.contains(document.activeElement)
 
-      if (e.shiftKey && (!dentro || document.activeElement === primeiro)) {
+      if (e.shiftKey && (!inside || document.activeElement === first)) {
         e.preventDefault()
-        ultimo.focus()
-      } else if (!e.shiftKey && (!dentro || document.activeElement === ultimo)) {
+        last.focus()
+      } else if (!e.shiftKey && (!inside || document.activeElement === last)) {
         e.preventDefault()
-        primeiro.focus()
+        first.focus()
       }
     }
 
     document.addEventListener("keydown", onKey)
     return () => {
       document.removeEventListener("keydown", onKey)
-      if (anterior?.isConnected) anterior.focus({ preventScroll: true })
+      if (returnTarget?.isConnected) returnTarget.focus({ preventScroll: true })
     }
-  }, [active, focoAoMontar])
+  }, [active, focusOnMount])
 
   return ref
 }

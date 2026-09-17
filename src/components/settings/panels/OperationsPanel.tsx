@@ -134,7 +134,7 @@ function OperationsEmailCard({ tenantId }: { tenantId: string | null }) {
     queryFn: () => meApi.getNotifications(),
     enabled: Boolean(tenantId),
   })
-  const salvar = useMutation({
+  const save = useMutation({
     mutationFn: (operationsEmail: boolean) => meApi.setNotifications({ operationsEmail }),
     onSuccess: (data) => {
       qc.setQueryData(["me-notifications", tenantId], data)
@@ -144,7 +144,7 @@ function OperationsEmailCard({ tenantId }: { tenantId: string | null }) {
     },
     onError: (e: unknown) => notifyError(e, "Não foi possível salvar a preferência."),
   })
-  const ligado = prefs.data?.operationsEmail ?? true
+  const enabled = prefs.data?.operationsEmail ?? true
 
   return (
     <div>
@@ -154,9 +154,9 @@ function OperationsEmailCard({ tenantId }: { tenantId: string | null }) {
       <label className="flex items-start gap-2.5 cursor-pointer">
         <input
           type="checkbox"
-          checked={ligado}
-          disabled={prefs.isLoading || salvar.isPending}
-          onChange={(e) => salvar.mutate(e.target.checked)}
+          checked={enabled}
+          disabled={prefs.isLoading || save.isPending}
+          onChange={(e) => save.mutate(e.target.checked)}
           className="mt-0.5 accent-[var(--color-teal-500)] disabled:opacity-60"
         />
         <span>

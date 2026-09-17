@@ -44,9 +44,9 @@ export default function ContractDetailPage() {
    * pergunta de quem abre deixa de ser "o que tem aqui" e passa a ser "o que falta" — rolar
    * quarenta campos cheios para achar os três vazios devolveria o trabalho que a herança tirou.
    */
-  const [soVazios, setSoVazios] = useState(false)
-  const salvarPadrao = useUpdateContractDefaults()
-  const padroesMarca = useContractDefaults()
+  const [emptyOnly, setEmptyOnly] = useState(false)
+  const saveDefault = useUpdateContractDefaults()
+  const tenantDefaults = useContractDefaults()
 
   const data = contract.data
   const fields = useMemo<ContractField[]>(
@@ -74,38 +74,38 @@ export default function ContractDetailPage() {
 
   // Datas que já passaram, num rascunho. Herdadas de uma campanha antiga, elas pareciam
   // combinadas e iam para a assinatura sem ninguém notar.
-  const hoje = new Date().toISOString().slice(0, 10)
-  const datasVencidas = isDraft
+  const today = new Date().toISOString().slice(0, 10)
+  const pastDates = isDraft
     ? fields.filter((f) =>
       ["start_date", "end_date", "publish_deadline", "creation_deadline"].includes(f.placeholder)
-      && Boolean(f.value) && (f.value ?? "") < hoje)
+      && Boolean(f.value) && (f.value ?? "") < today)
     : []
 
-  const propostaUsadaEm = isDraft ? data.proposalUsedByContractId ?? null : null
+  const proposalUsedBy = isDraft ? data.proposalUsedByContractId ?? null : null
 
   // Pelo valor SALVO: é dele que a API tira o valor da custódia. "a combinar" passava pela
   // assinatura e só travava depois, com o contrato já assinado e o valor sem poder mudar.
-  const campoValorTotal = data.fields.find((f) => f.placeholder === "total_value")
-  const valorTotalSalvo = (campoValorTotal?.value ?? "").trim()
-  const valorIlegivel = isDraft && data.usesEscrow && valorTotalSalvo !== "" && data.declaredTotalCents == null
+  const totalValueField = data.fields.find((f) => f.placeholder === "total_value")
+  const savedTotalValue = (totalValueField?.value ?? "").trim()
+  const unreadableTotal = isDraft && data.usesEscrow && savedTotalValue !== "" && data.declaredTotalCents == null
   const missing = new Set([...data.missingRequiredFields, ...serverMissing])
 
   // Vazio pelo valor SALVO, não pelo que está sendo digitado: senão o campo sumiria da lista
   // na primeira tecla e levaria o foco junto. Ele sai do filtro depois de salvar.
-  const salvos = new Map(data.fields.map((f) => [f.placeholder, f.value]))
-  const vazio = (f: ContractField) => !f.isSystemManaged && !(salvos.get(f.placeholder) ?? "").trim()
-  const vazios = fields.filter(vazio)
+  const savedValues = new Map(data.fields.map((f) => [f.placeholder, f.value]))
+  const isEmpty = (f: ContractField) => !f.isSystemManaged && !(savedValues.get(f.placeholder) ?? "").trim()
+  const emptyFields = fields.filter(isEmpty)
   // Obrigatório vazio primeiro: é ele que trava o envio.
-  const visiveis = soVazios
-    ? [...vazios].sort((a, b) => Number(missing.has(b.placeholder)) - Number(missing.has(a.placeholder)))
+  const visibleFields = emptyOnly
+    ? [...emptyFields].sort((a, b) => Number(missing.has(b.placeholder)) - Number(missing.has(a.placeholder)))
     : fields
 
-  const padraoAtual = new Map((padroesMarca.data?.fields ?? []).map((c) => [c.placeholder, (c.value ?? "").trim()]))
+  const currentDefaults = new Map((tenantDefaults.data?.fields ?? []).map((c) => [c.placeholder, (c.value ?? "").trim()]))
 
-  const tornarPadrao = (f: ContractField) => {
-    const valor = (f.value ?? "").trim()
-    if (!valor) return
-    salvarPadrao.mutate({ [f.placeholder]: valor }, {
+  const makeDefault = (f: ContractField) => {
+    const value = (f.value ?? "").trim()
+    if (!value) return
+    saveDefault.mutate({ [f.placeholder]: value }, {
       onSuccess: () => notifySuccess(`“${f.label}” virou padrão. Os próximos contratos já nascem com ele.`),
       onError: (e) => notifyError(e, "Não foi possível salvar o padrão."),
     })
@@ -169,14 +169,14 @@ export default function ContractDetailPage() {
             <div className="flex items-center gap-2.5 flex-wrap">
               <h2 className="text-[15px] font-semibold m-0">Campos do contrato</h2>
               <button
-                onClick={() => setSoVazios((v) => !v)}
-                aria-pressed={soVazios}
+                onClick={() => setEmptyOnly((v) => !v)}
+                aria-pressed={emptyOnly}
                 className="px-2.5 py-1 rounded-full text-[11.5px] font-medium border transition-colors"
-                style={soVazios
+                style={emptyOnly
                   ? { background: "var(--color-teal-500)", borderColor: "transparent", color: "#fff" }
                   : { borderColor: "var(--border-soft)", color: "var(--ink-muted)" }}
               >
-                Só os vazios ({vazios.length})
+                Só os vazios ({emptyFields.length})
               </button>
             </div>
             <RoleGate minRole="Admin">
@@ -212,18 +212,18 @@ export default function ContractDetailPage() {
             </p>
           )}
 
-          {datasVencidas.length > 0 && (
+          {pastDates.length > 0 && (
             <div className="rounded-lg p-3 text-[12.5px] mb-4" style={{ background: "#D9770615", color: "#B45309" }}>
               <span className="font-medium">Datas no passado:</span>{" "}
-              {datasVencidas.map((f) => f.label).join(", ")}. Confira antes de enviar para assinatura —
+              {pastDates.map((f) => f.label).join(", ")}. Confira antes de enviar para assinatura —
               o contrato nasceria com prazos já vencidos.
             </div>
           )}
 
-          {valorIlegivel && (
+          {unreadableTotal && (
             <div className="rounded-lg p-3 text-[12.5px] mb-4" style={{ background: "#D9770615", color: "#B45309" }}>
-              <span className="font-medium">{campoValorTotal?.label ?? "Valor total"} ilegível:</span>{" "}
-              “{valorTotalSalvo}” não é um valor em reais que a custódia consiga ler (ex.: 5.000,00).{" "}
+              <span className="font-medium">{totalValueField?.label ?? "Valor total"} ilegível:</span>{" "}
+              “{savedTotalValue}” não é um valor em reais que a custódia consiga ler (ex.: 5.000,00).{" "}
               {data.autoAdvanceEscrow
                 ? "Com pagamento automático, o envio para assinatura é recusado até corrigir."
                 : "Assim, ela não abre sozinha depois da assinatura — e o valor assinado já não muda."}
@@ -232,7 +232,7 @@ export default function ContractDetailPage() {
 
           {/* Sem isto o cachê vazio parecia herança quebrada: a proposta vale para um contrato
               só, e outro deste criador nesta campanha já a levou. */}
-          {propostaUsadaEm && (
+          {proposalUsedBy && (
             <div
               className="rounded-lg p-3 text-[12.5px] mb-4 border border-border-soft"
               style={{ background: "var(--bg, #F9FAFB)", color: "var(--ink-2)" }}
@@ -240,7 +240,7 @@ export default function ContractDetailPage() {
               <span className="font-medium" style={{ color: "var(--ink)" }}>Sem a proposta do convite:</span>{" "}
               ela já foi usada em{" "}
               <Link
-                to={`/operations/contracts/${propostaUsadaEm}`}
+                to={`/operations/contracts/${proposalUsedBy}`}
                 className="underline"
                 style={{ color: "var(--color-teal-500)" }}
               >
@@ -255,23 +255,23 @@ export default function ContractDetailPage() {
               largura nao ajuda ninguem a ler nem a preencher, e empurrava o formulario
               para uma rolagem que nao precisava existir. Texto longo continua inteiro. */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-4">
-            {visiveis.map((f) => (
-              <div key={f.placeholder} className={campoLargo(f) ? "md:col-span-2" : undefined}>
+            {visibleFields.map((f) => (
+              <div key={f.placeholder} className={isWideField(f) ? "md:col-span-2" : undefined}>
                 <FieldRow
                   field={f}
                   readOnly={!isDraft || f.isSystemManaged}
                   isMissing={missing.has(f.placeholder)}
                   edited={f.placeholder in edits}
                   onChange={(v) => setValue(f.placeholder, v)}
-                  onMakeDefault={() => tornarPadrao(f)}
-                  alreadyDefault={Boolean((f.value ?? "").trim()) && padraoAtual.get(f.placeholder) === (f.value ?? "").trim()}
-                  savingDefault={salvarPadrao.isPending && salvarPadrao.variables?.[f.placeholder] !== undefined}
+                  onMakeDefault={() => makeDefault(f)}
+                  alreadyDefault={Boolean((f.value ?? "").trim()) && currentDefaults.get(f.placeholder) === (f.value ?? "").trim()}
+                  savingDefault={saveDefault.isPending && saveDefault.variables?.[f.placeholder] !== undefined}
                 />
               </div>
             ))}
           </div>
 
-          {soVazios && vazios.length === 0 && (
+          {emptyOnly && emptyFields.length === 0 && (
             <p className="text-[12.5px] text-ink-muted mt-2">
               Nenhum campo vazio — tudo veio herdado ou já foi preenchido.
             </p>
@@ -396,7 +396,7 @@ function Header({
 }
 
 /** Campos que pedem a linha inteira: texto corrido nao cabe em meia largura. */
-function campoLargo(f: ContractField) {
+function isWideField(f: ContractField) {
   return f.dataType === "LongText"
     || f.dataType === "Text" && (f.helpText?.length ?? 0) > 40
 }
@@ -417,10 +417,10 @@ function FieldRow({
 }) {
   // Campo do registro já tem o cadeado "do registro": uma segunda etiqueta dizendo a mesma
   // coisa com outras palavras só faz a linha parecer mais complicada do que é.
-  const origem = !edited && !field.isSystemManaged && field.source ? FIELD_SOURCE_LABEL[field.source] : null
+  const origin = !edited && !field.isSystemManaged && field.source ? FIELD_SOURCE_LABEL[field.source] : null
   // Compara com o padrão salvo, não com a origem: depois de um clique em "usar como padrão"
   // o botão tem de sumir, mesmo com o campo ainda marcado como digitado neste contrato.
-  const podeVirarPadrao = field.defaultable
+  const canBecomeDefault = field.defaultable
     && Boolean((field.value ?? "").trim())
     && !alreadyDefault
   const kind = fieldInputKind(field.dataType)
@@ -435,12 +435,12 @@ function FieldRow({
         {field.isRequired && !field.isSystemManaged && <span style={{ color: "#DC2626" }}>*</span>}
         {/* A origem diz de onde o valor veio sem obrigar a pessoa a reler tudo para confiar
             nele. Some quando ela edita: a partir daí o valor é dela. */}
-        {origem && (
+        {origin && (
           <span
             className="text-[10px] font-medium px-1.5 py-0.5 rounded"
             style={{ background: "#00A79914", color: "var(--color-teal-500)" }}
           >
-            {origem}
+            {origin}
           </span>
         )}
         {field.isSystemManaged ? (
@@ -500,7 +500,7 @@ function FieldRow({
 
       {field.helpText && <span className="text-[11.5px] text-ink-muted">{field.helpText}</span>}
 
-      {podeVirarPadrao && (
+      {canBecomeDefault && (
         <RoleGate minRole="Admin">
           <button
             type="button"
@@ -585,7 +585,7 @@ function SignaturePanel({
       )}
 
       {data.status === "Signed" && data.usesEscrow && !data.escrowAccountId && (
-        aguardandoAutomacao(data)
+        awaitingAutomation(data)
           ? (
             <p className="text-[12.5px] text-ink-muted flex items-start gap-1.5">
               <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0 mt-0.5" />
@@ -637,11 +637,11 @@ function SignaturePanel({
  * impediu (valor ilegível, teto do provedor) e a tela devolve o botão manual em vez de
  * deixar a pessoa esperando um passo que não vai acontecer.
  */
-const AUTOMACAO_JANELA_MS = 5 * 60_000
+const AUTOMATION_WINDOW_MS = 5 * 60_000
 
-function aguardandoAutomacao(data: ContractDetail): boolean {
+function awaitingAutomation(data: ContractDetail): boolean {
   if (!data.autoAdvanceEscrow || !data.signedAt) return false
-  return Date.now() - Date.parse(data.signedAt) < AUTOMACAO_JANELA_MS
+  return Date.now() - Date.parse(data.signedAt) < AUTOMATION_WINDOW_MS
 }
 
 /** Valor com centavos: é o que vai ser reservado, e arredondar aqui esconderia diferença. */
@@ -661,15 +661,15 @@ function OpenEscrowPanel({
 
   // O valor do contrato assinado é o único que a custódia aceita: com ele legível, não há o
   // que digitar. O campo só aparece quando o contrato não traz valor que dê para ler.
-  const temValorDoContrato = declaredTotalCents != null && declaredTotalCents > 0
+  const hasContractValue = declaredTotalCents != null && declaredTotalCents > 0
 
   const cents = parseBRLToCents(amount)
-  const valid = temValorDoContrato || (cents !== null && cents > 0)
+  const valid = hasContractValue || (cents !== null && cents > 0)
 
   const submit = async () => {
     if (!valid) return
     try {
-      await open.mutateAsync(temValorDoContrato ? { contractId } : { contractId, amountCents: cents ?? undefined })
+      await open.mutateAsync(hasContractValue ? { contractId } : { contractId, amountCents: cents ?? undefined })
       notifySuccess("Custódia aberta. O próximo passo é o depósito.")
     } catch (e) {
       notifyError(e, "Não foi possível abrir a custódia.", { terminal: true })
@@ -692,7 +692,7 @@ function OpenEscrowPanel({
         </p>
 
         <div className="flex gap-2 flex-wrap sm:flex-nowrap">
-          {temValorDoContrato ? (
+          {hasContractValue ? (
             <div className="flex-1 min-w-[160px]">
               <div className="text-[11px] text-ink-muted mb-1.5">Valor do contrato assinado</div>
               <div
@@ -726,7 +726,7 @@ function OpenEscrowPanel({
         )}
 
         <p className="text-[11.5px] text-ink-muted mt-2 mb-0">
-          {temValorDoContrato
+          {hasContractValue
             ? "O criador recebe o valor do contrato inteiro. Taxa e processamento são cobrados da marca, por cima, e não mudam depois da assinatura."
             : "O contrato não tem valor total legível — informe o valor combinado. Taxa da plataforma e processamento são acrescentados ao que a marca paga."}
         </p>
@@ -752,20 +752,20 @@ function OpenEscrowPanel({
  * alimenta os três. Ler aqui e assinar outra coisa seria a divergência que o desenho do
  * contrato existe para impedir.</p>
  */
-function ClausulaItem({ c }: { c: ContractClause }) {
-  const [aberta, setAberta] = useState(false)
+function ClauseItem({ c }: { c: ContractClause }) {
+  const [open, setOpen] = useState(false)
 
   return (
     <li className="border-b border-border-soft last:border-b-0">
       <button
-        onClick={() => setAberta((v) => !v)}
+        onClick={() => setOpen((v) => !v)}
         className="w-full text-left py-2 flex items-start gap-1.5 text-[12.5px]"
       >
         <ChevronRight
           className="w-3 h-3 mt-0.5 shrink-0 transition-transform"
           style={{
             color: "var(--ink-muted)",
-            transform: aberta ? "rotate(90deg)" : undefined,
+            transform: open ? "rotate(90deg)" : undefined,
           }}
         />
         {c.isSystem && (
@@ -776,7 +776,7 @@ function ClausulaItem({ c }: { c: ContractClause }) {
         </span>
       </button>
 
-      {aberta && (
+      {open && (
         <p className="text-[12px] text-ink-2 leading-relaxed whitespace-pre-line pl-[18px] pb-3 m-0">
           {c.body?.trim()
             ? c.body
@@ -920,7 +920,7 @@ function ClausesPanel({ contract }: { contract: ContractDetail }) {
           o que esta' assinando tinha de baixar o PDF. Agora abre no lugar. */}
       <ol className="flex flex-col m-0 p-0 list-none">
         {clauses.map((c) => (
-          <ClausulaItem key={c.order} c={c} />
+          <ClauseItem key={c.order} c={c} />
         ))}
       </ol>
       <p className="text-[11px] text-ink-muted mt-3">

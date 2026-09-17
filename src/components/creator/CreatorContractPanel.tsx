@@ -7,7 +7,7 @@ import { tEnum } from "@/i18n/enums"
 import { fmtDate } from "@/lib/operations-format"
 import { fmtCents } from "@/lib/api/operations"
 import {
-  useCreatorContract, useResendSignature, creatorApi, trabalhoLabel,
+  useCreatorContract, useResendSignature, creatorApi, workLabel,
   type CreatorEngagement, type CreatorContract, type CreatorContractClause,
   type CreatorContractField,
 } from "@/lib/api/creator"
@@ -125,7 +125,7 @@ function ContractTab({
       <span className="flex items-center gap-1.5">
         <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: color }} />
         <span className="text-[12.5px] font-semibold" style={{ color: "var(--ink)" }}>
-          {trabalhoLabel(e.campaignName)}
+          {workLabel(e.campaignName)}
         </span>
         {shortRef && (
           <span className="font-mono-zoe text-[10px] text-ink-muted">#{shortRef}</span>
@@ -218,7 +218,7 @@ function HeaderCard({
         <div className="min-w-0">
           <div className="eyebrow mb-1">{c.brandName}</div>
           <h2 className="font-display m-0 mb-2" style={{ fontSize: 20, color: "var(--ink)" }}>
-            {trabalhoLabel(c.campaignName)}
+            {workLabel(c.campaignName)}
           </h2>
           {/* Status era texto corrido e repetia a palavra "assinado" duas vezes na mesma
               linha. Vira chip porque é a informação que se procura de relance. */}
@@ -278,7 +278,7 @@ function HeaderCard({
           className="mt-5 rounded-xl border border-border-soft overflow-hidden"
           style={{ background: "var(--bg, #FAFBFC)" }}
         >
-          {taxaDescontadaDoCriador(c) ? (
+          {feeDeductedFromCreator(c) ? (
             <div className="grid grid-cols-1 sm:grid-cols-3">
               <Money label="Valor do contrato" value={c.amountCents} />
               <Money
@@ -496,7 +496,7 @@ function splitClauseBody(body: string): { marker: string | null; text: string }[
  * Regra antiga: a cobrança era o valor do contrato e fechava exatamente com taxa + líquido. Na
  * cobrança por cima ela é maior que os dois somados, porque inclui o processamento.
  */
-function taxaDescontadaDoCriador(c: { amountCents: number | null; takeRateCents: number | null; netToInfluencerCents: number | null }) {
+function feeDeductedFromCreator(c: { amountCents: number | null; takeRateCents: number | null; netToInfluencerCents: number | null }) {
   return c.amountCents != null
     && c.amountCents === (c.takeRateCents ?? 0) + (c.netToInfluencerCents ?? 0)
 }

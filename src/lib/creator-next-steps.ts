@@ -1,17 +1,17 @@
-import { trabalhoLabel, type CreatorWorkspace } from "@/lib/api/creator"
+import { workLabel, type CreatorWorkspace } from "@/lib/api/creator"
 
 /**
  * Um passo que depende do criador. O destino diz onde a tela leva: a um trabalho na aba de
  * campanhas, a um contrato na aba de contratos, a um card desta página ou a outra rota.
  */
-export type ProximoPasso = {
-  chave: string
-  titulo: string
-  detalhe: string
-  destino:
-    | { aba: "campanhas" | "contratos"; contractId: string }
-    | { ancora: string }
-    | { rota: string }
+export type NextStep = {
+  key: string
+  title: string
+  detail: string
+  target:
+    | { tab: "campaigns" | "contracts"; contractId: string }
+    | { anchor: string }
+    | { route: string }
 }
 
 /**
@@ -24,19 +24,19 @@ export type ProximoPasso = {
  * <p>Só entra o que é do criador. Corte em revisão e entrega aguardando são a vez da marca, e
  * listá-los aqui faria a pessoa procurar uma ação que não existe.</p>
  */
-export function proximosPassos(w: CreatorWorkspace): ProximoPasso[] {
-  const passos: ProximoPasso[] = []
+export function nextSteps(w: CreatorWorkspace): NextStep[] {
+  const steps: NextStep[] = []
 
   for (const e of w.engagements) {
-    const trabalho = `${trabalhoLabel(e.campaignName)} · ${e.brandName}`
-    const naCampanha = { aba: "campanhas" as const, contractId: e.contractId }
+    const work = `${workLabel(e.campaignName)} · ${e.brandName}`
+    const inCampaignsTab = { tab: "campaigns" as const, contractId: e.contractId }
 
     if (e.contractStatus === "SentForSignature") {
-      passos.push({
-        chave: `assinar-${e.contractId}`,
-        titulo: "Assinar o contrato",
-        detalhe: `${trabalho} — o link de assinatura foi para o seu e-mail.`,
-        destino: { aba: "contratos", contractId: e.contractId },
+      steps.push({
+        key: `assinar-${e.contractId}`,
+        title: "Assinar o contrato",
+        detail: `${work} — o link de assinatura foi para o seu e-mail.`,
+        target: { tab: "contracts", contractId: e.contractId },
       })
       continue
     }
@@ -44,70 +44,70 @@ export function proximosPassos(w: CreatorWorkspace): ProximoPasso[] {
     if (!e.canSubmitDelivery) continue
 
     if (e.requiresDraftApproval && !e.draft) {
-      passos.push({
-        chave: `corte-${e.contractId}`,
-        titulo: "Enviar o corte para aprovação",
-        detalhe: `${trabalho} — a marca vê o vídeo antes de você publicar.`,
-        destino: naCampanha,
+      steps.push({
+        key: `corte-${e.contractId}`,
+        title: "Enviar o corte para aprovação",
+        detail: `${work} — a marca vê o vídeo antes de você publicar.`,
+        target: inCampaignsTab,
       })
       continue
     }
 
     if (e.draft?.status === "ChangesRequested") {
-      passos.push({
-        chave: `refazer-${e.contractId}`,
-        titulo: "Refazer o corte",
-        detalhe: e.draft.decisionNotes ? `${trabalho} — ${e.draft.decisionNotes}` : trabalho,
-        destino: naCampanha,
+      steps.push({
+        key: `refazer-${e.contractId}`,
+        title: "Refazer o corte",
+        detail: e.draft.decisionNotes ? `${work} — ${e.draft.decisionNotes}` : work,
+        target: inCampaignsTab,
       })
       continue
     }
 
     // Corte ainda em revisão: a vez é da marca.
-    const corteLiberado = !e.requiresDraftApproval || e.draft?.status === "Approved"
-    if (!corteLiberado) continue
+    const draftReleased = !e.requiresDraftApproval || e.draft?.status === "Approved"
+    if (!draftReleased) continue
 
-    const ultima = [...e.deliveries].sort((a, b) => b.submissionAttempt - a.submissionAttempt)[0]
-    if (!ultima) {
-      passos.push({
-        chave: `publicar-${e.contractId}`,
-        titulo: "Publicar e mandar o link",
-        detalhe: e.requiresDraftApproval ? `${trabalho} — o corte foi aprovado.` : trabalho,
-        destino: naCampanha,
+    const latest = [...e.deliveries].sort((a, b) => b.submissionAttempt - a.submissionAttempt)[0]
+    if (!latest) {
+      steps.push({
+        key: `publicar-${e.contractId}`,
+        title: "Publicar e mandar o link",
+        detail: e.requiresDraftApproval ? `${work} — o corte foi aprovado.` : work,
+        target: inCampaignsTab,
       })
-    } else if (ultima.status === "ReworkRequested") {
-      passos.push({
-        chave: `corrigir-${e.contractId}`,
-        titulo: "Corrigir a publicação e reenviar o link",
-        detalhe: ultima.decisionNotes ? `${trabalho} — ${ultima.decisionNotes}` : trabalho,
-        destino: naCampanha,
+    } else if (latest.status === "ReworkRequested") {
+      steps.push({
+        key: `corrigir-${e.contractId}`,
+        title: "Corrigir a publicação e reenviar o link",
+        detail: latest.decisionNotes ? `${work} — ${latest.decisionNotes}` : work,
+        target: inCampaignsTab,
       })
     }
   }
 
   if (!w.taxId) {
-    passos.push({
-      chave: "documento",
-      titulo: "Informar seu CPF ou CNPJ",
-      detalhe: "É o que identifica você como parte no contrato.",
-      destino: { ancora: "documento" },
+    steps.push({
+      key: "documento",
+      title: "Informar seu CPF ou CNPJ",
+      detail: "É o que identifica você como parte no contrato.",
+      target: { anchor: "documento" },
     })
   }
 
   // Título pelo estado da conta: mandar "conectar" a quem já conectou e só espera o provedor
   // fazia a pessoa refazer o que já fez. O motivo vem pronto da API.
   if (!w.canReceivePayout && w.payoutBlockedReason) {
-    passos.push({
-      chave: "recebimento",
-      titulo: w.kycStatus === "Rejected"
+    steps.push({
+      key: "recebimento",
+      title: w.kycStatus === "Rejected"
         ? "Revisar os dados da conta de recebimento"
         : w.kycStatus === "Pending"
           ? "Conta de recebimento em verificação"
           : "Conectar a conta de recebimento",
-      detalhe: w.payoutBlockedReason,
-      destino: { rota: "/creator/payout" },
+      detail: w.payoutBlockedReason,
+      target: { route: "/creator/payout" },
     })
   }
 
-  return passos
+  return steps
 }

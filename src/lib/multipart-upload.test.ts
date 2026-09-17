@@ -1,30 +1,30 @@
 import { describe, it, expect, vi } from "vitest"
 import {
-  enviarEmPartes, chaveDeRetomada,
-  type ArquivoEnviavel, type EnvioGuardado, type GuardaDeEnvio, type MultipartApi,
+  uploadInParts, resumeKey,
+  type UploadableFile, type StoredUpload, type UploadStore, type MultipartApi,
 } from "./multipart-upload"
 
 const MB = 1024 * 1024
 
-const arquivo = (tamanho: number): ArquivoEnviavel => ({
+const fakeFile = (size: number): UploadableFile => ({
   name: "corte.mp4",
-  size: tamanho,
+  size,
   lastModified: 1_700_000_000,
-  slice: (inicio = 0, fim = tamanho) => ({ size: Number(fim) - Number(inicio) }) as Blob,
+  slice: (start = 0, end = size) => ({ size: Number(end) - Number(start) }) as Blob,
 })
 
-function memoria(inicial: Record<string, EnvioGuardado> = {}) {
-  const dados: Record<string, EnvioGuardado> = structuredClone(inicial)
-  const guarda: GuardaDeEnvio = {
-    ler: (chave) => dados[chave] ?? null,
-    gravar: (chave, envio) => { dados[chave] = structuredClone(envio) },
-    limpar: (chave) => { delete dados[chave] },
+function memoryStore(initial: Record<string, StoredUpload> = {}) {
+  const data: Record<string, StoredUpload> = structuredClone(initial)
+  const store: UploadStore = {
+    read: (key) => data[key] ?? null,
+    write: (key, upload) => { data[key] = structuredClone(upload) },
+    clear: (key) => { delete data[key] },
   }
-  return { guarda, dados }
+  return { store, data }
 }
 
 /** API falsa: abre um envio de 3 partes de 8 MiB e assina a URL de cada uma. */
-function apiFalsa(over: Partial<MultipartApi> = {}) {
+function fakeApi(over: Partial<MultipartApi> = {}) {
   const complete = vi.fn(async () => ({}))
   const signParts = vi.fn(async (v: { partNumbers: number[] }) => ({
     parts: v.partNumbers.map((n) => ({ partNumber: n, url: `https://s3.test/parte/${n}` })),
@@ -45,31 +45,31 @@ function apiFalsa(over: Partial<MultipartApi> = {}) {
  *
  * Função simples, não `vi.fn`: um mock compartilhado entre testes soma as chamadas de todos.
  */
-const putOk = async (url: string, corpo: Blob, onProgress: (b: number) => void) => {
-  onProgress(corpo.size)
+const putOk = async (url: string, body: Blob, onProgress: (b: number) => void) => {
+  onProgress(body.size)
   return `"etag-${url.split("/").pop()}"`
 }
 
-const semEspera = async () => {}
+const noWait = async () => {}
 
-const padrao = (over: Partial<Parameters<typeof enviarEmPartes>[0]> = {}) => ({
+const defaults = (over: Partial<Parameters<typeof uploadInParts>[0]> = {}) => ({
   contractId: "c1",
-  file: arquivo(20 * MB),
+  file: fakeFile(20 * MB),
   contentType: "video/mp4",
-  concorrencia: 1,
-  esperar: semEspera,
+  concurrency: 1,
+  wait: noWait,
   ...over,
 })
 
 describe("envio em partes", () => {
   it("sobe todas as partes e conclui com os ETags em ordem", async () => {
-    const api = apiFalsa()
-    const { guarda, dados } = memoria()
+    const api = fakeApi()
+    const { store, data } = memoryStore()
     const put = vi.fn(putOk)
 
-    const chave = await enviarEmPartes(padrao({ api, storage: guarda, putParte: put }) as never)
+    const key = await uploadInParts(defaults({ api, storage: store, putPart: put }) as never)
 
-    expect(chave).toBe("delivery-drafts/t/c/abc.mp4")
+    expect(key).toBe("delivery-drafts/t/c/abc.mp4")
     expect(put).toHaveBeenCalledTimes(3)
     expect(api.complete).toHaveBeenCalledWith(expect.objectContaining({
       mediaKey: "delivery-drafts/t/c/abc.mp4",
@@ -81,14 +81,14 @@ describe("envio em partes", () => {
       ],
     }))
     // Concluído, não há o que retomar: o estado sai do navegador.
-    expect(dados).toEqual({})
+    expect(data).toEqual({})
   })
 
   it("retoma sem reenviar o que já subiu", async () => {
-    const file = arquivo(20 * MB)
-    const api = apiFalsa()
-    const { guarda } = memoria({
-      [chaveDeRetomada("c1", file)]: {
+    const file = fakeFile(20 * MB)
+    const api = fakeApi()
+    const { store } = memoryStore({
+      [resumeKey("c1", file)]: {
         mediaKey: "delivery-drafts/t/c/abc.mp4",
         uploadId: "upload-1",
         partSizeBytes: 8 * MB,
@@ -97,10 +97,10 @@ describe("envio em partes", () => {
       },
     })
     const put = vi.fn(putOk)
-    const progresso: number[] = []
+    const progress: number[] = []
 
-    await enviarEmPartes(padrao({
-      file, api, storage: guarda, putParte: put, onProgress: (f) => progresso.push(f),
+    await uploadInParts(defaults({
+      file, api, storage: store, putPart: put, onProgress: (f) => progress.push(f),
     }) as never)
 
     // Nem abre envio novo, nem sobe de novo o que já estava lá.
@@ -115,23 +115,23 @@ describe("envio em partes", () => {
       ],
     }))
     // A barra não volta a zero ao retomar: começa no que já subiu.
-    expect(progresso[0]).toBeCloseTo((16 * MB) / (20 * MB), 5)
-    expect(progresso.at(-1)).toBe(1)
+    expect(progress[0]).toBeCloseTo((16 * MB) / (20 * MB), 5)
+    expect(progress.at(-1)).toBe(1)
   })
 
   it("repete a parte que falhou, pedindo outra URL", async () => {
-    const api = apiFalsa()
-    const { guarda } = memoria()
-    let falhou = false
-    const put = vi.fn(async (url: string, corpo: Blob, onProgress: (b: number) => void) => {
-      if (!falhou && url.endsWith("/2")) {
-        falhou = true
+    const api = fakeApi()
+    const { store } = memoryStore()
+    let failed = false
+    const put = vi.fn(async (url: string, body: Blob, onProgress: (b: number) => void) => {
+      if (!failed && url.endsWith("/2")) {
+        failed = true
         throw new Error("conexão caiu")
       }
-      return putOk(url, corpo, onProgress)
+      return putOk(url, body, onProgress)
     })
 
-    await enviarEmPartes(padrao({ api, storage: guarda, putParte: put }) as never)
+    await uploadInParts(defaults({ api, storage: store, putPart: put }) as never)
 
     expect(put).toHaveBeenCalledTimes(4)
     // URL vencida é uma das causas da queda: a parte repetida pede assinatura de novo.
@@ -140,32 +140,32 @@ describe("envio em partes", () => {
   })
 
   it("desiste depois das tentativas e guarda o que já subiu", async () => {
-    const file = arquivo(20 * MB)
-    const api = apiFalsa()
-    const { guarda, dados } = memoria()
-    const put = vi.fn(async (url: string, corpo: Blob, onProgress: (b: number) => void) => {
+    const file = fakeFile(20 * MB)
+    const api = fakeApi()
+    const { store, data } = memoryStore()
+    const put = vi.fn(async (url: string, body: Blob, onProgress: (b: number) => void) => {
       if (url.endsWith("/2")) throw new Error("conexão caiu")
-      return putOk(url, corpo, onProgress)
+      return putOk(url, body, onProgress)
     })
 
-    await expect(enviarEmPartes(padrao({
-      file, api, storage: guarda, putParte: put, tentativasPorParte: 2,
+    await expect(uploadInParts(defaults({
+      file, api, storage: store, putPart: put, attemptsPerPart: 2,
     }) as never)).rejects.toThrow("conexão caiu")
 
     expect(api.complete).not.toHaveBeenCalled()
     // O que subiu continua guardado — é isso que faz o próximo envio recomeçar do meio.
-    expect(dados[chaveDeRetomada("c1", file)].etags).toEqual({ 1: '"etag-1"' })
+    expect(data[resumeKey("c1", file)].etags).toEqual({ 1: '"etag-1"' })
   })
 
   it("conclusão recusada limpa o estado, porque retomar não resolveria", async () => {
-    const file = arquivo(20 * MB)
-    const api = apiFalsa({ complete: vi.fn(async () => { throw new Error("upload_incomplete") }) })
-    const { guarda, dados } = memoria()
+    const file = fakeFile(20 * MB)
+    const api = fakeApi({ complete: vi.fn(async () => { throw new Error("upload_incomplete") }) })
+    const { store, data } = memoryStore()
 
-    await expect(enviarEmPartes(padrao({
-      file, api, storage: guarda, putParte: vi.fn(putOk),
+    await expect(uploadInParts(defaults({
+      file, api, storage: store, putPart: vi.fn(putOk),
     }) as never)).rejects.toThrow("upload_incomplete")
 
-    expect(dados[chaveDeRetomada("c1", file)]).toBeUndefined()
+    expect(data[resumeKey("c1", file)]).toBeUndefined()
   })
 })

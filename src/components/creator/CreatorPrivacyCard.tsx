@@ -18,7 +18,7 @@ export function CreatorPrivacyCard() {
   const [deleting, setDeleting] = useState(false)
   const [result, setResult] = useState<DataDeletionResult | null>(null)
 
-  const exportar = async () => {
+  const exportData = async () => {
     setExporting(true)
     try {
       const data = await creatorApi.exportMyData()
@@ -35,7 +35,7 @@ export function CreatorPrivacyCard() {
     }
   }
 
-  const excluir = async () => {
+  const requestDeletion = async () => {
     const ok = await confirm({
       title: "Pedir a exclusão dos seus dados?",
       description: (
@@ -86,7 +86,7 @@ export function CreatorPrivacyCard() {
 
       <div className="flex gap-2 flex-wrap">
         <button
-          onClick={exportar}
+          onClick={exportData}
           disabled={exporting}
           className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[12.5px] font-medium border border-border-soft disabled:opacity-50"
           style={{ color: "var(--ink)" }}
@@ -95,7 +95,7 @@ export function CreatorPrivacyCard() {
           Baixar meus dados
         </button>
         <button
-          onClick={excluir}
+          onClick={requestDeletion}
           disabled={deleting || result !== null}
           className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[12.5px] font-medium border disabled:opacity-50"
           style={{ color: "#DC2626", borderColor: "#DC262640" }}

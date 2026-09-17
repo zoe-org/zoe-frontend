@@ -9,42 +9,42 @@
  * saem na ordem em que cada campanha aparece nela, então a campanha com o item mais urgente fica no
  * topo, e dentro de cada seção os itens mantêm a ordem que tinham.</p>
  */
-export type SecaoFila<T> = {
-  chave: string
-  rotulo: string
-  itens: T[]
+export type CampaignSection<T> = {
+  key: string
+  label: string
+  items: T[]
   /** Quantos itens da seção esperam decisão. */
-  pendentes: number
+  pendingCount: number
 }
 
 /** Chave da seção de contratos sem campanha. */
-export const SECAO_SEM_CAMPANHA = "avulso"
+export const NO_CAMPAIGN_SECTION = "avulso"
 
-export function secoesPorCampanha<T>(
-  itens: readonly T[],
-  campanha: (item: T) => { id: string | null; nome: string | null },
-  pendente: (item: T) => boolean,
-  rotulo: (nome: string | null) => string,
-): SecaoFila<T>[] {
-  const porChave = new Map<string, SecaoFila<T>>()
-  for (const item of itens) {
-    const { id, nome } = campanha(item)
-    const chave = id ?? SECAO_SEM_CAMPANHA
-    let secao = porChave.get(chave)
-    if (!secao) {
-      secao = { chave, rotulo: rotulo(nome), itens: [], pendentes: 0 }
-      porChave.set(chave, secao)
+export function sectionsByCampaign<T>(
+  items: readonly T[],
+  campaignOf: (item: T) => { id: string | null; name: string | null },
+  isPending: (item: T) => boolean,
+  label: (name: string | null) => string,
+): CampaignSection<T>[] {
+  const byKey = new Map<string, CampaignSection<T>>()
+  for (const item of items) {
+    const { id, name } = campaignOf(item)
+    const key = id ?? NO_CAMPAIGN_SECTION
+    let section = byKey.get(key)
+    if (!section) {
+      section = { key, label: label(name), items: [], pendingCount: 0 }
+      byKey.set(key, section)
     }
-    secao.itens.push(item)
-    if (pendente(item)) secao.pendentes++
+    section.items.push(item)
+    if (isPending(item)) section.pendingCount++
   }
-  return [...porChave.values()]
+  return [...byKey.values()]
 }
 
 /**
  * Os itens na ordem da tela, sem os das seções recolhidas. É a lista que o teclado percorre e de onde
  * sai o "próximo" depois de decidir — senão a seleção pularia para um item escondido.
  */
-export function itensVisiveis<T>(secoes: readonly SecaoFila<T>[], recolhidas: ReadonlySet<string>): T[] {
-  return secoes.flatMap((s) => (recolhidas.has(s.chave) ? [] : s.itens))
+export function visibleItems<T>(sections: readonly CampaignSection<T>[], collapsed: ReadonlySet<string>): T[] {
+  return sections.flatMap((s) => (collapsed.has(s.key) ? [] : s.items))
 }

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient, apiBlob } from "@/lib/api"
 import {
-  enviarEmPartes, guardaEmLocalStorage, type MultipartApi, type PutParte,
+  uploadInParts, localStorageUploadStore, type MultipartApi, type PutPart,
 } from "@/lib/multipart-upload"
 import { useAuth } from "@/features/auth/context"
 import {
@@ -415,9 +415,9 @@ export function useCreatorContract(contractId: string | null) {
  * Um arquivo pequeno termina rápido o bastante para a queda de conexão ser rara, e cada parte tem
  * custo próprio — uma ida à API para assinar e uma requisição para subir.
  */
-export const LIMITE_PUT_UNICO = 16 * 1024 * 1024
+export const SINGLE_PUT_LIMIT = 16 * 1024 * 1024
 
-const FALHA_DE_REDE =
+const NETWORK_FAILURE =
   "O arquivo não subiu. Verifique sua conexão e tente de novo — o que já subiu fica guardado."
 
 /**
@@ -427,9 +427,9 @@ const FALHA_DE_REDE =
  * conexão doméstica, e um botão parado em "enviando…" durante cinco minutos é indistinguível de
  * travado — a pessoa cancela e tenta de novo, que é o pior desfecho possível para um upload grande.
  */
-function subirComProgresso(
+function uploadWithProgress(
   url: string,
-  corpo: Blob,
+  body: Blob,
   onProgress: (bytes: number) => void,
   contentType?: string,
 ): Promise<XMLHttpRequest> {
@@ -445,17 +445,17 @@ function subirComProgresso(
     xhr.upload.onprogress = (ev) => { if (ev.lengthComputable) onProgress(ev.loaded) }
 
     xhr.onload = () =>
-      xhr.status >= 200 && xhr.status < 300 ? resolve(xhr) : reject(new Error(FALHA_DE_REDE))
+      xhr.status >= 200 && xhr.status < 300 ? resolve(xhr) : reject(new Error(NETWORK_FAILURE))
 
-    xhr.onerror = () => reject(new Error(FALHA_DE_REDE))
+    xhr.onerror = () => reject(new Error(NETWORK_FAILURE))
 
-    xhr.send(corpo)
+    xhr.send(body)
   })
 }
 
 /** Sobe uma parte e devolve o ETag — é ele que identifica a parte na hora de juntar tudo. */
-const putParte: PutParte = async (url, corpo, onProgress) => {
-  const xhr = await subirComProgresso(url, corpo, onProgress)
+const putPart: PutPart = async (url, body, onProgress) => {
+  const xhr = await uploadWithProgress(url, body, onProgress)
   const etag = xhr.getResponseHeader("ETag")
   if (!etag) {
     // Sem `ExposeHeaders: ETag` no CORS do bucket o navegador esconde o cabeçalho, e sem ele não há
@@ -471,14 +471,14 @@ const multipartApi: MultipartApi = {
   complete: (v) => creatorApi.completeDraftMultipart(v),
 }
 
-async function enviarEmPutUnico(
+async function uploadSinglePut(
   contractId: string,
   file: File,
   contentType: string,
-  onProgress?: (fracao: number) => void,
+  onProgress?: (fraction: number) => void,
 ): Promise<string> {
   const auth = await creatorApi.requestDraftUpload({ contractId, fileName: file.name, contentType })
-  await subirComProgresso(
+  await uploadWithProgress(
     auth.uploadUrl, file, (bytes) => onProgress?.(bytes / (file.size || 1)), contentType)
   return auth.mediaKey
 }
@@ -504,17 +504,17 @@ export function useDraftUpload() {
 
       // Arquivo grande vai em partes: a queda de conexão custa só a parte em curso, e escolher o
       // mesmo arquivo de novo continua de onde parou em vez de recomeçar do zero.
-      const mediaKey = v.file.size > LIMITE_PUT_UNICO
-        ? await enviarEmPartes({
+      const mediaKey = v.file.size > SINGLE_PUT_LIMIT
+        ? await uploadInParts({
           contractId: v.contractId,
           file: v.file,
           contentType,
           api: multipartApi,
-          putParte,
-          storage: guardaEmLocalStorage(),
+          putPart,
+          storage: localStorageUploadStore(),
           onProgress: v.onProgress,
         })
-        : await enviarEmPutUnico(v.contractId, v.file, contentType, v.onProgress)
+        : await uploadSinglePut(v.contractId, v.file, contentType, v.onProgress)
 
       return creatorApi.submitDraft({
         contractId: v.contractId,
@@ -594,6 +594,6 @@ export function useCreatorMutations() {
  * trabalho, com ou sem uma campanha por trás. O rótulo do avulso diz isso, em vez de
  * anunciar a ausência de um agrupamento que não é problema dele.</p>
  */
-export function trabalhoLabel(campaignName: string | null | undefined): string {
+export function workLabel(campaignName: string | null | undefined): string {
   return campaignName?.trim() ? campaignName : "Trabalho avulso"
 }

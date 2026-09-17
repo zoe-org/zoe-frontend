@@ -1,24 +1,24 @@
 import type { CampaignContract, CampaignDetail } from "@/lib/api/operations"
 
-export type TomFunil = "alerta" | "atencao" | "neutro" | "ok"
+export type FunnelTone = "alert" | "attention" | "neutral" | "ok"
 
 /** Um criador da campanha: onde ele está e, quando a vez é da marca, o que fazer. */
-export type LinhaFunil = {
+export type FunnelRow = {
   influencerId: string
-  nome: string
-  etapa: string
-  tom: TomFunil
-  acao: { label: string; to: string } | null
+  creatorName: string
+  stage: string
+  tone: FunnelTone
+  action: { label: string; to: string } | null
   /**
    * Outros contratos ativos do mesmo criador na campanha. A linha mostra o que mais precisa da
    * marca; sem este número, um segundo trabalho em andamento simplesmente sumia da tela.
    */
-  outrosContratos: number
+  otherContracts: number
 }
 
-type Etapa = Pick<LinhaFunil, "etapa" | "tom" | "acao">
+type FunnelStage = Pick<FunnelRow, "stage" | "tone" | "action">
 
-const ORDEM: Record<TomFunil, number> = { alerta: 0, atencao: 1, neutro: 2, ok: 3 }
+const TONE_ORDER: Record<FunnelTone, number> = { alert: 0, attention: 1, neutral: 2, ok: 3 }
 
 /**
  * Funil por criador da campanha.
@@ -30,126 +30,126 @@ const ORDEM: Record<TomFunil, number> = { alerta: 0, atencao: 1, neutro: 2, ok: 
  * <p>Quem precisa de ação sobe: alerta (disputa, recusa), depois atenção (revisar, abrir custódia,
  * pagar), depois o que está andando sem a marca, e por último o que terminou.</p>
  */
-export function funilDaCampanha(
+export function campaignFunnel(
   d: CampaignDetail,
   /**
    * Criadores cuja conta de recebimento ainda não está pronta. O detalhe da campanha não traz
    * isso; sem o dado, custódia liberável parecia pagamento esperando a marca.
    */
-  contaNaoPronta: ReadonlySet<string> = new Set(),
-): LinhaFunil[] {
-  const nomes = new Map<string, string>()
-  for (const i of d.invites ?? []) nomes.set(i.influencerId, i.influencerName)
-  for (const c of d.contracts) nomes.set(c.influencerId, c.influencerName)
+  payoutNotReady: ReadonlySet<string> = new Set(),
+): FunnelRow[] {
+  const names = new Map<string, string>()
+  for (const i of d.invites ?? []) names.set(i.influencerId, i.influencerName)
+  for (const c of d.contracts) names.set(c.influencerId, c.influencerName)
 
-  const linhas: LinhaFunil[] = []
+  const rows: FunnelRow[] = []
 
-  for (const [influencerId, nome] of nomes) {
-    const base = { influencerId, nome, outrosContratos: 0 }
-    const contratos = d.contracts.filter((c) => c.influencerId === influencerId)
-    const ativos = contratos.filter((x) => x.status !== "Cancelled")
+  for (const [influencerId, creatorName] of names) {
+    const base = { influencerId, creatorName, otherContracts: 0 }
+    const contracts = d.contracts.filter((c) => c.influencerId === influencerId)
+    const active = contracts.filter((x) => x.status !== "Cancelled")
 
-    if (ativos.length === 0) {
-      if (contratos.length > 0) {
-        linhas.push({ ...base, etapa: "Contrato cancelado", tom: "ok", acao: null })
+    if (active.length === 0) {
+      if (contracts.length > 0) {
+        rows.push({ ...base, stage: "Contrato cancelado", tone: "ok", action: null })
         continue
       }
       // Sem contrato: vale o convite, com o aceito na frente do mais recente.
-      const convites = (d.invites ?? []).filter((i) => i.influencerId === influencerId)
-      const convite = convites.find((i) => i.accepted) ?? convites[0]
-      if (convite?.accepted) {
-        linhas.push({ ...base, etapa: "Aceitou — sem contrato", tom: "atencao", acao: { label: "Criar contrato", to: `/operations/contracts?new=1&campaign=${d.campaignId}&creator=${influencerId}` } })
-      } else if (convite?.expired) {
-        linhas.push({ ...base, etapa: "Convite vencido", tom: "neutro", acao: null })
+      const invites = (d.invites ?? []).filter((i) => i.influencerId === influencerId)
+      const invite = invites.find((i) => i.accepted) ?? invites[0]
+      if (invite?.accepted) {
+        rows.push({ ...base, stage: "Aceitou — sem contrato", tone: "attention", action: { label: "Criar contrato", to: `/operations/contracts?new=1&campaign=${d.campaignId}&creator=${influencerId}` } })
+      } else if (invite?.expired) {
+        rows.push({ ...base, stage: "Convite vencido", tone: "neutral", action: null })
       } else {
-        linhas.push({ ...base, etapa: "Convite enviado", tom: "neutro", acao: null })
+        rows.push({ ...base, stage: "Convite enviado", tone: "neutral", action: null })
       }
       continue
     }
 
     // Mais de um trabalho com o mesmo criador: vale o que mais precisa da marca. No empate, o mais
     // antigo (a API manda do mais antigo ao mais novo) — é o que está esperando há mais tempo.
-    let escolhida = etapaDoContrato(d, ativos[0], contaNaoPronta)
-    for (const c of ativos.slice(1)) {
-      const e = etapaDoContrato(d, c, contaNaoPronta)
-      if (ORDEM[e.tom] < ORDEM[escolhida.tom]) escolhida = e
+    let chosen = contractStage(d, active[0], payoutNotReady)
+    for (const c of active.slice(1)) {
+      const e = contractStage(d, c, payoutNotReady)
+      if (TONE_ORDER[e.tone] < TONE_ORDER[chosen.tone]) chosen = e
     }
-    linhas.push({ ...base, ...escolhida, outrosContratos: ativos.length - 1 })
+    rows.push({ ...base, ...chosen, otherContracts: active.length - 1 })
   }
 
   // sort é estável: dentro do mesmo tom, a ordem de chegada se mantém.
-  return linhas.sort((a, b) => ORDEM[a.tom] - ORDEM[b.tom])
+  return rows.sort((a, b) => TONE_ORDER[a.tone] - TONE_ORDER[b.tone])
 }
 
 /** Etapa de um contrato não cancelado. */
-function etapaDoContrato(
+function contractStage(
   d: CampaignDetail,
   c: CampaignContract,
-  contaNaoPronta: ReadonlySet<string>,
-): Etapa {
-  const contrato = `/operations/contracts/${c.contractId}`
-  const fila = `/operations/deliveries?campaign=${d.campaignId}&contract=${c.contractId}`
+  payoutNotReady: ReadonlySet<string>,
+): FunnelStage {
+  const contractLink = `/operations/contracts/${c.contractId}`
+  const queueLink = `/operations/deliveries?campaign=${d.campaignId}&contract=${c.contractId}`
 
   if (c.status === "Draft") {
-    return { etapa: "Rascunho do contrato", tom: "atencao", acao: { label: "Revisar e enviar", to: contrato } }
+    return { stage: "Rascunho do contrato", tone: "attention", action: { label: "Revisar e enviar", to: contractLink } }
   }
   if (c.status === "SentForSignature") {
-    return { etapa: "Aguardando assinatura", tom: "neutro", acao: { label: "Ver contrato", to: contrato } }
+    return { stage: "Aguardando assinatura", tone: "neutral", action: { label: "Ver contrato", to: contractLink } }
   }
 
   // Assinado. O que o dinheiro diz vem antes da entrega quando já encerrou ou travou.
-  if (c.escrowState === "Released") return { etapa: "Pago", tom: "ok", acao: null }
-  if (c.escrowState === "Refunded") return { etapa: "Reembolsado", tom: "ok", acao: null }
+  if (c.escrowState === "Released") return { stage: "Pago", tone: "ok", action: null }
+  if (c.escrowState === "Refunded") return { stage: "Reembolsado", tone: "ok", action: null }
   if (c.escrowState === "Disputed") {
-    return { etapa: "Em disputa", tom: "alerta", acao: { label: "Ver custódia", to: "/operations/escrow" } }
+    return { stage: "Em disputa", tone: "alert", action: { label: "Ver custódia", to: "/operations/escrow" } }
   }
 
-  const ultima = d.deliveries
+  const latest = d.deliveries
     .filter((x) => x.contractId === c.contractId)
     .sort((a, b) => b.submissionAttempt - a.submissionAttempt)[0]
 
-  if (ultima) {
-    if (ultima.status === "Submitted" || ultima.status === "UnderReview") {
-      return { etapa: "Entrega esperando revisão", tom: "atencao", acao: { label: "Revisar entrega", to: fila } }
+  if (latest) {
+    if (latest.status === "Submitted" || latest.status === "UnderReview") {
+      return { stage: "Entrega esperando revisão", tone: "attention", action: { label: "Revisar entrega", to: queueLink } }
     }
-    if (ultima.status === "ReworkRequested") {
-      return { etapa: "Correção pedida — vez do criador", tom: "neutro", acao: { label: "Ver entrega", to: fila } }
+    if (latest.status === "ReworkRequested") {
+      return { stage: "Correção pedida — vez do criador", tone: "neutral", action: { label: "Ver entrega", to: queueLink } }
     }
-    if (ultima.status === "Rejected") {
-      return { etapa: "Entrega recusada", tom: "alerta", acao: { label: "Ver entrega", to: fila } }
+    if (latest.status === "Rejected") {
+      return { stage: "Entrega recusada", tone: "alert", action: { label: "Ver entrega", to: queueLink } }
     }
-    if (c.escrowState === "Releasable" && contaNaoPronta.has(c.influencerId)) {
+    if (c.escrowState === "Releasable" && payoutNotReady.has(c.influencerId)) {
       // Liberável, mas a vez é do criador: o pagamento espera a conta dele. Mandar a marca à
       // custódia a fazia procurar um clique que não resolve nada.
       return {
-        etapa: "Aprovada — pagamento esperando a conta do criador",
-        tom: "neutro",
-        acao: { label: "Ver criador", to: `/operations/influencers?creator=${c.influencerId}` },
+        stage: "Aprovada — pagamento esperando a conta do criador",
+        tone: "neutral",
+        action: { label: "Ver criador", to: `/operations/influencers?creator=${c.influencerId}` },
       }
     }
     if (c.escrowState === "Releasable") {
-      return { etapa: "Aprovada — pagamento liberável", tom: "atencao", acao: { label: "Ver custódia", to: "/operations/escrow" } }
+      return { stage: "Aprovada — pagamento liberável", tone: "attention", action: { label: "Ver custódia", to: "/operations/escrow" } }
     }
-    return { etapa: "Entrega aprovada", tom: "ok", acao: null }
+    return { stage: "Entrega aprovada", tone: "ok", action: null }
   }
 
   // Sem entrega ainda: o corte diz em que pé está a produção. Corte esperando aprovação é a
   // etapa em que o criador mais fica parado, e o funil não a mostrava.
   if (c.draftStatus === "AwaitingReview") {
-    return { etapa: "Corte esperando aprovação", tom: "atencao", acao: { label: "Revisar o corte", to: "/operations/deliveries?stage=drafts" } }
+    return { stage: "Corte esperando aprovação", tone: "attention", action: { label: "Revisar o corte", to: "/operations/deliveries?stage=drafts" } }
   }
   if (c.draftStatus === "ChangesRequested") {
-    return { etapa: "Correção no corte — vez do criador", tom: "neutro", acao: null }
+    return { stage: "Correção no corte — vez do criador", tone: "neutral", action: null }
   }
   if (c.draftStatus === "Approved") {
-    return { etapa: "Corte aprovado — aguardando publicar", tom: "neutro", acao: null }
+    return { stage: "Corte aprovado — aguardando publicar", tone: "neutral", action: null }
   }
 
   if (c.usesEscrow && !c.escrowState) {
-    return { etapa: "Assinado — custódia não aberta", tom: "atencao", acao: { label: "Abrir custódia", to: contrato } }
+    return { stage: "Assinado — custódia não aberta", tone: "attention", action: { label: "Abrir custódia", to: contractLink } }
   }
   if (c.escrowState === "PendingDeposit") {
-    return { etapa: "Aguardando o depósito", tom: "neutro", acao: { label: "Ver contrato", to: contrato } }
+    return { stage: "Aguardando o depósito", tone: "neutral", action: { label: "Ver contrato", to: contractLink } }
   }
-  return { etapa: "Em produção", tom: "neutro", acao: null }
+  return { stage: "Em produção", tone: "neutral", action: null }
 }

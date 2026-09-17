@@ -9,7 +9,7 @@ import { RoleGate } from "@/features/auth/RoleGate"
 import { tEnum } from "@/i18n/enums"
 import { useEscapeKey } from "@/lib/useEscapeKey"
 import { useFocusTrap } from "@/lib/useFocusTrap"
-import { fmtDate, initials, matches, campanhaLabel } from "@/lib/operations-format"
+import { fmtDate, initials, matches, campaignLabel } from "@/lib/operations-format"
 import {
   TableSkeleton, ErrorState, SearchBox, NoResults,
 } from "@/components/operations/shared"
@@ -22,47 +22,47 @@ import {
 import { AUDIENCE_SIZES } from "@/lib/api/creator"
 
 /** Valor da aba do filtro de pagamento travado — não é um estado de relacionamento. */
-const TRAVADO = "pagamento-travado"
+const PAYMENT_STUCK = "pagamento-travado"
 
 /**
  * A conta de recebimento numa situação só. Eram duas colunas, KYC e Recebimento, dizendo quase o
  * mesmo com palavras diferentes — e nenhuma das duas dizia o que fazer.
  */
-function situacaoRecebimento(it: RosterItem): { label: string; cor: string; explicacao: string } {
+function payoutState(it: RosterItem): { label: string; color: string; explanation: string } {
   if (canReceivePayout(it)) {
-    return { label: "pode receber", cor: "#00A799", explicacao: "Conta de recebimento conectada e verificada." }
+    return { label: "pode receber", color: "#00A799", explanation: "Conta de recebimento conectada e verificada." }
   }
   if (it.kycStatus === "Rejected") {
     return {
       label: "verificação recusada",
-      cor: "#DC2626",
-      explicacao: "O provedor recusou a verificação. O criador revisa os dados pela área dele — daqui não há o que fazer além de avisá-lo.",
+      color: "#DC2626",
+      explanation: "O provedor recusou a verificação. O criador revisa os dados pela área dele — daqui não há o que fazer além de avisá-lo.",
     }
   }
   if (it.hasStripeAccount || it.kycStatus === "Pending") {
     return {
       label: "em verificação",
-      cor: "#D97706",
-      explicacao: "A conta existe e está em verificação pelo provedor. O criador conclui pela área dele.",
+      color: "#D97706",
+      explanation: "A conta existe e está em verificação pelo provedor. O criador conclui pela área dele.",
     }
   }
   return {
     label: "sem conta",
-    cor: "#6B7280",
-    explicacao: "O criador ainda não conectou a conta de recebimento. Ele faz isso pela área dele; sem ela, pagamento aprovado espera.",
+    color: "#6B7280",
+    explanation: "O criador ainda não conectou a conta de recebimento. Ele faz isso pela área dele; sem ela, pagamento aprovado espera.",
   }
 }
 
 /** Dinheiro já aprovado para ele, parado porque a conta não está pronta. */
-const pagamentoTravado = (it: RosterItem) => (it.releasableCents ?? 0) > 0 && !canReceivePayout(it)
+const isPaymentStuck = (it: RosterItem) => (it.releasableCents ?? 0) > 0 && !canReceivePayout(it)
 
-const REDES: Record<string, { sigla: string; url: (handle: string) => string }> = {
-  YouTube: { sigla: "YT", url: (h) => `https://www.youtube.com/@${h}` },
-  Instagram: { sigla: "IG", url: (h) => `https://www.instagram.com/${h}` },
-  TikTok: { sigla: "TT", url: (h) => `https://www.tiktok.com/@${h}` },
+const NETWORKS: Record<string, { abbreviation: string; url: (handle: string) => string }> = {
+  YouTube: { abbreviation: "YT", url: (h) => `https://www.youtube.com/@${h}` },
+  Instagram: { abbreviation: "IG", url: (h) => `https://www.instagram.com/${h}` },
+  TikTok: { abbreviation: "TT", url: (h) => `https://www.tiktok.com/@${h}` },
 }
 
-const semArroba = (h: string) => h.trim().replace(/^@/, "")
+const stripAt = (h: string) => h.trim().replace(/^@/, "")
 
 export default function OperationsRosterPage() {
   const roster = useRoster()
@@ -71,8 +71,8 @@ export default function OperationsRosterPage() {
   // O criador aberto vive na URL: é assim que a custódia e o funil da campanha trazem a pessoa
   // direto para cá, e o voltar do navegador fecha a gaveta.
   const [params, setParams] = useSearchParams()
-  const selecionado = params.get("creator")
-  const abrir = (influencerId: string | null) => setParams((p) => {
+  const selectedId = params.get("creator")
+  const openCreator = (influencerId: string | null) => setParams((p) => {
     if (influencerId) p.set("creator", influencerId)
     else p.delete("creator")
     return p
@@ -80,9 +80,9 @@ export default function OperationsRosterPage() {
 
   const all = useMemo(() => roster.data?.items ?? [], [roster.data])
   const [rel, setRel] = useState<string>("")
-  const [busca, setBusca] = useState("")
+  const [search, setSearch] = useState("")
   const [area, setArea] = useState("")
-  const [audiencia, setAudiencia] = useState("")
+  const [audience, setAudience] = useState("")
 
   // Só as áreas que existem no elenco: oferecer as quinze do cadastro faria a maioria dar vazio.
   const areas = useMemo(
@@ -92,23 +92,23 @@ export default function OperationsRosterPage() {
   )
 
   // Só as faixas que existem no elenco, na ordem de tamanho do cadastro.
-  const audiencias = useMemo(
+  const audienceOptions = useMemo(
     () => AUDIENCE_SIZES.filter((a) => all.some((i) => i.audienceSize === a.value)),
     [all],
   )
 
   const items = useMemo(
-    () => (rel === TRAVADO ? all.filter(pagamentoTravado) : rel ? all.filter((i) => i.relationshipStatus === rel) : all)
+    () => (rel === PAYMENT_STUCK ? all.filter(isPaymentStuck) : rel ? all.filter((i) => i.relationshipStatus === rel) : all)
       // E-mail entra na busca porque e' o identificador que a pessoa tem em maos quando
       // veio de fora — de uma conversa, de uma planilha — e nem sempre sabe o nome exato
       // com que o criador foi cadastrado aqui.
       .filter((i) => !area || i.primaryArea === area)
-      .filter((i) => !audiencia || i.audienceSize === audiencia)
-      .filter((i) => matches(busca, i.displayName, i.fullName, i.email, i.primaryArea)),
-    [all, rel, busca, area, audiencia],
+      .filter((i) => !audience || i.audienceSize === audience)
+      .filter((i) => matches(search, i.displayName, i.fullName, i.email, i.primaryArea)),
+    [all, rel, search, area, audience],
   )
 
-  const atual = selecionado ? all.find((i) => i.influencerId === selecionado) ?? null : null
+  const selectedCreator = selectedId ? all.find((i) => i.influencerId === selectedId) ?? null : null
 
   return (
     <div className="-m-6 border-t border-border-soft" style={{ color: "var(--ink)" }}>
@@ -142,20 +142,20 @@ export default function OperationsRosterPage() {
                 {areas.map((a) => <option key={a} value={a}>{a}</option>)}
               </select>
             )}
-            {audiencias.length > 1 && (
+            {audienceOptions.length > 1 && (
               <select
-                value={audiencia}
-                onChange={(e) => setAudiencia(e.target.value)}
+                value={audience}
+                onChange={(e) => setAudience(e.target.value)}
                 aria-label="Filtrar por audiência"
                 className="h-9 px-2.5 rounded-lg border border-border-soft text-[12.5px] bg-transparent max-w-[200px]"
                 style={{ color: "var(--ink)" }}
               >
                 <option value="">Qualquer audiência</option>
-                {audiencias.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
+                {audienceOptions.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
               </select>
             )}
             {all.length > 0 && (
-              <SearchBox value={busca} onChange={setBusca} placeholder="Buscar por nome, e-mail, área…" />
+              <SearchBox value={search} onChange={setSearch} placeholder="Buscar por nome, e-mail, área…" />
             )}
           <RoleGate minRole="Admin">
             {/* Convidar nao depende de campanha: a marca monta elenco antes de existir
@@ -182,10 +182,10 @@ export default function OperationsRosterPage() {
           <TableSkeleton />
         ) : roster.isError ? (
           <ErrorState onRetry={() => roster.refetch()} />
-        ) : items.length === 0 && (busca || area || audiencia) ? (
+        ) : items.length === 0 && (search || area || audience) ? (
           <NoResults
-            query={busca || area || AUDIENCE_SIZES.find((a) => a.value === audiencia)?.label || ""}
-            onClear={() => { setBusca(""); setArea(""); setAudiencia("") }}
+            query={search || area || AUDIENCE_SIZES.find((a) => a.value === audience)?.label || ""}
+            onClear={() => { setSearch(""); setArea(""); setAudience("") }}
           />
         ) : items.length === 0 ? (
           <EmptyBlock
@@ -209,7 +209,7 @@ export default function OperationsRosterPage() {
               </thead>
               <tbody>
                 {items.map((it, i) => (
-                  <RosterRow key={it.tenantInfluencerId} item={it} index={i} onOpen={() => abrir(it.influencerId)} />
+                  <RosterRow key={it.tenantInfluencerId} item={it} index={i} onOpen={() => openCreator(it.influencerId)} />
                 ))}
               </tbody>
             </table>
@@ -217,7 +217,7 @@ export default function OperationsRosterPage() {
         )}
       </section>
 
-      {atual && <CreatorDrawer item={atual} onClose={() => abrir(null)} />}
+      {selectedCreator && <CreatorDrawer item={selectedCreator} onClose={() => openCreator(null)} />}
       {inviteOpen && <InviteCreatorModal onClose={() => setInviteOpen(false)} />}
     </div>
   )
@@ -225,8 +225,8 @@ export default function OperationsRosterPage() {
 
 function RosterRow({ item, index, onOpen }: { item: RosterItem; index: number; onOpen: () => void }) {
   const name = item.displayName || item.fullName
-  const rec = situacaoRecebimento(item)
-  const redes = Object.entries(item.handles ?? {})
+  const rec = payoutState(item)
+  const networks = Object.entries(item.handles ?? {})
 
   return (
     // A linha inteira abre a gaveta; o nome é o botão, para teclado e leitor de tela.
@@ -258,11 +258,11 @@ function RosterRow({ item, index, onOpen }: { item: RosterItem; index: number; o
         </div>
       </td>
       <td className="py-3.5 text-[12px] text-ink-2">
-        {redes.length === 0
+        {networks.length === 0
           ? <span className="text-ink-muted">—</span>
-          : redes.map(([rede, handle]) => (
-            <span key={rede} className="mr-2 whitespace-nowrap">
-              <span className="text-ink-muted">{REDES[rede]?.sigla ?? rede}</span> @{semArroba(handle)}
+          : networks.map(([network, handle]) => (
+            <span key={network} className="mr-2 whitespace-nowrap">
+              <span className="text-ink-muted">{NETWORKS[network]?.abbreviation ?? network}</span> @{stripAt(handle)}
             </span>
           ))}
       </td>
@@ -270,8 +270,8 @@ function RosterRow({ item, index, onOpen }: { item: RosterItem; index: number; o
         {item.primaryArea ?? <span className="text-ink-muted">—</span>}
       </td>
       <td className="py-3.5 text-[12.5px]">
-        <span style={{ color: rec.cor }}>{rec.label}</span>
-        {pagamentoTravado(item) && (
+        <span style={{ color: rec.color }}>{rec.label}</span>
+        {isPaymentStuck(item) && (
           <div className="text-[11px] font-medium" style={{ color: "#DC2626" }}>
             {fmtCents(item.releasableCents ?? 0)} esperando
           </div>
@@ -280,7 +280,7 @@ function RosterRow({ item, index, onOpen }: { item: RosterItem; index: number; o
       <td className="py-3.5 font-mono-zoe text-ink-2">{item.contractCount}</td>
       <td className="px-8 py-3.5 text-[12.5px] text-ink-2">
         {item.lastContractAt
-          ? <>{campanhaLabel(item.lastCampaignName)} <span className="text-ink-muted">· {fmtDate(item.lastContractAt)}</span></>
+          ? <>{campaignLabel(item.lastCampaignName)} <span className="text-ink-muted">· {fmtDate(item.lastContractAt)}</span></>
           : <span className="text-ink-muted">—</span>}
       </td>
     </tr>
@@ -295,23 +295,23 @@ function RosterRow({ item, index, onOpen }: { item: RosterItem; index: number; o
 function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => void }) {
   useEscapeKey(onClose)
   const dialogRef = useFocusTrap<HTMLDivElement>()
-  const contratos = useContracts()
-  const meus = (contratos.data?.items ?? []).filter((c) => c.influencerId === item.influencerId)
+  const contracts = useContracts()
+  const creatorContracts = (contracts.data?.items ?? []).filter((c) => c.influencerId === item.influencerId)
 
   // Histórico do trabalho com este criador. As entregas vêm pela lista de contratos dele (a fila
   // não traz o id do criador); os pagamentos, pelas custódias já liberadas.
-  const entregas = useDeliveries()
-  const custodias = useEscrowAccounts()
-  const idsContratos = new Set(meus.map((c) => c.contractId))
-  const minhasEntregas = (entregas.data?.items ?? [])
-    .filter((d) => idsContratos.has(d.contractId))
+  const deliveries = useDeliveries()
+  const escrows = useEscrowAccounts()
+  const contractIds = new Set(creatorContracts.map((c) => c.contractId))
+  const creatorDeliveries = (deliveries.data?.items ?? [])
+    .filter((d) => contractIds.has(d.contractId))
     .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt))
-  const meusPagamentos = (custodias.data?.items ?? [])
+  const creatorPayments = (escrows.data?.items ?? [])
     .filter((e) => e.influencerId === item.influencerId && e.state === "Released")
-  const rec = situacaoRecebimento(item)
-  const audiencia = AUDIENCE_SIZES.find((a) => a.value === item.audienceSize)?.label
-  const redes = Object.entries(item.handles ?? {})
-  const topicos = item.topics ?? []
+  const rec = payoutState(item)
+  const audience = AUDIENCE_SIZES.find((a) => a.value === item.audienceSize)?.label
+  const networks = Object.entries(item.handles ?? {})
+  const topics = item.topics ?? []
 
   return (
     <>
@@ -346,9 +346,9 @@ function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => voi
 
           <div className="rounded-lg border border-border-soft p-4 mt-5">
             <div className="eyebrow mb-1.5">Recebimento</div>
-            <div className="text-[13px] font-medium" style={{ color: rec.cor }}>{rec.label}</div>
-            <p className="text-[12px] text-ink-muted m-0 mt-1">{rec.explicacao}</p>
-            {pagamentoTravado(item) && (
+            <div className="text-[13px] font-medium" style={{ color: rec.color }}>{rec.label}</div>
+            <p className="text-[12px] text-ink-muted m-0 mt-1">{rec.explanation}</p>
+            {isPaymentStuck(item) && (
               <div className="rounded-md p-2.5 mt-2.5 text-[12px]" style={{ background: "#DC262612", color: "#B91C1C" }}>
                 {fmtCents(item.releasableCents ?? 0)} já aprovados para este criador esperam esta conta.{" "}
                 <Link to="/operations/escrow" className="underline">Ver na custódia</Link>
@@ -356,7 +356,7 @@ function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => voi
             )}
             {!canReceivePayout(item) && (
               <RoleGate minRole="Admin">
-                <LembrarCriador influencerId={item.influencerId} nome={item.displayName || item.fullName} />
+                <RemindCreatorButton influencerId={item.influencerId} name={item.displayName || item.fullName} />
               </RoleGate>
             )}
           </div>
@@ -372,27 +372,27 @@ function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => voi
               <div>
                 <span className="text-ink-muted">Área: </span>
                 {item.primaryArea ?? "—"}
-                {audiencia && <span className="text-ink-muted"> · audiência {audiencia.toLowerCase()}</span>}
+                {audience && <span className="text-ink-muted"> · audiência {audience.toLowerCase()}</span>}
               </div>
-              {redes.length > 0 && (
+              {networks.length > 0 && (
                 <div className="flex flex-wrap gap-x-3 gap-y-1">
-                  {redes.map(([rede, handle]) => (
+                  {networks.map(([network, handle]) => (
                     <a
-                      key={rede}
-                      href={REDES[rede]?.url(semArroba(handle)) ?? "#"}
+                      key={network}
+                      href={NETWORKS[network]?.url(stripAt(handle)) ?? "#"}
                       target="_blank"
                       rel="noreferrer noopener"
                       className="inline-flex items-center gap-1"
                       style={{ color: "var(--color-teal-500)" }}
                     >
-                      {rede} @{semArroba(handle)} <ExternalLink className="w-3 h-3" />
+                      {network} @{stripAt(handle)} <ExternalLink className="w-3 h-3" />
                     </a>
                   ))}
                 </div>
               )}
-              {topicos.length > 0 && (
+              {topics.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-0.5">
-                  {topicos.map((t) => <span key={t} className="chip text-[10.5px]">{t}</span>)}
+                  {topics.map((t) => <span key={t} className="chip text-[10.5px]">{t}</span>)}
                 </div>
               )}
               {item.bio && <p className="m-0 mt-1">{item.bio}</p>}
@@ -411,7 +411,7 @@ function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => voi
           </div>
 
           <div className="mt-5">
-            <div className="eyebrow mb-2">Contratos com você ({meus.length})</div>
+            <div className="eyebrow mb-2">Contratos com você ({creatorContracts.length})</div>
             {/* O dinheiro da relação num relance, sempre em líquido — o que chega nele. */}
             {((item.paidCents ?? 0) > 0 || (item.inEscrowCents ?? 0) > 0 || (item.releasableCents ?? 0) > 0) && (
               <div className="grid grid-cols-3 gap-2 mb-2.5">
@@ -419,28 +419,28 @@ function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => voi
                   ["Pago", item.paidCents ?? 0],
                   ["Em custódia", item.inEscrowCents ?? 0],
                   ["Liberável", item.releasableCents ?? 0],
-                ] as const).map(([rotulo, valor]) => (
-                  <div key={rotulo} className="rounded-lg border border-border-soft px-2.5 py-2">
-                    <div className="text-[10.5px] text-ink-muted">{rotulo}</div>
+                ] as const).map(([label, value]) => (
+                  <div key={label} className="rounded-lg border border-border-soft px-2.5 py-2">
+                    <div className="text-[10.5px] text-ink-muted">{label}</div>
                     <div className="font-mono-zoe text-[12.5px] font-semibold" style={{ color: "var(--ink)" }}>
-                      {fmtCents(valor)}
+                      {fmtCents(value)}
                     </div>
                   </div>
                 ))}
               </div>
             )}
-            {meus.length === 0 ? (
+            {creatorContracts.length === 0 ? (
               <p className="text-[12.5px] text-ink-muted m-0">Nenhum contrato com este criador ainda.</p>
             ) : (
               <div className="rounded-lg border border-border-soft">
-                {meus.map((c, i) => (
+                {creatorContracts.map((c, i) => (
                   <Link
                     key={c.contractId}
                     to={`/operations/contracts/${c.contractId}`}
                     className="flex items-center gap-2 px-3.5 py-2.5 text-[12.5px] hover:bg-[#FAFBFC] dark:hover:bg-[#181B28]"
                     style={{ borderTop: i === 0 ? undefined : "1px solid var(--border-soft)" }}
                   >
-                    <span className="flex-1 truncate" style={{ color: "var(--ink)" }}>{campanhaLabel(c.campaignName)}</span>
+                    <span className="flex-1 truncate" style={{ color: "var(--ink)" }}>{campaignLabel(c.campaignName)}</span>
                     {c.escrowState && (
                       <span className="text-[11px] text-ink-muted">{tEnum("escrowState", c.escrowState)}</span>
                     )}
@@ -451,11 +451,11 @@ function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => voi
             )}
           </div>
 
-          {minhasEntregas.length > 0 && (
+          {creatorDeliveries.length > 0 && (
             <div className="mt-5">
-              <div className="eyebrow mb-2">Entregas ({minhasEntregas.length})</div>
+              <div className="eyebrow mb-2">Entregas ({creatorDeliveries.length})</div>
               <div className="rounded-lg border border-border-soft">
-                {minhasEntregas.slice(0, 5).map((d, i) => (
+                {creatorDeliveries.slice(0, 5).map((d, i) => (
                   <Link
                     key={d.deliveryId}
                     to={`/operations/deliveries?contract=${d.contractId}`}
@@ -463,7 +463,7 @@ function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => voi
                     style={{ borderTop: i === 0 ? undefined : "1px solid var(--border-soft)" }}
                   >
                     <span className="flex-1 min-w-0">
-                      <span className="block truncate" style={{ color: "var(--ink)" }}>{campanhaLabel(d.campaignName)}</span>
+                      <span className="block truncate" style={{ color: "var(--ink)" }}>{campaignLabel(d.campaignName)}</span>
                       <span className="text-[11px] text-ink-muted">
                         {fmtDate(d.submittedAt)}
                         {d.submissionAttempt > 1 && ` · ${d.submissionAttempt}ª tentativa`}
@@ -473,7 +473,7 @@ function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => voi
                   </Link>
                 ))}
               </div>
-              {minhasEntregas.length > 5 && (
+              {creatorDeliveries.length > 5 && (
                 <p className="text-[11.5px] text-ink-muted m-0 mt-1.5">
                   Mostrando as 5 mais recentes. As demais estão na fila de entregas.
                 </p>
@@ -481,18 +481,18 @@ function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => voi
             </div>
           )}
 
-          {meusPagamentos.length > 0 && (
+          {creatorPayments.length > 0 && (
             <div className="mt-5">
-              <div className="eyebrow mb-2">Pagamentos feitos ({meusPagamentos.length})</div>
+              <div className="eyebrow mb-2">Pagamentos feitos ({creatorPayments.length})</div>
               <div className="rounded-lg border border-border-soft">
-                {meusPagamentos.map((e, i) => (
+                {creatorPayments.map((e, i) => (
                   <Link
                     key={e.escrowAccountId}
                     to="/operations/escrow"
                     className="flex items-center gap-2 px-3.5 py-2.5 text-[12.5px] hover:bg-[#FAFBFC] dark:hover:bg-[#181B28]"
                     style={{ borderTop: i === 0 ? undefined : "1px solid var(--border-soft)" }}
                   >
-                    <span className="flex-1 truncate" style={{ color: "var(--ink)" }}>{campanhaLabel(e.campaignName)}</span>
+                    <span className="flex-1 truncate" style={{ color: "var(--ink)" }}>{campaignLabel(e.campaignName)}</span>
                     {/* Líquido: o que chegou nele, como no resumo acima. */}
                     <span className="font-mono-zoe text-[12px]" style={{ color: "var(--ink)" }}>
                       {fmtCents(e.netToInfluencerCents)}
@@ -513,15 +513,15 @@ function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => voi
  * não tem como concluir por ele —, e sem isto o caminho era mandar mensagem por fora sem saber
  * o que dizer. O servidor limita o envio e recusa quando a conta já está pronta.
  */
-function LembrarCriador({ influencerId, nome }: { influencerId: string; nome: string }) {
+function RemindCreatorButton({ influencerId, name }: { influencerId: string; name: string }) {
   const { remindPayout } = useRosterMutations()
-  const [enviado, setEnviado] = useState(false)
+  const [sent, setSent] = useState(false)
 
-  const lembrar = async () => {
+  const remind = async () => {
     try {
       const res = await remindPayout.mutateAsync(influencerId)
-      setEnviado(true)
-      if (res.emailDelivery === "Sent") notifySuccess(`Lembrete enviado para ${nome}.`)
+      setSent(true)
+      if (res.emailDelivery === "Sent") notifySuccess(`Lembrete enviado para ${name}.`)
       else notifyError(null, "O e-mail não saiu — o envio está desligado ou falhou neste ambiente.")
     } catch (e) {
       notifyError(e, "Não foi possível lembrar o criador.")
@@ -530,13 +530,13 @@ function LembrarCriador({ influencerId, nome }: { influencerId: string; nome: st
 
   return (
     <button
-      onClick={lembrar}
-      disabled={remindPayout.isPending || enviado}
+      onClick={remind}
+      disabled={remindPayout.isPending || sent}
       className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-medium border border-border-soft disabled:opacity-50"
       style={{ color: "var(--color-teal-500)" }}
     >
       {remindPayout.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
-      {enviado ? "Lembrete enviado" : "Lembrar criador por e-mail"}
+      {sent ? "Lembrete enviado" : "Lembrar criador por e-mail"}
     </button>
   )
 }
@@ -568,13 +568,13 @@ function RelationshipTabs({
     for (const i of items) m.set(i.relationshipStatus, (m.get(i.relationshipStatus) ?? 0) + 1)
     return m
   }, [items])
-  const travados = items.filter(pagamentoTravado).length
+  const stuckCount = items.filter(isPaymentStuck).length
 
   // Ordem do fluxo, não alfabética: é a jornada do criador com a marca.
   const ORDER = ["Convidado", "Aceito", "Contratado", "Active", "Paused", "ConviteExpirado", "Archived"]
   const present = ORDER.filter((k) => counts.has(k))
 
-  if (present.length <= 1 && travados === 0) return null
+  if (present.length <= 1 && stuckCount === 0) return null
 
   return (
     <div className="flex gap-1 flex-wrap">
@@ -588,13 +588,13 @@ function RelationshipTabs({
           onClick={() => onChange(k)}
         />
       ))}
-      {travados > 0 && (
+      {stuckCount > 0 && (
         <TabButton
           label="Pagamento travado"
-          count={travados}
-          active={value === TRAVADO}
-          onClick={() => onChange(TRAVADO)}
-          alerta
+          count={stuckCount}
+          active={value === PAYMENT_STUCK}
+          onClick={() => onChange(PAYMENT_STUCK)}
+          warning
         />
       )}
     </div>
@@ -602,17 +602,17 @@ function RelationshipTabs({
 }
 
 function TabButton({
-  label, count, active, onClick, alerta = false,
-}: { label: string; count: number; active: boolean; onClick: () => void; alerta?: boolean }) {
-  const cor = alerta ? "#DC2626" : "var(--color-teal-500)"
+  label, count, active, onClick, warning = false,
+}: { label: string; count: number; active: boolean; onClick: () => void; warning?: boolean }) {
+  const color = warning ? "#DC2626" : "var(--color-teal-500)"
   return (
     <button
       onClick={onClick}
       className="px-3 py-1.5 rounded-lg text-[12.5px] font-medium transition-colors"
       style={
         active
-          ? { background: cor, color: "#fff" }
-          : { color: alerta ? "#DC2626" : "var(--ink-muted)", border: `1px solid ${alerta ? "#DC262640" : "var(--border-soft)"}` }
+          ? { background: color, color: "#fff" }
+          : { color: warning ? "#DC2626" : "var(--ink-muted)", border: `1px solid ${warning ? "#DC262640" : "var(--border-soft)"}` }
       }
     >
       {label} <span style={{ opacity: 0.7 }}>({count})</span>

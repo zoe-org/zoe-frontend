@@ -12,12 +12,12 @@ describe("parseBRLToCents", () => {
     ["1500.50", 150_050],
     ["0,20", 20],
     ["0", 0],
-  ])("%s → %i centavos", (texto, centavos) => {
-    expect(parseBRLToCents(texto)).toBe(centavos)
+  ])("%s → %i centavos", (text, cents) => {
+    expect(parseBRLToCents(text)).toBe(cents)
   })
 
-  it.each(["", "   ", "a combinar", "1,500,00", "1.50.0", "-10", "12,345"])("%s não é valor", (texto) => {
-    expect(parseBRLToCents(texto)).toBeNull()
+  it.each(["", "   ", "a combinar", "1,500,00", "1.50.0", "-10", "12,345"])("%s não é valor", (text) => {
+    expect(parseBRLToCents(text)).toBeNull()
   })
 })
 
