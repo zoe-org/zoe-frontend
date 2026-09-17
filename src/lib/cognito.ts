@@ -1,13 +1,30 @@
 import { Amplify } from "aws-amplify"
+// Troca o `code` do redirect por tokens em qualquer rota, não só onde o redirect começou.
+import "aws-amplify/auth/enable-oauth-listener"
 import { cognitoUserPoolsTokenProvider } from "aws-amplify/auth/cognito"
 import { defaultStorage, sessionStorage as amplifySessionStorage } from "aws-amplify/utils"
+
+const cognitoDomain = import.meta.env.VITE_COGNITO_DOMAIN
 
 Amplify.configure({
   Auth: {
     Cognito: {
       userPoolId: import.meta.env.VITE_COGNITO_USER_POOL_ID,
       userPoolClientId: import.meta.env.VITE_COGNITO_CLIENT_ID,
-      loginWith: { email: true },
+      loginWith: {
+        email: true,
+        // Login com Google/Microsoft (ADR-064). As duas URLs precisam estar nos
+        // callback_urls/logout_urls do client no zoe-infra.
+        ...(cognitoDomain ? {
+          oauth: {
+            domain: cognitoDomain,
+            scopes: ["openid", "email", "profile"],
+            redirectSignIn: [`${window.location.origin}/auth/callback`],
+            redirectSignOut: [`${window.location.origin}/auth/logout`],
+            responseType: "code" as const,
+          },
+        } : {}),
+      },
     },
   },
 })

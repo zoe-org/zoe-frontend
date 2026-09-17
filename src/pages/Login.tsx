@@ -8,8 +8,9 @@ import { Label } from "@/components/ui/label"
 import { auth } from "@/features/auth/useAuth"
 import { applyRememberMe } from "@/lib/cognito"
 import { useAuth } from "@/features/auth/context"
-import { DEV_CREDENTIALS, useCognitoAuth } from "@/features/auth/constants"
+import { DEV_CREDENTIALS, socialLoginEnabled, useCognitoAuth } from "@/features/auth/constants"
 import { translateCognitoError } from "@/features/auth/errors"
+import { startSocialLogin, type SocialProvider } from "@/features/auth/socialLogin"
 import { useNavigate, useLocation, Link } from "react-router-dom"
 import { Eye, EyeOff} from "lucide-react"
 import ZoeLogo from "@/assets/zoe-logo.svg?react"
@@ -40,6 +41,19 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false)
 
   const returnTo = (location.state as { from?: string } | null)?.from ?? "/dashboard"
+  const [redirecting, setRedirecting] = useState<SocialProvider | null>(null)
+
+  const onSocial = async (provider: SocialProvider) => {
+    setError("")
+    setRedirecting(provider)
+    try {
+      applyRememberMe(remember)
+      await startSocialLogin(provider, returnTo)
+    } catch (err) {
+      setError(translateCognitoError(err).message)
+      setRedirecting(null)
+    }
+  }
 
   useEffect(() => {
     if (isAuthenticated) nav(returnTo, { replace: true })
@@ -240,11 +254,11 @@ export default function LoginPage() {
           </div>
 
           <div className="flex gap-5 justify-center items-center" >
-            <Button variant="outline" disabled>
-              <Google className="w-4 h-4 mr-2"/> Entrar com Google
+            <Button variant="outline" disabled={!socialLoginEnabled || redirecting !== null} onClick={() => onSocial("Google")}>
+              <Google className="w-4 h-4 mr-2"/> {redirecting === "Google" ? "Redirecionando..." : "Entrar com Google"}
             </Button>
-            <Button variant="outline" disabled>
-              <Microsoft className="w-4 h-4 mr-2"/> Entrar com Microsoft
+            <Button variant="outline" disabled={!socialLoginEnabled || redirecting !== null} onClick={() => onSocial("Microsoft")}>
+              <Microsoft className="w-4 h-4 mr-2"/> {redirecting === "Microsoft" ? "Redirecionando..." : "Entrar com Microsoft"}
             </Button>
           </div>
 

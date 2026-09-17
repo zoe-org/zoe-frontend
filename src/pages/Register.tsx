@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label"
 import { auth } from "@/features/auth/useAuth"
 import { useAuth } from "@/features/auth/context"
 import { translateCognitoError } from "@/features/auth/errors"
+import { socialLoginEnabled } from "@/features/auth/constants"
+import { startSocialLogin, type SocialProvider } from "@/features/auth/socialLogin"
 import { setOnboardingIntent, type OnboardingIntent } from "@/features/auth/onboardingIntent"
 import { getPendingInviteToken, clearPendingInviteToken } from "@/features/auth/pendingInvite"
 import { invitesApi } from "@/lib/api/invites"
@@ -193,7 +195,20 @@ function StepAccount({ onNext, defaultEmail = "", emailLocked = false }: { onNex
   const form = useForm<AccountData>({ resolver: zodResolver(accountSchema), defaultValues: { email: defaultEmail } })
   const [error, setError] = useState("")
   const [showPw, setShowPw] = useState(false)
+  const [redirecting, setRedirecting] = useState<SocialProvider | null>(null)
   const password = form.watch("password") ?? ""
+
+  // Intent e convite pendente já estão no localStorage: o /auth/callback segue daqui.
+  const onSocial = async (provider: SocialProvider) => {
+    setError("")
+    setRedirecting(provider)
+    try {
+      await startSocialLogin(provider)
+    } catch (err) {
+      setError(translateCognitoError(err).message)
+      setRedirecting(null)
+    }
+  }
 
   const strength = password.length >= 12 ? 3 : password.length >= 8 ? 2 : password.length >= 4 ? 1 : 0
   const strengthColors = ["bg-[#E5E7EB]", "bg-red-500", "bg-amber-500", "bg-green-500"]
@@ -338,12 +353,15 @@ function StepAccount({ onNext, defaultEmail = "", emailLocked = false }: { onNex
       <div className="hidden lg:flex flex-col items-center gap-5 w-80 shrink-0">
         <span className="text-xs text-[#6B7280] font-medium">ou cadastre-se com</span>
 
-        <Button variant="outline" disabled className="w-full justify-center bg-transparent gap-2">
-          <Google className="w-4 h-4" /> Google
+        <Button variant="outline" disabled={!socialLoginEnabled || redirecting !== null} onClick={() => onSocial("Google")} className="w-full justify-center bg-transparent gap-2">
+          <Google className="w-4 h-4" /> {redirecting === "Google" ? "Redirecionando..." : "Google"}
         </Button>
-        <Button variant="outline" disabled className="w-full justify-center bg-transparent gap-2">
-          <Microsoft className="w-4 h-4" /> Microsoft
+        <Button variant="outline" disabled={!socialLoginEnabled || redirecting !== null} onClick={() => onSocial("Microsoft")} className="w-full justify-center bg-transparent gap-2">
+          <Microsoft className="w-4 h-4" /> {redirecting === "Microsoft" ? "Redirecionando..." : "Microsoft"}
         </Button>
+        <p className="text-xs text-[#6B7280] text-center">
+          Ao continuar, você aceita os termos de uso e a política de privacidade.
+        </p>
       </div>
     </div>
   )
