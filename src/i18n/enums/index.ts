@@ -10,6 +10,16 @@ export type EnumKind =
   | "pipelinePath"
   | "channelRelation"
   | "transcriptionSource"
+  | "kycStatus"
+  | "relationshipStatus"
+  | "rosterStatus"
+  | "contractModality"
+  | "campaignStatus"
+  | "contractStatus"
+  | "escrowState"
+  | "auditCriterion"
+  | "briefingSentiment"
+  | "deliveryStatus"
 
 type LocaleDictionaries = Record<EnumKind, Record<string, string>>
 
@@ -56,6 +66,90 @@ const dictionaries: Record<string, LocaleDictionaries> = {
     transcriptionSource: {
       Whisper: "Áudio",
       Caption: "Legenda",
+    },
+    // KYC é do criador na plataforma; o status do elenco é do vínculo com este workspace.
+    kycStatus: {
+      NotStarted: "Não iniciado",
+      Pending: "Em análise",
+      Verified: "Verificado",
+      Rejected: "Recusado",
+    },
+    // Estado derivado do relacionamento com o criador. Mistura ciclo do convite,
+    // existência de contrato e status no elenco — por isso não espelha um enum só.
+    relationshipStatus: {
+      Convidado: "Convidado",
+      Aceito: "Aceito",
+      Contratado: "Contratado",
+      ConviteExpirado: "Convite expirado",
+      Active: "No elenco",
+      Paused: "Pausado",
+      Archived: "Arquivado",
+    },
+    rosterStatus: {
+      Active: "Ativo",
+      Paused: "Pausado",
+      Archived: "Arquivado",
+    },
+    contractModality: {
+      Publipost: "Publipost",
+      Ambassador: "Embaixador",
+      Barter: "Permuta",
+      Affiliate: "Afiliado",
+      License: "Licenciamento",
+      Ugc: "UGC",
+      Events: "Eventos",
+      Cocreation: "Cocriação",
+      SocialManagement: "Gestão de redes",
+      Exclusivity: "Exclusividade",
+    },
+    campaignStatus: {
+      Draft: "Rascunho",
+      Active: "Ativa",
+      Completed: "Concluída",
+      Cancelled: "Cancelada",
+    },
+    contractStatus: {
+      Draft: "Rascunho",
+      SentForSignature: "Aguardando assinatura",
+      Signed: "Assinado",
+      Cancelled: "Cancelado",
+    },
+    // Estados da custódia. "Releasable" é liberável, não liberado — a diferença
+    // entre os dois é a aprovação humana, então os rótulos não podem se confundir.
+    escrowState: {
+      PendingDeposit: "Aguardando depósito",
+      Funded: "Fundos reservados",
+      InProduction: "Em produção",
+      Delivered: "Entregue",
+      UnderReview: "Em revisão",
+      Releasable: "Liberável",
+      Released: "Liberado",
+      Disputed: "Em disputa",
+      Refunded: "Devolvido",
+    },
+    // Critérios da auditoria (RN-O-059). Cada um deriva de um item do briefing.
+    auditCriterion: {
+      BrandMention: "Menção à marca",
+      RequiredHashtags: "Hashtags obrigatórias",
+      LogoVisibility: "Logo visível",
+      SentimentAlignment: "Tom alinhado",
+      AdDisclosure: "Identificação de publicidade",
+      AudienceQuality: "Qualidade da audiência",
+    },
+    // Piso de sentimento exigido no briefing. "Qualquer" é opção legítima: campanha que
+    // pede review honesta não pode exigir tom positivo.
+    briefingSentiment: {
+      Any: "Qualquer",
+      Neutral: "Neutro ou melhor",
+      Positive: "Só positivo",
+    },
+    // Entrega e custódia dividem "Em revisão": o mesmo momento para o usuário.
+    deliveryStatus: {
+      Submitted: "Aguardando revisão",
+      UnderReview: "Em revisão",
+      Approved: "Aprovada",
+      ReworkRequested: "Precisa correção",
+      Rejected: "Recusada",
     },
   },
 }

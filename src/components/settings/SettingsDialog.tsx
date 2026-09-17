@@ -1,14 +1,16 @@
 import { useCallback, useMemo } from "react"
 import { useSearchParams } from "react-router-dom"
 import { Dialog } from "radix-ui"
-import { Building2, CreditCard, Gauge, Palette, Sparkles, User, X } from "lucide-react"
+import { Building2, CreditCard, Gauge, Handshake, Palette, Sparkles, User, X } from "lucide-react"
 import { AccountPanel } from "./panels/AccountPanel"
 import { AddOnsPanel } from "./panels/AddOnsPanel"
 import { AppearancePanel } from "./panels/AppearancePanel"
 import { WorkspacePanel } from "./panels/WorkspacePanel"
 import { PlanPanel } from "./panels/PlanPanel"
 import { UsagePanel } from "./panels/UsagePanel"
+import { OperationsPanel } from "./panels/OperationsPanel"
 import { useLongVideoDecisions } from "@/lib/api/usage"
+import { useAuth } from "@/features/auth/context"
 
 /**
  * Configurações da conta e do workspace num diálogo só.
@@ -25,7 +27,7 @@ import { useLongVideoDecisions } from "@/lib/api/usage"
 
 export const SETTINGS_PARAM = "settings"
 
-export type SectionKey = "perfil" | "aparencia" | "workspace" | "plano" | "consumo" | "addons"
+export type SectionKey = "perfil" | "aparencia" | "workspace" | "plano" | "consumo" | "addons" | "contratos"
 
 type Section = {
   key: SectionKey
@@ -34,6 +36,8 @@ type Section = {
   icon: React.ComponentType<{ className?: string }>
   title: string
   description: string
+  /** Slug que a seção exige. Sem ele, a seção vale para qualquer workspace. */
+  feature?: string
 }
 
 const SECTIONS: Section[] = [
@@ -87,23 +91,38 @@ const SECTIONS: Section[] = [
     title: "Add-ons",
     description: "Complementos contratados junto com o plano.",
   },
+  // Só aparece com o módulo: sem Operations não existe contrato para ter padrão.
+  {
+    key: "contratos",
+    label: "Contratos",
+    group: "Workspace",
+    icon: Handshake,
+    title: "Contratos",
+    description:
+      "Quem contrata, com que padrões e quem fica sabendo — vale para todo contrato novo deste workspace.",
+    feature: "operations",
+  },
 ]
 
 const DEFAULT_SECTION: SectionKey = "perfil"
 
 const GROUP_ORDER: Section["group"][] = ["Conta", "Workspace"]
 
-function isSection(v: string | null): v is SectionKey {
-  return SECTIONS.some((s) => s.key === v)
+function isSection(v: string | null, visiveis: Section[]): v is SectionKey {
+  return visiveis.some((s) => s.key === v)
 }
 
 export function SettingsDialog() {
   const [params, setParams] = useSearchParams()
+  const { hasFeature } = useAuth()
   const raw = params.get(SETTINGS_PARAM)
   const open = raw !== null
-  // Valor inválido na URL não é erro do usuário: cai na primeira seção em vez de
-  // abrir um diálogo vazio.
-  const activeKey: SectionKey = isSection(raw) ? raw : DEFAULT_SECTION
+  // Seção gateada some do rail e da URL.
+  const visiveis = useMemo(
+    () => SECTIONS.filter((s) => !s.feature || hasFeature(s.feature)),
+    [hasFeature],
+  )
+  const activeKey: SectionKey = isSection(raw, visiveis) ? raw : DEFAULT_SECTION
 
   const close = useCallback(() => {
     setParams(
@@ -131,11 +150,11 @@ export function SettingsDialog() {
   )
 
   const groups = useMemo(
-    () => GROUP_ORDER.map((g) => ({ group: g, items: SECTIONS.filter((s) => s.group === g) })),
-    [],
+    () => GROUP_ORDER.map((g) => ({ group: g, items: visiveis.filter((s) => s.group === g) })),
+    [visiveis],
   )
 
-  const active = SECTIONS.find((s) => s.key === activeKey)!
+  const active = visiveis.find((s) => s.key === activeKey)!
 
   return (
     <Dialog.Root open={open} onOpenChange={(o) => { if (!o) close() }}>
@@ -170,7 +189,7 @@ export function SettingsDialog() {
 
             {/* Sem o rail lateral a navegação teria sumido junto: em tela estreita o
                 usuário ficaria preso na seção em que abriu. */}
-            <TabStrip activeKey={activeKey} onSelect={goTo} />
+            <TabStrip sections={visiveis} activeKey={activeKey} onSelect={goTo} />
 
             {/* A `key` remonta o painel ao trocar de seção: sem ela o scroll da seção
                 anterior fica herdado e a próxima abre no meio. */}
@@ -247,16 +266,18 @@ function ConsumoBadge() {
 
 /** Navegação de tela estreita: o rail vira uma faixa rolável logo abaixo do título. */
 function TabStrip({
+  sections,
   activeKey,
   onSelect,
 }: {
+  sections: Section[]
   activeKey: SectionKey
   onSelect: (key: SectionKey) => void
 }) {
   return (
     <div className="sm:hidden shrink-0 border-b border-border-soft overflow-x-auto">
       <div className="flex items-center gap-1 px-5 py-2.5 w-max">
-        {SECTIONS.map(({ key, label, icon: Icon }) => {
+        {sections.map(({ key, label, icon: Icon }) => {
           const active = key === activeKey
           return (
             <button
@@ -301,5 +322,7 @@ function Panel({
       return <UsagePanel />
     case "addons":
       return <AddOnsPanel onGoToPlan={() => onGoTo("plano")} />
+    case "contratos":
+      return <OperationsPanel />
   }
 }

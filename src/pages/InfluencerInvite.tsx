@@ -1,0 +1,289 @@
+import { useEffect, useState } from "react"
+import { Link, useNavigate, useParams } from "react-router-dom"
+import { useQuery } from "@tanstack/react-query"
+import { Loader2, AlertCircle, CheckCircle2, Handshake } from "lucide-react"
+import { notifyError, notifySuccess } from "@/lib/feedback"
+import { useAuth } from "@/features/auth/context"
+import {
+  setPendingInfluencerInviteToken,
+  setPendingInviteEmail,
+  clearPendingInfluencerInviteToken,
+} from "@/features/auth/pendingInvite"
+import { tEnum } from "@/i18n/enums"
+import { operationsApi, fmtCents } from "@/lib/api/operations"
+import { fmtDate } from "@/lib/operations-format"
+
+/** Aceite do convite de criador, fora do AppShell. A prévia é pública; só o aceite exige login. */
+export default function InfluencerInvitePage() {
+  const { token = "" } = useParams<{ token: string }>()
+  const { isAuthenticated, isLoading: authLoading, refresh } = useAuth()
+  const navigate = useNavigate()
+  const [accepting, setAccepting] = useState(false)
+  const [accepted, setAccepted] = useState<string | null>(null)
+
+  const preview = useQuery({
+    queryKey: ["influencer-invite", token],
+    queryFn: () => operationsApi.previewInfluencerInvite(token),
+    enabled: Boolean(token),
+    retry: false,
+  })
+
+  // Guarda o token para voltar a este convite depois de cadastro e confirmação.
+  useEffect(() => {
+    if (token) setPendingInfluencerInviteToken(token)
+  }, [token])
+
+  // O e-mail vai junto: o cadastro trava esse campo em modo convite, e sem tê-lo aqui
+  // ele ficava travado E vazio — ninguém conseguia se cadastrar.
+  useEffect(() => {
+    if (preview.data?.email) setPendingInviteEmail(preview.data.email)
+  }, [preview.data?.email])
+
+  // Convite que não tem mais para onde ir (vencido, já aceito, inexistente) precisa
+  // sair do armazenamento: senão o ProtectedRoute devolve a pessoa para cá em loop.
+  useEffect(() => {
+    if (preview.isError || preview.data?.expired || preview.data?.accepted)
+      clearPendingInfluencerInviteToken()
+  }, [preview.isError, preview.data?.expired, preview.data?.accepted])
+
+  const accept = async () => {
+    setAccepting(true)
+    try {
+      const res = await operationsApi.acceptInfluencerInvite(token, preview.data!.termsVersion)
+      clearPendingInfluencerInviteToken()
+      // O aceite torna a conta de criador: sem recarregar a sessão, a guarda mandaria criar workspace.
+      await refresh()
+      setAccepted(res.campaignName ?? res.tenantName)
+      notifySuccess(res.campaignName
+        ? `Você entrou na campanha ${res.campaignName}.`
+        : `Você entrou no elenco de ${res.tenantName}.`)
+    } catch (e) {
+      // O backend recusa por motivos que a pessoa precisa entender: e-mail diferente
+      // do convite, ou conta que já pertence a um workspace.
+      notifyError(e, "Não foi possível aceitar o convite.")
+    } finally {
+      setAccepting(false)
+    }
+  }
+
+  return (
+    <div className="min-h-dvh flex items-center justify-center p-6" style={{ background: "var(--bg, #FAFBFC)" }}>
+      <div
+        className="w-full max-w-md rounded-xl border border-border-soft p-7"
+        style={{ background: "var(--surface)" }}
+      >
+        {preview.isLoading || authLoading ? (
+          <div className="flex items-center gap-2 text-ink-muted text-[13px]">
+            <Loader2 className="w-4 h-4 animate-spin" /> Carregando convite…
+          </div>
+        ) : preview.isError ? (
+          <Invalid />
+        ) : accepted ? (
+          <Done campaignName={accepted} onGo={() => navigate("/creator/onboarding", { replace: true })} />
+        ) : (
+          <Preview
+            data={preview.data!}
+            isAuthenticated={isAuthenticated}
+            accepting={accepting}
+            onAccept={accept}
+          />
+        )}
+      </div>
+    </div>
+  )
+}
+
+function Preview({
+  data, isAuthenticated, accepting, onAccept,
+}: {
+  data: import("@/lib/api/operations").InfluencerInvitePreview
+  isAuthenticated: boolean
+  accepting: boolean
+  onAccept: () => void
+}) {
+  const blocked = data.expired || data.accepted
+  // É o aceite do convite que cria a conta de criador e começa o tratamento do dado pessoal —
+  // o aceite dos termos precisa ser aqui, marcado pela pessoa, e o backend grava a versão.
+  const [termsAccepted, setTermsAccepted] = useState(false)
+
+  return (
+    <>
+      <div className="flex items-center gap-2 mb-5">
+        <Handshake className="w-5 h-5" style={{ color: "var(--color-teal-500)" }} />
+        <div className="eyebrow">{data.campaignName ? "Convite de campanha" : "Convite de elenco"}</div>
+      </div>
+
+      <h1 className="font-display m-0 mb-2" style={{ fontSize: 26, lineHeight: 1.15, color: "var(--ink)" }}>
+        {data.tenantName} convidou você
+      </h1>
+
+      {/* Sem campanha, o convite é para o elenco; o texto não promete trabalho que ainda não existe. */}
+      <p className="text-[14px] text-ink-muted mb-5">
+        {data.campaignName ? (
+          <>
+            Para a campanha <span style={{ color: "var(--ink)" }}>{data.campaignName}</span>
+            {data.modality && <> ({tEnum("contractModality", data.modality)})</>}, no nome de{" "}
+            <span style={{ color: "var(--ink)" }}>{data.influencerName}</span>.
+          </>
+        ) : (
+          <>
+            Para fazer parte do elenco de criadores, no nome de{" "}
+            <span style={{ color: "var(--ink)" }}>{data.influencerName}</span>. As campanhas
+            chegam depois, conforme surgirem.
+          </>
+        )}
+      </p>
+
+      {data.message && (
+        <div
+          className="rounded-lg p-3 text-[13px] mb-5"
+          style={{ background: "var(--bg, #F9FAFB)", color: "var(--ink)" }}
+        >
+          “{data.message}” <span className="text-ink-muted">— {data.inviterName}</span>
+        </div>
+      )}
+
+      {/* A proposta vem antes do botão: o aceite já monta o contrato com estes valores, e quem
+          aceita tem direito de ler o que foi oferecido antes de dizer sim. */}
+      {(data.feeCents != null || data.expectedDeliverables || data.deliveryDeadline) && (
+        <div className="rounded-lg border border-border-soft p-4 mb-5">
+          <div className="eyebrow mb-2.5">O que foi proposto</div>
+          <dl className="m-0 flex flex-col gap-2 text-[13px]">
+            {data.feeCents != null && (
+              <div className="flex justify-between gap-4">
+                <dt className="text-ink-muted">Cachê</dt>
+                <dd className="m-0 font-mono-zoe font-semibold" style={{ color: "var(--ink)" }}>
+                  {fmtCents(data.feeCents)}
+                </dd>
+              </div>
+            )}
+            {data.expectedDeliverables && (
+              <div className="flex justify-between gap-4">
+                <dt className="text-ink-muted shrink-0">Entregas</dt>
+                <dd className="m-0 text-right" style={{ color: "var(--ink)" }}>{data.expectedDeliverables}</dd>
+              </div>
+            )}
+            {data.deliveryDeadline && (
+              <div className="flex justify-between gap-4">
+                <dt className="text-ink-muted">Prazo de entrega</dt>
+                <dd className="m-0" style={{ color: "var(--ink)" }}>{fmtDate(data.deliveryDeadline)}</dd>
+              </div>
+            )}
+          </dl>
+          <p className="text-[11.5px] text-ink-muted mt-3 mb-0">
+            Aceitar não obriga ninguém: a proposta vira contrato, e só vale depois de assinado
+            pelas duas partes.
+          </p>
+        </div>
+      )}
+
+      {data.accepted ? (
+        <Notice tone="ok" text="Este convite já foi aceito. Entre na sua conta para ver a campanha." />
+      ) : data.expired ? (
+        <Notice
+          tone="warn"
+          text={`Este convite venceu em ${fmtDate(data.expiresAt)}. Peça um novo para quem te chamou.`}
+        />
+      ) : (
+        <p className="text-[12.5px] text-ink-muted mb-5">
+          Aceitando, você passa a ver as campanhas e contratos em que foi convidado, e envia
+          suas entregas por aqui. Você não terá acesso aos dados de {data.tenantName}.
+        </p>
+      )}
+
+      {!blocked && (isAuthenticated ? (
+        <>
+        <label className="flex items-start gap-2 text-[12.5px] text-ink-muted mb-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={termsAccepted}
+            onChange={(e) => setTermsAccepted(e.target.checked)}
+            className="mt-0.5 accent-[var(--color-teal-500)]"
+          />
+          <span>
+            Li e aceito os{" "}
+            <a href="/terms" target="_blank" rel="noopener" className="text-teal-500 font-medium hover:underline">Termos de Uso</a>{" "}
+            e a{" "}
+            <a href="/privacy" target="_blank" rel="noopener" className="text-teal-500 font-medium hover:underline">Política de Privacidade</a>.
+          </span>
+        </label>
+        <button
+          onClick={onAccept}
+          disabled={accepting || !termsAccepted}
+          className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[14px] font-medium text-white disabled:opacity-50"
+          style={{ background: "var(--color-teal-500)" }}
+        >
+          {accepting && <Loader2 className="w-4 h-4 animate-spin" />}
+          Aceitar convite
+        </button>
+        </>
+      ) : (
+        <>
+          {/* O aceite exige conta: é ela que assume o registro do criador. O e-mail
+              precisa ser o mesmo do convite, senão o backend recusa. */}
+          <Link
+            to="/register"
+            className="w-full inline-flex items-center justify-center px-4 py-2.5 rounded-lg text-[14px] font-medium text-white"
+            style={{ background: "var(--color-teal-500)" }}
+          >
+            Criar minha conta
+          </Link>
+          <Link
+            to="/login"
+            className="w-full inline-flex items-center justify-center px-4 py-2.5 mt-2 rounded-lg text-[14px] font-medium border border-border-soft"
+          >
+            Já tenho conta
+          </Link>
+          <p className="text-[11.5px] text-ink-muted mt-3 text-center">
+            Use o e-mail <span className="font-mono-zoe">{data.email}</span> — o convite é dele.
+          </p>
+        </>
+      ))}
+    </>
+  )
+}
+
+function Notice({ tone, text }: { tone: "ok" | "warn"; text: string }) {
+  const color = tone === "ok" ? "#00A799" : "#D97706"
+  return (
+    <div className="rounded-lg p-3 text-[12.5px] mb-1" style={{ background: `${color}15`, color }}>
+      {text}
+    </div>
+  )
+}
+
+function Done({ campaignName, onGo }: { campaignName: string; onGo: () => void }) {
+  return (
+    <div className="text-center">
+      <CheckCircle2 className="w-10 h-10 mx-auto mb-3" style={{ color: "var(--color-teal-500)" }} />
+      <h1 className="font-display m-0 mb-2" style={{ fontSize: 24, color: "var(--ink)" }}>
+        Tudo certo
+      </h1>
+      <p className="text-[13.5px] text-ink-muted mb-5">
+        Você entrou em {campaignName}. Falta completar seu cadastro — leva poucos minutos e
+        é o que permite à marca montar a proposta.
+      </p>
+      <button
+        onClick={onGo}
+        className="w-full px-4 py-2.5 rounded-lg text-[14px] font-medium text-white"
+        style={{ background: "var(--color-teal-500)" }}
+      >
+        Completar cadastro
+      </button>
+    </div>
+  )
+}
+
+function Invalid() {
+  return (
+    <div className="text-center">
+      <AlertCircle className="w-10 h-10 mx-auto mb-3 text-[#DC2626]" />
+      <h1 className="font-display m-0 mb-2" style={{ fontSize: 24, color: "var(--ink)" }}>
+        Convite não encontrado
+      </h1>
+      <p className="text-[13.5px] text-ink-muted">
+        O link pode ter sido digitado errado ou revogado. Peça um novo para quem te chamou.
+      </p>
+    </div>
+  )
+}

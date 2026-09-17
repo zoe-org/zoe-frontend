@@ -148,13 +148,15 @@ export type SubscribePayload = {
   officialChannelIds?: string[]
 }
 
-/** Brands assinadas pelo tenant ativo. `tenantId` na key isola o cache por tenant. */
+/**
+ * Brands do tenant ativo, com <code>tenantId</code> na key. Desligada para criador, que não tem workspace.
+ */
 export function useTenantBrands() {
-  const { activeTenantId } = useAuth()
+  const { activeTenantId, isCreator } = useAuth()
   return useQuery({
     queryKey: ["tenant-brands", activeTenantId],
     queryFn: ({ signal }) => brandsApi.listMine({ signal }),
-    enabled: Boolean(activeTenantId),
+    enabled: Boolean(activeTenantId) && !isCreator,
     staleTime: 60_000,
   })
 }

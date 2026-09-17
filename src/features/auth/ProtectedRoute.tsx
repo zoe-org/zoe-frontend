@@ -1,9 +1,12 @@
 import { Navigate, useLocation } from "react-router-dom"
 import { useAuth } from "@/features/auth/context"
-import { getPendingInviteToken } from "@/features/auth/pendingInvite"
+import {
+  getPendingInviteToken,
+  getPendingInfluencerInviteToken,
+} from "@/features/auth/pendingInvite"
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading, needsOnboarding } = useAuth()
+  const { isAuthenticated, isLoading, needsOnboarding, isCreator } = useAuth()
   const location = useLocation()
 
   if (isLoading) {
@@ -25,6 +28,20 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     if (inviteToken) {
       return <Navigate to={`/invite/${inviteToken}`} replace />
     }
+  }
+
+  // Convite de criador pendente vence o desvio de criador: a conta só vira criador depois do aceite.
+  if (needsOnboarding && !location.pathname.startsWith("/creator-invite/")) {
+    const influencerToken = getPendingInfluencerInviteToken()
+    if (influencerToken) {
+      return <Navigate to={`/creator-invite/${influencerToken}`} replace />
+    }
+  }
+
+  // Criador já registrado: o app da marca não se aplica a ele — sem tenant, toda tela de
+  // lá volta 403. A área dele é a única que faz sentido, em qualquer login.
+  if (isCreator && !location.pathname.startsWith("/creator")) {
+    return <Navigate to="/creator" replace />
   }
 
   if (needsOnboarding && !location.pathname.startsWith("/onboarding")) {

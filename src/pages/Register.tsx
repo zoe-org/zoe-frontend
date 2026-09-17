@@ -11,8 +11,15 @@ import { translateCognitoError } from "@/features/auth/errors"
 import { socialLoginEnabled } from "@/features/auth/constants"
 import { startSocialLogin, type SocialProvider } from "@/features/auth/socialLogin"
 import { setOnboardingIntent, type OnboardingIntent } from "@/features/auth/onboardingIntent"
-import { getPendingInviteToken, clearPendingInviteToken } from "@/features/auth/pendingInvite"
+import {
+  getPendingInviteToken, clearPendingInviteToken,
+  getPendingInfluencerInviteToken,
+  clearPendingInfluencerInviteToken,
+  getPendingInviteEmail,
+  clearPendingInviteEmail,
+} from "@/features/auth/pendingInvite"
 import { invitesApi } from "@/lib/api/invites"
+import { operationsApi } from "@/lib/api/operations"
 import { ApiError, setActiveTenantId } from "@/lib/api"
 import { useNavigate, useLocation, Link } from "react-router-dom"
 import { Check, ArrowLeft, Eye, EyeOff, BriefcaseBusiness, Blocks } from "lucide-react"
@@ -330,8 +337,9 @@ function StepAccount({ onNext, defaultEmail = "", emailLocked = false }: { onNex
             <input type="checkbox" {...form.register("terms")} className="mt-0.5 rounded border-[#E5E7EB] accent-teal-500" />
             <span>
               Ao criar conta, você aceita os{" "}
-              <a href="#" className="text-teal-500 font-medium hover:underline">termos de uso</a> e a{" "}
-              <a href="#" className="text-teal-500 font-medium hover:underline">política de privacidade</a>.
+              {/* Nova aba: o formulário preenchido não pode se perder para ler o documento. */}
+              <a href="/terms" target="_blank" rel="noopener" className="text-teal-500 font-medium hover:underline">termos de uso</a> e a{" "}
+              <a href="/privacy" target="_blank" rel="noopener" className="text-teal-500 font-medium hover:underline">política de privacidade</a>.
             </span>
           </label>
           {form.formState.errors.terms && <p className="text-xs text-destructive">{form.formState.errors.terms.message}</p>}
@@ -368,18 +376,26 @@ function StepAccount({ onNext, defaultEmail = "", emailLocked = false }: { onNex
 }
 
 function StepVerification({
-  email, password, onBack,
+  email, password, onBack, codeSent = false,
 }: {
   email: string
   password: string | null
   onBack: () => void
+  /** A tela anterior já disparou um código novo. Dizer isso evita que a pessoa digite o antigo. */
+  codeSent?: boolean
 }) {
   const nav = useNavigate()
   const { refresh } = useAuth()
   const [code, setCode] = useState(Array(6).fill(""))
   const [error, setError] = useState("")
+  const [notice, setNotice] = useState(
+    codeSent ? "Enviamos um código novo agora — use o e-mail mais recente." : "")
   const [resendTimer, setResendTimer] = useState(30)
   const [submitting, setSubmitting] = useState(false)
+  /** Conta confirmada mas login não concluído: digitar o código não resolve, então a tela oferece o login. */
+  const [confirmedOnly, setConfirmedOnly] = useState(false)
+
+  const typed = code.join("")
 
   useEffect(() => {
     if (resendTimer <= 0) return
@@ -400,6 +416,10 @@ function StepVerification({
     const next = [...code]
     next[index] = value
     setCode(next)
+
+    // O erro da tentativa anterior ficava na tela enquanto a pessoa corrigia os dígitos,
+    // e parecia recusa do que ela está digitando agora.
+    if (error) setError("")
 
     if (value && index < 5) {
       document.getElementById(`otp-${index + 1}`)?.focus()
@@ -430,11 +450,29 @@ function StepVerification({
   }
 
   const submitCode = async (fullCode: string) => {
-    try {
-      setSubmitting(true)
-      setError("")
-      await auth.confirm(email, fullCode)
+    setSubmitting(true)
+    setError("")
+    setNotice("")
 
+    // ── Fase 1: confirmar ──
+    // Só o que falha aqui é problema do código.
+    try {
+      await auth.confirm(email, fullCode)
+    } catch (err) {
+      const name = (err as { name?: string })?.name
+
+      // CONFIRMED chega como NotAuthorizedException; a conta está pronta, segue.
+      if (name !== "NotAuthorizedException") {
+        const { message } = translateCognitoError(err)
+        setError(err instanceof ApiError ? err.message : message)
+        setSubmitting(false)
+        return
+      }
+    }
+
+    // ── Fase 2: entrar ──
+    // Falha daqui em diante leva para o login, não de volta ao código.
+    try {
       // Sem senha (veio do fluxo "UserNotConfirmed" no login): manda pro login.
       if (!password) {
         nav("/login", { replace: true, state: { email } })
@@ -454,6 +492,7 @@ function StepVerification({
           const res = await invitesApi.accept(inviteToken)
           setActiveTenantId(res.tenantId)
           clearPendingInviteToken()
+          clearPendingInviteEmail()
           await refresh()
           nav("/dashboard", { replace: true })
         } catch {
@@ -465,20 +504,60 @@ function StepVerification({
         return
       }
 
+      // Convite de criador: o fim do fluxo é o cadastro do criador, não o dashboard.
+      const creatorToken = getPendingInfluencerInviteToken()
+      if (creatorToken) {
+        // Aceita aqui mesmo: a pessoa já viu o convite antes de criar a conta.
+        clearPendingInviteEmail()
+        try {
+          // O aceite dos termos é o checkbox obrigatório deste formulário, que abre os mesmos
+          // documentos. A versão vem da prévia do convite — o backend é quem diz qual vale.
+          const { termsVersion } = await operationsApi.previewInfluencerInvite(creatorToken)
+          await operationsApi.acceptInfluencerInvite(creatorToken, termsVersion)
+          clearPendingInfluencerInviteToken()
+          // Refresh depois do aceite, que é o que torna a conta de criador.
+          await refresh()
+          nav("/creator/onboarding", { replace: true })
+        } catch {
+          // Conta criada, aceite recusado (vencido, e-mail divergente). A tela do convite
+          // mostra o motivo e oferece tentar de novo.
+          await refresh()
+          nav(`/creator-invite/${creatorToken}`, { replace: true })
+        }
+        return
+      }
+
       await refresh()
       nav("/dashboard", { replace: true })
     } catch (err) {
       const { message } = translateCognitoError(err)
-      setError(err instanceof ApiError ? err.message : message)
+      setConfirmedOnly(true)
+      setError(
+        "Seu e-mail foi confirmado, mas não conseguimos entrar automaticamente: "
+        + (err instanceof ApiError ? err.message : message))
       setSubmitting(false)
     }
   }
 
   const handleResend = async () => {
+    setError("")
+    setNotice("")
     try {
       await auth.resendCode(email)
-    } catch { /* best-effort */ }
-    setResendTimer(30)
+      setResendTimer(30)
+      setNotice("Código reenviado. Use o do e-mail mais recente — o anterior deixa de valer.")
+    } catch (err) {
+      const name = (err as { name?: string })?.name
+      // O Cognito recusa reenviar para conta já confirmada. Engolir esse erro deixava a
+      // pessoa esperando um e-mail que nunca ia chegar.
+      if (name === "InvalidParameterException" || name === "NotAuthorizedException") {
+        setConfirmedOnly(true)
+        setError("Esta conta já está confirmada. Entre com seu e-mail e senha.")
+        return
+      }
+      setResendTimer(30)
+      setError(translateCognitoError(err).message)
+    }
   }
 
   return (
@@ -503,49 +582,75 @@ function StepVerification({
             id={`otp-${i}`}
             type="text"
             inputMode="numeric"
+            autoComplete="one-time-code"
             maxLength={1}
             value={digit}
             onChange={(e) => handleDigit(i, e.target.value)}
             onKeyDown={(e) => handleKeyDown(i, e)}
-            disabled={submitting}
+            disabled={submitting || confirmedOnly}
             className="w-12 h-14 text-center text-2xl font-bold border-2 border-[#E5E7EB] rounded-xl focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 outline-none transition-all disabled:opacity-50"
           />
         ))}
       </div>
-      {error && <p className="text-sm font-semibold text-red-500">{error}</p>}
 
-      <div className="space-y-3">
-        <p className="text-sm text-[#6B7280]">
-          {resendTimer > 0 ? (
-            `Reenviar código em ${resendTimer}s`
-          ) : (
-            <button onClick={handleResend} className="text-teal-500 font-bold hover:underline">
-              Reenviar código
+      {error && <p className="text-sm font-semibold text-red-500">{error}</p>}
+      {!error && notice && <p className="text-sm text-teal-600 font-medium">{notice}</p>}
+
+      {/* A confirmação também dispara pelo botão, para quem corrige um dígito do meio. */}
+      {confirmedOnly ? (
+        <Button
+          onClick={() => nav("/login", { replace: true, state: { email } })}
+          className="w-full bg-teal-500 hover:bg-teal-500/90 text-white font-bold py-5"
+        >
+          Ir para o login
+        </Button>
+      ) : (
+        <Button
+          onClick={() => submitCode(typed)}
+          disabled={typed.length !== 6 || submitting}
+          className="w-full bg-teal-500 hover:bg-teal-500/90 text-white font-bold py-5"
+        >
+          {submitting ? "Confirmando…" : "Confirmar"}
+        </Button>
+      )}
+
+      {!confirmedOnly && (
+        <div className="space-y-3">
+          <p className="text-sm text-[#6B7280]">
+            {resendTimer > 0 ? (
+              `Reenviar código em ${resendTimer}s`
+            ) : (
+              <button onClick={handleResend} className="text-teal-500 font-bold hover:underline">
+                Reenviar código
+              </button>
+            )}
+          </p>
+          <div className="pt-3 border-t border-gray-100">
+            <button onClick={onBack} className="text-sm text-[#6B7280] hover:text-midnight dark:hover:text-[#E6E8EF] hover:underline transition-colors">
+              Digitou o e-mail errado? Voltar
             </button>
-          )}
-        </p>
-        <div className="pt-3 border-t border-gray-100">
-          <button onClick={onBack} className="text-sm text-[#6B7280] hover:text-midnight dark:hover:text-[#E6E8EF] hover:underline transition-colors">
-            Digitou o e-mail errado? Voltar
-          </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
 
 export default function RegisterPage() {
   const location = useLocation()
-  const initial = (location.state ?? null) as { email?: string; step?: number; invite?: boolean } | null
+  const initial = (location.state ?? null) as
+    { email?: string; step?: number; invite?: boolean; codeSent?: boolean } | null
 
-  // Modo convite: usuário chegou pelo link de convite (AcceptInvite) sem ter conta.
-  // Pula a escolha de objetivo (não cria workspace), trava o e-mail e, ao final,
-  // aceita o convite pendente em vez do onboarding.
-  const inviteMode = Boolean(initial?.invite) || getPendingInviteToken() != null
+  // Modo convite (de membro ou de criador): pula o objetivo, trava o e-mail e aceita o convite no fim.
+  const inviteMode = Boolean(initial?.invite)
+    || getPendingInviteToken() != null
+    || getPendingInfluencerInviteToken() != null
 
   const [step, setStep] = useState(initial?.step ?? (inviteMode ? 2 : 1))
   const [intent, setIntent] = useState("")
-  const [email, setEmail] = useState(initial?.email ?? "")
+  // Em modo convite o campo é travado, então o valor TEM de vir de algum lugar: do
+  // estado de navegação (convite de membro) ou do que a tela de convite guardou.
+  const [email, setEmail] = useState(initial?.email ?? getPendingInviteEmail() ?? "")
   const [password, setPassword] = useState<string | null>(null)
 
   const minStep = inviteMode ? 2 : 1
@@ -687,6 +792,7 @@ export default function RegisterPage() {
                   email={email}
                   password={password}
                   onBack={() => setStep(2)}
+                  codeSent={initial?.codeSent}
                 />
               </div>
             )}

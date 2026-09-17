@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { NavLink, Link, Outlet, useLocation, useNavigate } from "react-router-dom"
 import {
-  House, Brain, Settings,
+  House, Brain, Settings, Handshake,
   ChevronDown, ChevronUp, Search, PanelLeftClose, PanelLeftOpen, ChevronsUpDown,
   Sun, Moon, LogOut, Check, Plus, ShieldCheck, AlertCircle,
 } from "lucide-react"
@@ -27,6 +27,7 @@ import ZoeLogo from "@/assets/zoe-logo.svg?react"
 
 const STORAGE_INTEL_KEY = "zoe_sidebar_intel_open"
 const STORAGE_GESTAO_KEY = "zoe_sidebar_gestao_open"
+const STORAGE_OPS_KEY = "zoe_sidebar_ops_open"
 const STORAGE_SIDEBAR_KEY = "zoe_sidebar_open"
 
 function getInitialOpenState(key: string): boolean {
@@ -55,9 +56,12 @@ const AlertsBadge = () => {
   )
 }
 
-const SubNavItem = ({ to, children, badge }: { to: string, children: React.ReactNode, badge?: React.ReactNode }) => (
+const SubNavItem = ({ to, children, badge, end }: { to: string, children: React.ReactNode, badge?: React.ReactNode, end?: boolean }) => (
   <NavLink
     to={to}
+    // O painel e a raiz da secao: sem `end`, ele ficaria marcado como ativo em toda
+    // subpagina de Operations e dois itens do menu apareceriam selecionados ao mesmo tempo.
+    end={end}
     className={({ isActive }) =>
       `relative flex items-center font-medium justify-between py-1.5 pl-4 text-[13.5px] transition-colors ${isActive
         ? "text-teal-500 dark:text-teal-300"
@@ -100,9 +104,9 @@ export function AppShell() {
   // Relatórios é add-on cross-módulo: o item some sem a feature (a rota segue
   // montada e a própria página mostra o upsell, como no SoV).
   const hasReports = useFeature("reports")
-  // Plano exibido abaixo do nome (design: "Intelligence · Owner"). O módulo é o
-  // que o tenant tem; combinado com a role vira a linha de contexto do usuário.
-  const planLabel = hasIntelligence ? "Intelligence" : hasOperations ? "Operations" : null
+  // Linha de contexto do usuário: módulos do tenant (os dois quando houver) e a role.
+  const planLabel = [hasIntelligence && "Intelligence", hasOperations && "Operations"]
+    .filter(Boolean).join(" + ") || null
   const userContext = [planLabel, role].filter(Boolean).join(" · ")
   const location = useLocation()
   const navigate = useNavigate()
@@ -113,12 +117,15 @@ export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(() => getInitialOpenState(STORAGE_SIDEBAR_KEY))
   const [intelOpen, setIntelOpen] = useState(() => getInitialOpenState(STORAGE_INTEL_KEY))
   const [gestaoOpen, setGestaoOpen] = useState(() => getInitialOpenState(STORAGE_GESTAO_KEY))
+  const [opsOpen, setOpsOpen] = useState(() => getInitialOpenState(STORAGE_OPS_KEY))
 
-  // Troca de tenant: descarta o cache do tenant anterior. O tenantId nas query
-  // keys já impede servir dado de outro tenant; isto libera memória e força um
-  // refetch limpo. Isolamento é preocupação de frontend também.
+  // Troca de tenant: remove só as queries do tenant anterior, nunca na montagem (um clear() geral deixava observers órfãos).
+  const previousTenantRef = useRef(activeTenantId)
   useEffect(() => {
-    queryClient.clear()
+    const previous = previousTenantRef.current
+    previousTenantRef.current = activeTenantId
+    if (!previous || previous === activeTenantId) return
+    queryClient.removeQueries({ predicate: (q) => q.queryKey.includes(previous) })
   }, [activeTenantId, queryClient])
 
   useEffect(() => {
@@ -132,6 +139,10 @@ export function AppShell() {
   useEffect(() => {
     try { localStorage.setItem(STORAGE_GESTAO_KEY, String(gestaoOpen)) } catch { /* storage indisponível */ }
   }, [gestaoOpen])
+
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_OPS_KEY, String(opsOpen)) } catch { /* storage indisponível */ }
+  }, [opsOpen])
 
   // Deriva a abertura das seções a partir da rota durante o render (não em efeito),
   // pra evitar o passe de render em cascata que um setState em useEffect causaria.
@@ -150,6 +161,9 @@ export function AppShell() {
       location.pathname === "/users"
     ) {
       setGestaoOpen(true)
+    }
+    if (location.pathname.startsWith("/operations")) {
+      setOpsOpen(true)
     }
   }
 
@@ -205,6 +219,34 @@ export function AppShell() {
                   {hasSov && <SubNavItem to="/intelligence/sov">Share of Voice</SubNavItem>}
                   <SubNavItem to="/intelligence/influencers">Influenciadores</SubNavItem>
                   <SubNavItem to="/alerts" badge={<AlertsBadge />}>Alertas</SubNavItem>
+                </div>
+              )}
+            </>
+          )}
+
+          {hasOperations && (
+            <>
+              <button
+                onClick={() => sidebarOpen ? setOpsOpen(!opsOpen) : setSidebarOpen(true)}
+                className={`w-full flex items-center py-2 rounded-md text-[14px] font-medium transition-colors text-[#697788] dark:text-[#8A91A3] ${sidebarOpen ? "pl-3 justify-between" : "justify-center px-2"}`}
+              >
+                <span className={`flex items-center ${sidebarOpen ? "gap-2" : ""}`}>
+                  <Handshake className="w-[18px] h-[18px] shrink-0" strokeWidth={2.5} />
+                  {sidebarOpen && <span>Operations</span>}
+                </span>
+                {sidebarOpen && (opsOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
+              </button>
+
+              {sidebarOpen && opsOpen && (
+                <div className="ml-[21px] border-l-2 border-[#E5E7EB] dark:border-[#1C1F2E] flex flex-col mt-0 mb-2">
+                  {/* A ordem do menu é a ordem do fluxo: campanha → elenco →
+                      contrato → entrega → custódia. */}
+                  <SubNavItem to="/operations" end>Painel</SubNavItem>
+                  <SubNavItem to="/operations/campaigns">Campanhas</SubNavItem>
+                  <SubNavItem to="/operations/influencers">Elenco</SubNavItem>
+                  <SubNavItem to="/operations/contracts">Contratos</SubNavItem>
+                  <SubNavItem to="/operations/deliveries">Entregas</SubNavItem>
+                  <SubNavItem to="/operations/escrow">Custódia</SubNavItem>
                 </div>
               )}
             </>

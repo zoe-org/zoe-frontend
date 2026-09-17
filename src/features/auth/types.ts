@@ -9,8 +9,10 @@ export type AuthState = {
   activeTenant: MeTenant | null
   role: string | null
   features: string[]
-  /** True quando o user logou mas ainda não tem nenhum tenant — onboarding pendente. */
+  /** True quando o user ainda não tem tenant. Nunca para criador, que não tem workspace por desenho. */
   needsOnboarding: boolean
+  /** Conta de criador (<code>user_type = Influencer</code>), sem workspace (RN-O-011). */
+  isCreator: boolean
   /**
    * Admin da Zoe (grupo `zoe-admin` em `cognito:groups`) — espelha a policy
    * `ZoeAdmin` do backend. É só pra ESCONDER navegação: a autoridade continua

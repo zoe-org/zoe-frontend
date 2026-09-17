@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { fetchAuthSession, signOut as amplifySignOut } from "aws-amplify/auth"
 import { meApi, type Me, type Membership, type MeTenant } from "@/lib/api/me"
 import { ApiError, getActiveTenantId, setActiveTenantId } from "@/lib/api"
@@ -12,6 +13,7 @@ const DEV_MOCK: { me: Me; tenant: MeTenant } = {
     id: "00000000-0000-0000-0000-000000000001",
     email: "julia@zoe.ai",
     name: "Júlia",
+    userType: "Tenant",
     memberships: [{
       tenantId: "00000000-0000-0000-0000-0000000000aa",
       tenantName: "Zoe Dev",
@@ -25,6 +27,7 @@ const DEV_MOCK: { me: Me; tenant: MeTenant } = {
       name: "Zoe Dev",
       slug: "zoe-dev",
       status: "Active",
+      taxId: null,
     },
     role: "Owner",
     features: ["intelligence", "operations"],
@@ -41,6 +44,7 @@ const initialState: AuthState = {
   role: null,
   features: [],
   needsOnboarding: false,
+  isCreator: false,
   isZoeAdmin: false,
   error: null,
 }
@@ -70,6 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>(initialState)
   /** Travessas concorrentes: protege contra um refresh tardio sobrescrever um signOut recente. */
   const generationRef = useRef(0)
+  const qc = useQueryClient()
 
   const applyTenant = useCallback((memberships: Membership[]): string | null => {
     const stored = getActiveTenantId()
@@ -128,7 +133,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         activeTenant: tenantCtx,
         role: tenantCtx?.role ?? null,
         features: tenantCtx?.features ?? [],
-        needsOnboarding: me.memberships.length === 0,
+        // Criador não tem workspace por desenho: tratar a ausência como pendência o
+        // mandaria para "crie seu workspace", que é o oposto do fluxo dele.
+        needsOnboarding: me.memberships.length === 0 && me.userType !== "Influencer",
+        isCreator: me.userType === "Influencer",
         isZoeAdmin,
         error: null,
       })
@@ -161,8 +169,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setActiveTenantId(null)
     clearPendingInviteToken()
+    // O cache sai com a sessão: as chaves da área do criador não levam identidade.
+    qc.clear()
     setState({ ...initialState, isLoading: false })
-  }, [])
+  }, [qc])
 
   const devLogin = useCallback(() => {
     generationRef.current++
@@ -177,6 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       role: DEV_MOCK.tenant.role,
       features: DEV_MOCK.tenant.features,
       needsOnboarding: false,
+      isCreator: false,
       // Login mock local não é admin Zoe — pra ver a curadoria é preciso o
       // grupo `zoe-admin` no Cognito de verdade.
       isZoeAdmin: false,

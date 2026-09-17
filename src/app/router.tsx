@@ -6,6 +6,10 @@ import LoginPage from "@/pages/Login"
 import RegisterPage from "@/pages/Register"
 import ForgotPasswordPage from "@/pages/ForgotPassword"
 import AcceptInvitePage from "@/pages/AcceptInvite"
+import InfluencerInvitePage from "@/pages/InfluencerInvite"
+import CreatorHomePage from "@/pages/creator/CreatorHome"
+import CreatorOnboardingPage from "@/pages/creator/CreatorOnboarding"
+import CreatorPayoutPage from "@/pages/creator/CreatorPayout"
 import AuthCallbackPage from "@/pages/AuthCallback"
 import OnboardingTenantPage from "@/pages/OnboardingTenant"
 import DashboardPage from "@/pages/Dashboard"
@@ -18,14 +22,46 @@ import BrandsPage from "@/pages/Brands"
 import AlertsPage from "@/pages/Alerts"
 import ReportsPage from "@/pages/Reports"
 import ReportViewPage from "@/pages/ReportView"
+import OperationsCampaignsPage from "@/pages/operations/Campaigns"
+import OperationsContractDetailPage from "@/pages/operations/ContractDetail"
+import OperationsContractsPage from "@/pages/operations/Contracts"
+import OperationsDashboardPage from "@/pages/operations/Dashboard"
+import OperationsDeliveriesPage from "@/pages/operations/Deliveries"
+import OperationsEscrowPage from "@/pages/operations/Escrow"
+import OperationsRosterPage from "@/pages/operations/Roster"
 import UsersPage from "@/pages/Users"
 import AdminBrandsPage from "@/pages/admin/AdminBrands"
+import TermsPage from "@/pages/legal/Terms"
+import PrivacyPage from "@/pages/legal/Privacy"
 
 export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
   { path: "/register", element: <RegisterPage /> },
   { path: "/forgot-password", element: <ForgotPasswordPage /> },
+  // Documentos legais: públicos, porque são lidos antes de existir conta — no cadastro e no
+  // convite de criador, que é quando a pessoa aceita.
+  { path: "/terms", element: <TermsPage /> },
+  { path: "/privacy", element: <PrivacyPage /> },
   { path: "/invite/:token", element: <AcceptInvitePage /> },
+  // Convite de criador: separado de /invite porque não cria membership. Prévia pública; aceite exige login.
+  { path: "/creator-invite/:token", element: <InfluencerInvitePage /> },
+  // Área do criador: protegida, mas fora do AppShell — ele não tem workspace para o
+  // shell da marca representar, e nenhuma tela de lá responderia sem tenant.
+  {
+    path: "/creator",
+    element: <ProtectedRoute><CreatorHomePage /></ProtectedRoute>,
+  },
+  {
+    // Cadastro em três passos. Fora do AppShell e com layout próprio: quem chega aqui
+    // acabou de aceitar um convite e ainda não tem nada para navegar.
+    path: "/creator/onboarding",
+    element: <ProtectedRoute><CreatorOnboardingPage /></ProtectedRoute>,
+  },
+  {
+    // Fora do AppShell, sem workspace de marca. É a returnUrl do provedor ao fim do cadastro.
+    path: "/creator/payout",
+    element: <ProtectedRoute><CreatorPayoutPage /></ProtectedRoute>,
+  },
   // Retorno do login com Google/Microsoft (ADR-064). URLs registradas no client do Cognito.
   { path: "/auth/callback", element: <AuthCallbackPage /> },
   { path: "/auth/logout", element: <Navigate to="/login" replace /> },
@@ -56,6 +92,15 @@ export const router = createBrowserRouter([
       // Tela de canal próprio removida: link antigo cai no monitoramento já filtrado.
       { path: "/intelligence/owned", element: <Navigate to="/intelligence/monitoring?rel=owned" replace /> },
       { path: "/mentions", element: <Navigate to="/intelligence/monitoring" replace /> },
+      // Operations: rota sempre montada. O gate real é o [RequiresFeature] do
+      // backend (403); o item no menu é que some sem a feature.
+      { path: "/operations", element: <OperationsDashboardPage /> },
+      { path: "/operations/campaigns", element: <OperationsCampaignsPage /> },
+      { path: "/operations/influencers", element: <OperationsRosterPage /> },
+      { path: "/operations/contracts", element: <OperationsContractsPage /> },
+      { path: "/operations/deliveries", element: <OperationsDeliveriesPage /> },
+      { path: "/operations/escrow", element: <OperationsEscrowPage /> },
+      { path: "/operations/contracts/:contractId", element: <OperationsContractDetailPage /> },
       { path: "/brands", element: <BrandsPage /> },
       { path: "/alerts", element: <AlertsPage /> },
       { path: "/reports", element: <ReportsPage /> },

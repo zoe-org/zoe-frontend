@@ -106,6 +106,33 @@ export async function api<T>(path: string, init: ApiOptions = {}): Promise<T> {
   return res.json() as Promise<T>
 }
 
+/**
+ * Binário com a autenticação da API: <code>&lt;a href&gt;</code> e <code>window.open</code> não levam o token.
+ */
+export async function apiBlob(path: string, init: ApiOptions = {}): Promise<Blob> {
+  const { noTenant, tenantId, headers, ...rest } = init
+  const token = await getIdToken()
+  const tenant = tenantId !== undefined ? tenantId : (noTenant ? null : getActiveTenantId())
+
+  const base = import.meta.env.VITE_API_BASE_URL ?? ""
+  const res = await fetch(`${base}${path}`, {
+    ...rest,
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(tenant ? { "X-Tenant-Id": tenant } : {}),
+      ...(headers as Record<string, string> | undefined),
+    },
+  })
+
+  if (res.status === 401) {
+    await handleUnauthorized()
+    throw new ApiError(401, "Sessão expirada.")
+  }
+
+  if (!res.ok) throw await parseError(res)
+  return res.blob()
+}
+
 export const apiClient = {
   get:    <T>(path: string, opts?: ApiOptions) => api<T>(path, { ...opts, method: "GET" }),
   post:   <T>(path: string, body?: unknown, opts?: ApiOptions) =>

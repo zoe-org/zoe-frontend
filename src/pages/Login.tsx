@@ -88,7 +88,9 @@ export default function LoginPage() {
     } catch (err) {
       const { code, message } = translateCognitoError(err)
       if (code === "UserNotConfirmedException") {
-        nav("/register", { state: { email, step: 3 }, replace: true })
+        // Conta não confirmada: reenvia o código antes de pedir para digitar, porque o do cadastro pode ter vencido.
+        await auth.resendCode(email).catch(() => { /* a tela oferece reenviar de novo */ })
+        nav("/register", { state: { email, step: 3, codeSent: true }, replace: true })
         return
       }
       if (tryDevLogin) {
