@@ -1,6 +1,7 @@
 import { Check, Plus } from "lucide-react"
 import { Link } from "react-router-dom"
 import { useAuth } from "@/features/auth/context"
+import { useSwitchWorkspace } from "@/features/auth/useSwitchWorkspace"
 import { Section, ReadOnlyValue } from "./AccountPanel"
 
 // Workspace ativo e a lista de todos. A troca vive aqui além do menu do rodapé:
@@ -19,7 +20,9 @@ function tenantColor(id: string) {
 }
 
 export function WorkspacePanel({ onNavigate }: { onNavigate: () => void }) {
-  const { role, memberships, activeTenantId, switchTenant } = useAuth()
+  const { role, memberships, activeTenantId } = useAuth()
+  // Leva pro Dashboard, e o diálogo fecha junto: ele vive no `?settings=` da rota.
+  const switchWorkspace = useSwitchWorkspace()
   const active = memberships.find((m) => m.tenantId === activeTenantId)
 
   return (
@@ -51,7 +54,7 @@ export function WorkspacePanel({ onNavigate }: { onNavigate: () => void }) {
             return (
               <button
                 key={m.tenantId}
-                onClick={() => { if (!isActive) void switchTenant(m.tenantId) }}
+                onClick={() => { if (!isActive) switchWorkspace(m.tenantId) }}
                 disabled={isActive}
                 className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
                   i > 0 ? "border-t border-border-soft" : ""

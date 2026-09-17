@@ -149,9 +149,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const switchTenant = useCallback(async (tenantId: string) => {
     if (!state.memberships.some(m => m.tenantId === tenantId)) return
+    const previous = state.activeTenantId
     setActiveTenantId(tenantId)
     setState(s => ({ ...s, isLoading: true }))
     const tenantCtx = await loadTenantContext(tenantId)
+    // As queries do workspace anterior saem aqui, e não num efeito do shell: o
+    // `isLoading` desmonta o shell, e o efeito remontava já com o tenant novo — nunca
+    // limpava nada. Depois do await elas não têm mais observer: nada refaz a busca
+    // com a chave antiga e o header novo.
+    if (previous && previous !== tenantId) {
+      qc.removeQueries({ predicate: (q) => q.queryKey.includes(previous) })
+    }
     setState(s => ({
       ...s,
       isLoading: false,
@@ -160,7 +168,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       role: tenantCtx?.role ?? null,
       features: tenantCtx?.features ?? [],
     }))
-  }, [state.memberships, loadTenantContext])
+  }, [state.memberships, state.activeTenantId, loadTenantContext, qc])
 
   const signOut = useCallback(async () => {
     generationRef.current++
