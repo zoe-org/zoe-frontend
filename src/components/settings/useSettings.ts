@@ -12,9 +12,10 @@ export function useOpenSettings() {
   const [params, setParams] = useSearchParams()
 
   return useCallback(
-    (section: SectionKey = "perfil") => {
+    (section: SectionKey = "perfil", extra?: Record<string, string>) => {
       const next = new URLSearchParams(params)
       next.set(SETTINGS_PARAM, section)
+      for (const [key, value] of Object.entries(extra ?? {})) next.set(key, value)
       setParams(next)
     },
     [params, setParams],

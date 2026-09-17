@@ -72,7 +72,7 @@ const SECTIONS: Section[] = [
     icon: CreditCard,
     title: "Plano e faturamento",
     description:
-      "Cada plano dá uma cota de vídeo-minutos por mês. Trocas entram com proração na próxima fatura.",
+      "Intelligence, Operations ou os dois. Upgrade vale na hora; downgrade, no fim do período já pago.",
   },
   {
     key: "consumo",
