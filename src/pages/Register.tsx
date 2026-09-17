@@ -323,8 +323,8 @@ function StepAccount({ onNext, defaultEmail = "", emailLocked = false }: { onNex
             <span>
               Ao criar conta, você aceita os{" "}
               {/* Nova aba: o formulário preenchido não pode se perder para ler o documento. */}
-              <a href="/termos" target="_blank" rel="noopener" className="text-teal-500 font-medium hover:underline">termos de uso</a> e a{" "}
-              <a href="/privacidade" target="_blank" rel="noopener" className="text-teal-500 font-medium hover:underline">política de privacidade</a>.
+              <a href="/terms" target="_blank" rel="noopener" className="text-teal-500 font-medium hover:underline">termos de uso</a> e a{" "}
+              <a href="/privacy" target="_blank" rel="noopener" className="text-teal-500 font-medium hover:underline">política de privacidade</a>.
             </span>
           </label>
           {form.formState.errors.terms && <p className="text-xs text-destructive">{form.formState.errors.terms.message}</p>}
@@ -515,12 +515,12 @@ function StepVerification({
           // dele a sessão diria "conta comum sem workspace", e a guarda de rota mandaria
           // para a criação de workspace.
           await refresh()
-          nav("/criador/cadastro", { replace: true })
+          nav("/creator/onboarding", { replace: true })
         } catch {
           // Conta criada, aceite recusado (vencido, e-mail divergente). A tela do convite
           // mostra o motivo e oferece tentar de novo.
           await refresh()
-          nav(`/convite-criador/${creatorToken}`, { replace: true })
+          nav(`/creator-invite/${creatorToken}`, { replace: true })
         }
         return
       }

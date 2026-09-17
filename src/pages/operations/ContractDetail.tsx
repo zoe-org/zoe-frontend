@@ -3,16 +3,16 @@ import { Link, useParams } from "react-router-dom"
 import {
   ArrowLeft, Loader2, AlertCircle, Lock, Send, Save, PenLine, ChevronRight, BookmarkPlus, RefreshCw,
 } from "lucide-react"
-import { toast } from "sonner"
+import { notifyError, notifyInfo, notifySuccess } from "@/lib/feedback"
 import { parseBRLToCents } from "@/lib/money"
 import { MoneyInput } from "@/components/ui/money-input"
 import { ApiError } from "@/lib/api"
 import { Input } from "@/components/ui/input"
 import { RoleGate } from "@/features/auth/RoleGate"
 import { tEnum } from "@/i18n/enums"
-import { fmtDate } from "@/pages/operations/format"
-import { ChargeBreakdown, TableSkeleton } from "@/pages/operations/shared"
-import { ContractTimeline } from "@/pages/operations/ContractTimeline"
+import { fmtDate } from "@/lib/operations-format"
+import { ChargeBreakdown, TableSkeleton } from "@/components/operations/shared"
+import { ContractTimeline } from "@/components/operations/ContractTimeline"
 import {
   useContract, useContractDetailMutations, useEscrowMutations, useCustomClauseMutations,
   CUSTOM_CONTRACTS_UPGRADE_CODE,
@@ -106,8 +106,8 @@ export default function ContractDetailPage() {
     const valor = (f.value ?? "").trim()
     if (!valor) return
     salvarPadrao.mutate({ [f.placeholder]: valor }, {
-      onSuccess: () => toast.success(`“${f.label}” virou padrão. Os próximos contratos já nascem com ele.`),
-      onError: (e) => toast.error(e instanceof ApiError ? e.message : "Não foi possível salvar o padrão."),
+      onSuccess: () => notifySuccess(`“${f.label}” virou padrão. Os próximos contratos já nascem com ele.`),
+      onError: (e) => notifyError(e, "Não foi possível salvar o padrão."),
     })
   }
 
@@ -121,38 +121,39 @@ export default function ContractDetailPage() {
     saveFields.mutate(edits, {
       onSuccess: (res) => {
         setEdits({})
-        toast.success(
+        notifySuccess(
           res.missingRequiredFields.length === 0
             ? "Campos salvos. Nenhum obrigatório pendente."
             : `Campos salvos. Faltam ${res.missingRequiredFields.length} obrigatórios.`,
         )
       },
-      onError: (e) => toast.error(e instanceof ApiError ? e.message : "Não foi possível salvar."),
+      onError: (e) => notifyError(e, "Não foi possível salvar."),
     })
   }
 
   const send = () => {
     if (dirty) {
-      toast.error("Salve os campos alterados antes de enviar.")
+      notifyError(null, "Salve os campos alterados antes de enviar.")
       return
     }
     sendForSignature.mutate(undefined, {
-      onSuccess: () => toast.success("Contrato enviado para assinatura."),
+      onSuccess: () => notifySuccess("Contrato enviado para assinatura."),
       onError: (e) => {
         const code = e instanceof ApiError ? e.code : undefined
         if (code === "contract_fields_incomplete") {
           const list = missingFromProblem(e)
           setServerMissing(list)
-          toast.error(`Faltam ${list.length} campos obrigatórios — estão marcados na lista.`)
+          notifyError(null, `Faltam ${list.length} campos obrigatórios — estão marcados na lista.`)
           return
         }
         if (code === "template_not_legally_reviewed") {
-          toast.error(
+          notifyError(
+            null,
             "O template desta modalidade ainda não passou por revisão jurídica. Isso é liberado pela Zoe, não pelo workspace.",
           )
           return
         }
-        toast.error(e instanceof ApiError ? e.message : "Não foi possível enviar.")
+        notifyError(e, "Não foi possível enviar.")
       },
     })
   }
@@ -282,14 +283,14 @@ export default function ContractDetailPage() {
           <SignaturePanel
             data={data}
             onMarkSigned={() => markSigned.mutate(undefined, {
-              onSuccess: () => toast.success("Contrato marcado como assinado."),
-              onError: (e) => toast.error(e instanceof ApiError ? e.message : "Não foi possível marcar."),
+              onSuccess: () => notifySuccess("Contrato marcado como assinado."),
+              onError: (e) => notifyError(e, "Não foi possível marcar."),
             })}
             pending={markSigned.isPending}
             onRefreshSignature={() => refreshSignature.mutate(undefined, {
               // "Ainda não assinaram" não é erro: é a resposta do provedor, e diz o que falta.
-              onSuccess: (r) => (r.changed ? toast.success(r.message) : toast.info(r.message)),
-              onError: (e) => toast.error(e instanceof ApiError ? e.message : "Não foi possível consultar a assinatura."),
+              onSuccess: (r) => (r.changed ? notifySuccess(r.message) : notifyInfo(r.message)),
+              onError: (e) => notifyError(e, "Não foi possível consultar a assinatura."),
             })}
             refreshing={refreshSignature.isPending}
           />
@@ -329,7 +330,7 @@ function AutoReleasePanel({ data }: { data: ContractDetail }) {
               checked={data.autoReleaseOnTimeout}
               disabled={setAutoRelease.isPending}
               onChange={(e) => setAutoRelease.mutate(e.target.checked, {
-                onError: (err) => toast.error(err instanceof ApiError ? err.message : "Não foi possível mudar o termo."),
+                onError: (err) => notifyError(err, "Não foi possível mudar o termo."),
               })}
               className="accent-[var(--color-teal-500)]"
             />
@@ -669,9 +670,9 @@ function OpenEscrowPanel({
     if (!valid) return
     try {
       await open.mutateAsync(temValorDoContrato ? { contractId } : { contractId, amountCents: cents ?? undefined })
-      toast.success("Custódia aberta. O próximo passo é o depósito.")
+      notifySuccess("Custódia aberta. O próximo passo é o depósito.")
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Não foi possível abrir a custódia.")
+      notifyError(e, "Não foi possível abrir a custódia.", { terminal: true })
     }
   }
 
@@ -810,14 +811,14 @@ function ClausesPanel({ contract }: { contract: ContractDetail }) {
     try {
       await update.mutateAsync(clean)
       setEditing(false)
-      toast.success(clean.length === 0 ? "Cláusulas próprias removidas." : "Cláusulas salvas.")
+      notifySuccess(clean.length === 0 ? "Cláusulas próprias removidas." : "Cláusulas salvas.")
     } catch (e) {
       if (e instanceof ApiError && e.problem?.code === CUSTOM_CONTRACTS_UPGRADE_CODE) {
         setEditing(false)
         setUpgrade(true)
         return
       }
-      toast.error(e instanceof ApiError ? e.message : "Não foi possível salvar.")
+      notifyError(e, "Não foi possível salvar.")
     }
   }
 

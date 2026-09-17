@@ -1,11 +1,11 @@
 import { Link } from "react-router-dom"
-import { ESCROW_STATE_COLOR } from "@/pages/operations/statusColors"
+import { ESCROW_STATE_COLOR } from "@/lib/status-colors"
 import {
   AlertTriangle, ArrowRight, CheckCircle2, FileText, Film, Megaphone, Users,
   Wallet, PenLine, Banknote,
 } from "lucide-react"
 import { tEnum } from "@/i18n/enums"
-import { TableSkeleton, ErrorState } from "@/pages/operations/shared"
+import { TableSkeleton, ErrorState } from "@/components/operations/shared"
 import {
   useOperationsDashboard, fmtCents, type OperationsDashboard,
 } from "@/lib/api/operations"
@@ -79,7 +79,7 @@ function PendingPanel({ pending: p }: { pending: OperationsDashboard["pending"] 
       n: p.draftsAwaitingReview,
       rotulo: p.draftsAwaitingReview === 1 ? "corte por aprovar" : "cortes por aprovar",
       detalhe: "O criador espera o aval antes de publicar.",
-      href: "/operations/deliveries?etapa=cortes",
+      href: "/operations/deliveries?stage=drafts",
       icon: <Film className="w-4 h-4" />,
       urgente: true,
     },

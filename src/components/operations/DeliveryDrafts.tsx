@@ -1,17 +1,16 @@
 import { useMemo, useState, Fragment } from "react"
-import { DRAFT_STATUS_COLOR } from "@/pages/operations/statusColors"
+import { DRAFT_STATUS_COLOR } from "@/lib/status-colors"
 import { Loader2, Check, RotateCcw, Film } from "lucide-react"
-import { toast } from "sonner"
-import { ApiError } from "@/lib/api"
+import { notifyError, notifySuccess } from "@/lib/feedback"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { RoleGate } from "@/features/auth/RoleGate"
-import { fmtDate, matches, campanhaLabel } from "@/pages/operations/format"
+import { fmtDate, matches, campanhaLabel } from "@/lib/operations-format"
 import {
   ErrorState, TableSkeleton, SearchBox, NoResults,
-} from "@/pages/operations/shared"
-import { QueueLayout, QueueRow, QueueSection } from "@/pages/operations/ReviewQueue"
-import { secoesPorCampanha, itensVisiveis } from "@/pages/operations/queueSections"
-import { useIsWide, useQueueKeys, esperaLabel } from "@/pages/operations/queueNavigation"
+} from "@/components/operations/shared"
+import { QueueLayout, QueueRow, QueueSection } from "@/components/operations/ReviewQueue"
+import { secoesPorCampanha, itensVisiveis } from "@/lib/queue-sections"
+import { useIsWide, useQueueKeys, esperaLabel } from "@/lib/queue-navigation"
 import {
   useDeliveryDrafts, useDeliveryDraftMutations, type DeliveryDraftItem,
 } from "@/lib/api/operations"
@@ -254,7 +253,7 @@ function DraftPanel({ draft, onDecided }: { draft: DeliveryDraftItem; onDecided:
 
   const run = async (decision: "Approve" | "RequestChanges") => {
     if (decision === "RequestChanges" && !notes.trim()) {
-      toast.error("Diga o que precisa mudar — o criador não tem como adivinhar.")
+      notifyError(null, "Diga o que precisa mudar — o criador não tem como adivinhar.")
       document.getElementById("draft-notes")?.focus()
       return
     }
@@ -263,12 +262,12 @@ function DraftPanel({ draft, onDecided }: { draft: DeliveryDraftItem; onDecided:
       const res = await decide.mutateAsync({
         draftId: draft.draftId, decision, notes: notes.trim() || undefined,
       })
-      toast.success(res.publicationReleased
+      notifySuccess(res.publicationReleased
         ? "Corte aprovado. O criador já pode publicar."
         : "Devolvido com o que mudar.")
       onDecided()
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Não foi possível registrar a decisão.")
+      notifyError(e, "Não foi possível registrar a decisão.")
     }
   }
 

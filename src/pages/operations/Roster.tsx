@@ -1,20 +1,19 @@
 import { useMemo, useState } from "react"
 import { Link, useSearchParams } from "react-router-dom"
 import { Users, UserPlus, X, ExternalLink, Loader2, Mail } from "lucide-react"
-import { toast } from "sonner"
-import { ApiError } from "@/lib/api"
+import { notifyError, notifySuccess } from "@/lib/feedback"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { StatusChip } from "@/components/ui/status-chip"
-import { DELIVERY_STATUS_COLOR } from "@/pages/operations/statusColors"
+import { DELIVERY_STATUS_COLOR } from "@/lib/status-colors"
 import { RoleGate } from "@/features/auth/RoleGate"
 import { tEnum } from "@/i18n/enums"
 import { useEscapeKey } from "@/lib/useEscapeKey"
 import { useFocusTrap } from "@/lib/useFocusTrap"
-import { fmtDate, initials, matches, campanhaLabel } from "@/pages/operations/format"
+import { fmtDate, initials, matches, campanhaLabel } from "@/lib/operations-format"
 import {
   TableSkeleton, ErrorState, SearchBox, NoResults,
-} from "@/pages/operations/shared"
-import { InviteCreatorModal } from "@/pages/operations/InviteCreatorModal"
+} from "@/components/operations/shared"
+import { InviteCreatorModal } from "@/components/operations/InviteCreatorModal"
 import {
   useRoster, useContracts, useRosterMutations, canReceivePayout, fmtCents,
   useDeliveries, useEscrowAccounts,
@@ -72,10 +71,10 @@ export default function OperationsRosterPage() {
   // O criador aberto vive na URL: é assim que a custódia e o funil da campanha trazem a pessoa
   // direto para cá, e o voltar do navegador fecha a gaveta.
   const [params, setParams] = useSearchParams()
-  const selecionado = params.get("criador")
+  const selecionado = params.get("creator")
   const abrir = (influencerId: string | null) => setParams((p) => {
-    if (influencerId) p.set("criador", influencerId)
-    else p.delete("criador")
+    if (influencerId) p.set("creator", influencerId)
+    else p.delete("creator")
     return p
   })
 
@@ -459,7 +458,7 @@ function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => voi
                 {minhasEntregas.slice(0, 5).map((d, i) => (
                   <Link
                     key={d.deliveryId}
-                    to={`/operations/deliveries?contrato=${d.contractId}`}
+                    to={`/operations/deliveries?contract=${d.contractId}`}
                     className="flex items-center gap-2 px-3.5 py-2.5 text-[12.5px] hover:bg-[#FAFBFC] dark:hover:bg-[#181B28]"
                     style={{ borderTop: i === 0 ? undefined : "1px solid var(--border-soft)" }}
                   >
@@ -522,10 +521,10 @@ function LembrarCriador({ influencerId, nome }: { influencerId: string; nome: st
     try {
       const res = await remindPayout.mutateAsync(influencerId)
       setEnviado(true)
-      if (res.emailDelivery === "Sent") toast.success(`Lembrete enviado para ${nome}.`)
-      else toast.error("O e-mail não saiu — o envio está desligado ou falhou neste ambiente.")
+      if (res.emailDelivery === "Sent") notifySuccess(`Lembrete enviado para ${nome}.`)
+      else notifyError(null, "O e-mail não saiu — o envio está desligado ou falhou neste ambiente.")
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Não foi possível lembrar o criador.")
+      notifyError(e, "Não foi possível lembrar o criador.")
     }
   }
 

@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom"
-import { LegalPage, PrivacyContact, Section } from "@/pages/legal/LegalPage"
+import { LegalPage, PrivacyContact, Section } from "@/components/legal/LegalPage"
 
 /**
  * Termos de Uso. Dizem, em linguagem direta, as regras que o produto já aplica — quem paga o
@@ -12,7 +12,7 @@ export default function TermsPage() {
       <p className="m-0 text-ink-muted">
         Estes termos valem para quem usa a Zoe — marcas, agências e criadores de conteúdo. Ao criar
         uma conta ou aceitar um convite, você concorda com eles e com a{" "}
-        <Link to="/privacidade" className="text-teal-500 hover:underline">Política de Privacidade</Link>.
+        <Link to="/privacy" className="text-teal-500 hover:underline">Política de Privacidade</Link>.
       </p>
 
       <Section title="1. O que a Zoe faz">

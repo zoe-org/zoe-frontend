@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom"
 import ZoeLogo from "@/assets/zoe-logo.svg?react"
-import { LEGAL_VERSION, PRIVACY_CONTACT_EMAIL } from "@/pages/legal/legal"
+import { LEGAL_VERSION, PRIVACY_CONTACT_EMAIL } from "@/lib/legal"
 
 /**
  * Moldura dos documentos legais. Pública e fora do AppShell: é lida antes de existir conta —
@@ -13,8 +13,8 @@ export function LegalPage({ title, children }: { title: string; children: React.
         <div className="max-w-[760px] mx-auto px-6 py-4 flex items-center justify-between gap-4">
           <Link to="/" aria-label="Zoe"><ZoeLogo className="h-6 w-auto" /></Link>
           <nav className="flex gap-4 text-[12.5px]">
-            <Link to="/termos" className="text-ink-muted hover:underline">Termos de Uso</Link>
-            <Link to="/privacidade" className="text-ink-muted hover:underline">Privacidade</Link>
+            <Link to="/terms" className="text-ink-muted hover:underline">Termos de Uso</Link>
+            <Link to="/privacy" className="text-ink-muted hover:underline">Privacidade</Link>
           </nav>
         </div>
       </header>

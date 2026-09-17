@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { DeliverySummary } from "@/lib/api/operations"
-import { agruparPorContrato, ordenarFila } from "./deliveryQueue"
-import { esperaLabel } from "./queueNavigation"
+import { agruparPorContrato, ordenarFila } from "./delivery-queue"
+import { esperaLabel } from "./queue-navigation"
 
 const entrega = (p: Partial<DeliverySummary>): DeliverySummary => ({
   deliveryId: "d",

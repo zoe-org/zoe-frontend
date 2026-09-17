@@ -39,30 +39,30 @@ export const router = createBrowserRouter([
   { path: "/forgot-password", element: <ForgotPasswordPage /> },
   // Documentos legais: públicos, porque são lidos antes de existir conta — no cadastro e no
   // convite de criador, que é quando a pessoa aceita.
-  { path: "/termos", element: <TermsPage /> },
-  { path: "/privacidade", element: <PrivacyPage /> },
+  { path: "/terms", element: <TermsPage /> },
+  { path: "/privacy", element: <PrivacyPage /> },
   { path: "/invite/:token", element: <AcceptInvitePage /> },
   // Convite de criador. Rota separada de /invite porque é outro convite: aqui não
   // nasce membership no workspace do contratante — nasce um criador com conta própria.
   // A prévia é pública; só o aceite exige login.
-  { path: "/convite-criador/:token", element: <InfluencerInvitePage /> },
+  { path: "/creator-invite/:token", element: <InfluencerInvitePage /> },
   // Área do criador: protegida, mas fora do AppShell — ele não tem workspace para o
   // shell da marca representar, e nenhuma tela de lá responderia sem tenant.
   {
-    path: "/criador",
+    path: "/creator",
     element: <ProtectedRoute><CreatorHomePage /></ProtectedRoute>,
   },
   {
     // Cadastro em três passos. Fora do AppShell e com layout próprio: quem chega aqui
     // acabou de aceitar um convite e ainda não tem nada para navegar.
-    path: "/criador/cadastro",
+    path: "/creator/onboarding",
     element: <ProtectedRoute><CreatorOnboardingPage /></ProtectedRoute>,
   },
   {
     // Fora do AppShell pelo mesmo motivo da home do criador: não há workspace para o
     // shell da marca representar. É para cá que o provedor devolve quem concluiu o
     // cadastro — a returnUrl que o backend monta aponta exatamente para esta rota.
-    path: "/criador/recebimento",
+    path: "/creator/payout",
     element: <ProtectedRoute><CreatorPayoutPage /></ProtectedRoute>,
   },
   {

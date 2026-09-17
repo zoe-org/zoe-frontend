@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import { X, Loader2, Copy, Check } from "lucide-react"
-import { toast } from "sonner"
+import { notifyError, notifySuccess } from "@/lib/feedback"
 import { useEscapeKey } from "@/lib/useEscapeKey"
 import { useFocusTrap } from "@/lib/useFocusTrap"
 import { MoneyInput } from "@/components/ui/money-input"
@@ -8,8 +8,8 @@ import { parseBRLToCents } from "@/lib/money"
 import { ApiError } from "@/lib/api"
 import { Input } from "@/components/ui/input"
 import { tEnum } from "@/i18n/enums"
-import { fmtDate, initials } from "@/pages/operations/format"
-import { Field, Select } from "@/pages/operations/shared"
+import { fmtDate, initials } from "@/lib/operations-format"
+import { Field, Select } from "@/components/operations/shared"
 import {
   useRoster, useRosterMutations, useCampaigns, useCampaign, INFLUENCER_INVITE_PATH,
   type RosterItem, type InviteInfluencerResponse, type CampaignBriefing,
@@ -104,7 +104,7 @@ export function InviteCreatorModal({
     try {
       const cents = fee.trim() ? parseBRLToCents(fee) : undefined
       if (cents === null) {
-        toast.error("Cachê inválido — use o formato 12.000,00.")
+        notifyError(null, "Cachê inválido — use o formato 12.000,00.")
         return
       }
 
@@ -121,13 +121,13 @@ export function InviteCreatorModal({
           : undefined,
       })
       setSent(res)
-      if (res.emailDelivery === "Sent") toast.success(`Convite enviado para ${res.email}.`)
+      if (res.emailDelivery === "Sent") notifySuccess(`Convite enviado para ${res.email}.`)
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) {
         setConflito({ code: e.code ?? "conflict", message: e.message })
         return
       }
-      toast.error(e instanceof ApiError ? e.message : "Não foi possível convidar.")
+      notifyError(e, "Não foi possível convidar.")
     }
   }
 
@@ -139,7 +139,7 @@ export function InviteCreatorModal({
     try {
       const cents = fee.trim() && !isBarter ? parseBRLToCents(fee) : undefined
       if (cents === null) {
-        toast.error("Cachê inválido — use o formato 12.000,00.")
+        notifyError(null, "Cachê inválido — use o formato 12.000,00.")
         return
       }
       const res = await resendInvite.mutateAsync({
@@ -156,9 +156,9 @@ export function InviteCreatorModal({
       setConflito(null)
       setReenviado(true)
       setSent(res)
-      if (res.emailDelivery === "Sent") toast.success(`Convite reenviado para ${res.email}.`)
+      if (res.emailDelivery === "Sent") notifySuccess(`Convite reenviado para ${res.email}.`)
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Não foi possível reenviar.")
+      notifyError(e, "Não foi possível reenviar.")
     }
   }
 
@@ -168,7 +168,7 @@ export function InviteCreatorModal({
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      toast.error("Não foi possível copiar — selecione o link manualmente.")
+      notifyError(null, "Não foi possível copiar — selecione o link manualmente.")
     }
   }
 

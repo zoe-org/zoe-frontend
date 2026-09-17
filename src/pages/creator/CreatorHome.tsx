@@ -1,27 +1,27 @@
 import { useState } from "react"
-import { DELIVERY_STATUS_COLOR } from "@/pages/operations/statusColors"
+import { DELIVERY_STATUS_COLOR } from "@/lib/status-colors"
 import { Link, useNavigate } from "react-router-dom"
 import {
   Loader2, LogOut, Upload, ExternalLink, AlertCircle, Play, FileText, Megaphone,
   UserRoundPen, ListChecks,
 } from "lucide-react"
-import { toast } from "sonner"
+import { notifyError, notifySuccess } from "@/lib/feedback"
 import { ApiError } from "@/lib/api"
 import { Input } from "@/components/ui/input"
 import { StatusChip } from "@/components/ui/status-chip"
 import { useAuth } from "@/features/auth/context"
 import { tEnum } from "@/i18n/enums"
-import { fmtDate, initials } from "@/pages/operations/format"
+import { fmtDate, initials } from "@/lib/operations-format"
 import { fmtCents, deliveryLink } from "@/lib/api/operations"
-import { PlatformCover } from "@/pages/operations/shared"
+import { PlatformCover } from "@/components/operations/shared"
 import {
   useCreatorWorkspace, useCreatorMutations, useSetCreatorTaxId, useCreatorDeliveryThumb, trabalhoLabel,
   type CreatorEngagement, type CreatorDelivery,
 } from "@/lib/api/creator"
-import { CreatorContractPanel } from "@/pages/creator/CreatorContractPanel"
-import { CreatorPrivacyCard } from "@/pages/creator/CreatorPrivacyCard"
-import { CreatorDraftUpload } from "@/pages/creator/CreatorDraftUpload"
-import { proximosPassos, type ProximoPasso } from "@/pages/creator/nextSteps"
+import { CreatorContractPanel } from "@/components/creator/CreatorContractPanel"
+import { CreatorPrivacyCard } from "@/components/creator/CreatorPrivacyCard"
+import { CreatorDraftUpload } from "@/components/creator/CreatorDraftUpload"
+import { proximosPassos, type ProximoPasso } from "@/lib/creator-next-steps"
 import ZoeLogo from "@/assets/zoe-logo.svg?react"
 
 const DELIVERY_COLOR = DELIVERY_STATUS_COLOR
@@ -55,10 +55,9 @@ function TaxIdCard({ current }: { current: string | null }) {
     ev.preventDefault()
     try {
       await save.mutateAsync(value)
-      toast.success("Documento registrado.")
+      notifySuccess("Documento registrado.")
     } catch (e) {
-      toast.error(
-        e instanceof ApiError ? e.message : "Não foi possível registrar o documento.")
+      notifyError(e, "Não foi possível registrar o documento.")
     }
   }
 
@@ -228,7 +227,7 @@ export default function CreatorHomePage() {
                 isso que o card diz, em vez de tratar a pessoa como pendência. */}
             {!d.profile.complete && (
               <Link
-                to="/criador/cadastro"
+                to="/creator/onboarding"
                 className="rounded-xl border p-4 mb-4 flex items-start gap-3 transition-colors"
                 style={{ background: "var(--surface)", borderColor: "var(--color-teal-500)" }}
               >
@@ -369,9 +368,9 @@ function EngagementCard({ e }: { e: CreatorEngagement }) {
     try {
       await submit.mutateAsync({ contractId: e.contractId, submittedUrl: url.trim() })
       setUrl("")
-      toast.success("Entrega enviada. A marca vai revisar o vídeo.")
+      notifySuccess("Entrega enviada. A marca vai revisar o vídeo.")
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Não foi possível enviar.")
+      notifyError(err, "Não foi possível enviar.")
     }
   }
 

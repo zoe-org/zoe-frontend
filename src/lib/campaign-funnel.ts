@@ -58,7 +58,7 @@ export function funilDaCampanha(
       const convites = (d.invites ?? []).filter((i) => i.influencerId === influencerId)
       const convite = convites.find((i) => i.accepted) ?? convites[0]
       if (convite?.accepted) {
-        linhas.push({ ...base, etapa: "Aceitou — sem contrato", tom: "atencao", acao: { label: "Criar contrato", to: `/operations/contracts?novo=1&campanha=${d.campaignId}&criador=${influencerId}` } })
+        linhas.push({ ...base, etapa: "Aceitou — sem contrato", tom: "atencao", acao: { label: "Criar contrato", to: `/operations/contracts?new=1&campaign=${d.campaignId}&creator=${influencerId}` } })
       } else if (convite?.expired) {
         linhas.push({ ...base, etapa: "Convite vencido", tom: "neutro", acao: null })
       } else {
@@ -88,7 +88,7 @@ function etapaDoContrato(
   contaNaoPronta: ReadonlySet<string>,
 ): Etapa {
   const contrato = `/operations/contracts/${c.contractId}`
-  const fila = `/operations/deliveries?campanha=${d.campaignId}&contrato=${c.contractId}`
+  const fila = `/operations/deliveries?campaign=${d.campaignId}&contract=${c.contractId}`
 
   if (c.status === "Draft") {
     return { etapa: "Rascunho do contrato", tom: "atencao", acao: { label: "Revisar e enviar", to: contrato } }
@@ -124,7 +124,7 @@ function etapaDoContrato(
       return {
         etapa: "Aprovada — pagamento esperando a conta do criador",
         tom: "neutro",
-        acao: { label: "Ver criador", to: `/operations/influencers?criador=${c.influencerId}` },
+        acao: { label: "Ver criador", to: `/operations/influencers?creator=${c.influencerId}` },
       }
     }
     if (c.escrowState === "Releasable") {
@@ -136,7 +136,7 @@ function etapaDoContrato(
   // Sem entrega ainda: o corte diz em que pé está a produção. Corte esperando aprovação é a
   // etapa em que o criador mais fica parado, e o funil não a mostrava.
   if (c.draftStatus === "AwaitingReview") {
-    return { etapa: "Corte esperando aprovação", tom: "atencao", acao: { label: "Revisar o corte", to: "/operations/deliveries?etapa=cortes" } }
+    return { etapa: "Corte esperando aprovação", tom: "atencao", acao: { label: "Revisar o corte", to: "/operations/deliveries?stage=drafts" } }
   }
   if (c.draftStatus === "ChangesRequested") {
     return { etapa: "Correção no corte — vez do criador", tom: "neutro", acao: null }

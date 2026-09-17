@@ -1,11 +1,10 @@
 import { useState } from "react"
-import { CONTRACT_STATUS_COLOR, ESCROW_STATE_COLOR } from "@/pages/operations/statusColors"
+import { CONTRACT_STATUS_COLOR, ESCROW_STATE_COLOR } from "@/lib/status-colors"
 import { Loader2, FileText, Lock, Download, AlertCircle, Send, Wallet } from "lucide-react"
-import { toast } from "sonner"
-import { ApiError } from "@/lib/api"
+import { notifyError, notifySuccess } from "@/lib/feedback"
 import { StatusChip } from "@/components/ui/status-chip"
 import { tEnum } from "@/i18n/enums"
-import { fmtDate } from "@/pages/operations/format"
+import { fmtDate } from "@/lib/operations-format"
 import { fmtCents } from "@/lib/api/operations"
 import {
   useCreatorContract, useResendSignature, creatorApi, trabalhoLabel,
@@ -148,10 +147,10 @@ function ContractView({ contractId }: { contractId: string }) {
   const resend = async () => {
     try {
       const r = await resending.mutateAsync()
-      if (r.sent) toast.success("Link reenviado. Confira seu e-mail.")
-      else toast.error(r.message ?? "O provedor não reenviou o aviso.")
+      if (r.sent) notifySuccess("Link reenviado. Confira seu e-mail.")
+      else notifyError(null, r.message ?? "O provedor não reenviou o aviso.")
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Não foi possível reenviar.")
+      notifyError(e, "Não foi possível reenviar.")
     }
   }
 
@@ -164,7 +163,7 @@ function ContractView({ contractId }: { contractId: string }) {
       // Revoga depois de dar tempo de a aba abrir; segurar para sempre vaza memória.
       setTimeout(() => URL.revokeObjectURL(url), 60_000)
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Não foi possível abrir o PDF.")
+      notifyError(e, "Não foi possível abrir o PDF.")
     } finally {
       setDownloading(false)
     }

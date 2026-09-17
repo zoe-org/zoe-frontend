@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { apiClient, apiBlob } from "@/lib/api"
 import {
   enviarEmPartes, guardaEmLocalStorage, type MultipartApi, type PutParte,
-} from "@/lib/upload/multipartUpload"
+} from "@/lib/multipart-upload"
 import { useAuth } from "@/features/auth/context"
 import {
   useRemoteDeliveryThumb, type DeliveryStatus, type DeliveryThumbnail, type EscrowState,
@@ -247,7 +247,7 @@ export type CreatorContractField = {
  * Para onde o provedor devolve a pessoa depois do cadastro. Nome de destino, nunca URL —
  * o caminho é resolvido no backend a partir de uma lista fechada.
  */
-export type PayoutReturnTo = "cadastro" | "recebimento"
+export type PayoutReturnTo = "onboarding" | "payout"
 
 export type StartPayoutOnboarding = {
   onboardingUrl: string | null

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { Check, Loader2, ExternalLink, ShieldCheck } from "lucide-react"
-import { toast } from "sonner"
+import { notifyError, notifyInfo } from "@/lib/feedback"
 import { ApiError } from "@/lib/api"
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/features/auth/context"
@@ -40,7 +40,7 @@ export default function CreatorOnboardingPage() {
   const [params] = useSearchParams()
   // Volta do provedor de pagamentos: o retorno aponta para o passo 3. Sem ler isto a
   // pessoa reabriria o cadastro no passo 1, como se não tivesse feito nada.
-  const [passo, setPasso] = useState(() => (params.get("passo") === "3" ? 3 : 1))
+  const [passo, setPasso] = useState(() => (params.get("step") === "3" ? 3 : 1))
 
   // Dados pessoais
   const [fullName, setFullName] = useState("")
@@ -83,7 +83,7 @@ export default function CreatorOnboardingPage() {
         // Teto silencioso seria pior: o clique não faria nada e a pessoa acharia que a
         // tela travou. O aviso diz o motivo.
         : atual.length >= MAX_TOPICS
-          ? (toast.info(`Escolha até ${MAX_TOPICS} temas — os que mais te representam.`), atual)
+          ? (notifyInfo(`Escolha até ${MAX_TOPICS} temas — os que mais te representam.`), atual)
           : [...atual, t])
   }
 
@@ -92,7 +92,7 @@ export default function CreatorOnboardingPage() {
       await salvar.mutateAsync(corpo)
       setPasso(proximo)
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Não foi possível salvar.")
+      notifyError(e, "Não foi possível salvar.")
     }
   }
 
@@ -161,7 +161,7 @@ export default function CreatorOnboardingPage() {
           {passo === 3 && (
             <StepRecebimento
               onBack={() => setPasso(2)}
-              onFinish={() => nav("/criador", { replace: true })}
+              onFinish={() => nav("/creator", { replace: true })}
             />
           )}
         </div>
@@ -492,7 +492,7 @@ function StepRecebimento({
   const [params, setParams] = useSearchParams()
   const retorno = params.get("status")
   // Capturado na montagem: a URL é limpa logo depois, e o aviso precisa sobreviver a isso.
-  const [linkVenceu] = useState(() => params.get("status") === "expirado")
+  const [linkVenceu] = useState(() => params.get("status") === "expired")
 
   // Pergunta ao provedor ao entrar no passo — inclusive voltando dele. A verificação
   // acontece lá sem avisar ninguém; sem perguntar, a tela diria "não conectada" para quem
@@ -503,7 +503,7 @@ function StepRecebimento({
     sincronizado.current = true
     sync.mutate(undefined, {
       onError: (e) => {
-        toast.error(e instanceof ApiError
+        notifyError(null, e instanceof ApiError
           ? `Não foi possível checar sua conta de recebimento: ${e.message}`
           : "Não foi possível checar sua conta de recebimento agora.")
       },
@@ -521,15 +521,15 @@ function StepRecebimento({
 
   const conectar = async () => {
     try {
-      // "cadastro": o provedor devolve para este passo, e não para a tela de recebimento.
-      const res = await start.mutateAsync("cadastro")
+      // "onboarding": o provedor devolve para este passo, e não para a tela de recebimento.
+      const res = await start.mutateAsync("onboarding")
       if (!res.onboardingUrl) {
-        toast.error(res.message ?? "O provedor não devolveu o link de cadastro.")
+        notifyError(null, res.message ?? "O provedor não devolveu o link de cadastro.")
         return
       }
       window.location.href = res.onboardingUrl
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Não foi possível iniciar o cadastro.")
+      notifyError(e, "Não foi possível iniciar o cadastro.")
     }
   }
 

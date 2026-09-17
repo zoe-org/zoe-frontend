@@ -3,19 +3,18 @@ import { Link } from "react-router-dom"
 import {
   Loader2, UserPlus, Pencil, Play, CheckCircle2, Ban,
 } from "lucide-react"
-import { toast } from "sonner"
+import { notifyError, notifySuccess } from "@/lib/feedback"
 import { useEscapeKey } from "@/lib/useEscapeKey"
 import { useFocusTrap } from "@/lib/useFocusTrap"
-import { ApiError } from "@/lib/api"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { StatusChip } from "@/components/ui/status-chip"
 import { RoleGate } from "@/features/auth/RoleGate"
 import { tEnum } from "@/i18n/enums"
-import { CAMPAIGN_STATUS_COLOR } from "@/pages/operations/statusColors"
-import { funilDaCampanha, type TomFunil } from "@/pages/operations/campaignFunnel"
-import { fmtDate } from "@/pages/operations/format"
-import { InviteCreatorModal } from "@/pages/operations/InviteCreatorModal"
-import { EditCampaignModal } from "@/pages/operations/CampaignModals"
+import { CAMPAIGN_STATUS_COLOR } from "@/lib/status-colors"
+import { funilDaCampanha, type TomFunil } from "@/lib/campaign-funnel"
+import { fmtDate } from "@/lib/operations-format"
+import { InviteCreatorModal } from "@/components/operations/InviteCreatorModal"
+import { EditCampaignModal } from "@/components/operations/CampaignModals"
 import {
   useCampaign, useCampaignMutations, escrowRejectionReason, fmtCents,
   allowedCampaignTransitions, CAMPAIGN_TRANSITION_LABEL,
@@ -188,7 +187,7 @@ export function CampaignDetailPanel({ campaignId }: { campaignId: string }) {
         <div className="flex items-center justify-between mb-3.5">
           <div className="eyebrow">Contratos ({d.contracts.length})</div>
           <Link
-            to={`/operations/contracts?campanha=${campaignId}`}
+            to={`/operations/contracts?campaign=${campaignId}`}
             className="text-[12.5px]"
             style={{ color: "var(--color-teal-500)" }}
           >
@@ -222,7 +221,7 @@ export function CampaignDetailPanel({ campaignId }: { campaignId: string }) {
         <div className="flex items-center justify-between mb-3.5">
           <div className="eyebrow">Entregas ({d.deliveries.length})</div>
           <Link
-            to={`/operations/deliveries?campanha=${campaignId}`}
+            to={`/operations/deliveries?campaign=${campaignId}`}
             className="text-[12.5px]"
             style={{ color: "var(--color-teal-500)" }}
           >
@@ -236,7 +235,7 @@ export function CampaignDetailPanel({ campaignId }: { campaignId: string }) {
             // Cada linha abre a fila já no contrato dela, como a linha de contrato abre o contrato.
             <Link
               key={dl.deliveryId}
-              to={`/operations/deliveries?campanha=${campaignId}&contrato=${dl.contractId}`}
+              to={`/operations/deliveries?campaign=${campaignId}&contract=${dl.contractId}`}
               className="flex items-center gap-3 py-2.5 hover:opacity-80 transition-opacity"
               style={{ borderTop: i === 0 ? undefined : "1px solid var(--border-soft)" }}
             >
@@ -340,11 +339,11 @@ function CampaignTransitions({ campaign }: { campaign: CampaignDetail }) {
   const run = (transition: CampaignTransition) => {
     update.mutate({ transition }, {
       onSuccess: (res) => {
-        toast.success(`Campanha agora está ${tEnum("campaignStatus", res.status).toLowerCase()}.`)
+        notifySuccess(`Campanha agora está ${tEnum("campaignStatus", res.status).toLowerCase()}.`)
         setConfirming(false)
       },
       onError: (e) =>
-        toast.error(e instanceof ApiError ? e.message : "Não foi possível mudar o status."),
+        notifyError(e, "Não foi possível mudar o status."),
     })
   }
 
@@ -491,7 +490,7 @@ function CampaignFunnel({ d }: { d: CampaignDetail }) {
           style={{ borderTop: i === 0 ? undefined : "1px solid var(--border-soft)" }}
         >
           <Link
-            to={`/operations/influencers?criador=${l.influencerId}`}
+            to={`/operations/influencers?creator=${l.influencerId}`}
             className="flex-1 min-w-[130px] text-[13px] truncate hover:underline"
             style={{ color: "var(--ink)" }}
           >
@@ -499,7 +498,7 @@ function CampaignFunnel({ d }: { d: CampaignDetail }) {
           </Link>
           {l.outrosContratos > 0 && (
             <Link
-              to={`/operations/contracts?campanha=${d.campaignId}`}
+              to={`/operations/contracts?campaign=${d.campaignId}`}
               className="text-[11px] text-ink-muted hover:underline whitespace-nowrap"
               title="A linha mostra o contrato que mais precisa de você; os outros estão na lista de contratos."
             >

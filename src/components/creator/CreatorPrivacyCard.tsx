@@ -2,8 +2,7 @@ import { useState } from "react"
 import { Link } from "react-router-dom"
 import { Download, Loader2, ShieldCheck, Trash2 } from "lucide-react"
 import { useQueryClient } from "@tanstack/react-query"
-import { toast } from "sonner"
-import { ApiError } from "@/lib/api"
+import { notifyError, notifySuccess } from "@/lib/feedback"
 import { creatorApi, type DataDeletionResult } from "@/lib/api/creator"
 import { useConfirm } from "@/features/confirm/context"
 
@@ -30,7 +29,7 @@ export function CreatorPrivacyCard() {
       a.click()
       URL.revokeObjectURL(url)
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Não foi possível baixar seus dados.")
+      notifyError(e, "Não foi possível baixar seus dados.")
     } finally {
       setExporting(false)
     }
@@ -56,10 +55,10 @@ export function CreatorPrivacyCard() {
       const res = await creatorApi.requestDataDeletion()
       setResult(res)
       await qc.invalidateQueries({ queryKey: ["creator-workspace"] })
-      toast.success("Pedido de exclusão registrado.")
+      notifySuccess("Pedido de exclusão registrado.")
     } catch (e) {
       // A recusa com contrato em andamento traz a explicação — é ela que a pessoa precisa ler.
-      toast.error(e instanceof ApiError ? e.message : "Não foi possível registrar o pedido.")
+      notifyError(e, "Não foi possível registrar o pedido.")
     } finally {
       setDeleting(false)
     }
@@ -79,7 +78,7 @@ export function CreatorPrivacyCard() {
           </h2>
           <p className="text-[12.5px] text-ink-muted m-0 mt-0.5">
             Baixe tudo o que a Zoe guarda sobre você ou peça a exclusão. Como tratamos seus dados
-            está na <Link to="/privacidade" target="_blank" className="text-teal-500 hover:underline">Política
+            está na <Link to="/privacy" target="_blank" className="text-teal-500 hover:underline">Política
             de Privacidade</Link>.
           </p>
         </div>

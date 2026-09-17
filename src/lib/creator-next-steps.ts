@@ -105,7 +105,7 @@ export function proximosPassos(w: CreatorWorkspace): ProximoPasso[] {
           ? "Conta de recebimento em verificação"
           : "Conectar a conta de recebimento",
       detalhe: w.payoutBlockedReason,
-      destino: { rota: "/criador/recebimento" },
+      destino: { rota: "/creator/payout" },
     })
   }
 

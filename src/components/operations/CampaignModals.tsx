@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { X, Loader2, Sparkles } from "lucide-react"
-import { toast } from "sonner"
+import { notifyError, notifySuccess } from "@/lib/feedback"
 import { useEscapeKey } from "@/lib/useEscapeKey"
 import { useFocusTrap } from "@/lib/useFocusTrap"
 import { MoneyInput } from "@/components/ui/money-input"
@@ -11,8 +11,8 @@ import { Input } from "@/components/ui/input"
 import { useFeature } from "@/features/auth/useFeature"
 import { useTenantBrands } from "@/lib/api/brands"
 import { tEnum } from "@/i18n/enums"
-import { fmtDate } from "@/pages/operations/format"
-import { Field, Select } from "@/pages/operations/shared"
+import { fmtDate } from "@/lib/operations-format"
+import { Field, Select } from "@/components/operations/shared"
 import {
   useCampaignMutations, CAMPAIGN_MODALITIES, escrowRejectionReason, supportsEscrow,
   type CreateCampaignBody, type CampaignDetail,
@@ -71,7 +71,7 @@ export function EditCampaignModal({
   const submit = () => {
     const budgetCents = budget.trim() ? parseBRLToCents(budget) : 0
     if (budgetCents === null) {
-      toast.error("Orçamento inválido — use o formato 15.000,00.")
+      notifyError(null, "Orçamento inválido — use o formato 15.000,00.")
       return
     }
     update.mutate({
@@ -83,11 +83,11 @@ export function EditCampaignModal({
       briefing,
     }, {
       onSuccess: () => {
-        toast.success("Campanha atualizada.")
+        notifySuccess("Campanha atualizada.")
         onClose()
       },
       onError: (e) =>
-        toast.error(e instanceof ApiError ? e.message : "Não foi possível salvar."),
+        notifyError(e, "Não foi possível salvar."),
     })
   }
 
@@ -380,7 +380,7 @@ export function CreateCampaignModal({ onClose }: { onClose: () => void }) {
     if (!canSubmit) return
     const budgetCents = budget.trim() ? parseBRLToCents(budget) : 0
     if (budgetCents === null) {
-      toast.error("Orçamento inválido — use o formato 15.000,00.")
+      notifyError(null, "Orçamento inválido — use o formato 15.000,00.")
       return
     }
     const body: CreateCampaignBody = {
@@ -394,7 +394,7 @@ export function CreateCampaignModal({ onClose }: { onClose: () => void }) {
     }
     create.mutate(body, {
       onSuccess: (res) => {
-        toast.success(`Campanha "${res.name}" criada.`)
+        notifySuccess(`Campanha "${res.name}" criada.`)
         onClose()
       },
       onError: (e) => {
@@ -405,7 +405,7 @@ export function CreateCampaignModal({ onClose }: { onClose: () => void }) {
           setLimit(readAllowance(e))
           return
         }
-        toast.error(e instanceof ApiError ? e.message : "Não foi possível criar a campanha.")
+        notifyError(e, "Não foi possível criar a campanha.")
       },
     })
   }

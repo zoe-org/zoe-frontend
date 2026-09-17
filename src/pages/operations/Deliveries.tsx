@@ -1,28 +1,27 @@
 import { useMemo, useState, Fragment } from "react"
-import { DELIVERY_STATUS_COLOR } from "@/pages/operations/statusColors"
-import { DeliveryDrafts } from "@/pages/operations/DeliveryDrafts"
+import { DELIVERY_STATUS_COLOR } from "@/lib/status-colors"
+import { DeliveryDrafts } from "@/components/operations/DeliveryDrafts"
 import { Link, useSearchParams } from "react-router-dom"
 import {
   X, Loader2, Play, Check, RotateCcw, Ban, ExternalLink, Clock, AlertTriangle,
 } from "lucide-react"
-import { toast } from "sonner"
-import { ApiError } from "@/lib/api"
+import { notifyError, notifySuccess } from "@/lib/feedback"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { StatusChip } from "@/components/ui/status-chip"
 import { ConfidenceBadge } from "@/components/ui/confidence-badge"
 import { RoleGate } from "@/features/auth/RoleGate"
 import { tEnum } from "@/i18n/enums"
-import { fmtDate, matches, campanhaLabel } from "@/pages/operations/format"
+import { fmtDate, matches, campanhaLabel } from "@/lib/operations-format"
 import {
   TableSkeleton, ErrorState, SearchBox, NoResults, PlatformCover,
-} from "@/pages/operations/shared"
-import { QueueLayout, QueueRow, QueueSection } from "@/pages/operations/ReviewQueue"
-import { secoesPorCampanha, itensVisiveis } from "@/pages/operations/queueSections"
-import { ContractTimeline } from "@/pages/operations/ContractTimeline"
-import { useIsWide, useQueueKeys, esperaLabel } from "@/pages/operations/queueNavigation"
+} from "@/components/operations/shared"
+import { QueueLayout, QueueRow, QueueSection } from "@/components/operations/ReviewQueue"
+import { secoesPorCampanha, itensVisiveis } from "@/lib/queue-sections"
+import { ContractTimeline } from "@/components/operations/ContractTimeline"
+import { useIsWide, useQueueKeys, esperaLabel } from "@/lib/queue-navigation"
 import {
   agruparPorContrato, ordenarFila, PENDENTE, type DeliveryGroup,
-} from "@/pages/operations/deliveryQueue"
+} from "@/lib/delivery-queue"
 import {
   useDeliveries, useDeliveryDrafts, useDeliveryMutations, fmtCents, useDeliveryThumb, deliveryLink,
   PLATFORM_LABEL,
@@ -71,10 +70,10 @@ const SEM_CAMPANHA = "avulso"
 export default function OperationsDeliveriesPage() {
   // Os dois portões são momentos distintos do processo — cortes por aprovar e vídeos já
   // publicados. Numa lista só, a distinção some e alguém aprova o que não pretendia.
-  // "?etapa=cortes" abre direto no primeiro portão: é para onde o Painel manda quem tem corte
+  // "?stage=drafts" abre direto no primeiro portão: é para onde o Painel manda quem tem corte
   // esperando, e cair em "Entregas publicadas" fazia parecer que não havia nada.
   const [params] = useSearchParams()
-  const [gate, setGate] = useState<Gate>(() => (params.get("etapa") === "cortes" ? "drafts" : "published"))
+  const [gate, setGate] = useState<Gate>(() => (params.get("stage") === "drafts" ? "drafts" : "published"))
   const deliveries = useDeliveries()
   const drafts = useDeliveryDrafts()
 
@@ -119,10 +118,10 @@ function PublishedQueue({
   const wide = useIsWide()
   // Vindo do detalhe da campanha, a fila já abre filtrada por ela — e no contrato clicado.
   const [params] = useSearchParams()
-  const contratoInicial = params.get("contrato")
+  const contratoInicial = params.get("contract")
   const [abaEscolhida, setAba] = useState<Aba | null>(null)
   const [busca, setBusca] = useState("")
-  const [campanha, setCampanha] = useState(() => params.get("campanha") ?? "")
+  const [campanha, setCampanha] = useState(() => params.get("campaign") ?? "")
   /** Por contrato, não por entrega: o reenvio do criador continua selecionado. */
   const [selected, setSelected] = useState<string | null>(contratoInicial)
 
@@ -510,7 +509,7 @@ function ReviewPanel({ group, onDecided }: { group: DeliveryGroup; onDecided: ()
     // Correção e recusa mudam o rumo do contrato: exigir o motivo é o mínimo para o
     // criador saber o que refazer, e é o que fica no relatório da entrega.
     if (decision !== "Approve" && !notes.trim()) {
-      toast.error("Diga o motivo — ele vai para o criador junto com a decisão.")
+      notifyError(null, "Diga o motivo — ele vai para o criador junto com a decisão.")
       document.getElementById("review-notes")?.focus()
       return
     }
@@ -521,10 +520,10 @@ function ReviewPanel({ group, onDecided }: { group: DeliveryGroup; onDecided: ()
         notes: notes.trim() || undefined,
         scope: decision === "RequestRework" ? escopo : undefined,
       })
-      toast.success(ok)
+      notifySuccess(ok)
       onDecided()
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Não foi possível concluir.")
+      notifyError(e, "Não foi possível concluir.", { terminal: true })
     }
   }
 

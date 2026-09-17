@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest"
 import {
   enviarEmPartes, chaveDeRetomada,
   type ArquivoEnviavel, type EnvioGuardado, type GuardaDeEnvio, type MultipartApi,
-} from "./multipartUpload"
+} from "./multipart-upload"
 
 const MB = 1024 * 1024
 

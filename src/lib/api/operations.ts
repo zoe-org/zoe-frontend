@@ -324,7 +324,7 @@ export type AcceptInfluencerInviteResponse = {
 }
 
 /** Rota da tela de aceite. Espelha o LinkPath que o backend põe no e-mail. */
-export const INFLUENCER_INVITE_PATH = "convite-criador"
+export const INFLUENCER_INVITE_PATH = "creator-invite"
 
 // ————————————————————————————— Contratos —————————————————————————————
 

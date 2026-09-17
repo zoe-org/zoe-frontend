@@ -1,18 +1,17 @@
 import { useMemo, useState } from "react"
-import { ESCROW_STATE_COLOR } from "@/pages/operations/statusColors"
+import { ESCROW_STATE_COLOR } from "@/lib/status-colors"
 import { Link } from "react-router-dom"
 import { Loader2, Wallet, AlertTriangle, Clock, X } from "lucide-react"
-import { toast } from "sonner"
+import { notifyError, notifySuccess } from "@/lib/feedback"
 import { useEscapeKey } from "@/lib/useEscapeKey"
 import { useFocusTrap } from "@/lib/useFocusTrap"
-import { ApiError } from "@/lib/api"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { RoleGate } from "@/features/auth/RoleGate"
 import { tEnum } from "@/i18n/enums"
-import { fmtDate, matches, campanhaLabel } from "@/pages/operations/format"
+import { fmtDate, matches, campanhaLabel } from "@/lib/operations-format"
 import {
   TableSkeleton, ErrorState, SearchBox, NoResults,
-} from "@/pages/operations/shared"
+} from "@/components/operations/shared"
 import {
   useEscrowAccounts, useEscrowMutations, fmtCents,
   ESCROW_STATES, ESCROW_ACTION_TRIGGER,
@@ -332,11 +331,11 @@ function EscrowDrawer({ e, onClose }: { e: EscrowSummary; onClose: () => void })
       const res = await apply.mutateAsync({ escrowAccountId: e.escrowAccountId, action })
       // A resposta distingue enfileirado de transicionado. Dizer "liberado" quando o
       // provedor ainda não capturou seria a tela mentindo sobre dinheiro.
-      toast.success(res.queued
+      notifySuccess(res.queued
         ? "Pedido na fila. O estado muda quando o provedor confirmar."
         : `Custódia agora em ${tEnum("escrowState", res.to ?? "")}.`)
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Não foi possível concluir.")
+      notifyError(err, "Não foi possível concluir.", { terminal: true })
     }
   }
 
@@ -417,7 +416,7 @@ function EscrowDrawer({ e, onClose }: { e: EscrowSummary; onClose: () => void })
               <span>
                 O criador ainda não tem conta de recebimento. O bloqueio é só no pagamento —
                 a entrega segue normalmente, e a liberação espera a conta existir.{" "}
-                <Link to={`/operations/influencers?criador=${e.influencerId}`} className="underline">
+                <Link to={`/operations/influencers?creator=${e.influencerId}`} className="underline">
                   Ver {e.influencerName} no elenco
                 </Link>
               </span>
@@ -434,7 +433,7 @@ function EscrowDrawer({ e, onClose }: { e: EscrowSummary; onClose: () => void })
                 A conta de recebimento do criador está em verificação pelo provedor. A liberação
                 espera essa verificação — o criador conclui pela área dele, e nada precisa ser
                 feito aqui.{" "}
-                <Link to={`/operations/influencers?criador=${e.influencerId}`} className="underline">
+                <Link to={`/operations/influencers?creator=${e.influencerId}`} className="underline">
                   Ver {e.influencerName} no elenco
                 </Link>
               </span>
@@ -475,7 +474,7 @@ function EscrowDrawer({ e, onClose }: { e: EscrowSummary; onClose: () => void })
             </Link>
             {/* Só o contrato não bastava: para saber quem é o criador e em que pé está a conta
                 dele, era preciso lembrar o nome e procurar no Elenco. */}
-            <Link to={`/operations/influencers?criador=${e.influencerId}`} style={{ color: "var(--color-teal-500)" }}>
+            <Link to={`/operations/influencers?creator=${e.influencerId}`} style={{ color: "var(--color-teal-500)" }}>
               Ver criador no elenco →
             </Link>
           </div>

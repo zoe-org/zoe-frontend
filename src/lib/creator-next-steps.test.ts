@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { CreatorDelivery, CreatorEngagement, CreatorWorkspace } from "@/lib/api/creator"
-import { proximosPassos } from "./nextSteps"
+import { proximosPassos } from "./creator-next-steps"
 
 const trabalho = (p: Partial<CreatorEngagement>): CreatorEngagement => ({
   contractId: "c1",

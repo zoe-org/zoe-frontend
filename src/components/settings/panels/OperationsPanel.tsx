@@ -1,10 +1,9 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { toast } from "sonner"
+import { notifyError, notifySuccess } from "@/lib/feedback"
 import { useAuth } from "@/features/auth/context"
-import { ApiError } from "@/lib/api"
 import { meApi } from "@/lib/api/me"
-import { ContractDefaultsTab } from "@/pages/operations/ContractDefaultsSettings"
+import { ContractDefaultsTab } from "@/components/settings/panels/ContractDefaultsSettings"
 import { Section, ReadOnlyValue } from "./AccountPanel"
 
 /**
@@ -82,9 +81,9 @@ function TenantTaxId({
     try {
       const r = await meApi.setTaxId(tenantId, value)
       setSaved(r.formatted)
-      toast.success("CNPJ registrado.")
+      notifySuccess("CNPJ registrado.")
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Não foi possível registrar o CNPJ.")
+      notifyError(e, "Não foi possível registrar o CNPJ.")
     } finally {
       setSaving(false)
     }
@@ -139,11 +138,11 @@ function OperationsEmailCard({ tenantId }: { tenantId: string | null }) {
     mutationFn: (operationsEmail: boolean) => meApi.setNotifications({ operationsEmail }),
     onSuccess: (data) => {
       qc.setQueryData(["me-notifications", tenantId], data)
-      toast.success(data.operationsEmail
+      notifySuccess(data.operationsEmail
         ? "Você volta a receber os avisos do Operations por e-mail."
         : "Você não recebe mais os avisos do Operations por e-mail neste workspace.")
     },
-    onError: (e: unknown) => toast.error(e instanceof ApiError ? e.message : "Não foi possível salvar a preferência."),
+    onError: (e: unknown) => notifyError(e, "Não foi possível salvar a preferência."),
   })
   const ligado = prefs.data?.operationsEmail ?? true
 

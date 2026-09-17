@@ -2,9 +2,9 @@ import { useRef, useState } from "react"
 import {
   Loader2, Upload, Check, AlertCircle, RotateCcw, Clock, FileVideo,
 } from "lucide-react"
-import { toast } from "sonner"
+import { notifyError, notifySuccess } from "@/lib/feedback"
 import { Input } from "@/components/ui/input"
-import { fmtDate } from "@/pages/operations/format"
+import { fmtDate } from "@/lib/operations-format"
 import { useDraftUpload, LIMITE_PUT_UNICO, type CreatorEngagement } from "@/lib/api/creator"
 
 /**
@@ -48,7 +48,7 @@ export function CreatorDraftUpload({ engagement }: { engagement: CreatorEngageme
   // arquivo inteiro subir.
   const escolher = (f: File | null) => {
     const recusar = (motivo: string) => {
-      toast.error(motivo)
+      notifyError(null, motivo)
       if (inputRef.current) inputRef.current.value = ""
     }
     if (f && f.size > LIMITE_BYTES) {
@@ -87,9 +87,9 @@ export function CreatorDraftUpload({ engagement }: { engagement: CreatorEngageme
       setNotes("")
       setProgresso(0)
       if (inputRef.current) inputRef.current.value = ""
-      toast.success("Corte enviado. A marca vai revisar antes de você publicar.")
+      notifySuccess("Corte enviado. A marca vai revisar antes de você publicar.")
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Não foi possível enviar o corte.")
+      notifyError(null, e instanceof Error ? e.message : "Não foi possível enviar o corte.")
     }
   }
 

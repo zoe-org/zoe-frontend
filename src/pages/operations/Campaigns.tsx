@@ -3,12 +3,12 @@ import { Plus, Megaphone } from "lucide-react"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { RoleGate } from "@/features/auth/RoleGate"
 import { tEnum } from "@/i18n/enums"
-import { matches } from "@/pages/operations/format"
+import { matches } from "@/lib/operations-format"
 import {
   TableSkeleton, ErrorState, SearchBox, NoResults,
-} from "@/pages/operations/shared"
+} from "@/components/operations/shared"
 import { CampaignChip, CampaignDetailPanel } from "@/pages/operations/CampaignDetail"
-import { CreateCampaignModal } from "@/pages/operations/CampaignModals"
+import { CreateCampaignModal } from "@/components/operations/CampaignModals"
 import { useCampaigns } from "@/lib/api/operations"
 
 export default function OperationsCampaignsPage() {

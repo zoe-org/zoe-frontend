@@ -2,8 +2,7 @@ import { useEffect, useState } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { useQuery } from "@tanstack/react-query"
 import { Loader2, AlertCircle, CheckCircle2, Handshake } from "lucide-react"
-import { toast } from "sonner"
-import { ApiError } from "@/lib/api"
+import { notifyError, notifySuccess } from "@/lib/feedback"
 import { useAuth } from "@/features/auth/context"
 import {
   setPendingInfluencerInviteToken,
@@ -12,7 +11,7 @@ import {
 } from "@/features/auth/pendingInvite"
 import { tEnum } from "@/i18n/enums"
 import { operationsApi, fmtCents } from "@/lib/api/operations"
-import { fmtDate } from "@/pages/operations/format"
+import { fmtDate } from "@/lib/operations-format"
 
 /**
  * Aceite do convite de criador. Fora do AppShell de propósito: quem abre este link
@@ -68,13 +67,13 @@ export default function InfluencerInvitePage() {
       // depois do cadastro.
       await refresh()
       setAccepted(res.campaignName ?? res.tenantName)
-      toast.success(res.campaignName
+      notifySuccess(res.campaignName
         ? `Você entrou na campanha ${res.campaignName}.`
         : `Você entrou no elenco de ${res.tenantName}.`)
     } catch (e) {
       // O backend recusa por motivos que a pessoa precisa entender: e-mail diferente
       // do convite, ou conta que já pertence a um workspace.
-      toast.error(e instanceof ApiError ? e.message : "Não foi possível aceitar o convite.")
+      notifyError(e, "Não foi possível aceitar o convite.")
     } finally {
       setAccepting(false)
     }
@@ -93,7 +92,7 @@ export default function InfluencerInvitePage() {
         ) : preview.isError ? (
           <Invalid />
         ) : accepted ? (
-          <Done campaignName={accepted} onGo={() => navigate("/criador/cadastro", { replace: true })} />
+          <Done campaignName={accepted} onGo={() => navigate("/creator/onboarding", { replace: true })} />
         ) : (
           <Preview
             data={preview.data!}
@@ -218,9 +217,9 @@ function Preview({
           />
           <span>
             Li e aceito os{" "}
-            <a href="/termos" target="_blank" rel="noopener" className="text-teal-500 font-medium hover:underline">Termos de Uso</a>{" "}
+            <a href="/terms" target="_blank" rel="noopener" className="text-teal-500 font-medium hover:underline">Termos de Uso</a>{" "}
             e a{" "}
-            <a href="/privacidade" target="_blank" rel="noopener" className="text-teal-500 font-medium hover:underline">Política de Privacidade</a>.
+            <a href="/privacy" target="_blank" rel="noopener" className="text-teal-500 font-medium hover:underline">Política de Privacidade</a>.
           </span>
         </label>
         <button

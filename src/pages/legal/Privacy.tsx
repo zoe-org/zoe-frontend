@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom"
-import { LegalPage, PrivacyContact, Section } from "@/pages/legal/LegalPage"
+import { LegalPage, PrivacyContact, Section } from "@/components/legal/LegalPage"
 
 /**
  * Política de Privacidade. Descreve o que o sistema faz de verdade — quais dados, onde ficam,
@@ -89,7 +89,7 @@ export default function PrivacyPage() {
 
       <Section title="7. Mudanças nesta política">
         <p className="m-0">Quando o texto mudar, a versão e a data acima mudam junto. Veja também os{" "}
-          <Link to="/termos" className="text-teal-500 hover:underline">Termos de Uso</Link>.</p>
+          <Link to="/terms" className="text-teal-500 hover:underline">Termos de Uso</Link>.</p>
       </Section>
     </LegalPage>
   )

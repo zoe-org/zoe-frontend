@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { itensVisiveis, secoesPorCampanha, SECAO_SEM_CAMPANHA } from "./queueSections"
+import { itensVisiveis, secoesPorCampanha, SECAO_SEM_CAMPANHA } from "./queue-sections"
 
 type Item = { id: string; campanhaId: string | null; campanha: string | null; pendente: boolean }
 

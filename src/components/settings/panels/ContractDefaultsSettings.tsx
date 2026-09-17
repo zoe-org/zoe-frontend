@@ -1,10 +1,9 @@
 import { useMemo, useState } from "react"
 import { Loader2, Save, ChevronDown } from "lucide-react"
-import { toast } from "sonner"
-import { ApiError } from "@/lib/api"
+import { notifyError, notifySuccess } from "@/lib/feedback"
 import { Input } from "@/components/ui/input"
-import { SearchBox } from "@/pages/operations/shared"
-import { matches } from "@/pages/operations/format"
+import { SearchBox } from "@/components/operations/shared"
+import { matches } from "@/lib/operations-format"
 import {
   useContractDefaults, useUpdateContractDefaults, ESSENTIAL_CONTRACT_DEFAULTS, useCampaigns, useContracts,
   useSetAutoReleaseDefault,
@@ -93,11 +92,11 @@ export function ContractDefaultsTab({ isAdmin }: { isAdmin: boolean }) {
       await salvar.mutateAsync(edits)
       const n = Object.keys(edits).length
       setEdits({})
-      toast.success(n === 1
+      notifySuccess(n === 1
         ? "Padrão salvo. Os próximos contratos já nascem com ele."
         : `${n} padrões salvos. Os próximos contratos já nascem com eles.`)
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Não foi possível salvar os padrões.")
+      notifyError(e, "Não foi possível salvar os padrões.")
     }
   }
 
@@ -160,10 +159,10 @@ export function ContractDefaultsTab({ isAdmin }: { isAdmin: boolean }) {
             checked={defaults.data?.autoReleaseOnTimeout ?? true}
             disabled={!isAdmin || salvarLiberacao.isPending}
             onChange={(e) => salvarLiberacao.mutate(e.target.checked, {
-              onSuccess: (res) => toast.success(res.autoReleaseOnTimeout === false
+              onSuccess: (res) => notifySuccess(res.autoReleaseOnTimeout === false
                 ? "Contratos novos passam a esperar a revisão mesmo depois do prazo."
                 : "Contratos novos passam a aprovar a entrega quando o prazo de revisão vencer."),
-              onError: (err) => toast.error(err instanceof ApiError ? err.message : "Não foi possível salvar."),
+              onError: (err) => notifyError(err, "Não foi possível salvar."),
             })}
             className="mt-0.5 accent-[var(--color-teal-500)] disabled:opacity-60"
           />

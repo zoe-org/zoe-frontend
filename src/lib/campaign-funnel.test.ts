@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import type {
   CampaignContract, CampaignDelivery, CampaignDetail, CampaignInvite,
 } from "@/lib/api/operations"
-import { funilDaCampanha } from "./campaignFunnel"
+import { funilDaCampanha } from "./campaign-funnel"
 
 const contrato = (p: Partial<CampaignContract>) => ({
   contractId: "k1", influencerId: "i1", influencerName: "Ana", status: "Signed", usesEscrow: true,
@@ -43,7 +43,7 @@ describe("funilDaCampanha", () => {
   it("sem entrega, o corte diz a etapa — e o que espera aprovação vai para a fila de cortes", () => {
     const [linha] = funilDaCampanha(campanha({ contracts: [contrato({ escrowState: "InProduction", draftStatus: "AwaitingReview" })] }))
     expect(linha).toMatchObject({ etapa: "Corte esperando aprovação", tom: "atencao" })
-    expect(linha.acao?.to).toBe("/operations/deliveries?etapa=cortes")
+    expect(linha.acao?.to).toBe("/operations/deliveries?stage=drafts")
     expect(etapa(campanha({ contracts: [contrato({ escrowState: "InProduction", draftStatus: "ChangesRequested" })] })))
       .toEqual(["Correção no corte — vez do criador"])
   })
@@ -58,7 +58,7 @@ describe("funilDaCampanha", () => {
     })
     const [linha] = funilDaCampanha(d)
     expect(linha.etapa).toBe("Entrega esperando revisão")
-    expect(linha.acao?.to).toBe("/operations/deliveries?campanha=c1&contrato=k1")
+    expect(linha.acao?.to).toBe("/operations/deliveries?campaign=c1&contract=k1")
   })
 
   it("liberável com a conta do criador não pronta não é pendência da marca", () => {
@@ -71,7 +71,7 @@ describe("funilDaCampanha", () => {
     expect(funilDaCampanha(d, new Set(["i1"]))[0]).toMatchObject({
       etapa: "Aprovada — pagamento esperando a conta do criador",
       tom: "neutro",
-      acao: { label: "Ver criador", to: "/operations/influencers?criador=i1" },
+      acao: { label: "Ver criador", to: "/operations/influencers?creator=i1" },
     })
   })
 

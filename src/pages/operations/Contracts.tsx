@@ -1,20 +1,19 @@
 import { useMemo, useState } from "react"
-import { CONTRACT_STATUS_COLOR } from "@/pages/operations/statusColors"
+import { CONTRACT_STATUS_COLOR } from "@/lib/status-colors"
 import { Plus, X, Loader2, FileText, ShieldAlert, Trash2 } from "lucide-react"
-import { toast } from "sonner"
+import { notifyError, notifySuccess } from "@/lib/feedback"
 import { useEscapeKey } from "@/lib/useEscapeKey"
 import { useFocusTrap } from "@/lib/useFocusTrap"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
-import { ApiError } from "@/lib/api"
 import { Input } from "@/components/ui/input"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { StatusChip } from "@/components/ui/status-chip"
 import { RoleGate } from "@/features/auth/RoleGate"
 import { tEnum } from "@/i18n/enums"
-import { fmtDate, matches } from "@/pages/operations/format"
+import { fmtDate, matches } from "@/lib/operations-format"
 import {
   Field, Select, TableSkeleton, ErrorState, SearchBox, NoResults,
-} from "@/pages/operations/shared"
+} from "@/components/operations/shared"
 import {
   useContractDefaults,
   useContracts, useContractMutations, useRoster, useCampaigns, useCampaign, fmtCents,
@@ -50,10 +49,10 @@ export default function OperationsContractsPage() {
   // Vem do "Ver todos" da campanha. Na URL, e não em estado, para o voltar do navegador e o
   // link copiado levarem à mesma lista.
   const [params, setParams] = useSearchParams()
-  const campanhaFiltro = params.get("campanha")
-  // "?novo=1" abre o modal; com "campanha" e "criador" ele já vem escolhido — é o "Criar
+  const campanhaFiltro = params.get("campaign")
+  // "?new=1" abre o modal; com "campaign" e "creator" ele já vem escolhido — é o "Criar
   // contrato" do funil da campanha.
-  const abrirPorLink = params.get("novo") === "1"
+  const abrirPorLink = params.get("new") === "1"
 
   const todos = useMemo(() => contracts.data?.items ?? [], [contracts.data])
   // O nome vem da lista de campanhas, não dos contratos: campanha sem contrato nenhum também
@@ -63,7 +62,7 @@ export default function OperationsContractsPage() {
     ? campanhas.data?.items.find((c) => c.campaignId === campanhaFiltro)?.name ?? "…"
     : null
   const limparCampanha = () => setParams((p) => {
-    p.delete("campanha")
+    p.delete("campaign")
     return p
   })
 
@@ -221,13 +220,13 @@ export default function OperationsContractsPage() {
       {(createOpen || abrirPorLink) && (
         <CreateContractModal
           initialCampaignId={abrirPorLink ? campanhaFiltro ?? undefined : undefined}
-          initialInfluencerId={abrirPorLink ? params.get("criador") ?? undefined : undefined}
+          initialInfluencerId={abrirPorLink ? params.get("creator") ?? undefined : undefined}
           onClose={() => {
             setCreateOpen(false)
             if (abrirPorLink) {
               setParams((p) => {
-                p.delete("novo")
-                p.delete("criador")
+                p.delete("new")
+                p.delete("creator")
                 return p
               })
             }
@@ -253,9 +252,9 @@ function ExcluirRascunho({ item }: { item: ContractSummary }) {
   const excluir = async () => {
     try {
       await remove.mutateAsync(item.contractId)
-      toast.success("Rascunho excluído.")
+      notifySuccess("Rascunho excluído.")
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Não foi possível excluir.")
+      notifyError(e, "Não foi possível excluir.")
     }
   }
 
@@ -423,7 +422,7 @@ function CreateContractModal({
     }
     create.mutate(body, {
       onSuccess: (res) => {
-        toast.success(
+        notifySuccess(
           `Rascunho criado a partir do template ${tEnum("contractModality", res.modality)} v${res.templateVersion}.`,
         )
         onClose()
@@ -434,7 +433,7 @@ function CreateContractModal({
       onError: (e) => {
         // A matriz é revalidada no backend. Se cair aqui, a tela e o domínio
         // discordaram — a mensagem do servidor é a que vale.
-        toast.error(e instanceof ApiError ? e.message : "Não foi possível criar o contrato.")
+        notifyError(e, "Não foi possível criar o contrato.")
       },
     })
   }

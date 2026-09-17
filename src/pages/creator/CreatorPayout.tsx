@@ -3,10 +3,10 @@ import { Link, useSearchParams } from "react-router-dom"
 import {
   Loader2, LogOut, Wallet, ArrowLeft, ExternalLink, Check, AlertCircle, ShieldCheck,
 } from "lucide-react"
-import { toast } from "sonner"
+import { notifyError } from "@/lib/feedback"
 import { ApiError } from "@/lib/api"
 import { useAuth } from "@/features/auth/context"
-import { initials } from "@/pages/operations/format"
+import { initials } from "@/lib/operations-format"
 import { useCreatorWorkspace, usePayoutMutations } from "@/lib/api/creator"
 import ZoeLogo from "@/assets/zoe-logo.svg?react"
 
@@ -36,7 +36,7 @@ export default function CreatorPayoutPage() {
   //
   // O retorno pela returnUrl é o caminho feliz — e não é o mais comum. Quem conclui o
   // cadastro costuma fechar a aba do provedor em vez de clicar em voltar, e aí o
-  // `?status=concluido` nunca chega: o banco fica dizendo "pendente" para quem já se
+  // `?status=completed` nunca chega: o banco fica dizendo "pendente" para quem já se
   // verificou. Perguntar na montagem cobre os dois casos.
   //
   // Uma vez por visita: a verificação não muda de segundo em segundo, e o comando
@@ -50,7 +50,8 @@ export default function CreatorPayoutPage() {
       // Sem isto a falha era MUDA: a sincronização roda sozinha, e quando ela quebrava a
       // tela seguia mostrando um estado desatualizado sem ninguém saber por quê.
       onError: (e) => {
-        toast.error(
+        notifyError(
+          null,
           e instanceof ApiError
             ? `Não foi possível checar sua conta de recebimento: ${e.message}`
             : "Não foi possível checar sua conta de recebimento agora.")
@@ -66,7 +67,7 @@ export default function CreatorPayoutPage() {
       const res = await start.mutateAsync()
 
       if (!res.onboardingUrl) {
-        toast.error(res.message ?? "Não foi possível abrir o cadastro agora.")
+        notifyError(null, res.message ?? "Não foi possível abrir o cadastro agora.")
         return
       }
 
@@ -74,7 +75,7 @@ export default function CreatorPayoutPage() {
       // em nova aba deixaria a original parada num estado que já não é verdade.
       window.location.href = res.onboardingUrl
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : "Não foi possível abrir o cadastro.")
+      notifyError(e, "Não foi possível abrir o cadastro.")
     }
   }
 
@@ -138,7 +139,7 @@ export default function CreatorPayoutPage() {
 
       <main className="max-w-[880px] mx-auto px-6 py-8">
         <Link
-          to="/criador"
+          to="/creator"
           className="inline-flex items-center gap-1.5 text-[13px] text-ink-muted hover:opacity-70 mb-5"
         >
           <ArrowLeft className="w-3.5 h-3.5" /> Voltar
@@ -222,7 +223,7 @@ export default function CreatorPayoutPage() {
               </div>
             </div>
 
-            {returned === "expirado" && (
+            {returned === "expired" && (
               <div
                 className="rounded-lg border border-border-soft p-3.5 mb-5 flex items-start gap-2.5"
                 style={{ background: "#D9770610" }}
