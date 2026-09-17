@@ -10,9 +10,11 @@ import { useTheme } from "next-themes"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useAuth } from "@/features/auth/context"
 import { useFeature } from "@/features/auth/useFeature"
+import { useSwitchWorkspace } from "@/features/auth/useSwitchWorkspace"
 import { useAlertUnreadCount } from "@/lib/api/alerts"
 import { useSubscription } from "@/lib/api/billing"
 import { useRealtimeConnection } from "@/lib/realtime"
+import { useScrollToTop } from "@/lib/useScrollToTop"
 import { Breadcrumb } from "@/components/ui/breadcrumb"
 import { BrandSwitcher } from "@/components/layout/BrandSwitcher"
 import { NotificationBell } from "@/components/layout/NotificationBell"
@@ -93,7 +95,7 @@ function tenantColor(id: string) {
 }
 
 export function AppShell() {
-  const { user, role, signOut, activeTenantId, memberships, switchTenant, isZoeAdmin } = useAuth()
+  const { user, role, signOut, activeTenantId, memberships, isZoeAdmin } = useAuth()
   const queryClient = useQueryClient()
   // WS-F3 — mantém a conexão de tempo real viva pro app inteiro logado (não só
   // Alertas: é daqui que o badge da sidebar recebe o "novo" sem precisar navegar).
@@ -111,8 +113,12 @@ export function AppShell() {
   const location = useLocation()
   const navigate = useNavigate()
   const openSettings = useOpenSettings()
+  const switchWorkspace = useSwitchWorkspace()
   const { resolvedTheme, setTheme } = useTheme()
   const isDark = resolvedTheme === "dark"
+
+  const mainRef = useRef<HTMLElement>(null)
+  useScrollToTop(mainRef)
 
   const [sidebarOpen, setSidebarOpen] = useState(() => getInitialOpenState(STORAGE_SIDEBAR_KEY))
   const [intelOpen, setIntelOpen] = useState(() => getInitialOpenState(STORAGE_INTEL_KEY))
@@ -337,7 +343,7 @@ export function AppShell() {
                     return (
                       <DropdownMenuItem
                         key={m.tenantId}
-                        onSelect={() => { if (!isActive) void switchTenant(m.tenantId) }}
+                        onSelect={() => { if (!isActive) switchWorkspace(m.tenantId) }}
                         className="flex items-center gap-2 cursor-pointer"
                       >
                         <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: tenantColor(m.tenantId) }} />
@@ -405,7 +411,7 @@ export function AppShell() {
         </header>
 
         {/* Content */}
-        <main className="flex-1 p-6 overflow-y-auto">
+        <main ref={mainRef} className="flex-1 p-6 overflow-y-auto">
           <BillingStateBanner />
           <TrialBanner />
           <Outlet />
