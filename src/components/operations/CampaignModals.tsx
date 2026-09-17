@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react"
-import { Link } from "react-router-dom"
 import { X, Loader2, Sparkles } from "lucide-react"
+import { useOpenSettings } from "@/components/settings/useSettings"
+import { PLAN_TAB_PARAM } from "@/lib/plans"
 import { notifyError, notifySuccess } from "@/lib/feedback"
 import { useEscapeKey } from "@/lib/useEscapeKey"
 import { useFocusTrap } from "@/lib/useFocusTrap"
@@ -252,7 +253,7 @@ export function EditCampaignModal({
 
 /** Cota vinda no `details` do Problem Details. Tudo opcional: a tela não pode quebrar
  *  se o formato mudar — o essencial é a mensagem, não o número. */
-type Allowance = { limit?: number; used?: number; resetsAt?: string }
+type Allowance = { limit?: number; used?: number; resetsAt?: string; noPlan?: boolean }
 
 function readAllowance(e: ApiError): Allowance {
   const d = e.problem?.details
@@ -269,15 +270,18 @@ function readAllowance(e: ApiError): Allowance {
 
 /** Convite de upgrade (RN-O-021): a campanha não foi descartada e o limite zera numa data conhecida. */
 function AllowanceModal({
-  allowance, campaignName, onBack, onClose,
+  allowance, campaignName, noPlan = false, onBack, onClose,
 }: {
   allowance: Allowance
   campaignName: string
+  /** Workspace sem plano de Operations: o convite é para assinar, não para subir. */
+  noPlan?: boolean
   onBack: () => void
   onClose: () => void
 }) {
   useEscapeKey(onClose)
   const dialogRef = useFocusTrap<HTMLDivElement>()
+  const openSettings = useOpenSettings()
   return (
     <div
       className="fixed inset-0 z-[90] flex items-center justify-center p-4"
@@ -304,7 +308,9 @@ function AllowanceModal({
         </div>
 
         <h2 className="font-display m-0 mb-2" style={{ fontSize: 22, color: "var(--ink)" }}>
-          Você usou as {allowance.limit ?? 5} campanhas deste mês
+          {noPlan
+            ? "Escolha um plano de Operations"
+            : `Você usou as ${allowance.limit ?? 5} campanhas deste mês`}
         </h2>
 
         <p className="text-[13.5px] text-ink-muted mb-4">
@@ -312,10 +318,12 @@ function AllowanceModal({
             ? <>A campanha <span style={{ color: "var(--ink)" }}>“{campaignName}”</span> não
                foi descartada — ela só não foi criada ainda.</>
             : "Nada do que você preencheu foi descartado."}
-          {" "}Com o plano Pro as campanhas passam a ser ilimitadas.
+          {noPlan
+            ? " Campanhas fazem parte dos planos de Operations, que incluem contrato digital e custódia."
+            : " Com o Operations Pro as campanhas passam a ser ilimitadas."}
         </p>
 
-        {allowance.resetsAt && (
+        {!noPlan && allowance.resetsAt && (
           <div
             className="rounded-lg p-3 text-[12.5px] mb-5"
             style={{ background: "var(--bg, #F9FAFB)", color: "var(--ink-muted)" }}
@@ -332,15 +340,16 @@ function AllowanceModal({
           >
             Voltar ao rascunho
           </button>
-          {/* Não existe fluxo de upgrade self-service: mandar para as configurações é o
-              caminho honesto, em vez de um botão que não faz nada. */}
-          <Link
-            to="/plan"
+          <button
+            onClick={() => {
+              onClose()
+              openSettings("plano", { [PLAN_TAB_PARAM]: "operations" })
+            }}
             className="flex-1 inline-flex items-center justify-center px-4 py-2.5 rounded-lg text-[13.5px] font-medium text-white"
             style={{ background: "var(--color-teal-500)" }}
           >
             Ver planos
-          </Link>
+          </button>
         </div>
       </div>
     </div>
@@ -395,6 +404,10 @@ export function CreateCampaignModal({ onClose }: { onClose: () => void }) {
           setLimit(readAllowance(e))
           return
         }
+        if (e instanceof ApiError && e.code === "operations_plan_required") {
+          setLimit({ noPlan: true })
+          return
+        }
         notifyError(e, "Não foi possível criar a campanha.")
       },
     })
@@ -406,6 +419,7 @@ export function CreateCampaignModal({ onClose }: { onClose: () => void }) {
     return (
       <AllowanceModal
         allowance={limit}
+        noPlan={limit.noPlan}
         campaignName={name.trim()}
         onBack={() => setLimit(null)}
         onClose={onClose}

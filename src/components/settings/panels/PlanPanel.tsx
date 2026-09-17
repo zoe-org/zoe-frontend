@@ -1,25 +1,38 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useSearchParams } from "react-router-dom"
-import { AlertCircle, Check, ExternalLink, Loader2, RotateCcw, ShieldCheck, Sparkles } from "lucide-react"
+import { AlertCircle, CalendarClock, ExternalLink, Loader2, RotateCcw, ShieldCheck, Sparkles } from "lucide-react"
 import { notifyError, notifySuccess } from "@/lib/feedback"
 import { EmptyBlock } from "@/components/ui/empty-block"
+import { TabPill } from "@/components/ui/tab-pill"
 import { ApiError } from "@/lib/api"
 import { useAuth } from "@/features/auth/context"
 import {
   newAttemptKey,
   PAYMENT_METHOD_REQUIRED,
+  projectionArrived,
   TRIAL_ALREADY_USED,
   useBillingPlans,
+  useChangePreview,
   usePaymentMethod,
   useSubscription,
   useProjectionWatch,
   useSubscriptionMutations,
   type BillingPlans,
   type PendingProjection,
-  type PlanOption,
+  type PlanSelection,
   type ProjectionPhase,
   type Subscription,
 } from "@/lib/api/billing"
+import {
+  describeSelection,
+  PLAN_TAB_PARAM,
+  qualifiesForBundle,
+  recurringCents,
+  selectionFromSubscription,
+} from "@/lib/plans"
+import { ChangePlanDialog } from "./plan/ChangePlanDialog"
+import { BundleGrid, IntelligenceGrid, OperationsGrid, type CardContext } from "./plan/PlanCards"
+import { day, int, money, shortDay } from "./plan/format"
 
 // Plano e faturamento (WS-F1). Nenhum valor em reais mora aqui: preço vem de
 // /api/billing/plans, que o lê do Stripe. Cravar número nesta tela criaria uma
@@ -29,29 +42,6 @@ import {
 // configurações. Por isso as larguras respondem ao CONTÊINER (@container), não à
 // janela — dentro do modal a viewport diz 1440px e a coluna tem 800.
 
-const PLAN_NAMES: Record<string, string> = {
-  starter: "Starter",
-  pro: "Pro",
-  max: "Max",
-  enterprise: "Enterprise",
-}
-
-const PLAN_PITCH: Record<string, string> = {
-  starter: "Uma marca própria e um concorrente.",
-  pro: "Operação de monitoramento com concorrência.",
-  max: "Portfólio de marcas e agências.",
-  enterprise: "Volume alto e contrato negociado.",
-}
-
-// A escada define o que é upgrade e o que é downgrade. Enterprise não entra:
-// é negociado, e o caminho dele é vendas.
-const LADDER = ["starter", "pro", "max"]
-
-const FEATURE_LABELS: Record<string, string> = {
-  sov: "Share of Voice",
-  reports: "Relatórios",
-}
-
 const STATUS_LABELS: Record<string, string> = {
   Trialing: "em teste",
   Active: "ativa",
@@ -59,22 +49,14 @@ const STATUS_LABELS: Record<string, string> = {
   Canceled: "cancelada",
 }
 
-const int = (v: number) => Math.round(v).toLocaleString("pt-BR")
-const money = (cents: number, currency: string | null) =>
-  (cents / 100).toLocaleString("pt-BR", {
-    style: "currency",
-    currency: (currency || "BRL").toUpperCase(),
-  })
-const day = (iso: string) =>
-  new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })
-/** Cabe no chip ao lado do nome do plano, onde o mês por extenso estoura a linha. */
-const shortDay = (iso: string) =>
-  new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+type ModuleTab = "intelligence" | "operations" | "pacote"
 
 export function PlanPanel() {
   // O que foi PEDIDO ao provedor e ainda não virou projeção. Quem decide parar o
   // repique é o callback do react-query, fora do render — relógio em render é impuro.
   const [awaiting, setAwaiting] = useState<PendingProjection | null>(null)
+  const [changing, setChanging] = useState<PlanSelection | null>(null)
+  const [tab, setTab] = useModuleTab()
 
   const plans = useBillingPlans(awaiting)
   const subscription = useSubscription(awaiting)
@@ -82,18 +64,9 @@ export function PlanPanel() {
   const voltandoDoCheckout = useCheckoutReturn()
 
   const sub = subscription.data ?? null
-
-  // Chegou = a projeção já reflete o que foi pedido. Comparação pura sobre o dado
-  // buscado, sem relógio. Marca extra entra na conta: ela não muda o plano, e comparar
-  // só o slug daria a espera por encerrada sem nada ter mudado na tela.
-  const arrived =
-    awaiting != null &&
-    sub != null &&
-    sub.planSlug === awaiting.planSlug &&
-    sub.extraBrandSlots === awaiting.extraBrandSlots &&
-    !sub.readOnly
-
+  const arrived = projectionArrived(awaiting, sub)
   const espera = useProjectionWatch(awaiting, arrived)
+  const start = useStartFlow(plans.data ?? null, setAwaiting)
 
   if (plans.isLoading) return <SkeletonScreen />
 
@@ -104,24 +77,70 @@ export function PlanPanel() {
   }
 
   const data = plans.data!
+  const reativando = Boolean(sub?.readOnly)
+  const pending = start.pending
+
+  const ctx: CardContext = {
+    data,
+    sub,
+    reativando,
+    disabled: pending || !data.billingEnabled,
+    busyKey: start.busyKey,
+    onStart: start.begin,
+    onChange: setChanging,
+  }
+
+  const temOsDois = Boolean(sub && !reativando && sub.planSlug && sub.operationsPlanSlug)
 
   return (
     <div className="@container">
       <div className="space-y-4">
         {!data.billingEnabled && <ProviderOffBanner />}
         {voltandoDoCheckout && !sub && <ProjectionBanner phase="waiting" />}
-        {awaiting && !arrived && (
-          <ProjectionBanner phase={espera.phase} onRetry={espera.retry} />
+        {awaiting && !arrived && <ProjectionBanner phase={espera.phase} onRetry={espera.retry} />}
+        {sub && (
+          <CurrentSubscription
+            sub={sub}
+            data={data}
+            onKeep={() => setChanging(selectionFromSubscription(sub))}
+          />
         )}
-        {sub && <CurrentSubscription sub={sub} />}
 
-        <PlanGrid data={data} sub={sub} onRequested={setAwaiting} />
+        <div className="flex items-center gap-1 flex-wrap">
+          <TabPill active={tab === "intelligence"} onClick={() => setTab("intelligence")} label="Intelligence" />
+          <TabPill active={tab === "operations"} onClick={() => setTab("operations")} label="Operations" />
+          <TabPill active={tab === "pacote"} onClick={() => setTab("pacote")} label="Full Platform" />
+        </div>
 
-        <SharedSlotsNote />
-
-        {data.currentPlanSlug && !sub?.readOnly && (
-          <ExtraBrandCard data={data} onRequested={setAwaiting} />
+        {tab === "intelligence" && (
+          <>
+            <IntelligenceGrid ctx={ctx} />
+            <SharedSlotsNote />
+            {data.currentPlanSlug && !reativando && (
+              <ExtraBrandCard data={data} sub={sub} onRequested={setAwaiting} />
+            )}
+            {temOsDois && (
+              <RemoveModuleLink
+                label="Tirar o Intelligence do plano"
+                onClick={() => setChanging({ planSlug: null, operationsPlanSlug: sub!.operationsPlanSlug, extraBrandSlots: 0 })}
+              />
+            )}
+          </>
         )}
+
+        {tab === "operations" && (
+          <>
+            <OperationsGrid ctx={ctx} />
+            {temOsDois && (
+              <RemoveModuleLink
+                label="Tirar o Operations do plano"
+                onClick={() => setChanging({ ...selectionFromSubscription(sub!), operationsPlanSlug: null })}
+              />
+            )}
+          </>
+        )}
+
+        {tab === "pacote" && <BundleGrid ctx={ctx} />}
 
         <BillingSection
           enabled={data.billingEnabled}
@@ -129,8 +148,121 @@ export function PlanPanel() {
           hasCard={payment.data?.hasPaymentMethod ?? null}
         />
       </div>
+
+      {changing && sub && !reativando && (
+        <ChangePlanDialog
+          target={changing}
+          data={data}
+          sub={sub}
+          onClose={() => setChanging(null)}
+          onRequested={setAwaiting}
+        />
+      )}
+
+      {start.trialUsedFor && (
+        <TrialUsedDialog
+          selection={start.trialUsedFor}
+          data={data}
+          pending={pending}
+          error={start.dialogError}
+          onClose={start.dismissTrialDialog}
+          onConfirm={() => start.checkout(start.trialUsedFor!)}
+        />
+      )}
     </div>
   )
+}
+
+/** Aba vinda da URL; sem ela, a do módulo que o workspace usa. */
+function useModuleTab(): [ModuleTab, (t: ModuleTab) => void] {
+  const [params, setParams] = useSearchParams()
+  const { hasFeature } = useAuth()
+  const raw = params.get(PLAN_TAB_PARAM)
+  const fallback: ModuleTab = hasFeature("intelligence") || !hasFeature("operations") ? "intelligence" : "operations"
+  const tab: ModuleTab = raw === "intelligence" || raw === "operations" || raw === "pacote" ? raw : fallback
+
+  const setTab = (t: ModuleTab) => {
+    const next = new URLSearchParams(params)
+    next.set(PLAN_TAB_PARAM, t)
+    setParams(next, { replace: true })
+  }
+
+  return [tab, setTab]
+}
+
+/**
+ * Assinatura nova (ou reativação). Só o trial nasce direto — ele é sem cartão; plano
+ * pago vai para a tela de pagamento do provedor.
+ */
+function useStartFlow(data: BillingPlans | null, onRequested: (r: PendingProjection) => void) {
+  const { start, checkout } = useSubscriptionMutations()
+  const [busyKey, setBusyKey] = useState<string | null>(null)
+  const [trialUsedFor, setTrialUsedFor] = useState<PlanSelection | null>(null)
+  // Erro com o diálogo aberto vai para dentro dele: é onde o olho de quem clicou está.
+  const [dialogError, setDialogError] = useState<string | null>(null)
+
+  const irParaCheckout = (selection: PlanSelection, key?: string) => {
+    setBusyKey(key ?? "checkout")
+    checkout.mutate(
+      { ...selection, idempotencyKey: newAttemptKey() },
+      {
+        onSuccess: ({ url }) => window.location.assign(url),
+        onError: (e) => {
+          notifyError(e, "Não foi possível abrir a tela de pagamento.", { terminal: true })
+          setBusyKey(null)
+        },
+      },
+    )
+  }
+
+  const begin = (selection: PlanSelection, key: string) => {
+    if (!data) return
+    // Assinatura cancelada: o provedor não reabre a antiga, então vai direto ao pagamento.
+    if (data.currentPlanSlug || data.currentOperationsPlanSlug) return irParaCheckout(selection, key)
+
+    setBusyKey(key)
+    start.mutate(
+      { ...selection, withTrial: true, idempotencyKey: newAttemptKey() },
+      {
+        // A resposta é o Stripe confirmando o pedido; quem escreve a projeção é o
+        // webhook. Por isso a mensagem fala em "solicitada", não em "concluída".
+        onSuccess: () => {
+          onRequested({ ...selection, mode: "immediate", since: Date.now() })
+          notifySuccess("Assinatura solicitada. Aguardando a confirmação do provedor.")
+        },
+        onError: (e) => {
+          // O trial já usado não é falha: é uma escolha que o cliente ainda pode fazer,
+          // então vira pergunta em vez de toast vermelho e beco sem saída.
+          const code = e instanceof ApiError ? e.problem?.code : undefined
+          if (code === TRIAL_ALREADY_USED) {
+            setDialogError(null)
+            setTrialUsedFor(selection)
+            return
+          }
+          // Falta de cartão deixou de ser erro: o checkout coleta o cartão junto com o pagamento.
+          if (code === PAYMENT_METHOD_REQUIRED) return irParaCheckout(selection, key)
+          notifyError(e, "Não foi possível concluir a assinatura.", { terminal: true })
+        },
+        onSettled: () => setBusyKey(null),
+      },
+    )
+  }
+
+  return {
+    begin,
+    checkout: (selection: PlanSelection) => {
+      setDialogError(null)
+      irParaCheckout(selection)
+    },
+    busyKey,
+    pending: start.isPending || checkout.isPending,
+    trialUsedFor,
+    dialogError,
+    dismissTrialDialog: () => {
+      setTrialUsedFor(null)
+      setDialogError(null)
+    },
+  }
 }
 
 /**
@@ -278,13 +410,23 @@ function usePortal() {
   return { open, pending: portal.isPending }
 }
 
-function CurrentSubscription({ sub }: { sub: Subscription }) {
+function CurrentSubscription({
+  sub,
+  data,
+  onKeep,
+}: {
+  sub: Subscription
+  data: BillingPlans
+  onKeep: () => void
+}) {
   const degraded = sub.readOnly
   const portal = usePortal()
 
   // Cancelar no portal não mexe no status: sem este sinal a tela ficava idêntica à de
   // antes do pedido, e era isso que fazia o cliente achar que nada tinha acontecido.
   const scheduled = !degraded && sub.cancelAt != null
+  const troca = !degraded ? sub.scheduledChange : null
+  const pacote = !degraded && qualifiesForBundle(sub, data) && data.bundle.percentOff != null
 
   const tone = degraded
     ? { color: "var(--color-neg)", bg: "#FEF2F2" }
@@ -295,9 +437,9 @@ function CurrentSubscription({ sub }: { sub: Subscription }) {
       <div className="flex items-start justify-between gap-6 flex-wrap">
         <div>
           <div className="eyebrow">Assinatura atual</div>
-          <div className="flex items-baseline gap-2.5 mt-2">
+          <div className="flex items-baseline gap-2.5 mt-2 flex-wrap">
             <span className="font-display" style={{ fontSize: 26, color: "var(--ink)" }}>
-              {PLAN_NAMES[sub.planSlug] ?? sub.planSlug}
+              {describeSelection(sub)}
             </span>
             <span
               className="text-[11.5px] font-semibold rounded-full px-2 py-0.5"
@@ -305,6 +447,15 @@ function CurrentSubscription({ sub }: { sub: Subscription }) {
             >
               {STATUS_LABELS[sub.status] ?? sub.status}
             </span>
+            {pacote && (
+              <span
+                className="text-[11.5px] font-semibold rounded-full px-2 py-0.5 inline-flex items-center gap-1"
+                style={{ background: "var(--teal-bg)", color: "var(--color-teal-500)" }}
+              >
+                <Sparkles className="w-3 h-3" />
+                Full Platform · −{data.bundle.percentOff}%
+              </span>
+            )}
             {/* Chip separado, e não texto no lugar do status: a assinatura segue "ativa"
                 ou "em teste" até a data, e trocar um pelo outro perderia qual das duas. */}
             {scheduled && (
@@ -324,9 +475,13 @@ function CurrentSubscription({ sub }: { sub: Subscription }) {
             <div className="text-[12.5px] text-ink-muted mt-1 max-w-140 leading-relaxed">
               {/* A cota do teste é menor que a do tier. Sem dizer isso aqui, o card do
                   plano logo abaixo anuncia outro número e a tela se contradiz. */}
-              Cota do teste:{" "}
-              <strong style={{ color: "var(--ink)" }}>{int(sub.quotaMinutes)} minutos</strong> — a
-              cota cheia do plano vale quando a assinatura for paga.
+              {sub.planSlug && (
+                <>
+                  Cota do teste:{" "}
+                  <strong style={{ color: "var(--ink)" }}>{int(sub.quotaMinutes)} minutos</strong> — a
+                  cota cheia do plano vale quando a assinatura for paga.
+                </>
+              )}
               {sub.trialEndsAt && (
                 <>
                   {" "}
@@ -338,6 +493,27 @@ function CurrentSubscription({ sub }: { sub: Subscription }) {
           )}
         </div>
       </div>
+
+      {troca && (
+        <div className="mt-4 pt-4 border-t border-border-soft">
+          <div className="flex items-start gap-2.5">
+            <CalendarClock className="w-[15px] h-[15px] shrink-0 mt-0.5" style={{ color: "var(--color-teal-500)" }} />
+            <div className="text-[12.5px] text-ink-muted leading-relaxed max-w-165">
+              <strong style={{ color: "var(--ink)" }}>
+                Troca agendada para {day(troca.effectiveAt)}: passa a ser {describeSelection(troca)}.
+              </strong>{" "}
+              Até lá nada muda — cota, marcas e módulos seguem como estão.
+            </div>
+          </div>
+          <button
+            onClick={onKeep}
+            className="mt-3 ml-[25px] h-8 px-3 inline-flex items-center gap-1.5 rounded-lg text-[12.5px] font-medium border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            Manter {describeSelection(sub)}
+          </button>
+        </div>
+      )}
 
       {scheduled && (
         <div className="mt-4 pt-4 border-t border-border-soft">
@@ -355,8 +531,8 @@ function CurrentSubscription({ sub }: { sub: Subscription }) {
               <strong>nenhum dado é apagado</strong>.
               {/* Trocar de plano não desmarca a saída: o Stripe mantém o agendamento sobre
                   a assinatura nova, e quem só faz upgrade sairia mesmo assim. */}{" "}
-              Fazer upgrade ou downgrade <strong>não cancela o agendamento</strong> — para
-              continuar, retome a assinatura no portal.
+              Fazer upgrade <strong>não cancela o agendamento</strong>, e downgrade só pode ser
+              agendado depois de retomar a assinatura no portal.
             </div>
           </div>
           <button
@@ -385,6 +561,13 @@ function CurrentSubscription({ sub }: { sub: Subscription }) {
           </span>
         </div>
       )}
+
+      {!degraded && !troca && sub.status !== "Trialing" && (
+        <div className="mt-4 pt-4 border-t border-border-soft text-[12.5px] text-ink-muted leading-relaxed max-w-165">
+          Upgrade vale na hora, com a diferença proporcional cobrada no ato. Downgrade fica
+          agendado para o fim do período já pago, sem mudar nada até lá.
+        </div>
+      )}
     </div>
   )
 }
@@ -401,139 +584,12 @@ function SharedSlotsNote() {
   )
 }
 
-// ── Planos ────────────────────────────────────────────────────────────────
-
-function PlanGrid({
-  data,
-  sub,
-  onRequested,
-}: {
-  data: BillingPlans
-  sub: Subscription | null
-  onRequested: (r: PendingProjection) => void
-}) {
-  const { start, change, checkout } = useSubscriptionMutations()
-  const pending = start.isPending || change.isPending || checkout.isPending
-  const [busySlug, setBusySlug] = useState<string | null>(null)
-
-  const [trialUsedFor, setTrialUsedFor] = useState<PlanOption | null>(null)
-  // Erro com o diálogo aberto vai para dentro dele: é onde o olho de quem clicou está.
-  const [dialogError, setDialogError] = useState<string | null>(null)
-
-  // Assinatura cancelada EXISTE mas não é alterável: o provedor recusa update nela, e
-  // o caminho certo é abrir uma nova. Decidir por "tem linha" em vez de "está ativa"
-  // mandava a reativação para o endpoint de troca e devolvia erro cru do provedor.
-  const reativando = Boolean(sub?.readOnly)
-
-  /**
-   * Plano pago vai para a tela de pagamento do provedor. Só o trial nasce direto —
-   * ele é sem cartão, então não há o que pagar.
-   */
-  const irParaCheckout = (plan: PlanOption) => {
-    setBusySlug(plan.slug)
-    checkout.mutate(
-      {
-        planSlug: plan.slug,
-        extraBrandSlots: data.currentExtraBrandSlots,
-        idempotencyKey: newAttemptKey(),
-      },
-      {
-        onSuccess: ({ url }) => window.location.assign(url),
-        onError: (e) => {
-          notifyError(e, "Não foi possível abrir a tela de pagamento.", { terminal: true })
-          setBusySlug(null)
-        },
-      },
-    )
-  }
-
-  const act = (plan: PlanOption, withTrial = true) => {
-    // Assinatura nova sem trial = compra: quem conduz é o provedor.
-    if (!data.currentPlanSlug && !withTrial) return irParaCheckout(plan)
-    if (reativando && !withTrial) return irParaCheckout(plan)
-
-    setBusySlug(plan.slug)
-    const trocando = Boolean(data.currentPlanSlug) && !reativando
-    const input = trocando
-      ? { planSlug: plan.slug, extraBrandSlots: data.currentExtraBrandSlots }
-      : {
-          planSlug: plan.slug,
-          extraBrandSlots: data.currentExtraBrandSlots,
-          withTrial,
-          idempotencyKey: newAttemptKey(),
-        }
-    const mutation = trocando ? change : start
-    const verb = trocando ? "Troca" : "Assinatura"
-
-    mutation.mutate(input, {
-      // A resposta é o Stripe confirmando o pedido; quem escreve a projeção é o
-      // webhook. Por isso a mensagem fala em "solicitada", não em "concluída".
-      onSuccess: () => {
-        setTrialUsedFor(null)
-        setDialogError(null)
-        onRequested({
-          planSlug: plan.slug,
-          extraBrandSlots: data.currentExtraBrandSlots,
-          since: Date.now(),
-        })
-        notifySuccess(`${verb} solicitada. Aguardando a confirmação do provedor.`)
-      },
-      onError: (e) => {
-        // O trial já usado não é falha: é uma escolha que o cliente ainda pode fazer,
-        // então vira pergunta em vez de toast vermelho e beco sem saída.
-        if (e instanceof ApiError && e.problem?.code === TRIAL_ALREADY_USED) {
-          setDialogError(null)
-          setTrialUsedFor(plan)
-          return
-        }
-
-        const code = e instanceof ApiError ? e.problem?.code : undefined
-        const message =
-          e instanceof ApiError ? e.message : `Não foi possível concluir a ${verb.toLowerCase()}.`
-
-        // Falta de cartão deixou de ser erro: o checkout coleta o cartão junto com o
-        // pagamento, então a resposta certa é levar para lá, não pedir para voltar.
-        if (code === PAYMENT_METHOD_REQUIRED) {
-          setTrialUsedFor(null)
-          irParaCheckout(plan)
-          return
-        }
-
-        if (trialUsedFor) setDialogError(message)
-        else notifyError(e, `Não foi possível concluir a ${verb.toLowerCase()}.`, { terminal: true })
-      },
-      onSettled: () => setBusySlug(null),
-    })
-  }
-
+function RemoveModuleLink({ label, onClick }: { label: string; onClick: () => void }) {
   return (
-    <div className="grid gap-4 @md:grid-cols-2 @4xl:grid-cols-4">
-      {data.plans.map((plan) => (
-        <PlanCard
-          key={plan.slug}
-          plan={plan}
-          data={data}
-          sub={sub}
-          reativando={reativando}
-          busy={busySlug === plan.slug}
-          disabled={pending || !data.billingEnabled}
-          onAct={() => act(plan)}
-        />
-      ))}
-
-      {trialUsedFor && (
-        <TrialUsedDialog
-          plan={trialUsedFor}
-          currency={data.currency}
-          pending={pending}
-          error={dialogError}
-          onClose={() => {
-            setTrialUsedFor(null)
-            setDialogError(null)
-          }}
-          onConfirm={() => irParaCheckout(trialUsedFor)}
-        />
-      )}
+    <div className="text-right">
+      <button onClick={onClick} className="text-[12.5px] text-ink-muted underline hover:opacity-80">
+        {label}
+      </button>
     </div>
   )
 }
@@ -544,20 +600,22 @@ function PlanGrid({
  * receber um erro e ter que adivinhar o que fazer.
  */
 function TrialUsedDialog({
-  plan,
-  currency,
+  selection,
+  data,
   pending,
   error,
   onClose,
   onConfirm,
 }: {
-  plan: PlanOption
-  currency: string | null
+  selection: PlanSelection
+  data: BillingPlans
   pending: boolean
   error: string | null
   onClose: () => void
   onConfirm: () => void
 }) {
+  const price = recurringCents(selection, data)
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
@@ -571,8 +629,8 @@ function TrialUsedDialog({
         </h2>
         <p className="text-[13.5px] text-ink-muted mt-3 leading-relaxed">
           O período de teste é um por pessoa, mesmo em workspaces diferentes. Você ainda pode
-          assinar o {PLAN_NAMES[plan.slug] ?? plan.slug}
-          {plan.priceCents != null && <> por {money(plan.priceCents, currency)}/mês</>}. Você vai
+          assinar {describeSelection(selection)}
+          {price != null && <> por {money(price, data.currency)}/mês</>}. Você vai
           para a tela de pagamento do provedor para confirmar.
         </p>
 
@@ -610,154 +668,15 @@ function TrialUsedDialog({
   )
 }
 
-function PlanCard({
-  plan,
-  data,
-  reativando,
-  busy,
-  disabled,
-  onAct,
-}: {
-  plan: PlanOption
-  data: BillingPlans
-  sub: Subscription | null
-  reativando: boolean
-  busy: boolean
-  disabled: boolean
-  onAct: () => void
-}) {
-  const isEnterprise = plan.slug === "enterprise"
-  const current = plan.isCurrent
-
-  const action = useMemo(() => {
-    if (isEnterprise) return { label: "Falar com vendas", kind: "sales" as const }
-
-    // Cancelada: todo card volta a ser assinável, inclusive o do plano anterior.
-    // Desabilitar aquele card prenderia o cliente fora do plano que ele já tinha.
-    if (reativando)
-      return { label: current ? "Reativar" : "Assinar", kind: "primary" as const }
-
-    if (current) return { label: "Plano atual", kind: "disabled" as const }
-    if (!data.currentPlanSlug) return { label: "Assinar", kind: "primary" as const }
-
-    const from = LADDER.indexOf(data.currentPlanSlug)
-    const to = LADDER.indexOf(plan.slug)
-    // Plano atual fora da escada (Enterprise): qualquer troca é "mudar", não descer.
-    if (from < 0 || to < 0) return { label: "Mudar para este", kind: "primary" as const }
-    return to > from
-      ? { label: "Fazer upgrade", kind: "primary" as const }
-      : { label: "Fazer downgrade", kind: "ghost" as const }
-  }, [current, isEnterprise, reativando, data.currentPlanSlug, plan.slug])
-
-  return (
-    <div
-      className="rounded-[14px] border px-5 py-5 flex flex-col"
-      style={{
-        background: "var(--surface)",
-        borderColor: current && !reativando ? "var(--color-teal-500)" : "var(--border-soft)",
-      }}
-    >
-      {current && (
-        <span
-          className="self-start text-[10px] font-semibold rounded-full px-2 py-0.5 mb-2"
-          style={
-            reativando
-              ? { background: "#F3F4F6", color: "#6B7280" }
-              : { background: "var(--teal-bg)", color: "var(--color-teal-500)" }
-          }
-        >
-          {reativando ? "Plano anterior" : "Plano atual"}
-        </span>
-      )}
-
-      <div className="text-[15px] font-semibold" style={{ color: "var(--ink)" }}>
-        {PLAN_NAMES[plan.slug] ?? plan.slug}
-      </div>
-      <div className="text-[12.5px] text-ink-muted mt-1 min-h-[34px] leading-relaxed">
-        {PLAN_PITCH[plan.slug] ?? ""}
-      </div>
-
-      <div className="font-display mt-3 mb-4" style={{ fontSize: 24, color: "var(--ink)" }}>
-        {plan.priceCents != null ? (
-          <>
-            {money(plan.priceCents, data.currency)}
-            <span className="text-[13px] text-ink-muted">/mês</span>
-          </>
-        ) : (
-          // Nunca "R$ 0,00": Enterprise é negociado, e ambiente sem Stripe não tem preço.
-          <span style={{ fontSize: 18 }} className="text-ink-muted">
-            Sob consulta
-          </span>
-        )}
-      </div>
-
-      <dl className="text-[12.5px] space-y-1.5 mb-4">
-        <Row label="Vídeo-minutos" value={plan.quotaMinutes > 0 ? int(plan.quotaMinutes) : "Pay-as-you-go"} />
-        <Row label="Marcas" value={plan.brandSlots > 0 ? int(plan.brandSlots) : "Ilimitado"} />
-        {["sov", "reports"].map((code) => (
-          <Row
-            key={code}
-            label={FEATURE_LABELS[code]}
-            value={
-              plan.tierFeatures.includes(code) ? (
-                <Check className="w-3.5 h-3.5 inline" style={{ color: "var(--color-pos)" }} strokeWidth={2.6} />
-              ) : (
-                <span className="text-ink-muted-2">—</span>
-              )
-            }
-          />
-        ))}
-      </dl>
-
-      <div className="mt-auto">
-        {action.kind === "sales" ? (
-          <a
-            href="mailto:comercial@zoe.com.br?subject=Plano%20Enterprise"
-            className="w-full h-9 inline-flex items-center justify-center rounded-lg text-[13px] font-medium border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors"
-          >
-            {action.label}
-          </a>
-        ) : (
-          <button
-            onClick={onAct}
-            disabled={action.kind === "disabled" || disabled || busy}
-            className={`w-full h-9 inline-flex items-center justify-center gap-1.5 rounded-lg text-[13px] font-medium transition-colors disabled:opacity-50 ${
-              action.kind === "primary"
-                ? "text-white"
-                : "border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D]"
-            }`}
-            style={action.kind === "primary" ? { background: "var(--color-teal-500)" } : undefined}
-          >
-            {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            {action.label}
-          </button>
-        )}
-        {reativando && (
-          <div className="text-[11.5px] text-ink-muted mt-2 text-center">Reativa o acesso</div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function Row({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <dt className="text-ink-muted">{label}</dt>
-      <dd className="font-mono-zoe" style={{ color: "var(--ink)" }}>
-        {value}
-      </dd>
-    </div>
-  )
-}
-
 // ── Marca extra ───────────────────────────────────────────────────────────
 
 function ExtraBrandCard({
   data,
+  sub,
   onRequested,
 }: {
   data: BillingPlans
+  sub: Subscription | null
   onRequested: (r: PendingProjection) => void
 }) {
   const [confirming, setConfirming] = useState(false)
@@ -765,7 +684,7 @@ function ExtraBrandCard({
 
   // Só o Pro vende. Nos outros o card nem aparece: no Starter o limite é o gatilho
   // de upgrade, e Max/Enterprise já são ilimitados.
-  if (!current?.sellsExtraBrandSlots) return null
+  if (!current?.sellsExtraBrandSlots || !sub) return null
 
   const price = data.extraBrandSlotPriceCents
 
@@ -782,7 +701,7 @@ function ExtraBrandCard({
           </div>
           <div className="text-[13px] text-ink-muted mt-1 leading-relaxed max-w-140">
             Um slot de marca a mais no seu plano, <strong>sem alterar a cota de minutos</strong>.
-            Cobrado com proração na próxima fatura.
+            O proporcional até o fim do período é cobrado na hora.
             {data.currentExtraBrandSlots > 0 && (
               <> Você já tem {data.currentExtraBrandSlots} contratada(s).</>
             )}
@@ -807,6 +726,7 @@ function ExtraBrandCard({
       {confirming && (
         <ExtraBrandDialog
           data={data}
+          sub={sub}
           onRequested={onRequested}
           onClose={() => setConfirming(false)}
         />
@@ -822,36 +742,39 @@ function ExtraBrandCard({
  */
 function ExtraBrandDialog({
   data,
+  sub,
   onRequested,
   onClose,
 }: {
   data: BillingPlans
+  sub: Subscription
   onRequested: (r: PendingProjection) => void
   onClose: () => void
 }) {
   const [ack, setAck] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const { change } = useSubscriptionMutations()
   const current = data.plans.find((p) => p.isCurrent)!
+  const target: PlanSelection = {
+    ...selectionFromSubscription(sub),
+    extraBrandSlots: data.currentExtraBrandSlots + 1,
+  }
+  const preview = useChangePreview(target)
+  const dueNow = preview.data?.amountDueNowCents
 
   const confirm = () => {
-    change.mutate(
-      { planSlug: current.slug, extraBrandSlots: data.currentExtraBrandSlots + 1 },
-      {
-        onSuccess: () => {
-          // O plano NÃO muda aqui — o que muda é a contagem de slots. Esperar pelo slug
-          // dava a projeção por chegada antes de a marca extra existir.
-          onRequested({
-            planSlug: current.slug,
-            extraBrandSlots: data.currentExtraBrandSlots + 1,
-            since: Date.now(),
-          })
-          notifySuccess("Marca extra solicitada. Aguardando a confirmação do provedor.")
-          onClose()
-        },
-        onError: (e) =>
-          notifyError(e, "Não foi possível adicionar a marca.", { terminal: true }),
+    setError(null)
+    change.mutate(target, {
+      onSuccess: () => {
+        // O plano NÃO muda aqui — o que muda é a contagem de slots. Esperar pelo slug
+        // dava a projeção por chegada antes de a marca extra existir.
+        onRequested({ ...target, mode: "immediate", since: Date.now() })
+        notifySuccess("Marca extra confirmada. Aguardando a confirmação do provedor.")
+        onClose()
       },
-    )
+      onError: (e) =>
+        setError(e instanceof ApiError ? e.message : "Não foi possível adicionar a marca."),
+    })
   }
 
   return (
@@ -872,6 +795,17 @@ function ExtraBrandDialog({
           mesma cota que as atuais.
         </p>
 
+        <div className="text-[13px] mt-3" style={{ color: "var(--ink)" }}>
+          {preview.isLoading ? (
+            <span className="text-ink-muted">Calculando o valor…</span>
+          ) : dueNow != null ? (
+            <>
+              Cobrado agora: <strong className="font-mono-zoe">{money(dueNow, preview.data?.currency ?? data.currency)}</strong>{" "}
+              <span className="text-ink-muted">(proporcional até {day(sub.currentPeriodEnd)})</span>
+            </>
+          ) : null}
+        </div>
+
         <div
           className="flex items-start gap-3 rounded-[12px] border px-4 py-3 mt-4"
           style={{ background: "#FFFBEB", borderColor: "rgba(217,119,6,.32)" }}
@@ -882,6 +816,18 @@ function ExtraBrandDialog({
             tende a resolver melhor.
           </span>
         </div>
+
+        {error && (
+          <div
+            className="flex items-start gap-3 rounded-[12px] border px-4 py-3 mt-4"
+            style={{ background: "#FEF2F2", borderColor: "rgba(220,38,38,.32)" }}
+          >
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "var(--color-neg)" }} />
+            <span className="text-[13px] leading-relaxed" style={{ color: "var(--ink-2)" }}>
+              {error}
+            </span>
+          </div>
+        )}
 
         <label className="flex items-start gap-2.5 mt-4 cursor-pointer">
           <input
@@ -964,18 +910,16 @@ function BillingSection({
       <div className="px-6 pt-5 pb-3">
         <div className="eyebrow">Faturamento</div>
         <div className="text-[13px] text-ink-muted mt-2 max-w-165 leading-relaxed">
-          Pagamento e notas ficam no portal da Stripe. Os três itens abaixo abrem lá.
+          Pagamento e notas ficam no portal da Stripe. Os itens abaixo abrem lá.
         </div>
       </div>
 
-      {rows.map((r, i) => (
+      {rows.map((r) => (
         <button
           key={r.label}
           onClick={open}
           disabled={disabled}
-          className={`w-full flex items-center gap-4 px-6 py-4 text-left transition-colors hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] disabled:opacity-50 disabled:hover:bg-transparent ${
-            i === 0 ? "border-t border-border-soft" : "border-t border-border-soft"
-          }`}
+          className="w-full flex items-center gap-4 px-6 py-4 text-left transition-colors hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] disabled:opacity-50 disabled:hover:bg-transparent border-t border-border-soft"
         >
           <div className="flex-1">
             <div className="text-[14px] font-semibold" style={{ color: "var(--ink)" }}>
