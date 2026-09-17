@@ -8,11 +8,7 @@ import {
   useRemoteDeliveryThumb, type DeliveryStatus, type DeliveryThumbnail, type EscrowState,
 } from "@/lib/api/operations"
 
-/**
- * Área do criador. Módulo separado de `operations.ts` de propósito: aqui **nada** leva
- * tenant. O criador não pertence a workspace nenhum, e o escopo de cada request é a
- * identidade dele — por isso todas as chamadas usam `noTenant`.
- */
+/** Área do criador: nada aqui leva tenant, todas as chamadas usam <code>noTenant</code>. */
 
 export type CreatorDelivery = {
   deliveryId: string
@@ -73,10 +69,7 @@ export type CreatorWorkspace = {
 
 /** O cadastro declarado pelo criador — o que a marca lê para decidir o convite. */
 export type CreatorProfile = {
-  /**
-   * Se ele já concluiu o cadastro. Distingue "não preencheu" de "preencheu e deixou os
-   * opcionais em branco" — sem isso o segundo caso voltaria ao formulário para sempre.
-   */
+  /** Cadastro concluído, mesmo com opcionais em branco. */
   complete: boolean
   primaryArea: string | null
   audienceSize: AudienceSize | null
@@ -95,10 +88,7 @@ export const CHANNEL_PLATFORMS: ChannelPlatform[] = ["YouTube", "TikTok", "Insta
 export type AudienceSize =
   | "Under10k" | "From10kTo50k" | "From50kTo200k" | "From200kTo1m" | "Over1m"
 
-/**
- * Faixas, não número exato. O número muda toda semana e ficaria errado no dia seguinte ao
- * cadastro; a faixa é o que a marca usa para filtrar e continua verdadeira por meses.
- */
+/** Faixas de audiência, não número exato. */
 export const AUDIENCE_SIZES: { value: AudienceSize; label: string }[] = [
   { value: "Under10k", label: "Até 10 mil" },
   { value: "From10kTo50k", label: "10 mil a 50 mil" },
@@ -107,20 +97,14 @@ export const AUDIENCE_SIZES: { value: AudienceSize; label: string }[] = [
   { value: "Over1m", label: "Mais de 1 milhão" },
 ]
 
-/**
- * Áreas oferecidas na tela. Curadas aqui e não no domínio: vertical de conteúdo nasce e
- * morre com o mercado, e cada uma nova não deve custar uma migration.
- */
+/** Áreas curadas no front, sem migration por vertical nova. */
 export const CREATOR_AREAS = [
   "Finanças", "Tecnologia", "Games", "Beleza", "Moda", "Saúde e bem-estar",
   "Gastronomia", "Viagem", "Educação", "Esportes", "Casa e decoração",
   "Maternidade", "Humor e entretenimento", "Negócios", "Outra",
 ] as const
 
-/**
- * Temas sugeridos por área. São sugestão, não catálogo fechado — o criador escreve o
- * próprio se o dele não estiver ali, e é isso que impede a lista de envelhecer.
- */
+/** Temas sugeridos por área; o criador pode escrever o próprio. */
 export const TOPICS_BY_AREA: Record<string, string[]> = {
   "Finanças": [
     "Bancos digitais", "Cartões", "Investimentos", "Cripto",
@@ -196,11 +180,7 @@ export type UpdateCreatorProfileBody = {
   handles?: Partial<Record<ChannelPlatform, string>>
 }
 
-/**
- * O contrato como o criador o vê. As cláusulas chegam com os valores já substituídos — o
- * mesmo texto que a marca vê e que vai para o PDF, para que ele não leia um documento
- * diferente do que assina.
- */
+/** O contrato como o criador o vê, com as cláusulas preenchidas. */
 export type CreatorContract = {
   contractId: string
   campaignId: string | null
@@ -213,10 +193,7 @@ export type CreatorContract = {
   takeRateCents: number | null
   netToInfluencerCents: number | null
   takeRateBps: number | null
-  /**
-   * Se a tela pode oferecer o reenvio do aviso. A Clicksign não expõe link de assinatura
-   * pela API — o caminho até o documento é o e-mail que ela dispara.
-   */
+  /** A tela pode reenviar o aviso de assinatura. */
   canResendSignature: boolean
   escrowState: EscrowState | null
   clauses: CreatorContractClause[]
@@ -237,18 +214,10 @@ export type CreatorContractField = {
   value: string | null
 }
 
-/**
- * Início do cadastro da conta de recebimento.
- *
- * `onboardingUrl` é do provedor, **de uso único e expira em minutos** — por isso não se
- * guarda: cada clique pede um novo.
- */
-/**
- * Para onde o provedor devolve a pessoa depois do cadastro. Nome de destino, nunca URL —
- * o caminho é resolvido no backend a partir de uma lista fechada.
- */
+/** Destino da volta do provedor, por nome de uma lista fechada, nunca URL. */
 export type PayoutReturnTo = "onboarding" | "payout"
 
+/** Início do cadastro de recebimento; <code>onboardingUrl</code> é de uso único e expira em minutos. */
 export type StartPayoutOnboarding = {
   onboardingUrl: string | null
   expiresAt: string | null
@@ -279,10 +248,7 @@ export const creatorApi = {
     apiClient.post<{ uploadUrl: string; mediaKey: string; expiresAt: string }>(
       "/api/creator/deliveries/draft-upload", body, { noTenant: true }),
 
-  /**
-   * Envio em partes, para arquivo grande: abrir, assinar as próximas partes e juntar no fim. A
-   * confirmação continua sendo a mesma do PUT único, com a mesma chave.
-   */
+  /** Envio em partes: abrir, assinar partes e concluir; a confirmação é a do PUT único. */
   startDraftMultipart: (body: {
     contractId: string; fileName: string; contentType: string; sizeBytes: number
   }) =>
@@ -360,10 +326,7 @@ export const creatorApi = {
       signal: opts?.signal,
     }),
 
-  /**
-   * PDF do contrato. Buscado como blob e não por link direto: `<a href>` não carrega o
-   * cabeçalho de autorização, e o endpoint é protegido.
-   */
+  /** PDF do contrato buscado como blob, porque o endpoint exige autorização. */
   contractDocument: (contractId: string) =>
     apiBlob(`/api/creator/contracts/${contractId}/document`, { noTenant: true }),
 
@@ -409,24 +372,13 @@ export function useCreatorContract(contractId: string | null) {
   })
 }
 
-/**
- * Acima disto o corte sobe em partes; abaixo, num PUT só.
- *
- * Um arquivo pequeno termina rápido o bastante para a queda de conexão ser rara, e cada parte tem
- * custo próprio — uma ida à API para assinar e uma requisição para subir.
- */
+/** Acima disto o corte sobe em partes; abaixo, num PUT só. */
 export const SINGLE_PUT_LIMIT = 16 * 1024 * 1024
 
 const NETWORK_FAILURE =
   "O arquivo não subiu. Verifique sua conexão e tente de novo — o que já subiu fica guardado."
 
-/**
- * Sobe um corpo por PUT com progresso.
- *
- * XMLHttpRequest em vez de fetch por UM motivo: progresso. Vídeo de campanha sobe por minutos numa
- * conexão doméstica, e um botão parado em "enviando…" durante cinco minutos é indistinguível de
- * travado — a pessoa cancela e tenta de novo, que é o pior desfecho possível para um upload grande.
- */
+/** PUT com progresso por XMLHttpRequest, que o fetch não oferece. */
 function uploadWithProgress(
   url: string,
   body: Blob,
@@ -437,9 +389,7 @@ function uploadWithProgress(
     const xhr = new XMLHttpRequest()
     xhr.open("PUT", url)
 
-    // O Content-Type tem de bater com o que foi assinado: o storage recusa a escrita se divergir, e
-    // a mensagem dele não diria que o problema é esse. Na parte de um envio múltiplo ele NÃO é
-    // assinado — mandá-lo ali só arriscaria barrar no CORS.
+    // Content-Type igual ao assinado; nas partes ele não vai, para não barrar no CORS.
     if (contentType) xhr.setRequestHeader("Content-Type", contentType)
 
     xhr.upload.onprogress = (ev) => { if (ev.lengthComputable) onProgress(ev.loaded) }
@@ -483,12 +433,7 @@ async function uploadSinglePut(
   return auth.mediaKey
 }
 
-/**
- * Envio do corte em três passos: autorizar, subir, confirmar.
- *
- * O passo 2 vai DIRETO para o storage, fora da API — vídeo é grande, e passá-lo por
- * dentro do backend prenderia por minutos o mesmo worker que atende todo o resto.
- */
+/** Envio do corte em três passos (autorizar, subir direto ao storage, confirmar). */
 export function useDraftUpload() {
   const qc = useQueryClient()
 
@@ -534,12 +479,7 @@ export function useResendSignature(contractId: string) {
   })
 }
 
-/**
- * Grava o cadastro inteiro de uma vez.
- *
- * <p>Invalida o workspace porque quase tudo na área do criador deriva dele: o nome no
- * cabeçalho, o card de documento, o gate que manda para o formulário.</p>
- */
+/** Grava o cadastro inteiro e invalida o workspace, de onde deriva quase toda a área do criador. */
 export function useUpdateCreatorProfile() {
   const qc = useQueryClient()
   return useMutation({
@@ -587,13 +527,7 @@ export function useCreatorMutations() {
   }
 }
 
-/**
- * Como o trabalho se chama na tela do criador.
- *
- * <p>"Sem campanha" é palavra de sistema: para quem foi contratado, o que existe é um
- * trabalho, com ou sem uma campanha por trás. O rótulo do avulso diz isso, em vez de
- * anunciar a ausência de um agrupamento que não é problema dele.</p>
- */
+/** Nome do trabalho para o criador; o avulso não é chamado de "sem campanha". */
 export function workLabel(campaignName: string | null | undefined): string {
   return campaignName?.trim() ? campaignName : "Trabalho avulso"
 }

@@ -107,10 +107,7 @@ export async function api<T>(path: string, init: ApiOptions = {}): Promise<T> {
 }
 
 /**
- * Busca um binário com a mesma autenticação do resto da API.
- *
- * Existe porque `<a href>` e `window.open` não carregam o cabeçalho `Authorization` — um
- * PDF protegido aberto assim volta 401. O caminho é buscar com token e abrir o blob.
+ * Binário com a autenticação da API: <code>&lt;a href&gt;</code> e <code>window.open</code> não levam o token.
  */
 export async function apiBlob(path: string, init: ApiOptions = {}): Promise<Blob> {
   const { noTenant, tenantId, headers, ...rest } = init

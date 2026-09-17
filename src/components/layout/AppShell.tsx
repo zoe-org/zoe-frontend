@@ -104,9 +104,7 @@ export function AppShell() {
   // Relatórios é add-on cross-módulo: o item some sem a feature (a rota segue
   // montada e a própria página mostra o upsell, como no SoV).
   const hasReports = useFeature("reports")
-  // Plano exibido abaixo do nome (design: "Intelligence · Owner"). O módulo é o
-  // que o tenant tem; combinado com a role vira a linha de contexto do usuário.
-  // Os dois módulos quando o workspace tem os dois: mostrar só Intelligence escondia o Operations.
+  // Linha de contexto do usuário: módulos do tenant (os dois quando houver) e a role.
   const planLabel = [hasIntelligence && "Intelligence", hasOperations && "Operations"]
     .filter(Boolean).join(" + ") || null
   const userContext = [planLabel, role].filter(Boolean).join(" · ")
@@ -121,14 +119,7 @@ export function AppShell() {
   const [gestaoOpen, setGestaoOpen] = useState(() => getInitialOpenState(STORAGE_GESTAO_KEY))
   const [opsOpen, setOpsOpen] = useState(() => getInitialOpenState(STORAGE_OPS_KEY))
 
-  // Troca de tenant: descarta o cache do tenant anterior. O tenantId nas query
-  // keys já impede servir dado de outro tenant; isto libera memória. Isolamento é
-  // preocupação de frontend também.
-  //
-  // Só as chaves do tenant ANTERIOR, e nunca na montagem. Efeitos de filhos rodam antes
-  // dos do pai: quando este efeito roda, a página já se inscreveu nas próprias queries.
-  // Um clear() geral as apagava de baixo dos observers, que ficavam órfãos — no F5 o
-  // Painel ficava no esqueleto para sempre e Contratos dizia "0 contratos".
+  // Troca de tenant: remove só as queries do tenant anterior, nunca na montagem (um clear() geral deixava observers órfãos).
   const previousTenantRef = useRef(activeTenantId)
   useEffect(() => {
     const previous = previousTenantRef.current

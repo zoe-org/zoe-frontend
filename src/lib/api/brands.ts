@@ -149,13 +149,7 @@ export type SubscribePayload = {
 }
 
 /**
- * Brands assinadas pelo tenant ativo. `tenantId` na key isola o cache por tenant.
- *
- * <p><b>Desligada para criador.</b> O <code>BrandProvider</code> envolve o router inteiro,
- * então esta query roda em toda página — inclusive nas do criador, que não pertence a
- * workspace nenhum (RN-O-011). O backend recusava com 403 <code>influencer_scope</code>,
- * corretamente, mas a cada navegação: erro esperado repetido no log é o tipo de ruído que
- * ensina o time a ignorar log.</p>
+ * Brands do tenant ativo, com <code>tenantId</code> na key. Desligada para criador, que não tem workspace.
  */
 export function useTenantBrands() {
   const { activeTenantId, isCreator } = useAuth()

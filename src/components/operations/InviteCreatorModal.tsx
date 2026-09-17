@@ -15,35 +15,16 @@ import {
   type RosterItem, type InviteInfluencerResponse, type CampaignBriefing,
 } from "@/lib/api/operations"
 
-/*
- * Um convite só, venha de onde vier. Existiam dois: o do elenco, com proposta (cachê,
- * entregas, prazo), e o da campanha, só com nome e e-mail. Quem convidava pela campanha —
- * o caminho mais natural — gerava um contrato sem proposta para herdar, e o trabalho manual
- * que a herança tira voltava inteiro.
- */
+/* Um convite só, da campanha ou do elenco, sempre com proposta para o contrato herdar. */
 
 /**
- * Convite de criador — proposta de trabalho ou chamada para o elenco.
- *
- * É a única forma de pôr alguém no elenco: a própria pessoa cria a conta pelo link, e é
- * essa conta que conecta o recebimento. Dados fiscais e conta bancária são dela.
- *
- * <p>Duas portas de entrada, um convite só: escolher alguém que já está no elenco só
- * preenche e-mail e nome — o backend reaproveita o registro em vez de duplicar.</p>
- *
- * <p><b>Permuta não é campo.</b> O protótipo mostra um toggle ao lado do cachê, mas a
- * modalidade vem da campanha e o contrato a herda. Aqui ela é derivada: campanha de
- * permuta desliga o cachê e diz por quê, em vez de deixar alguém oferecer dinheiro que o
- * contrato não pode pagar.</p>
+ * Convite de criador, única entrada no elenco; escolher alguém do elenco preenche nome e e-mail. Permuta vem da campanha, não é campo.
  */
 export function InviteCreatorModal({
   onClose, initialCampaignId,
 }: {
   onClose: () => void
-  /**
-   * Campanha já escolhida — quando o convite parte da tela da campanha. Continua editável:
-   * é ponto de partida, não trava.
-   */
+  /** Campanha pré-escolhida quando o convite parte da campanha; continua editável. */
   initialCampaignId?: string
 }) {
   const { invite, resendInvite } = useRosterMutations()
@@ -65,10 +46,7 @@ export function InviteCreatorModal({
   const [updateProposal, setUpdateProposal] = useState(true)
   useEscapeKey(onClose)
   const dialogRef = useFocusTrap<HTMLDivElement>()
-  /**
-   * Convite recusado por já existir. Fica dentro do modal, junto do que a pessoa preencheu: um
-   * toast some em segundos e não diz o que fazer.
-   */
+  /** Convite recusado por já existir, mostrado no modal junto do que foi preenchido. */
   const [conflict, setConflict] = useState<{ code: string; message: string } | null>(null)
 
   const { data: rosterData } = useRoster()
@@ -458,13 +436,7 @@ export function InviteCreatorModal({
   )
 }
 
-/**
- * O briefing auditável da campanha, em leitura.
- *
- * <p>Não é enfeite: são os critérios contra os quais a entrega vai ser medida
- * (RN-O-030). Quem aceita tem direito de ler antes o que vai ser cobrado depois — e a
- * marca, de conferir que está convidando para a campanha certa.</p>
- */
+/** Critérios da auditoria (RN-O-030), visíveis antes do aceite. */
 function BriefingBox({ briefing }: { briefing: CampaignBriefing }) {
   const rules = [
     briefing.requiresLogo &&

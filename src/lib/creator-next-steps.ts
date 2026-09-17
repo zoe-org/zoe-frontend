@@ -1,9 +1,6 @@
 import { workLabel, type CreatorWorkspace } from "@/lib/api/creator"
 
-/**
- * Um passo que depende do criador. O destino diz onde a tela leva: a um trabalho na aba de
- * campanhas, a um contrato na aba de contratos, a um card desta página ou a outra rota.
- */
+/** Passo que depende do criador; o destino é uma aba, um card da página ou outra rota. */
 export type NextStep = {
   key: string
   title: string
@@ -14,16 +11,7 @@ export type NextStep = {
     | { route: string }
 }
 
-/**
- * O que o criador precisa fazer agora, na ordem do processo.
- *
- * <p>A área listava os trabalhos e cada card dizia o seu estado, mas a pergunta de quem abre —
- * sobretudo no celular — é "tem algo comigo?". Com três campanhas, a resposta ficava espalhada
- * em três cards e duas abas.</p>
- *
- * <p>Só entra o que é do criador. Corte em revisão e entrega aguardando são a vez da marca, e
- * listá-los aqui faria a pessoa procurar uma ação que não existe.</p>
- */
+/** O que o criador precisa fazer agora, na ordem do processo; o que é vez da marca fica fora. */
 export function nextSteps(w: CreatorWorkspace): NextStep[] {
   const steps: NextStep[] = []
 

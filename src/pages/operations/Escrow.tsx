@@ -18,27 +18,14 @@ import {
   type EscrowSummary, type EscrowAction,
 } from "@/lib/api/operations"
 
-/**
- * Quadro da custódia: KPIs em faixa, trilha de estados e lista.
- *
- * <p><b>O kanban do protótipo saiu.</b> Ele custa nove colunas de largura fixa — rolagem
- * horizontal garantida — para mostrar, quase sempre, oito colunas vazias e um cartão
- * empurrado para fora da tela. Kanban se paga quando as colunas estão povoadas e o
- * trabalho é arrastar entre elas; aqui a transição é ação com regra, e o volume de uma
- * marca cabe numa lista.</p>
- *
- * <p>A trilha de estados continua existindo, comprimida numa faixa que <b>filtra</b> em
- * vez de conter. O panorama sobrevive; a rolagem, não.</p>
- *
- * <p><b>Os nove estados continuam visíveis</b>, incluindo os três que o protótipo omitia:
- * <c>Delivered</c>, <c>Disputed</c> e <c>Refunded</c>. Esconder disputa e devolução de uma
- * tela de dinheiro é o pior lugar possível para simplificar — some justamente com os casos
- * que o operador precisa achar rápido.</p>
- */
 const COLUMN_COLOR = ESCROW_STATE_COLOR
 
 const NO_ITEMS: EscrowSummary[] = []
 
+/**
+ * Quadro da custódia: KPIs, trilha de estados que filtra e lista ordenada por urgência. Os nove
+ * estados ficam visíveis, inclusive Delivered, Disputed e Refunded, que o protótipo omitia.
+ */
 export default function OperationsEscrowPage() {
   const escrow = useEscrowAccounts()
   const [selected, setSelected] = useState<string | null>(null)
@@ -234,13 +221,7 @@ function StateChip({
   )
 }
 
-/**
- * Uma custódia por linha.
- *
- * <p>O que decide a ordem e' urgencia, nao data — e o motivo do alerta aparece na propria
- * linha. Escondê-lo na gaveta obrigaria a abrir uma a uma para descobrir qual esta' com
- * problema, que e' exatamente o trabalho que a tela deveria poupar.</p>
- */
+/** Uma custódia por linha, ordenada por urgência e com o alerta visível. */
 function EscrowRow({
   e, first, onOpen,
 }: {
@@ -248,10 +229,7 @@ function EscrowRow({
   first: boolean
   onOpen: () => void
 }) {
-  // Caduca e' pior que vencida: vencida e' a data ter passado, caduca e' a renovacao ter
-  // falhado — o dinheiro NAO esta' mais reservado e a liberacao vai recusar.
-  // Custódia encerrada (liberada, devolvida) não tem mais reserva a vencer: o alerta ali
-  // assustaria sobre um dinheiro que já foi pago.
+  // Reserva caída pesa mais que vencida; custódia encerrada não recebe alerta.
   const warning =
     e.authorizationLapsedAt && !e.isTerminal
       ? { icon: AlertTriangle, text: "reserva caiu — refinanciar", color: "#DC2626", strong: true }

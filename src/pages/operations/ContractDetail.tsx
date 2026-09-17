@@ -39,11 +39,7 @@ export default function ContractDetailPage() {
   const [edits, setEdits] = useState<Record<string, string>>({})
   /** Faltantes apontados pelo servidor na última tentativa de envio. */
   const [serverMissing, setServerMissing] = useState<string[]>([])
-  /**
-   * Mostra só os campos ainda vazios. Com o contrato nascendo quase todo preenchido, a
-   * pergunta de quem abre deixa de ser "o que tem aqui" e passa a ser "o que falta" — rolar
-   * quarenta campos cheios para achar os três vazios devolveria o trabalho que a herança tirou.
-   */
+  /** Só os campos vazios, porque o contrato já nasce quase todo preenchido. */
   const [emptyOnly, setEmptyOnly] = useState(false)
   const saveDefault = useUpdateContractDefaults()
   const tenantDefaults = useContractDefaults()
@@ -251,9 +247,7 @@ export default function ContractDetailPage() {
             </div>
           )}
 
-          {/* Duas colunas para o que e' curto. Um campo de data ocupando 1300px de
-              largura nao ajuda ninguem a ler nem a preencher, e empurrava o formulario
-              para uma rolagem que nao precisava existir. Texto longo continua inteiro. */}
+          {/* Duas colunas para campos curtos; texto longo ocupa a linha inteira. */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-4">
             {visibleFields.map((f) => (
               <div key={f.placeholder} className={isWideField(f) ? "md:col-span-2" : undefined}>
@@ -306,10 +300,7 @@ export default function ContractDetailPage() {
   )
 }
 
-/**
- * Aprovação por prazo de revisão vencido (RN-O-055). Em rascunho, quem prepara o contrato liga ou
- * desliga; depois do envio só informa — é termo do que as partes assinaram.
- */
+/** Aprovação por prazo vencido (RN-O-055): editável no rascunho, informativa depois do envio. */
 function AutoReleasePanel({ data }: { data: ContractDetail }) {
   const { setAutoRelease } = useContractDetailMutations(data.contractId)
   const isDraft = data.status === "Draft"
@@ -490,10 +481,7 @@ function FieldRow({
           className={field.isSystemManaged ? "font-mono-zoe text-[12px]" : undefined}
           onChange={(e) => onChange(e.target.value)}
           aria-invalid={isMissing || undefined}
-          // Pendencia nao e' erro. Antes todo campo obrigatorio vazio nascia com borda
-          // vermelha e a frase "obrigatorio e ainda vazio" embaixo — a tela abria como um
-          // alarme por algo que a pessoa simplesmente ainda nao fez. Agora e' uma marca
-          // ambar discreta na lateral; o vermelho fica para quando o envio for tentado.
+          // Obrigatório vazio é pendência, não erro: marca âmbar discreta.
           style={isMissing ? { borderLeft: "3px solid #D97706" } : undefined}
         />
       )}
@@ -546,9 +534,7 @@ function SignaturePanel({
 
       {data.status === "SentForSignature" && (
         <RoleGate minRole="Admin">
-          {/* A confirmação chega pelo webhook — mas webhook se perde, e em ambiente local
-              ele nem chega. Sem este botão o contrato assinado ficava preso em "aguardando"
-              e a única saída era chamar a API à mão. */}
+          {/* Consulta a assinatura no provedor quando o webhook não chegou. */}
           <button
             onClick={onRefreshSignature}
             disabled={refreshing}
@@ -622,21 +608,7 @@ function SignaturePanel({
   )
 }
 
-/**
- * Abre a custódia de um contrato assinado.
- *
- * <p>Existe aqui, e não no quadro de custódia, porque é aqui que a pergunta aparece: o
- * contrato acabou de ser assinado e o próximo passo é reservar o dinheiro. A ordem
- * contrato assinado → depósito → produção é imutável (RN-O-034).</p>
- *
- * <p>A taxa da plataforma NÃO é pedida: ela é termo do contrato e a custódia herda. Pedir
- * de novo abriria espaço para divergir do que foi assinado.</p>
- */
-/**
- * Janela em que a abertura automática ainda é esperada. Passado isso sem custódia, algo a
- * impediu (valor ilegível, teto do provedor) e a tela devolve o botão manual em vez de
- * deixar a pessoa esperando um passo que não vai acontecer.
- */
+/** Janela em que a abertura automática da custódia ainda é esperada; depois dela volta o botão manual. */
 const AUTOMATION_WINDOW_MS = 5 * 60_000
 
 function awaitingAutomation(data: ContractDetail): boolean {
@@ -648,6 +620,7 @@ function awaitingAutomation(data: ContractDetail): boolean {
 const brl = (cents: number) =>
   (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
 
+/** Abre a custódia do contrato assinado (RN-O-034). A taxa não é pedida: vem do contrato. */
 function OpenEscrowPanel({
   contractId, automationStalled = false, declaredTotalCents = null, chargePreview = null,
 }: {
@@ -735,23 +708,7 @@ function OpenEscrowPanel({
   )
 }
 
-/**
- * Cláusulas do contrato, com edição das próprias — Nível 2 da personalização (RN-O-024).
- *
- * <p>Cláusula de sistema aparece com cadeado e sem qualquer controle: escrow, disclosure
- * CONAR e auditoria são imutáveis em todos os níveis. Não é o front decidindo isso — o
- * domínio recusa de qualquer forma; aqui a tela apenas não oferece o que seria negado.</p>
- *
- * <p>Sem o add-on, a resposta do backend traz <code>custom_contracts_required</code> e a
- * tela abre o convite de upgrade. Esconder o recurso converteria zero.</p>
- */
-/**
- * Uma cláusula que abre no lugar.
- *
- * <p>O texto é o mesmo que vai para o PDF e para a tela do criador — a mesma composição
- * alimenta os três. Ler aqui e assinar outra coisa seria a divergência que o desenho do
- * contrato existe para impedir.</p>
- */
+/** Cláusula que abre no lugar, com o mesmo texto do PDF e da tela do criador. */
 function ClauseItem({ c }: { c: ContractClause }) {
   const [open, setOpen] = useState(false)
 
@@ -788,6 +745,10 @@ function ClauseItem({ c }: { c: ContractClause }) {
   )
 }
 
+/**
+ * Cláusulas do contrato, com edição das próprias (RN-O-024, nível 2). As de sistema aparecem com
+ * cadeado; sem o add-on, <code>custom_contracts_required</code> abre o convite de upgrade.
+ */
 function ClausesPanel({ contract }: { contract: ContractDetail }) {
   const clauses = contract.clauses
   const isDraft = contract.status === "Draft"

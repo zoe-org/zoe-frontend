@@ -1,12 +1,5 @@
 /**
- * Valor em reais digitado por gente, em centavos.
- *
- * <p>Aceita o jeito brasileiro ("1.500,00", "1500,5", "R$ 1.500") e o de máquina ("1500.50").
- * Devolve <c>null</c> quando não é um valor legível — quem chama decide o que dizer. O campo de
- * número do navegador fazia pior: "1.500,00" virava vazio, e o orçamento ia como zero sem aviso.</p>
- *
- * <p>Ponto sem vírgula é ambíguo; vale a leitura brasileira quando o formato é de milhar
- * ("1.500" = mil e quinhentos) e a decimal nos demais casos ("1.50" = um e cinquenta).</p>
+ * Valor em reais digitado em centavos, no formato brasileiro ou de máquina; <code>null</code> quando ilegível. Ponto com três casas é milhar.
  */
 export function parseBRLToCents(input: string): number | null {
   const s = input.replace(/R\$/gi, "").replace(/\s/g, "")

@@ -1,8 +1,4 @@
-/**
- * Formatação usada pelas telas de Operations. Separado de `shared.tsx` porque o
- * Fast Refresh só funciona em arquivos que exportam apenas componentes — misturar
- * função e componente no mesmo módulo desliga o hot reload da página inteira.
- */
+/** Formatação das telas de Operations, fora de <code>shared.tsx</code> por causa do Fast Refresh. */
 
 /** Data curta em pt-BR. Mesma forma usada em Usuários. */
 export const fmtDate = (iso: string) =>
@@ -16,10 +12,7 @@ export function initials(name: string, email: string): string {
   return base.slice(0, 2).toUpperCase()
 }
 
-/**
- * Normaliza para comparar: minúsculas e sem acento. Quem procura "custodia" espera achar
- * "Custódia", e quem digita o nome de um criador raramente acentua.
- */
+/** Normaliza para busca: minúsculas e sem acento. */
 export function norm(s: string | null | undefined): string {
   return (s ?? "")
     .toLowerCase()
@@ -35,12 +28,7 @@ export function matches(query: string, ...fields: (string | null | undefined)[])
   return terms.every((t) => haystack.includes(t))
 }
 
-/**
- * Como a campanha aparece numa lista quando o contrato é avulso.
- *
- * <p>Uma célula em branco lê como dado que faltou carregar. "Sem campanha" diz que o
- * contrato é assim de propósito — trabalho pontual, que não pertence a nenhuma ação.</p>
- */
+/** Rótulo da campanha no contrato avulso: "Sem campanha", em vez de célula em branco. */
 export function campaignLabel(name: string | null | undefined): string {
   return name?.trim() ? name : "Sem campanha"
 }

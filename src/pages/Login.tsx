@@ -74,10 +74,7 @@ export default function LoginPage() {
     } catch (err) {
       const { code, message } = translateCognitoError(err)
       if (code === "UserNotConfirmedException") {
-        // A conta existe e nunca foi confirmada. Mandar a pessoa para a tela do código
-        // sem disparar um novo é pedir que ela digite o do cadastro — que pode ter
-        // vencido (24h) ou já ter sido invalidado por um reenvio. Era o caminho mais
-        // curto para "o código não é aceito".
+        // Conta não confirmada: reenvia o código antes de pedir para digitar, porque o do cadastro pode ter vencido.
         await auth.resendCode(email).catch(() => { /* a tela oferece reenviar de novo */ })
         nav("/register", { state: { email, step: 3, codeSent: true }, replace: true })
         return

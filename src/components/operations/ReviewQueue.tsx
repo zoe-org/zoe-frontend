@@ -2,20 +2,9 @@ import { useEffect, useRef, type ReactNode } from "react"
 import { ChevronDown, X } from "lucide-react"
 import { useFocusTrap } from "@/lib/useFocusTrap"
 
-/*
- * Peças da fila de revisão, comuns a "Cortes por aprovar" e "Entregas publicadas". Largura e
- * teclado ficam em `queueNavigation.ts`.
- *
- * As duas telas eram diferentes para a mesma tarefa — uma pilha de cards com o player aberto,
- * uma grade com gaveta — e nenhuma escalava: com cinco itens a pessoa rolava várias telas para
- * achar o próximo. Aqui as duas viram lista compacta à esquerda e um item por vez à direita,
- * o mesmo mestre-detalhe de Campanhas.
- */
+/* Peças da fila de revisão compartilhadas por cortes e entregas: lista compacta e um item por vez. Largura e teclado em <code>queue-navigation.ts</code>. */
 
-/**
- * Lista e detalhe. Largo: lado a lado, com o detalhe preso no alto enquanto a lista rola.
- * Estreito: a lista ocupa a tela e o detalhe abre por cima, como gaveta.
- */
+/** Lista e detalhe: lado a lado no largo, gaveta no estreito. */
 export function QueueLayout({
   wide, list, detail, onCloseDetail, detailTitle, hint,
 }: {
@@ -138,10 +127,7 @@ export function QueueRow({
   )
 }
 
-/**
- * Cabeçalho de uma seção da fila: a campanha, quantos esperam decisão e quantos itens há. Recolhe e
- * abre; fica preso no alto enquanto a lista rola, para a pessoa não perder de qual campanha é a linha.
- */
+/** Cabeçalho da seção da fila: campanha, pendentes e total; recolhe e fica preso no alto. */
 export function QueueSection({
   label, count, pending, collapsed, onToggle,
 }: {

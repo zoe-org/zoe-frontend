@@ -67,9 +67,7 @@ const dictionaries: Record<string, LocaleDictionaries> = {
       Whisper: "Áudio",
       Caption: "Legenda",
     },
-    // Operations. KYC é do domínio do criador (InfluencerKycStatus) e vale na
-    // plataforma toda; o status do elenco (TenantInfluencerStatus) é do vínculo
-    // com ESTE workspace. São coisas diferentes de propósito.
+    // KYC é do criador na plataforma; o status do elenco é do vínculo com este workspace.
     kycStatus: {
       NotStarted: "Não iniciado",
       Pending: "Em análise",
@@ -145,9 +143,7 @@ const dictionaries: Record<string, LocaleDictionaries> = {
       Neutral: "Neutro ou melhor",
       Positive: "Só positivo",
     },
-    // Entrega e custódia compartilham o rótulo "Em revisão" de propósito: para o
-    // usuário é o mesmo momento. O que difere é o que está sendo revisado — o vídeo
-    // aqui, o dinheiro lá.
+    // Entrega e custódia dividem "Em revisão": o mesmo momento para o usuário.
     deliveryStatus: {
       Submitted: "Aguardando revisão",
       UnderReview: "Em revisão",

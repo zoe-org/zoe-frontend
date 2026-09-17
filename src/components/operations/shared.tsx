@@ -1,11 +1,7 @@
 import { AlertCircle, Search, X } from "lucide-react"
 
 /**
- * Componentes repetidos pelas telas de Operations. Estavam copiados em quatro
- * páginas — a cópia seguinte (entregas e custódia) seria a quinta.
- *
- * Só componentes aqui: as funções de formatação vivem em `format.ts`, senão o
- * Fast Refresh para de funcionar no módulo inteiro.
+ * Componentes compartilhados das telas de Operations. Formatação mora em <code>operations-format.ts</code> por causa do Fast Refresh.
  */
 
 /** Rótulo + campo + dica, o formato dos formulários do módulo. */
@@ -65,17 +61,7 @@ export function ErrorState({ onRetry }: { onRetry: () => void }) {
   )
 }
 
-/**
- * Busca das listagens do módulo.
- *
- * <p>Filtra no cliente de propósito: as listagens de Operations devolvem o conjunto
- * inteiro do tenant, sem paginação, então o dado a filtrar já está na memória. Mandar a
- * busca para o servidor obrigaria a paginar cinco endpoints para responder mais devagar a
- * mesma pergunta.</p>
- *
- * <p>Quando o filtro esconde tudo, quem chama mostra "nenhum resultado para X" — some da
- * tela é o que faz a pessoa achar que perdeu o dado.</p>
- */
+/** Busca das listagens, filtrada no cliente: as listas do módulo chegam inteiras, sem paginação. */
 export function SearchBox({
   value, onChange, placeholder, className,
 }: {
@@ -132,10 +118,7 @@ export function NoResults({ query, onClear }: { query: string; onClear: () => vo
   )
 }
 
-/**
- * Capa de entrega sem miniatura — Reel e TikTok não têm imagem pública por id, e uma área
- * preta vazia parecia vídeo quebrado. O nome da plataforma diz onde o conteúdo está.
- */
+/** Capa de entrega sem miniatura, com o nome da plataforma. */
 export function PlatformCover({ platform, compact = false }: { platform: string; compact?: boolean }) {
   const background = platform === "Instagram"
     ? "linear-gradient(135deg, #F58529, #DD2A7B 55%, #8134AF)"
@@ -153,13 +136,7 @@ export function PlatformCover({ platform, compact = false }: { platform: string;
   )
 }
 
-/**
- * O que a marca paga numa custódia, em linhas: o criador recebe o valor do contrato inteiro,
- * e taxa da plataforma e processamento do pagamento vão por cima.
- *
- * Sem a composição à vista o total parece errado — "o contrato é de R$ 10.000 e a cobrança
- * foi de R$ 10.832,62?" — e essa é exatamente a pergunta que chega ao suporte.
- */
+/** O que a marca paga: contrato inteiro ao criador, com taxa e processamento por cima. */
 export function ChargeBreakdown({
   contractValueCents, takeRateCents, processingFeeCents, totalCents, takeRateBps, format,
 }: {

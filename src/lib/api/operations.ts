@@ -26,9 +26,7 @@ export type RosterItem = {
   addedAt: string
   contractCount: number
   /**
-   * Estado do relacionamento, derivado no backend: Contratado | Aceito | Convidado |
-   * ConviteExpirado, ou o status no elenco (Active/Paused/Archived) quando não houve
-   * convite. Não existe "Recusou" — o convite não tem recusa explícita.
+   * Estado do relacionamento derivado no backend (Contratado, Aceito, Convidado, ConviteExpirado ou status do elenco).
    */
   relationshipStatus: string
   // Cadastro declarado pelo criador — opcionais porque a API antiga não os mandava.
@@ -53,11 +51,7 @@ export type RosterItem = {
 
 export type ListRosterResponse = { items: RosterItem[] }
 
-/**
- * O KYC é gate de RECEBIMENTO, não de entrada (RN-O-012): o criador pode assinar
- * contrato e produzir sem KYC aprovado — só não recebe. Por isso a tela mostra o
- * estado sem bloquear nada, e esta função responde só a pergunta do pagamento.
- */
+/** KYC gateia o recebimento, não a entrada (RN-O-012). */
 export function canReceivePayout(item: Pick<RosterItem, "kycStatus" | "hasStripeAccount">): boolean {
   return item.kycStatus === "Verified" && item.hasStripeAccount
 }
@@ -129,10 +123,7 @@ export type CampaignDelivery = {
   isReviewOverdue: boolean
 }
 
-/**
- * Briefing auditável (RN-O-030/031). É a régua contra a qual a auditoria automática vai
- * medir a entrega — por isso tudo aqui é tipado e verificável, não texto livre.
- */
+/** Briefing auditável (RN-O-030/031), tipado para a auditoria comparar. */
 export type CampaignBriefing = {
   keywords: string[]
   requiredHashtags: string[]
@@ -143,10 +134,7 @@ export type CampaignBriefing = {
   deliverySlaDays: number | null
   /** Herdado pelos contratos da campanha. O threshold segue sendo por contrato. */
   defaultAuditThreshold: number
-  /**
-   * Se há alguma verificação concreta configurada. Falso quando não há menção, hashtag
-   * nem logo — a tela usa isto para não prometer auditoria sobre um briefing vazio.
-   */
+  /** Há verificação configurada; sem ela a tela não promete auditoria. */
   isAuditable: boolean
 }
 
@@ -202,12 +190,7 @@ export type CreateCampaignBody = {
 
 export type CampaignTransition = "Activate" | "Complete" | "Cancel"
 
-/**
- * Transições possíveis a partir de cada status, espelhando `Campaign.Activate/Complete/
- * Cancel` no domínio: rascunho ativa ou cancela, ativa conclui ou cancela, e encerrada é
- * encerrada. A autoridade é o domínio — isto existe para a tela não oferecer um botão que
- * já se sabe que vai falhar.
- */
+/** Transições da campanha, espelho de <code>Campaign.Activate/Complete/Cancel</code>. */
 export function allowedCampaignTransitions(status: string): CampaignTransition[] {
   switch (status) {
     case "Draft": return ["Activate", "Cancel"]
@@ -328,12 +311,7 @@ export const INFLUENCER_INVITE_PATH = "creator-invite"
 
 // ————————————————————————————— Contratos —————————————————————————————
 
-/**
- * Modalidades na ordem de `ContractModality` do domínio. Espelho, não fonte:
- * a autoridade é o backend, que revalida tudo e recusa explicitamente. Isto existe
- * só para a tela conseguir EXPLICAR antes de mandar — sem isso o usuário escolheria
- * Afiliado, ligaria custódia e levaria um 400 sem entender o motivo.
- */
+/** Modalidades na ordem do domínio, espelho para a tela explicar antes do 400. */
 export const CONTRACT_MODALITIES = [
   "Publipost", "Ambassador", "Barter", "Affiliate", "License",
   "Ugc", "Events", "Cocreation", "SocialManagement", "Exclusivity",
@@ -364,21 +342,11 @@ export function supportsEscrow(modality: string): boolean {
   return MODALITY_ESCROW[modality as ContractModality] === "Supported"
 }
 
-/**
- * Toda modalidade cria campanha. O que a RN-O-039 proíbe é o contrato **com
- * custódia** em modalidade não suportada — e a Permuta prova que contrato sem
- * dinheiro é legítimo. Nas seis deferidas o pagamento corre fora da plataforma,
- * e a tela precisa dizer isso: o que a regra teme é o silêncio, não a ausência
- * de custódia.
- */
+/** Toda modalidade cria campanha; a RN-O-039 barra só contrato com custódia. */
 export const CAMPAIGN_MODALITIES = CONTRACT_MODALITIES
 
 /**
- * Por que esta modalidade não aceita custódia. `null` = aceita.
- *
- * Os dois motivos são diferentes e a tela precisa distingui-los: permuta nunca
- * vai ter custódia porque não há dinheiro; as outras vão ter quando o escrow por
- * milestone existir. Tratar as duas como "não dá" esconderia um roadmap.
+ * Motivo de a modalidade não aceitar custódia (<code>null</code> aceita): sem dinheiro, ou ainda sem escrow por milestone.
  */
 export function escrowRejectionReason(modality: string): string | null {
   switch (MODALITY_ESCROW[modality as ContractModality]) {
@@ -398,10 +366,7 @@ export type ContractSummary = {
   contractId: string
   influencerId: string
   influencerName: string
-  /**
-   * O que distingue dois contratos do mesmo criador. Nulo no contrato avulso — o
-   * trabalho pontual que não pertence a campanha nenhuma.
-   */
+  /** Distingue contratos do mesmo criador; nulo no avulso. */
   campaignId: string | null
   campaignName: string | null
   modality: string
@@ -423,10 +388,7 @@ export type ContractSummary = {
 export type ListContractsResponse = { items: ContractSummary[] }
 
 export type CreateContractBody = {
-  /**
-   * Campanha do contrato. Nula cria o contrato avulso — e aí `modality` é obrigatória,
-   * porque é ela que resolve o template.
-   */
+  /** Nula cria contrato avulso, e aí <code>modality</code> é obrigatória. */
   campaignId: string | null
   influencerId: string
   usesEscrow: boolean
@@ -435,10 +397,7 @@ export type CreateContractBody = {
   reviewSlaDays?: number
   maxResubmissions?: number
   autoReleaseOnTimeout?: boolean
-  /**
-   * Fluxo financeiro encadeado: assinado abre a custódia e pede a reserva, fundos liberam a
-   * produção, aprovar a entrega pede o pagamento. Ignorado em contrato sem custódia.
-   */
+  /** Fluxo financeiro encadeado da assinatura ao pagamento; ignorado sem custódia. */
   autoAdvanceEscrow?: boolean
 }
 
@@ -466,15 +425,9 @@ export type ContractField = {
   isRequired: boolean
   helpText: string | null
   value: string | null
-  /**
-   * Valor de que o sistema é dono — id do contrato, nome da campanha. Vem preenchido e a
-   * tela mostra sem permitir edição: é identidade do registro, não texto a digitar.
-   */
+  /** Valor do sistema (id do contrato, nome da campanha), exibido sem edição. */
   isSystemManaged: boolean
-  /**
-   * De onde veio o valor: TenantDefault | Campaign | Invite | Record | Manual. Nulo em
-   * contrato criado antes de a origem existir.
-   */
+  /** Origem do valor: TenantDefault, Campaign, Invite, Record ou Manual. */
   source: ContractFieldSource | null
   /** Se o valor pode virar padrão da marca — identidade e termos da negociação não podem. */
   defaultable: boolean
@@ -518,20 +471,13 @@ export type ContractDetail = {
   autoReleaseOnTimeout: boolean
   /** Fluxo financeiro encadeado — ver `CreateContractBody.autoAdvanceEscrow`. */
   autoAdvanceEscrow: boolean
-  /**
-   * Provedor de assinatura real configurado. Com ele o atalho "marcar como assinado" é
-   * recusado pela API — a confirmação vem do provedor.
-   */
+  /** Há provedor de assinatura real; o atalho manual é recusado. */
   signatureProviderLive?: boolean
   /** Valor total declarado no contrato, em centavos, quando legível — o que a custódia reserva. */
   declaredTotalCents?: number | null
   /** Rascunho que ficou sem a proposta do convite porque outro contrato a levou — é este. */
   proposalUsedByContractId?: string | null
-  /**
-   * O que a marca paga se a custódia abrir com o valor declarado: criador + taxa +
-   * processamento. Vem do servidor, com a tabela do provedor — a tela não refaz a conta.
-   * Nulo sem custódia, sem valor legível ou sem taxa.
-   */
+  /** Total da marca antes de abrir a custódia, calculado no servidor. Nulo sem custódia, valor ou taxa. */
   chargePreview?: ChargePreview | null
   /** Custódia já aberta. Nulo com usesEscrow = a tela oferece abrir. */
   escrowAccountId: string | null
@@ -562,13 +508,7 @@ export type MarkSignedResponse = {
   signedAt: string
 }
 
-/**
- * Traduz o tipo do domínio no primitivo de input que o navegador entende.
- *
- * `Enum` cai em texto de propósito: a API ainda não expõe a lista de opções do
- * campo, e um select vazio seria pior que um texto livre com dica. `Attachment`
- * também — não existe upload em lugar nenhum do fluxo ainda.
- */
+/** Tipo do domínio em primitivo de input; <code>Enum</code> e <code>Attachment</code> caem em texto. */
 export function fieldInputKind(dataType: string): "text" | "date" | "number" | "checkbox" {
   switch (dataType) {
     case "Date": return "date"
@@ -607,11 +547,6 @@ export const operationsApi = {
       { signal: opts?.signal },
     ),
 
-  /**
-   * Dispara o gatilho. Fund/Release/Refund **enfileiram** e devolvem `to: null` com
-   * `queued: true` — nenhuma operação financeira roda dentro do request (RN-O-044).
-   * StartProduction transiciona na hora porque não move dinheiro.
-   */
   /** Abre a custódia de um contrato assinado. A taxa NÃO vai aqui — vem do contrato. */
   // Sem amountCents a API usa o valor total declarado no contrato.
   openEscrow: (body: { contractId: string; amountCents?: number; currency?: string }) =>
@@ -625,6 +560,7 @@ export const operationsApi = {
       processingFeeCents: number
     }>("/api/operations/escrow", body),
 
+  /** Fund, Release e Refund enfileiram e devolvem <code>queued: true</code> (RN-O-044); StartProduction transiciona na hora. */
   applyEscrowAction: (escrowAccountId: string, action: EscrowAction) =>
     apiClient.post<{
       escrowAccountId: string
@@ -843,11 +779,7 @@ export function useContractMutations() {
 }
 
 /**
- * De quanto em quanto tempo o detalhe do contrato se atualiza sozinho, ou `false`.
- *
- * <p>Enquanto a tela espera um passo que acontece fora dela — a assinatura (webhook ou consulta
- * periódica) e, com pagamento automático, a custódia abrindo e reservando — ela vai buscar.
- * Antes dizia "atualize em instantes" e dependia de F5.</p>
+ * Intervalo de atualização do contrato enquanto espera assinatura ou custódia automática, ou <code>false</code>.
  */
 export function pollInterval(d: ContractDetail | undefined, now: number = Date.now()): number | false {
   if (!d) return false
@@ -929,11 +861,7 @@ export function useContractDetailMutations(contractId: string | undefined) {
   }
 }
 
-/**
- * Máquina de estados da custódia — **nove**, na ordem em que o domínio transiciona.
- * O protótipo desenha seis; faltam nele `Delivered` (entregue mas revisão não aberta),
- * `Disputed` e `Refunded`. Onde diverge, vale a máquina, que é a implementada e testada.
- */
+/** Os nove estados da custódia, na ordem do domínio. */
 export const ESCROW_STATES = [
   "PendingDeposit", "Funded", "InProduction", "Delivered", "UnderReview",
   "Releasable", "Released", "Disputed", "Refunded",
@@ -941,11 +869,7 @@ export const ESCROW_STATES = [
 
 export type EscrowState = (typeof ESCROW_STATES)[number]
 
-/**
- * Fila de entregas. Os estados vêm de `DeliveryStatus` no domínio — cinco, e nenhum
- * deles é financeiro: o que acontece com o dinheiro é `escrowState`, que vem junto
- * só para a tela poder dizer "aprovada mas ainda não paga" sem inventar estado.
- */
+/** Estados de entrega do domínio; <code>escrowState</code> vem junto para separar aprovada de paga. */
 export const DELIVERY_STATUSES = [
   "Submitted", "UnderReview", "Approved", "ReworkRequested", "Rejected",
 ] as const
@@ -979,18 +903,11 @@ export type DeliverySummary = {
   paymentFollowsApproval: boolean
   /** Conta de recebimento do criador existe e está verificada — sem ela o pagamento espera. */
   creatorPayoutReady: boolean
-  /**
-   * O contrato aprova a entrega quando o prazo de revisão vence (RN-O-055). A tela diz isso em vez de
-   * "nada acontece automaticamente".
-   */
+  /** O contrato aprova a entrega quando o prazo de revisão vence (RN-O-055). */
   autoReleaseOnTimeout?: boolean
 }
 
-/**
- * Resultado da auditoria automática (RN-O-056 a 061). `isApprovable` diz que a nota
- * alcançou o mínimo — **não** que a entrega está aprovada: o clique continua sendo humano,
- * e o botão de aprovar existe mesmo abaixo do threshold.
- */
+/** Auditoria automática (RN-O-056 a 061): aprovável não é aprovada. */
 export type DeliveryAudit = {
   score: number
   appliedThreshold: number
@@ -1012,10 +929,7 @@ export type ListDeliveriesResponse = { items: DeliverySummary[] }
 
 export type DeliveryDecision = "Approve" | "RequestRework" | "Reject"
 
-/**
- * O que a correção pede: ajustar a publicação (legenda, #publi, link — o vídeo aprovado segue
- * valendo) ou refazer o vídeo (o corte reabre e volta pela aprovação).
- */
+/** Correção de publicação (o vídeo segue valendo) ou de conteúdo (o corte reabre). */
 export type ReworkScope = "Publication" | "Content"
 
 export type DecideDeliveryResponse = {
@@ -1045,10 +959,7 @@ export const PLATFORM_LABEL: Record<string, string> = {
 
 type DeliveryLinkish = { platform?: string | null; youtubeVideoId: string | null; submittedUrl: string }
 
-/**
- * Miniatura montada sem rede. Só o YouTube expõe imagem pública pelo id do vídeo; a do TikTok vem
- * da API (`useDeliveryThumb`), e o Instagram fica com a capa com o nome da plataforma.
- */
+/** Miniatura sem rede, só do YouTube; TikTok vem de <code>useDeliveryThumb</code>. */
 export const deliveryThumb = (d: Omit<DeliveryLinkish, "submittedUrl">): string | null =>
   (d.platform ?? "YouTube") === "YouTube" && d.youtubeVideoId ? youtubeThumb(d.youtubeVideoId) : null
 
@@ -1058,18 +969,11 @@ export const deliveryLink = (d: DeliveryLinkish): string =>
 
 export type DeliveryThumbnail = { thumbnailUrl: string | null }
 
-/**
- * Quanto a miniatura buscada vale na tela. A URL do TikTok é assinada e vence em cerca de dois dias;
- * o servidor a guarda por até 12 h, então 6 h aqui não chegam perto do vencimento.
- */
+/** Validade da miniatura na tela: a URL do TikTok vence em ~2 dias e o servidor guarda por 12 h. */
 const THUMB_STALE = 6 * 60 * 60_000
 
 /**
- * Miniatura em qualquer plataforma: YouTube sai do id do vídeo, sem rede; TikTok é pedido à API, que
- * consulta o oEmbed (a imagem é assinada e expira, então não dá para montar nem gravar); Instagram
- * segue sem imagem. Uma consulta por entrega, só para as linhas que aparecem.
- *
- * Genérico no `fetchThumb` porque marca e criador leem por rotas diferentes — com tenant e sem.
+ * Miniatura em qualquer plataforma: YouTube pelo id, TikTok pela API (a URL do oEmbed expira), Instagram sem imagem. <code>fetchThumb</code> muda entre marca e criador.
  */
 export function useRemoteDeliveryThumb(
   d: Omit<DeliveryLinkish, "submittedUrl"> & { deliveryId: string },
@@ -1109,9 +1013,7 @@ export function useDeliveries(status?: string) {
     queryFn: ({ signal }) => operationsApi.listDeliveries(status, { signal }),
     enabled: Boolean(activeTenantId),
     staleTime: 30_000,
-    // Segura o conteudo anterior enquanto revalida. Sem isto a tela esvazia a cada
-    // volta ao modulo e a pessoa ve um vazio que nao e' verdade — parece que nao ha'
-    // entregas quando so' esta' buscando de novo.
+    // Mantém o conteúdo anterior enquanto revalida, para a tela não esvaziar a cada volta ao módulo.
     placeholderData: keepPreviousData,
   })
 }
@@ -1175,10 +1077,7 @@ export type EscrowSummary = {
   processingFeeCents: number
   authorizationExpiresAt: string | null
   isAuthorizationExpired: boolean
-  /**
-   * Quando a reserva caducou sem renovação (RN-O-046). Preenchido = o dinheiro NÃO está
-   * mais separado, e a liberação vai recusar.
-   */
+  /** Reserva caducada sem renovação (RN-O-046): o dinheiro não está mais separado. */
   authorizationLapsedAt: string | null
   disputeReason: string | null
   payoutAccountMissing: boolean
@@ -1239,9 +1138,7 @@ export function useDeliveryDrafts(status?: string) {
         { signal },
       ),
     enabled: Boolean(activeTenantId),
-    // Curto: o previewUrl assinado vence, e servir um vencido do cache mostraria um
-    // player quebrado sem explicação. Pelo mesmo motivo esta consulta NAO guarda o
-    // conteudo anterior enquanto revalida — melhor um vazio breve que um video morto.
+    // Curto e sem manter o conteúdo anterior: o previewUrl assinado vence.
     staleTime: 10_000,
   })
 }
@@ -1327,9 +1224,7 @@ export function useRosterMutations() {
   const qc = useQueryClient()
   return {
     invite: useMutation({
-      // Um convite, dois destinos. Com campanha ele é proposta de trabalho e vai para o
-      // endpoint dela — que é o único que aceita cachê, porque só ali existe modalidade
-      // para dizer se permuta o recusa. Sem campanha é convite de elenco.
+      // Com campanha, o convite é proposta e vai para a rota dela; sem campanha, é convite de elenco.
       mutationFn: ({ campaignId, ...body }: InviteInfluencerBody & { campaignId?: string }) =>
         campaignId
           ? operationsApi.inviteInfluencer(campaignId, body)
@@ -1354,12 +1249,7 @@ export function useRosterMutations() {
 
 // ————————————————————————————— Painel —————————————————————————————
 
-/**
- * Espelha OperationsDashboardResponse do zoe-api.
- *
- * <p>Os números são somados no servidor de propósito: somar dinheiro no cliente seria
- * uma segunda resposta para a mesma pergunta, e a que diverge é sempre descoberta tarde.</p>
- */
+/** Espelha OperationsDashboardResponse; os números vêm somados do servidor. */
 export type OperationsDashboard = {
   money: {
     pendingDepositCents: number
@@ -1407,10 +1297,7 @@ export function useOperationsDashboard() {
 
 // ————————————————————————— Padrões de contrato —————————————————————————
 
-/**
- * Padrão da marca para um campo de contrato (RN-O-024, Nível 1). Todo contrato novo nasce
- * com esse valor, e quem preenche pode trocar.
- */
+/** Padrão da marca para um campo de contrato (RN-O-024, nível 1). */
 export type ContractDefaultField = {
   placeholder: string
   label: string
@@ -1428,10 +1315,7 @@ export type ContractDefaults = {
   autoReleaseOnTimeout?: boolean
 }
 
-/**
- * Os que quase toda marca repete em todo contrato. A tela mostra estes primeiro; o resto do
- * catálogo fica numa lista com busca, porque ninguém quer rolar cem campos para achar o foro.
- */
+/** Padrões que quase toda marca repete, mostrados primeiro. */
 export const ESSENTIAL_CONTRACT_DEFAULTS = [
   "contract_object", "jurisdiction", "applicable_law", "digital_signature",
   "company_rep_name", "payment_terms", "image_rights", "copyright_assignment",

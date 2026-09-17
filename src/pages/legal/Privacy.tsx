@@ -2,9 +2,7 @@ import { Link } from "react-router-dom"
 import { LegalPage, PrivacyContact, Section } from "@/components/legal/LegalPage"
 
 /**
- * Política de Privacidade. Descreve o que o sistema faz de verdade — quais dados, onde ficam,
- * com quem vão — e não o que um modelo genérico diria. Texto de produto, não parecer: passa pela
- * mesma revisão jurídica dos contratos antes do primeiro cliente real.
+ * Política de Privacidade descrevendo o que o sistema faz; passa pela revisão jurídica antes do primeiro cliente.
  */
 export default function PrivacyPage() {
   return (

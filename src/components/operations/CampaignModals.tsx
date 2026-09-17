@@ -19,11 +19,7 @@ import {
   type CampaignBriefingInput, type BriefingSentiment, BRIEFING_SENTIMENTS,
 } from "@/lib/api/operations"
 
-/**
- * Edição do que ainda faz sentido mudar depois de criada. Modalidade fica fora: os
- * contratos já a herdaram, e trocá-la deixaria contrato e campanha discordando sobre que
- * acordo foi firmado — é a mesma razão pela qual o comando no backend não a aceita.
- */
+/** Edita o que ainda pode mudar; modalidade fica fora porque os contratos já a herdaram. */
 export function EditCampaignModal({
   campaign, onClose,
 }: {
@@ -271,11 +267,7 @@ function readAllowance(e: ApiError): Allowance {
   return {}
 }
 
-/**
- * Convite de upgrade, não mensagem de erro (RN-O-021). Duas coisas o texto precisa deixar
- * claras, porque são o ponto da regra: a campanha **não foi descartada**, e o limite volta
- * a zerar numa data conhecida — quem não quer pagar agora tem uma saída.
- */
+/** Convite de upgrade (RN-O-021): a campanha não foi descartada e o limite zera numa data conhecida. */
 function AllowanceModal({
   allowance, campaignName, onBack, onClose,
 }: {
@@ -398,9 +390,7 @@ export function CreateCampaignModal({ onClose }: { onClose: () => void }) {
         onClose()
       },
       onError: (e) => {
-        // RN-O-021 é explícita: o limite é soft-block **com modal de upgrade**. Cair no
-        // toast genérico transformaria um convite de upgrade em mensagem de erro — e a
-        // regra diz que a campanha não foi descartada, o que um toast não consegue dizer.
+        // RN-O-021: cota estourada abre o modal de upgrade, não um toast de erro.
         if (e instanceof ApiError && e.code === "campaign_monthly_limit_reached") {
           setLimit(readAllowance(e))
           return

@@ -11,17 +11,7 @@ import { useCreatorWorkspace, usePayoutMutations } from "@/lib/api/creator"
 import ZoeLogo from "@/assets/zoe-logo.svg?react"
 
 /**
- * Conta de recebimento do criador.
- *
- * <p><b>Nada de dado fiscal aqui.</b> Nome civil, CPF e conta bancária o criador preenche
- * no cadastro hospedado do provedor de pagamentos, não nesta tela. Não é economia de
- * formulário: é o que mantém dado sensível fora do nosso banco e deixa a verificação com
- * quem tem obrigação regulatória de fazê-la.</p>
- *
- * <p><b>O que trava é o recebimento, não o trabalho.</b> Sem conta verificada ele assina
- * contrato e produz normalmente — o que não acontece é o dinheiro sair. A tela diz isso
- * com todas as letras, porque a leitura contrária ("estou impedido de trabalhar") é a que
- * faz alguém desistir da campanha.</p>
+ * Conta de recebimento do criador. Dado fiscal fica no cadastro hospedado do provedor; sem conta verificada ele trabalha, só não recebe.
  */
 export default function CreatorPayoutPage() {
   const { user, signOut } = useAuth()
@@ -32,15 +22,7 @@ export default function CreatorPayoutPage() {
   const d = workspace.data
   const returned = params.get("status")
 
-  // Sincroniza ao ENTRAR, não só ao voltar do provedor.
-  //
-  // O retorno pela returnUrl é o caminho feliz — e não é o mais comum. Quem conclui o
-  // cadastro costuma fechar a aba do provedor em vez de clicar em voltar, e aí o
-  // `?status=completed` nunca chega: o banco fica dizendo "pendente" para quem já se
-  // verificou. Perguntar na montagem cobre os dois casos.
-  //
-  // Uma vez por visita: a verificação não muda de segundo em segundo, e o comando
-  // escreve — repetir a cada render encheria a trilha de auditoria de não-eventos.
+  // Sincroniza ao entrar, uma vez por visita: quem fecha a aba do provedor nunca volta pela returnUrl.
   const synced = useRef(false)
   useEffect(() => {
     if (synced.current) return
@@ -81,9 +63,7 @@ export default function CreatorPayoutPage() {
 
   const verified = d?.canReceivePayout ?? false
 
-  // Antes a tela só distinguia verificado de não-verificado, e quem acabara de criar a
-  // conta continuava vendo "cadastro pendente" como se nada tivesse acontecido. O estado
-  // existe no dado — a tela é que não o lia.
+  // Mostra também o estado intermediário da conta, não só verificado ou não.
   const kyc = d?.kycStatus ?? "NotStarted"
   const noAccount = kyc === "NotStarted"
   const inVerification = kyc === "Pending"

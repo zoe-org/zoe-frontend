@@ -24,10 +24,7 @@ import { AUDIENCE_SIZES } from "@/lib/api/creator"
 /** Valor da aba do filtro de pagamento travado — não é um estado de relacionamento. */
 const PAYMENT_STUCK = "pagamento-travado"
 
-/**
- * A conta de recebimento numa situação só. Eram duas colunas, KYC e Recebimento, dizendo quase o
- * mesmo com palavras diferentes — e nenhuma das duas dizia o que fazer.
- */
+/** A situação da conta de recebimento numa só coluna, com o que fazer. */
 function payoutState(it: RosterItem): { label: string; color: string; explanation: string } {
   if (canReceivePayout(it)) {
     return { label: "pode receber", color: "#00A799", explanation: "Conta de recebimento conectada e verificada." }
@@ -99,9 +96,7 @@ export default function OperationsRosterPage() {
 
   const items = useMemo(
     () => (rel === PAYMENT_STUCK ? all.filter(isPaymentStuck) : rel ? all.filter((i) => i.relationshipStatus === rel) : all)
-      // E-mail entra na busca porque e' o identificador que a pessoa tem em maos quando
-      // veio de fora — de uma conversa, de uma planilha — e nem sempre sabe o nome exato
-      // com que o criador foi cadastrado aqui.
+      // E-mail também entra na busca.
       .filter((i) => !area || i.primaryArea === area)
       .filter((i) => !audience || i.audienceSize === audience)
       .filter((i) => matches(search, i.displayName, i.fullName, i.email, i.primaryArea)),
@@ -158,13 +153,7 @@ export default function OperationsRosterPage() {
               <SearchBox value={search} onChange={setSearch} placeholder="Buscar por nome, e-mail, área…" />
             )}
           <RoleGate minRole="Admin">
-            {/* Convidar nao depende de campanha: a marca monta elenco antes de existir
-                acao, e o criador e da marca, nao do projeto.
-
-                E' a unica porta de entrada. Existia tambem "Adicionar criador", que
-                cadastrava sem avisar a pessoa: ela entrava no elenco sem conta, e sem
-                conta nao conecta o recebimento — o contrato andava e o pagamento travava
-                no fim. */}
+            {/* Única entrada no elenco é o convite, que dá ao criador a conta que conecta o recebimento. */}
             <button
               onClick={() => setInviteOpen(true)}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-medium text-white transition-colors"
@@ -287,11 +276,7 @@ function RosterRow({ item, index, onOpen }: { item: RosterItem; index: number; o
   )
 }
 
-/**
- * O criador por inteiro: situação da conta, o que ele declarou no cadastro e os contratos com
- * este workspace. A linha do elenco não abria nada, e para saber qualquer coisa além do nome era
- * preciso caçar em Contratos ou Custódia.
- */
+/** O criador por inteiro: conta, cadastro declarado e contratos com este workspace. */
 function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => void }) {
   useEscapeKey(onClose)
   const dialogRef = useFocusTrap<HTMLDivElement>()
@@ -508,11 +493,7 @@ function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => voi
   )
 }
 
-/**
- * Lembrete por e-mail para o criador resolver a conta de recebimento. A conta é dele — a marca
- * não tem como concluir por ele —, e sem isto o caminho era mandar mensagem por fora sem saber
- * o que dizer. O servidor limita o envio e recusa quando a conta já está pronta.
- */
+/** Lembra o criador de concluir a conta de recebimento; o servidor limita e recusa conta pronta. */
 function RemindCreatorButton({ influencerId, name }: { influencerId: string; name: string }) {
   const { remindPayout } = useRosterMutations()
   const [sent, setSent] = useState(false)
@@ -542,17 +523,7 @@ function RemindCreatorButton({ influencerId, name }: { influencerId: string; nam
 }
 
 /**
- * Filtro por estado do relacionamento.
- *
- * <p>As abas saem dos dados, não de uma lista fixa: só aparece o estado que existe no
- * elenco. Aba com zero é aba que o usuário clica e não entende por que está vazia.</p>
- *
- * <p><b>Não há "Recusou".</b> O convite tem aceite e vencimento, e nenhuma recusa
- * explícita — o criador aceita ou deixa vencer. O protótipo mostra essa aba; o domínio
- * não sabe produzi-la, e inventá-la aqui seria rotular como recusa o que é silêncio.</p>
- *
- * <p>"Pagamento travado" vem por último e só com alguém nele: não é etapa da relação, é o
- * que a marca procura quando a custódia avisa que um pagamento está parado.</p>
+ * Abas do relacionamento geradas dos dados, sem "Recusou" (o convite não tem recusa). "Pagamento travado" vem por último.
  */
 function RelationshipTabs({
   items,

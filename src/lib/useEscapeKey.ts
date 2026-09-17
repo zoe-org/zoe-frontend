@@ -1,11 +1,6 @@
 import { useEffect, useRef } from "react"
 
-/**
- * Esc fecha. Os modais do Operations são feitos à mão (div fixa), e só Marcas tratava a
- * tecla — nos outros a pessoa precisava achar o X ou clicar fora.
- *
- * <p>O callback fica numa ref para o listener não ser recriado a cada render de quem chama.</p>
- */
+/** Esc fecha os modais feitos à mão; o callback fica numa ref. */
 export function useEscapeKey(onEscape: () => void, enabled = true) {
   const callback = useRef(onEscape)
 

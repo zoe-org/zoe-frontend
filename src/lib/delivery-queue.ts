@@ -1,12 +1,7 @@
 import type { DeliverySummary } from "@/lib/api/operations"
 
 /**
- * Um contrato na fila de entregas: a tentativa mais recente e as anteriores.
- *
- * <p>Cada reenvio depois de uma correção é uma entrega nova no banco, e a fila mostrava as duas
- * lado a lado — mesmo vídeo, mesmo criador, mesmo valor, um card "Precisa correção" e outro
- * "Aguardando revisão". Com várias campanhas ao mesmo tempo cada correção duplicava o contrato
- * na tela. A decisão é sempre sobre a última tentativa; as outras são histórico.</p>
+ * Um contrato na fila de entregas: a tentativa mais recente e as anteriores, para o reenvio não duplicar a linha.
  */
 export type DeliveryGroup = { current: DeliverySummary; previous: DeliverySummary[] }
 
@@ -30,8 +25,7 @@ export function groupByContract(items: readonly DeliverySummary[]): DeliveryGrou
 }
 
 /**
- * Ordem da fila. Esperando decisão: prazo vencido primeiro, depois quem chegou antes — é a
- * ordem em que alguém deveria trabalhar. Nas demais abas, o mais recente no topo.
+ * Esperando decisão: prazo vencido primeiro, depois quem chegou antes. Nas outras abas, o mais recente no topo.
  */
 export function sortQueue(groups: readonly DeliveryGroup[], pendingFirst: boolean): DeliveryGroup[] {
   return [...groups].sort((a, b) => {

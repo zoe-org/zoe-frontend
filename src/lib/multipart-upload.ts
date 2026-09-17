@@ -1,15 +1,5 @@
 /**
- * Envio de arquivo grande em partes, com retomada.
- *
- * Num PUT único, queda de conexão no meio perde tudo — e corte de campanha sobe por minutos numa
- * banda doméstica. Aqui cada parte vai sozinha: a queda custa só a parte em curso, e o que já subiu
- * fica guardado no navegador para o próximo envio do MESMO arquivo continuar de onde parou.
- *
- * Quem guarda as partes enviadas é este lado, não a API: listar as partes no storage exigiria uma
- * permissão a mais no bucket, e o ETag de cada parte já volta no cabeçalho da resposta.
- *
- * Sem dependência de DOM: `putParte`, `api` e `storage` entram por parâmetro, e o arquivo é lido
- * pelo mínimo de `File` que interessa. É o que deixa a lógica de retomada testável.
+ * Envio de arquivo grande em partes, com retomada guardada no navegador. Sem DOM: <code>putPart</code>, <code>api</code> e <code>storage</code> entram por parâmetro, para testar a retomada.
  */
 
 export type UploadableFile = Pick<File, "name" | "size" | "lastModified" | "slice">
@@ -50,10 +40,7 @@ export type PutPart = (
   onProgress: (partBytes: number) => void,
 ) => Promise<string>
 
-/**
- * Identidade do arquivo para retomar. Nome, tamanho e data de modificação juntos: escolher outro
- * arquivo (ou reexportar o mesmo vídeo) tem de começar um envio novo, nunca colar partes de dois.
- */
+/** Identidade do arquivo para retomar: nome, tamanho e data de modificação. */
 export const resumeKey = (contractId: string, file: UploadableFile) =>
   `zoe-draft-upload:${contractId}:${file.name}:${file.size}:${file.lastModified}`
 
@@ -95,10 +82,7 @@ export type MultipartUploadOptions = {
   wait?: (ms: number) => Promise<void>
 }
 
-/**
- * Sobe o arquivo e conclui o envio. Devolve a chave do objeto, que é o que a confirmação do corte
- * manda para a API.
- */
+/** Sobe o arquivo, conclui o envio e devolve a chave do objeto. */
 export async function uploadInParts({
   contractId, file, contentType, api, putPart, storage,
   onProgress, concurrency = 3, attemptsPerPart = 3, wait = defaultWait,

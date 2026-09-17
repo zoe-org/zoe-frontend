@@ -1,14 +1,7 @@
 /**
- * Versão dos Termos de Uso e da Política de Privacidade exibida nas páginas.
- *
- * ⚠️ Tem de ser igual a `LegalTerms.CurrentVersion` no zoe-api. O aceite não usa este número —
- * ele vem da prévia do convite, que é o backend — mas a página mostra a versão que a pessoa está
- * lendo, e as duas precisam bater. Mudou o texto? Mude a versão nos dois lugares.
+ * Versão dos Termos exibida nas páginas; tem de ser igual a <code>LegalTerms.CurrentVersion</code> no zoe-api.
  */
 export const LEGAL_VERSION = "2026-09-16"
 
-/**
- * Canal para exercer direitos e falar com o encarregado (LGPD, art. 41). Vazio enquanto não for
- * definido — as páginas mostram o aviso no lugar em vez de inventar um endereço.
- */
+/** Contato do encarregado (LGPD, art. 41). Vazio até ser definido; as páginas mostram aviso. */
 export const PRIVACY_CONTACT_EMAIL = ""

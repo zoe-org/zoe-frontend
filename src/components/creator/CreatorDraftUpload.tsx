@@ -7,11 +7,7 @@ import { Input } from "@/components/ui/input"
 import { fmtDate } from "@/lib/operations-format"
 import { useDraftUpload, SINGLE_PUT_LIMIT, type CreatorEngagement } from "@/lib/api/creator"
 
-/**
- * Teto do corte. Nasceu do limite de um PUT único no S3; com o envio em partes o storage aceitaria
- * mais, mas o limite não pode depender do caminho que o navegador escolheu — e 5 GB já é um corte
- * enorme. Dito antes de começar, ninguém espera o arquivo inteiro subir para ouvir não.
- */
+/** Teto de 5 GB, igual nos dois caminhos de envio e avisado antes de começar. */
 const MAX_BYTES = 5 * 1024 ** 3
 
 const ACCEPTED_FORMATS = ["video/mp4", "video/quicktime", "video/x-matroska", "video/webm"]
@@ -22,16 +18,7 @@ function fmtRemaining(ms: number): string {
 }
 
 /**
- * Primeiro dos dois portões, do lado do criador: subir o corte para a marca ver **antes**
- * de publicar.
- *
- * <p>Depois de publicado, pedir correção custa republicação, alcance perdido e desgaste
- * com a audiência. Este portão existe para a reprovação acontecer antes do estrago — e a
- * tela diz isso, porque um upload "porque o sistema pede" é um upload que ninguém faz com
- * cuidado.</p>
- *
- * <p>O arquivo vai direto para o storage, fora da API. Três passos: autorizar, subir,
- * confirmar.</p>
+ * Primeiro portão, do lado do criador: o corte sobe para a marca ver antes de publicar, direto para o storage.
  */
 export function CreatorDraftUpload({ engagement }: { engagement: CreatorEngagement }) {
   const upload = useDraftUpload()
@@ -166,10 +153,7 @@ export function CreatorDraftUpload({ engagement }: { engagement: CreatorEngageme
 
           {!approved && !awaiting && (
             <div className="mt-3 flex flex-col gap-2.5">
-              {/* O input nativo ficava a' mostra com `file:text-white` e SEM cor de fundo:
-                  botao branco sobre branco. So' se via "Nenhum arquivo escolhido", sem
-                  nada indicando onde clicar. Agora ele fica escondido e a area inteira e'
-                  o alvo — que e' o gesto esperado para video, incluindo arrastar. */}
+              {/* Input nativo escondido: a área inteira é o alvo, inclusive para arrastar. */}
               <input
                 ref={inputRef}
                 type="file"
@@ -252,9 +236,7 @@ export function CreatorDraftUpload({ engagement }: { engagement: CreatorEngageme
                   : changesRequested ? "Enviar nova versão" : "Enviar para revisão"}
               </button>
 
-              {/* Barra de progresso REAL, nao um girador. Video sobe por minutos numa
-                  conexao domestica, e um botao parado em "enviando" e' indistinguivel de
-                  travado — a pessoa cancela e recomeça, que e' o pior desfecho. */}
+              {/* Barra de progresso real: upload de minutos parado em "enviando" parece travado. */}
               {upload.isPending && (
                 <div className="flex flex-col gap-1.5">
                   <div

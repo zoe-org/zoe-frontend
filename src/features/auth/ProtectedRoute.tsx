@@ -30,9 +30,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // Convite de criador ainda não aceito: o token no armazenamento é o que sobrevive ao
-  // round-trip de cadastro. Vem antes do desvio de criador porque a conta só passa a ser
-  // de criador DEPOIS do aceite.
+  // Convite de criador pendente vence o desvio de criador: a conta só vira criador depois do aceite.
   if (needsOnboarding && !location.pathname.startsWith("/creator-invite/")) {
     const influencerToken = getPendingInfluencerInviteToken()
     if (influencerToken) {

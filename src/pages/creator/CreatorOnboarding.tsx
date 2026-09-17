@@ -18,16 +18,7 @@ const STEPS = [
   { n: 3, title: "Recebimento" },
 ] as const
 
-/**
- * Cadastro do criador, em três passos.
- *
- * <p>Existe porque o convite pede só e-mail e nome — de propósito: exigir documento e
- * portfólio antes do aceite afastaria quem só quer ver a proposta. O que o cadastro
- * coleta é pedido <b>depois</b>, quando já serve para alguma coisa.</p>
- *
- * <p>Um passo por vez, e cada um só avança com o que ele exige. A alternativa — uma
- * página só com dezoito campos — é a que faz a pessoa fechar a aba.</p>
- */
+/** Cadastro do criador em três passos, pedido depois do aceite do convite. */
 export default function CreatorOnboardingPage() {
   const nav = useNavigate()
   const { user } = useAuth()
@@ -56,9 +47,7 @@ export default function CreatorOnboardingPage() {
 
   const [hydrated, setHydrated] = useState(false)
 
-  // Pré-preenche uma vez, quando os dados chegam. Quem volta para editar não deve
-  // reencontrar o formulário vazio — e uma vez só porque, depois disso, quem manda no
-  // campo é o que a pessoa está digitando.
+  // Pré-preenche uma vez, quando os dados chegam; depois vale o que a pessoa digita.
   if (d && profile && !hydrated) {
     setFullName(d.fullName)
     setTaxId(d.taxId ?? "")
@@ -129,9 +118,7 @@ export default function CreatorOnboardingPage() {
               area={area}
               onArea={(v) => {
                 setArea(v)
-                // Trocar de área troca as sugestões. Os temas escolhidos ficam: eles são
-                // dele, não da lista — apagar o que ele já marcou por causa de um clique
-                // no seletor ao lado seria perder trabalho sem avisar.
+                // Trocar de área troca as sugestões, mas mantém os temas já escolhidos.
               }}
               audience={audience}
               onAudience={setAudience}
@@ -494,9 +481,7 @@ function StepPayout({
   // Capturado na montagem: a URL é limpa logo depois, e o aviso precisa sobreviver a isso.
   const [linkExpired] = useState(() => params.get("status") === "expired")
 
-  // Pergunta ao provedor ao entrar no passo — inclusive voltando dele. A verificação
-  // acontece lá sem avisar ninguém; sem perguntar, a tela diria "não conectada" para quem
-  // acabou de concluir. Uma vez por visita, porque o comando escreve.
+  // Consulta o provedor ao entrar no passo, uma vez por visita, porque o comando escreve.
   const synced = useRef(false)
   useEffect(() => {
     if (synced.current) return
@@ -600,9 +585,7 @@ function StepPayout({
         </div>
       </div>
 
-      {/* Este passo pode ficar para depois de propósito: o KYC trava o PAGAMENTO, não a
-          produção (RN-O-012). Prender o cadastro aqui atrasaria a assinatura do contrato
-          por uma pendência que só importa no fim. */}
+      {/* Este passo pode ficar para depois: o KYC trava o pagamento, não a produção (RN-O-012). */}
       {!connected && (
         <p className="text-[12.5px] text-ink-muted mt-4">
           Dá para deixar isso para depois — você pode assinar o contrato e gravar sem a conta

@@ -18,22 +18,10 @@ export function clearPendingInviteToken() {
   try { localStorage.removeItem(STORAGE_KEY) } catch { /* storage off */ }
 }
 
-/**
- * Convite de CRIADOR — chave separada de propósito. Os dois convites sobrevivem ao
- * mesmo round-trip, mas terminam em endpoints diferentes: o de membro cria membership
- * no workspace, o de criador cria um influenciador com conta própria. Guardar os dois
- * na mesma chave faria o Register aceitar um token no endpoint errado, que é
- * justamente a confusão que motivou tabelas separadas no backend.
- */
+/** Chave separada do convite de membro: os dois terminam em endpoints diferentes. */
 const INFLUENCER_STORAGE_KEY = "zoe_pending_influencer_invite_token"
 
-/**
- * E-mail do convite pendente.
- *
- * <p>Guardado junto do token porque o cadastro TRAVA o campo de e-mail em modo convite —
- * o e-mail é a chave do aceite e não pode ser trocado. Sem guardá-lo, o campo ficava
- * travado e vazio, e ninguém conseguia se cadastrar.</p>
- */
+/** E-mail do convite, porque o cadastro em modo convite trava esse campo. */
 const EMAIL_KEY = "zoe_pending_invite_email"
 
 export function setPendingInviteEmail(email: string) {

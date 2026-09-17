@@ -117,9 +117,7 @@ export function SettingsDialog() {
   const { hasFeature } = useAuth()
   const raw = params.get(SETTINGS_PARAM)
   const open = raw !== null
-  // Seção gateada some do rail E deixa de ser alvo válido da URL: com o módulo
-  // desligado, `?settings=contratos` cai no perfil em vez de abrir um painel que
-  // só responderia 403.
+  // Seção gateada some do rail e da URL.
   const visiveis = useMemo(
     () => SECTIONS.filter((s) => !s.feature || hasFeature(s.feature)),
     [hasFeature],

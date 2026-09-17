@@ -32,14 +32,7 @@ function isTyping(target: EventTarget | null): boolean {
   return el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable
 }
 
-/**
- * Atalhos da fila: ↑/↓ ou J/K andam entre os itens, C leva ao campo de observações e Esc fecha
- * o detalhe no celular.
- *
- * <p><b>Nenhuma tecla aprova.</b> Aprovar a entrega publicada pede o pagamento; uma tecla solta
- * no lugar errado não pode fazer isso. Decidir continua sendo um clique no botão que diz o que
- * acontece.</p>
- */
+/** Atalhos da fila: ↑/↓ ou J/K navegam, C foca as observações, Esc fecha no celular. Nenhuma tecla aprova. */
 export function useQueueKeys({
   ids, selected, onSelect, onClose, notesId,
 }: {

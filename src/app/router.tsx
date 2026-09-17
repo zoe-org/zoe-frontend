@@ -42,9 +42,7 @@ export const router = createBrowserRouter([
   { path: "/terms", element: <TermsPage /> },
   { path: "/privacy", element: <PrivacyPage /> },
   { path: "/invite/:token", element: <AcceptInvitePage /> },
-  // Convite de criador. Rota separada de /invite porque é outro convite: aqui não
-  // nasce membership no workspace do contratante — nasce um criador com conta própria.
-  // A prévia é pública; só o aceite exige login.
+  // Convite de criador: separado de /invite porque não cria membership. Prévia pública; aceite exige login.
   { path: "/creator-invite/:token", element: <InfluencerInvitePage /> },
   // Área do criador: protegida, mas fora do AppShell — ele não tem workspace para o
   // shell da marca representar, e nenhuma tela de lá responderia sem tenant.
@@ -59,9 +57,7 @@ export const router = createBrowserRouter([
     element: <ProtectedRoute><CreatorOnboardingPage /></ProtectedRoute>,
   },
   {
-    // Fora do AppShell pelo mesmo motivo da home do criador: não há workspace para o
-    // shell da marca representar. É para cá que o provedor devolve quem concluiu o
-    // cadastro — a returnUrl que o backend monta aponta exatamente para esta rota.
+    // Fora do AppShell, sem workspace de marca. É a returnUrl do provedor ao fim do cadastro.
     path: "/creator/payout",
     element: <ProtectedRoute><CreatorPayoutPage /></ProtectedRoute>,
   },

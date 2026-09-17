@@ -6,11 +6,7 @@ import { notifyError, notifySuccess } from "@/lib/feedback"
 import { creatorApi, type DataDeletionResult } from "@/lib/api/creator"
 import { useConfirm } from "@/features/confirm/context"
 
-/**
- * Os direitos do titular, na própria área do criador (LGPD, art. 18): baixar o que a Zoe guarda
- * sobre ele e pedir a exclusão. Fica no fim da página — não é tarefa do dia, mas precisa estar a
- * um clique, e não escondida atrás de um e-mail para o suporte.
- */
+/** Direitos do titular (LGPD, art. 18): baixar os dados e pedir exclusão, a um clique. */
 export function CreatorPrivacyCard() {
   const qc = useQueryClient()
   const confirm = useConfirm()

@@ -374,11 +374,7 @@ function StepVerification({
     codeSent ? "Enviamos um código novo agora — use o e-mail mais recente." : "")
   const [resendTimer, setResendTimer] = useState(30)
   const [submitting, setSubmitting] = useState(false)
-  /**
-   * Conta confirmada, mas o passo seguinte não fechou. Digitar o código de novo não
-   * resolve — o Cognito recusa confirmar duas vezes —, então a tela precisa parar de
-   * pedir código e oferecer o login.
-   */
+  /** Conta confirmada mas login não concluído: digitar o código não resolve, então a tela oferece o login. */
   const [confirmedOnly, setConfirmedOnly] = useState(false)
 
   const typed = code.join("")
@@ -440,18 +436,14 @@ function StepVerification({
     setError("")
     setNotice("")
 
-    // ── Fase 1: confirmar ────────────────────────────────────────────────────────────
-    // Só o que falha AQUI é problema do código. Antes as duas fases dividiam um try só,
-    // e uma falha no login depois de confirmar aparecia como código recusado — numa
-    // conta que o Cognito já tinha confirmado, onde nenhum código funcionaria mais.
+    // ── Fase 1: confirmar ──
+    // Só o que falha aqui é problema do código.
     try {
       await auth.confirm(email, fullCode)
     } catch (err) {
       const name = (err as { name?: string })?.name
 
-      // "User cannot be confirmed. Current status is CONFIRMED" chega como
-      // NotAuthorizedException — que o tradutor mapeia para "e-mail ou senha incorretos",
-      // frase sem sentido numa tela que não pede senha. A conta está pronta: seguir.
+      // CONFIRMED chega como NotAuthorizedException; a conta está pronta, segue.
       if (name !== "NotAuthorizedException") {
         const { message } = translateCognitoError(err)
         setError(err instanceof ApiError ? err.message : message)
@@ -460,10 +452,8 @@ function StepVerification({
       }
     }
 
-    // ── Fase 2: entrar ───────────────────────────────────────────────────────────────
-    // A conta já está confirmada. O que falhar daqui em diante não se resolve digitando
-    // o código de novo, então o erro leva para o login em vez de prender a pessoa numa
-    // tela sem saída.
+    // ── Fase 2: entrar ──
+    // Falha daqui em diante leva para o login, não de volta ao código.
     try {
       // Sem senha (veio do fluxo "UserNotConfirmed" no login): manda pro login.
       if (!password) {
@@ -496,14 +486,10 @@ function StepVerification({
         return
       }
 
-      // Convite de criador: não há workspace para entrar nem membership para criar —
-      // o aceite registra a pessoa como influenciadora. Por isso o fim do fluxo é o cadastro
-      // do criador, e não o dashboard.
+      // Convite de criador: o fim do fluxo é o cadastro do criador, não o dashboard.
       const creatorToken = getPendingInfluencerInviteToken()
       if (creatorToken) {
-        // Aceita aqui mesmo, como o convite de membro acima. A pessoa já viu quem a
-        // chamou antes de clicar em "Criar minha conta" — devolvê-la à tela do convite
-        // para clicar em "Aceitar" era um passo a mais, e era nele que o fluxo se perdia.
+        // Aceita aqui mesmo: a pessoa já viu o convite antes de criar a conta.
         clearPendingInviteEmail()
         try {
           // O aceite dos termos é o checkbox obrigatório deste formulário, que abre os mesmos
@@ -511,9 +497,7 @@ function StepVerification({
           const { termsVersion } = await operationsApi.previewInfluencerInvite(creatorToken)
           await operationsApi.acceptInfluencerInvite(creatorToken, termsVersion)
           clearPendingInfluencerInviteToken()
-          // O refresh vem DEPOIS do aceite: é o aceite que torna a conta de criador. Antes
-          // dele a sessão diria "conta comum sem workspace", e a guarda de rota mandaria
-          // para a criação de workspace.
+          // Refresh depois do aceite, que é o que torna a conta de criador.
           await refresh()
           nav("/creator/onboarding", { replace: true })
         } catch {
@@ -594,9 +578,7 @@ function StepVerification({
       {error && <p className="text-sm font-semibold text-red-500">{error}</p>}
       {!error && notice && <p className="text-sm text-teal-600 font-medium">{notice}</p>}
 
-      {/* A confirmação só disparava ao digitar a última casa. Quem corrigia um dígito do
-          meio depois de errar ficava sem nenhuma forma de tentar de novo — a tela não
-          reagia, e o erro anterior continuava ali. */}
+      {/* A confirmação também dispara pelo botão, para quem corrige um dígito do meio. */}
       {confirmedOnly ? (
         <Button
           onClick={() => nav("/login", { replace: true, state: { email } })}
@@ -641,11 +623,7 @@ export default function RegisterPage() {
   const initial = (location.state ?? null) as
     { email?: string; step?: number; invite?: boolean; codeSent?: boolean } | null
 
-  // Modo convite: usuário chegou pelo link de convite (AcceptInvite) sem ter conta.
-  // Pula a escolha de objetivo (não cria workspace), trava o e-mail e, ao final,
-  // aceita o convite pendente em vez do onboarding.
-  // O convite de criador entra no mesmo modo: ele também não cria workspace, então a
-  // escolha de objetivo não faz sentido para ele.
+  // Modo convite (de membro ou de criador): pula o objetivo, trava o e-mail e aceita o convite no fim.
   const inviteMode = Boolean(initial?.invite)
     || getPendingInviteToken() != null
     || getPendingInfluencerInviteToken() != null

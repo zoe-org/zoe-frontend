@@ -14,15 +14,7 @@ import {
 const ESCROW_COLOR = ESCROW_STATE_COLOR
 
 /**
- * Painel do Operations.
- *
- * <p>A ordem da tela é a ordem da utilidade: primeiro o que está parado esperando alguém,
- * depois onde está o dinheiro, e só então os totais. Um painel que abre com "23 contratos"
- * informa sem pedir nada; a fila de aprovação é o que muda o dia de quem opera.</p>
- *
- * <p>Nenhum número aqui é estimado ou projetado. Todos vêm somados do servidor, do mesmo
- * lado em que a custódia é escrita — em módulo financeiro, duas contas para a mesma
- * pergunta é uma a mais.</p>
+ * Painel do Operations: o que espera alguém, onde está o dinheiro e só então os totais, todos somados no servidor.
  */
 export default function OperationsDashboardPage() {
   const q = useOperationsDashboard()

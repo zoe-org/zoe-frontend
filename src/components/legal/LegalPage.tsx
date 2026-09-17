@@ -2,10 +2,7 @@ import { Link } from "react-router-dom"
 import ZoeLogo from "@/assets/zoe-logo.svg?react"
 import { LEGAL_VERSION, PRIVACY_CONTACT_EMAIL } from "@/lib/legal"
 
-/**
- * Moldura dos documentos legais. Pública e fora do AppShell: é lida antes de existir conta —
- * no cadastro e no convite —, e quem abre pelo link do checkbox não pode cair num login.
- */
+/** Moldura dos documentos legais, pública e fora do AppShell: é lida antes de existir conta. */
 export function LegalPage({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="min-h-dvh" style={{ background: "var(--bg, #FAFBFC)" }}>

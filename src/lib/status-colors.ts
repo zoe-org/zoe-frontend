@@ -1,10 +1,4 @@
-/**
- * Cores de estado do Operations, num lugar só.
- *
- * <p>Estavam copiadas em cada tela — a custódia em três arquivos, as entregas em dois, os
- * contratos na área da marca e na do criador. Uma troca de cor numa tela e não na outra fazia o
- * mesmo estado parecer outra coisa conforme onde a pessoa olhava.</p>
- */
+/** Cores de estado do Operations, num lugar só. */
 
 export const CAMPAIGN_STATUS_COLOR: Record<string, string> = {
   Draft: "#6B7280",

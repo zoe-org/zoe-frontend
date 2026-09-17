@@ -27,9 +27,7 @@ export default function OperationsCampaignsPage() {
     [allCampaigns, search],
   )
 
-  // A primeira da lista fica selecionada por padrão, como no protótipo. Derivado no
-  // render em vez de setState em efeito — a mesma razão do AppShell: efeito que
-  // chama setState provoca um passe de render em cascata.
+  // Primeira campanha selecionada por padrão, derivada no render e não em efeito.
   const effectiveId = selectedId ?? items[0]?.campaignId ?? null
 
   return (

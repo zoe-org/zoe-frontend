@@ -10,10 +10,7 @@ import {
   type ContractDefaultField,
 } from "@/lib/api/operations"
 
-/**
- * Sugestões mostradas como exemplo no campo vazio. Nunca são gravadas: texto jurídico é
- * decisão da marca, e um valor que ninguém escolheu não pode ir para o contrato sozinho.
- */
+/** Exemplos no campo vazio, nunca gravados. */
 const EXAMPLES: Record<string, string> = {
   jurisdiction: "Ex.: Foro da Comarca de São Paulo/SP",
   applicable_law: "Ex.: Legislação brasileira",
@@ -23,14 +20,7 @@ const EXAMPLES: Record<string, string> = {
   payment_terms: "Ex.: Pagamento em até 5 dias após a aprovação da entrega",
 }
 
-/**
- * Padrões de contrato da marca (RN-O-024, Nível 1).
- *
- * <p>O que a marca repete igual em todo contrato — foro, lei, cessões, multas — escrito uma
- * vez aqui. Todo contrato novo nasce com esses valores, e quem preenche pode trocar naquele
- * contrato. Os essenciais vêm primeiro; o resto do catálogo fica numa lista com busca,
- * porque ninguém quer rolar dezenas de campos para achar o foro.</p>
- */
+/** Padrões de contrato da marca (RN-O-024, nível 1): essenciais primeiro, o resto com busca. */
 export function ContractDefaultsTab({ isAdmin }: { isAdmin: boolean }) {
   const defaults = useContractDefaults()
   const save = useUpdateContractDefaults()
@@ -41,9 +31,7 @@ export function ContractDefaultsTab({ isAdmin }: { isAdmin: boolean }) {
   const [search, setSearch] = useState("")
   const [allModalities, setAllModalities] = useState(false)
 
-  // Modalidades que a marca de fato usa, pelas campanhas e contratos. O catálogo traz campos de
-  // todos os templates publicados, e quem só faz publipost rolava dezenas de campos de permuta
-  // e eventos que nunca vão aparecer num contrato seu.
+  // Modalidades usadas pela marca, para mostrar primeiro os campos que aparecem nos contratos dela.
   const campaigns = useCampaigns()
   const contracts = useContracts()
   const usedModalities = useMemo(() => new Set<string>([

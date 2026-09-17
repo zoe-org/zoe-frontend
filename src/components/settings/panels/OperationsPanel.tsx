@@ -6,14 +6,7 @@ import { meApi } from "@/lib/api/me"
 import { ContractDefaultsTab } from "@/components/settings/panels/ContractDefaultsSettings"
 import { Section, ReadOnlyValue } from "./AccountPanel"
 
-/**
- * Operations dentro das Configurações: o que vale para todo contrato do workspace.
- *
- * Os três blocos vinham da página de Configurações que a Etapa 7 transformou em
- * diálogo. Ficam juntos porque respondem à mesma pergunta — "o que este workspace
- * assume quando um contrato nasce": quem contrata (CNPJ), com que padrões, e quem
- * fica sabendo do que acontece depois.
- */
+/** Operations nas Configurações: CNPJ, padrões de contrato e avisos por e-mail. */
 export function OperationsPanel() {
   const { role, activeTenantId, activeTenant } = useAuth()
   const isAdmin = role === "Owner" || role === "Admin"
@@ -37,14 +30,7 @@ export function OperationsPanel() {
   )
 }
 
-/**
- * CNPJ do contratante.
- *
- * Identifica a parte no contrato e no documento fiscal — sem ele o contrato sai sem
- * qualificar quem contrata, e a nota da taxa não pode ser emitida.
- *
- * Só Owner e Admin editam: é dado que aparece em documento com validade jurídica.
- */
+/** CNPJ do contratante, exigido no contrato e na nota da taxa. Só Owner e Admin editam. */
 function TenantTaxId({
   tenantId, current, canEdit,
 }: {
@@ -120,13 +106,7 @@ function TenantTaxId({
   )
 }
 
-/**
- * Avisos do Operations por e-mail para você, neste workspace.
- *
- * Iam para todo Owner, Admin e Manager sem opção de desligar — num workspace com
- * volume, quem não revisa recebia um e-mail por evento. Desligar aqui vale só para
- * você e só neste workspace.
- */
+/** Avisos do Operations por e-mail, só para você e só neste workspace. */
 function OperationsEmailCard({ tenantId }: { tenantId: string | null }) {
   const qc = useQueryClient()
   const prefs = useQuery({

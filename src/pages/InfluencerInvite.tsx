@@ -13,14 +13,7 @@ import { tEnum } from "@/i18n/enums"
 import { operationsApi, fmtCents } from "@/lib/api/operations"
 import { fmtDate } from "@/lib/operations-format"
 
-/**
- * Aceite do convite de criador. Fora do AppShell de propósito: quem abre este link
- * não pertence a workspace nenhum — e não vai pertencer, porque criador não é membro
- * do workspace do contratante.
- *
- * A prévia é pública: a pessoa vê quem a chamou e para qual campanha antes de decidir
- * criar conta. Só o aceite exige estar autenticado.
- */
+/** Aceite do convite de criador, fora do AppShell. A prévia é pública; só o aceite exige login. */
 export default function InfluencerInvitePage() {
   const { token = "" } = useParams<{ token: string }>()
   const { isAuthenticated, isLoading: authLoading, refresh } = useAuth()
@@ -35,9 +28,7 @@ export default function InfluencerInvitePage() {
     retry: false,
   })
 
-  // Guarda o token para depois do login: quem chega sem conta passa por
-  // cadastro/confirmação de e-mail e precisa voltar exatamente para este convite.
-  // Mesma mecânica do convite de membro, chave própria.
+  // Guarda o token para voltar a este convite depois de cadastro e confirmação.
   useEffect(() => {
     if (token) setPendingInfluencerInviteToken(token)
   }, [token])
@@ -60,11 +51,7 @@ export default function InfluencerInvitePage() {
     try {
       const res = await operationsApi.acceptInfluencerInvite(token, preview.data!.termsVersion)
       clearPendingInfluencerInviteToken()
-      // O aceite muda o TIPO da conta no backend — ela vira criadora. Sem recarregar a
-      // sessão, o app continuava achando que era uma conta comum sem workspace: o botão
-      // seguinte levava a uma rota protegida, e a guarda mandava a pessoa criar um
-      // workspace, que o backend recusa para criador. Era o desvio que aparecia logo
-      // depois do cadastro.
+      // O aceite torna a conta de criador: sem recarregar a sessão, a guarda mandaria criar workspace.
       await refresh()
       setAccepted(res.campaignName ?? res.tenantName)
       notifySuccess(res.campaignName
@@ -130,9 +117,7 @@ function Preview({
         {data.tenantName} convidou você
       </h1>
 
-      {/* Sem campanha o convite é para o elenco: a marca quer a pessoa por perto, e a
-          ação específica vem depois — ou nunca. Dizer "campanha" aqui seria prometer
-          trabalho que ainda não existe. */}
+      {/* Sem campanha, o convite é para o elenco; o texto não promete trabalho que ainda não existe. */}
       <p className="text-[14px] text-ink-muted mb-5">
         {data.campaignName ? (
           <>

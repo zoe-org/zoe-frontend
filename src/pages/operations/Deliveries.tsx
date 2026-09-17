@@ -56,22 +56,10 @@ const inTab = (tab: QueueTab, status: string) =>
 const NO_CAMPAIGN = "avulso"
 
 /**
- * Entregas — os dois portões de revisão.
- *
- * <p>Duas divergências do protótipo, das quais a regra de negócio venceu:</p>
- * <ol>
- *   <li><b>A nota só aparece quando existe.</b> Entrega de revisão manual não tem nota, e
- *   número inventado numa tela que decide pagamento é pior que espaço vazio.</li>
- *   <li><b>Aprovar não paga por conta própria, e a nota não decide.</b> O botão de aprovar
- *   continua disponível mesmo abaixo do mínimo — a IA é gate de qualidade, não autoridade
- *   financeira (RN-O-056).</li>
- * </ol>
+ * Entregas nos dois portões. A nota só aparece quando existe, e não decide: aprovar continua disponível abaixo do mínimo (RN-O-056).
  */
 export default function OperationsDeliveriesPage() {
-  // Os dois portões são momentos distintos do processo — cortes por aprovar e vídeos já
-  // publicados. Numa lista só, a distinção some e alguém aprova o que não pretendia.
-  // "?stage=drafts" abre direto no primeiro portão: é para onde o Painel manda quem tem corte
-  // esperando, e cair em "Entregas publicadas" fazia parecer que não havia nada.
+  // Dois portões em abas separadas; <code>?stage=drafts</code> abre no de cortes.
   const [params] = useSearchParams()
   const [gate, setGate] = useState<Gate>(() => (params.get("stage") === "drafts" ? "drafts" : "published"))
   const deliveries = useDeliveries()
@@ -328,12 +316,7 @@ function PublishedQueue({
 }
 
 /**
- * Conformidade da entrega. Quando houve auditoria, mostra a nota, o threshold que valeu e
- * o checklist item a item; quando não houve, diz que a revisão é manual — a ausência de
- * parecer é informação, não um vazio.
- *
- * A nota **não** esconde nem habilita o botão de aprovar: ela informa. Quem decide é quem
- * paga, inclusive contra o parecer da máquina (RN-O-056).
+ * Conformidade da entrega: nota, threshold e checklist, ou aviso de revisão manual. A nota informa, não habilita o botão (RN-O-056).
  */
 function AuditCard({ audit }: { audit: DeliveryAudit | null }) {
   if (!audit) {
@@ -424,10 +407,7 @@ function AuditCard({ audit }: { audit: DeliveryAudit | null }) {
   )
 }
 
-/**
- * Sugere o tipo de correção pelo que a auditoria reprovou. Identificação publicitária e hashtag
- * se resolvem editando a postagem; o resto mexe no vídeo. É sugestão — quem revisa escolhe.
- */
+/** Sugere o tipo de correção pelo que a auditoria reprovou; quem revisa escolhe. */
 function suggestScope(audit: DeliveryAudit | null): ReworkScope {
   const failures = audit?.checklist.filter((i) => !i.passed).map((i) => i.criterion.toLowerCase()) ?? []
   if (failures.length === 0) return "Content"
@@ -760,10 +740,7 @@ function ReviewPanel({ group, onDecided }: { group: DeliveryGroup; onDecided: ()
   )
 }
 
-/**
- * Alterna entre os dois portões. Fica acima do título de propósito: é a pergunta que vem
- * antes de "qual entrega", porque cada portão decide uma coisa diferente.
- */
+/** Alterna entre os dois portões, acima do título. */
 function GateHeader({
   gate, onChange, counts,
 }: {

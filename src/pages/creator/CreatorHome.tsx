@@ -27,23 +27,7 @@ import ZoeLogo from "@/assets/zoe-logo.svg?react"
 const DELIVERY_COLOR = DELIVERY_STATUS_COLOR
 
 /**
- * Área do criador. Shell próprio, fora do AppShell da marca: não há workspace para
- * trocar, não há navegação de módulos, e nenhuma tela de lá funcionaria — sem tenant
- * todas voltam 403.
- *
- * O que ele faz aqui é o que o fluxo lhe reserva: ver em que campanhas foi contratado,
- * quanto vai receber, e mandar o link do vídeo quando a produção estiver liberada.
- */
-/**
- * CPF ou CNPJ do criador.
- *
- * <p>Não confundir com o cadastro de recebimento: lá os dados fiscais ficam com o provedor
- * de pagamentos de propósito, e continuam ficando. O documento é pedido aqui por outro
- * motivo — um contrato precisa <b>identificar quem assina</b>, e o provedor não devolve
- * esse dado para nós.</p>
- *
- * <p>Some depois de preenchido: é campo que se toca uma vez, e mantê-lo em destaque
- * ocuparia a tela com uma tarefa já concluída.</p>
+ * CPF ou CNPJ do criador, exigido para identificá-lo no contrato; o provedor de pagamentos não devolve esse dado. Some depois de preenchido.
  */
 function TaxIdCard({ current }: { current: string | null }) {
   const [value, setValue] = useState("")
@@ -102,6 +86,7 @@ function TaxIdCard({ current }: { current: string | null }) {
   )
 }
 
+/** Área do criador, com shell próprio: sem workspace, as telas da marca responderiam 403. */
 export default function CreatorHomePage() {
   const { user, signOut } = useAuth()
   const workspace = useCreatorWorkspace()
@@ -193,9 +178,7 @@ export default function CreatorHomePage() {
               onGoTo={goToStep}
             />
 
-            {/* Duas abas, como o time definiu: acompanhar o trabalho e ler o contrato
-                são momentos diferentes, e misturá-los numa lista só faz o contrato
-                desaparecer embaixo das entregas. */}
+            {/* Duas abas: acompanhar o trabalho e ler o contrato são momentos diferentes. */}
             <div className="flex gap-1 mb-5">
               <TabButton
                 active={tab === "campaigns"}
@@ -222,9 +205,7 @@ export default function CreatorHomePage() {
                 sai sem identificar a parte contratada. */}
             <TaxIdCard current={d.taxId} />
 
-            {/* Cadastro incompleto não bloqueia a área — ele já pode ver contrato e mandar
-                entrega. É a marca que fica sem o que precisa para montar a proposta, e é
-                isso que o card diz, em vez de tratar a pessoa como pendência. */}
+            {/* Cadastro incompleto não bloqueia a área; o card diz o que a marca precisa. */}
             {!d.profile.complete && (
               <Link
                 to="/creator/onboarding"
@@ -269,10 +250,7 @@ export default function CreatorHomePage() {
   )
 }
 
-/**
- * O que depende do criador agora, no topo da área. Pensado para o celular: é a primeira coisa
- * que aparece, e cada linha leva direto ao lugar de fazer.
- */
+/** O que depende do criador agora, no topo da área, com link direto para cada ação. */
 function NextStepsCard({
   steps, hasWork, onGoTo,
 }: {
@@ -418,9 +396,7 @@ function EngagementCard({ e }: { e: CreatorEngagement }) {
         </div>
       )}
 
-      {/* Primeiro portão. Vem antes do campo do link de propósito: a ordem na tela é a
-          ordem do processo, e mostrar o campo do publicado por cima faria o criador
-          publicar antes de a marca ver. */}
+      {/* Primeiro portão antes do campo do link: a ordem da tela é a do processo. */}
       {e.canSubmitDelivery && (
         <div className="mb-4">
           <CreatorDraftUpload engagement={e} />

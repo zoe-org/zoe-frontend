@@ -9,10 +9,7 @@ export type FunnelRow = {
   stage: string
   tone: FunnelTone
   action: { label: string; to: string } | null
-  /**
-   * Outros contratos ativos do mesmo criador na campanha. A linha mostra o que mais precisa da
-   * marca; sem este número, um segundo trabalho em andamento simplesmente sumia da tela.
-   */
+  /** Outros contratos ativos do mesmo criador na campanha. */
   otherContracts: number
 }
 
@@ -21,21 +18,11 @@ type FunnelStage = Pick<FunnelRow, "stage" | "tone" | "action">
 const TONE_ORDER: Record<FunnelTone, number> = { alert: 0, attention: 1, neutral: 2, ok: 3 }
 
 /**
- * Funil por criador da campanha.
- *
- * <p>O detalhe da campanha listava contratos e entregas em blocos separados, e saber "em que pé
- * está cada um e o que falta de mim" pedia cruzar os dois de cabeça. Aqui cada criador ocupa uma
- * linha com a etapa e, quando depende da marca, o link para o lugar de agir.</p>
- *
- * <p>Quem precisa de ação sobe: alerta (disputa, recusa), depois atenção (revisar, abrir custódia,
- * pagar), depois o que está andando sem a marca, e por último o que terminou.</p>
+ * Funil por criador da campanha, com a ação da marca quando houver. Quem precisa da marca sobe: alerta, atenção, em andamento, encerrado.
  */
 export function campaignFunnel(
   d: CampaignDetail,
-  /**
-   * Criadores cuja conta de recebimento ainda não está pronta. O detalhe da campanha não traz
-   * isso; sem o dado, custódia liberável parecia pagamento esperando a marca.
-   */
+  /** Criadores com conta de recebimento ainda não pronta, que o detalhe da campanha não traz. */
   payoutNotReady: ReadonlySet<string> = new Set(),
 ): FunnelRow[] {
   const names = new Map<string, string>()

@@ -12,14 +12,7 @@ const EVENT_COLOR: Record<string, string> = {
 const fmtDateTime = (iso: string) =>
   new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
 
-/**
- * O que aconteceu com o contrato, em ordem. Antes era preciso juntar o detalhe do contrato, a fila
- * de entregas e o quadro de custódia para contar essa história — e as correções anteriores, com o
- * motivo de cada uma, não apareciam em lugar nenhum.
- *
- * <p>Recolhível no painel de revisão: lá ela é consulta ("o que foi pedido da outra vez?"), não o
- * assunto da tela, e aberta empurraria os botões de decisão para longe.</p>
- */
+/** Linha do tempo do contrato. Recolhível no painel de revisão, onde é consulta e não o assunto. */
 export function ContractTimeline({
   contractId, collapsible = false,
 }: {

@@ -16,12 +16,7 @@ const CONTRACT_COLOR = CONTRACT_STATUS_COLOR
 
 const ESCROW_COLOR = ESCROW_STATE_COLOR
 
-/**
- * O estado da custódia dito do ponto de vista de quem vai receber.
- *
- * <p>O rótulo do enum descreve a conta ("Fundos reservados"); o criador quer a resposta
- * de outra pergunta — <b>eu vou receber, e quando?</b> — e ela não se deduz do rótulo.</p>
- */
+/** Estado da custódia dito para quem recebe: "eu vou receber, e quando?". */
 const ESCROW_NOTE: Record<string, string> = {
   PendingDeposit: "A marca ainda não depositou. A produção começa depois do depósito.",
   Funded: "O valor já está reservado em custódia. Ele sai para você depois que a entrega for aprovada.",
@@ -35,15 +30,7 @@ const ESCROW_NOTE: Record<string, string> = {
 }
 
 /**
- * O contrato pela ótica do criador.
- *
- * <p>Existe porque ele não conseguia ler o que assina — os endpoints de contrato exigem
- * tenant, e criador não tem. A tela mostra o mesmo texto que a marca vê e que vai para o
- * PDF: divergir aqui seria mostrar a ele um documento diferente do que ele assina.</p>
- *
- * <p>A ordem na tela é a da pergunta que ele traz: primeiro quanto e quando recebe,
- * depois o que foi combinado só neste contrato, e por último as cláusulas — que são o
- * texto padrão da modalidade e o que menos distingue um contrato do outro.</p>
+ * O contrato pela ótica do criador: o mesmo texto da marca e do PDF, na ordem de quanto recebe, o combinado e as cláusulas.
  */
 export function CreatorContractPanel({
   engagements, initialContractId,
@@ -69,9 +56,7 @@ export function CreatorContractPanel({
     )
   }
 
-  // Duas campanhas com o mesmo nome acontecem — dois contratos na mesma ação, ou um
-  // refeito depois de cancelado. Sem diferenciar, o seletor mostra botões idênticos e
-  // escolher vira sorteio.
+  // Campanhas com o mesmo nome acontecem; sem diferenciar, os botões do seletor seriam idênticos.
   const repeated = new Set(
     engagements
       .map((e) => e.campaignName)
@@ -244,11 +229,7 @@ function HeaderCard({
         </button>
       </div>
 
-      {/* Assinar é a ação mais urgente desta tela: até acontecer, nada avança — sem
-          contrato assinado não há depósito, e sem depósito não há produção.
-
-          A Clicksign não expõe link de assinatura pela API, então o que a tela oferece é
-          reenviar o aviso. Resolve o problema real, que é o e-mail ter se perdido. */}
+      {/* Assinar destrava depósito e produção. Sem link de assinatura na API da Clicksign, a tela reenvia o aviso. */}
       {c.canResendSignature && (
         <div className="mt-5 rounded-lg p-3.5" style={{ background: "#D9770610" }}>
           <div className="text-[13px] font-medium mb-1" style={{ color: "#D97706" }}>
@@ -269,10 +250,7 @@ function HeaderCard({
         </div>
       )}
 
-      {/* O criador tem direito de ver como a plataforma é paga — é o que a cláusula de
-          sistema declara às partes, então a tela não pode esconder. Desde a cobrança por cima
-          ele recebe o contrato inteiro e a taxa sai da marca; custódia anterior ainda descontava
-          dele, e a tela mostra o que vale para cada uma. */}
+      {/* Como a plataforma é paga, declarado na cláusula de sistema: custódias novas cobram a taxa da marca, as antigas descontavam do criador. */}
       {c.amountCents != null && (
         <div
           className="mt-5 rounded-xl border border-border-soft overflow-hidden"
@@ -324,16 +302,7 @@ function HeaderCard({
   )
 }
 
-/**
- * O que foi combinado só neste contrato.
- *
- * <p>Vem antes das cláusulas porque é o que muda de um contrato para o outro: prazo,
- * entregáveis, exclusividade. As cláusulas são o texto padrão da modalidade.</p>
- *
- * <p>Campo em branco continua aparecendo — contrato com lacuna invisível é o que a
- * pessoa descobre tarde —, mas junto dos outros em branco: espalhado pela lista, um
- * "a preencher" em âmbar a cada duas linhas tira a atenção do que está preenchido.</p>
- */
+/** O combinado só neste contrato, antes das cláusulas padrão. Campos em branco aparecem agrupados. */
 function FieldsCard({ fields }: { fields: CreatorContractField[] }) {
   if (fields.length === 0) return null
 
@@ -382,13 +351,7 @@ function FieldsCard({ fields }: { fields: CreatorContractField[] }) {
   )
 }
 
-/**
- * As cláusulas, com índice.
- *
- * <p>São nove no publipost, e antes vinham como um bloco só: para conferir a cláusula de
- * exclusividade a pessoa rolava a tela procurando. O índice resolve isso sem esconder
- * texto — quem assina precisa ler, então nada aqui abre e fecha.</p>
- */
+/** Cláusulas com índice, sem esconder texto: quem assina precisa ler tudo. */
 function ClausesCard({ clauses }: { clauses: CreatorContractClause[] }) {
   const jump = (order: number) =>
     document.getElementById(`clausula-${order}`)
@@ -468,15 +431,7 @@ function Clause({ c }: { c: CreatorContractClause }) {
 }
 
 /**
- * Quebra o corpo da cláusula nos itens numerados.
- *
- * <p>O texto chega como um parágrafo só — "1.1. … 1.2. … 1.3. …" — porque é assim que ele
- * vai para o PDF, onde parágrafo justificado é a forma corrente de um contrato. Na tela
- * isso vira uma parede: mesma palavra, mesma ordem, sem nenhum ponto de apoio para os
- * olhos. Aqui só se quebra a linha; nenhum caractere é alterado ou removido.</p>
- *
- * <p>O marcador exige um ou dois dígitos de cada lado justamente para não confundir com
- * valor monetário — "R$ 15.000." tem três casas e não é item.</p>
+ * Quebra a cláusula nos itens numerados ("1.1."), sem alterar texto; exige 1–2 dígitos para não pegar valores como "R$ 15.000.".
  */
 function splitClauseBody(body: string): { marker: string | null; text: string }[] {
   const trimmed = body?.trim() ?? ""
@@ -492,10 +447,7 @@ function splitClauseBody(body: string): { marker: string | null; text: string }[
     })
 }
 
-/**
- * Regra antiga: a cobrança era o valor do contrato e fechava exatamente com taxa + líquido. Na
- * cobrança por cima ela é maior que os dois somados, porque inclui o processamento.
- */
+/** Regra antiga: cobrança igual a taxa + líquido. Na cobrança por cima, o total inclui o processamento. */
 function feeDeductedFromCreator(c: { amountCents: number | null; takeRateCents: number | null; netToInfluencerCents: number | null }) {
   return c.amountCents != null
     && c.amountCents === (c.takeRateCents ?? 0) + (c.netToInfluencerCents ?? 0)

@@ -2,9 +2,7 @@ import { Link } from "react-router-dom"
 import { LegalPage, PrivacyContact, Section } from "@/components/legal/LegalPage"
 
 /**
- * Termos de Uso. Dizem, em linguagem direta, as regras que o produto já aplica — quem paga o
- * quê, onde o dinheiro fica, o que a aprovação significa. Texto de produto, não parecer: passa
- * pela revisão jurídica junto com os contratos.
+ * Termos de Uso com as regras que o produto já aplica; passam pela revisão jurídica junto com os contratos.
  */
 export default function TermsPage() {
   return (

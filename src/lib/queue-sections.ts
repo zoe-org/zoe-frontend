@@ -1,13 +1,5 @@
 /**
- * Seções da fila de revisão por campanha.
- *
- * <p>Com várias campanhas ao mesmo tempo, a fila era uma lista só — o filtro por campanha existia,
- * mas escondia as outras. Agrupar mostra tudo sem misturar: uma seção por campanha, com quantos
- * esperam decisão, e cada seção recolhe.</p>
- *
- * <p><b>A ordem não muda.</b> A fila já chega ordenada pela espera (vencidas primeiro); as seções
- * saem na ordem em que cada campanha aparece nela, então a campanha com o item mais urgente fica no
- * topo, e dentro de cada seção os itens mantêm a ordem que tinham.</p>
+ * Seções da fila de revisão por campanha, na ordem de urgência em que cada campanha aparece. Cada seção recolhe.
  */
 export type CampaignSection<T> = {
   key: string
@@ -41,10 +33,7 @@ export function sectionsByCampaign<T>(
   return [...byKey.values()]
 }
 
-/**
- * Os itens na ordem da tela, sem os das seções recolhidas. É a lista que o teclado percorre e de onde
- * sai o "próximo" depois de decidir — senão a seleção pularia para um item escondido.
- */
+/** Itens na ordem da tela sem os das seções recolhidas: é o que o teclado percorre. */
 export function visibleItems<T>(sections: readonly CampaignSection<T>[], collapsed: ReadonlySet<string>): T[] {
   return sections.flatMap((s) => (collapsed.has(s.key) ? [] : s.items))
 }

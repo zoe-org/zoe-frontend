@@ -41,9 +41,7 @@ function fakeApi(over: Partial<MultipartApi> = {}) {
 }
 
 /**
- * Sobe a parte olhando o número na URL, para o teste saber o que foi enviado.
- *
- * Função simples, não `vi.fn`: um mock compartilhado entre testes soma as chamadas de todos.
+ * PUT falso que lê o número da parte na URL; função simples, porque um <code>vi.fn</code> compartilhado somaria chamadas.
  */
 const putOk = async (url: string, body: Blob, onProgress: (b: number) => void) => {
   onProgress(body.size)

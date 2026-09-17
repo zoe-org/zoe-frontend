@@ -22,10 +22,7 @@ import {
   useRoster, canReceivePayout,
 } from "@/lib/api/operations"
 
-/**
- * Detalhe da campanha: cabeçalho com as ações, números, briefing, funil por criador, contratos e
- * entregas. Separado da lista em `Campaigns.tsx`, que passava de mil linhas.
- */
+/** Detalhe da campanha: ações, números, briefing, funil por criador, contratos e entregas. */
 
 const STATUS_COLOR = CAMPAIGN_STATUS_COLOR
 
@@ -33,10 +30,7 @@ export const CampaignChip = (p: { status: string; small?: boolean }) => (
   <StatusChip {...p} kind="campaignStatus" colors={STATUS_COLOR} />
 )
 
-/**
- * Campanha ativa com prazo no passado. Não conclui sozinha — pode haver entrega atrasada em
- * andamento —, mas avisa: senão ela segue recebendo contrato e convite com datas vencidas.
- */
+/** Campanha ativa com prazo no passado: não conclui sozinha, mas avisa. */
 function isPastEndDate(d: { status: string; endsAt: string | null }): boolean {
   if (d.status !== "Active" || !d.endsAt) return false
   const today = new Date()
@@ -263,14 +257,7 @@ export function CampaignDetailPanel({ campaignId }: { campaignId: string }) {
   )
 }
 
-/**
- * Briefing auditável. É a régua contra a qual a auditoria vai medir a entrega, então a
- * tela mostra o que está de fato configurado — e diz quando **não** está.
- *
- * O `isAuditable` vem do backend em vez de ser deduzido aqui: a regra de "o que basta para
- * auditar" é de negócio, não de apresentação. Sem menção, hashtag nem logo, a IA não tem
- * contra o quê comparar, e prometer auditoria automática nesse estado seria mentira.
- */
+/** Briefing auditável como está configurado; <code>isAuditable</code> vem do backend. */
 function BriefingCard({ briefing: b }: { briefing: CampaignBriefing }) {
   const rows: [string, string][] = [
     ["Menções esperadas", b.keywords.length > 0 ? b.keywords.join(", ") : "não verificar"],
@@ -306,10 +293,7 @@ function BriefingCard({ briefing: b }: { briefing: CampaignBriefing }) {
         ))}
       </div>
 
-      {/* Antes isto era um bloco laranja de tres linhas ocupando a largura toda. Laranja
-          e' cor de pendencia, e nao ha' pendencia nenhuma: a auditoria automatica foi
-          ADIADA pelo time, e a revisao manual e' o funcionamento normal — nao um estado
-          degradado que alguem precisa corrigir. Virou uma nota discreta. */}
+      {/* Nota discreta: a revisão manual é o funcionamento normal, não pendência. */}
       <p className="text-[11.5px] text-ink-muted mt-4 mb-0">
         {b.isAuditable
           ? "Estes critérios ficam prontos para a conferência automática, quando ela entrar. "
@@ -321,14 +305,7 @@ function BriefingCard({ briefing: b }: { briefing: CampaignBriefing }) {
   )
 }
 
-/**
- * Botões de ciclo de vida. Vêm de `allowedCampaignTransitions`, que espelha o domínio —
- * a tela não oferece o que já se sabe que vai ser recusado.
- *
- * Cancelar pede confirmação porque é terminal e afeta o que está em volta: campanha
- * cancelada não aceita novo contrato nem novo criador. Ativar e concluir não pedem, para
- * não transformar o caminho normal em fricção.
- */
+/** Ações de ciclo de vida permitidas pelo domínio. Só cancelar, que é terminal, pede confirmação. */
 function CampaignTransitions({ campaign }: { campaign: CampaignDetail }) {
   const { update } = useCampaignMutations(campaign.campaignId)
   const [confirming, setConfirming] = useState(false)
@@ -458,11 +435,7 @@ const TONE_COLOR: Record<FunnelTone, string> = {
   ok: "#00A799",
 }
 
-/**
- * Cada criador da campanha numa linha: a etapa e, quando a vez é da marca, o botão para o lugar
- * de agir. É a pergunta de quem abre a campanha — "o que falta de mim?" — sem cruzar contratos e
- * entregas de cabeça.
- */
+/** Funil da campanha: uma linha por criador, com a ação da marca quando for a vez dela. */
 function CampaignFunnel({ d }: { d: CampaignDetail }) {
   // A situação da conta vem do elenco: o detalhe da campanha não a traz, e sem ela custódia
   // liberável de quem ainda não pode receber virava pendência da marca.

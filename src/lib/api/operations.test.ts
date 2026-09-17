@@ -47,9 +47,7 @@ describe("payoutBlockReason", () => {
   })
 })
 
-// A matriz aqui é ESPELHO da do domínio (ContractModalityRules). O backend
-// revalida e é a autoridade — estes testes existem para o espelho não deslizar
-// em silêncio, que é o único jeito de a tela passar a mentir para o usuário.
+// Espelho da matriz do domínio (ContractModalityRules); o teste evita que ele deslize.
 describe("matriz modalidade × custódia", () => {
   it("cobre todas as modalidades, sem sobra nem falta", () => {
     expect(Object.keys(MODALITY_ESCROW).sort()).toEqual([...CONTRACT_MODALITIES].sort())

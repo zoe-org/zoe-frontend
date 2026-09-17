@@ -169,10 +169,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     setActiveTenantId(null)
     clearPendingInviteToken()
-    // O cache sai junto com a sessão. As chaves de Operations levam o tenant, mas as da
-    // área do criador não levam identidade nenhuma — o endpoint é escopado por quem chama.
-    // Sem isto, a próxima pessoa a entrar na mesma aba via o workspace da anterior até o
-    // refetch terminar.
+    // O cache sai com a sessão: as chaves da área do criador não levam identidade.
     qc.clear()
     setState({ ...initialState, isLoading: false })
   }, [qc])

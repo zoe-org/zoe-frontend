@@ -23,11 +23,7 @@ import {
 
 const STATUS_COLOR = CONTRACT_STATUS_COLOR
 
-/**
- * Célula de custódia. Três situações diferentes que não podem virar a mesma coisa:
- * conta aberta (mostra o estado), custódia prevista mas ainda não aberta, e
- * contrato que por desenho não tem custódia nenhuma.
- */
+/** Custódia aberta (estado), prevista e ainda não aberta, ou inexistente por desenho. */
 function EscrowCell({ item }: { item: ContractSummary }) {
   if (item.escrowState) {
     return (
@@ -237,14 +233,7 @@ export default function OperationsContractsPage() {
   )
 }
 
-/**
- * Exclusão de rascunho, com confirmação.
- *
- * <p>Confirmar em dois passos no proprio botao, sem caixa de dialogo: a acao e' pequena e
- * reversivel pelo esforco (basta criar outro rascunho), e um modal para isso interromperia
- * mais do que protege. O que ele protege e' o clique errado, e um segundo clique explicito
- * ja' resolve.</p>
- */
+/** Exclusão de rascunho confirmada no próprio botão, sem modal. */
 function DeleteDraftButton({ item }: { item: ContractSummary }) {
   const { remove } = useContractMutations()
   const [confirming, setConfirming] = useState(false)
@@ -309,17 +298,11 @@ function CreateContractModal({
   const [avulsaModality, setAvulsaModality] = useState("")
   const [influencerId, setInfluencerId] = useState(initialInfluencerId ?? "")
   const [usesEscrow, setUsesEscrow] = useState(true)
-  /**
-   * Ligado por padrão: é o fluxo que a regra descreve (assinado → depósito → produção →
-   * aprovação → pagamento) sem os cliques entre um passo e outro. Desligar volta ao manual.
-   */
+  /** Pagamento encadeado ligado por padrão; desligar volta ao fluxo manual. */
   const [autoAdvance, setAutoAdvance] = useState(true)
   const [reviewSlaDays, setReviewSlaDays] = useState("7")
   const [maxResubmissions, setMaxResubmissions] = useState("2")
-  /**
-   * Aprovação por prazo vencido (RN-O-055). Nulo enquanto a pessoa não mexe: a tela mostra o padrão da
-   * marca e o pedido vai sem o campo, para o servidor aplicar o mesmo padrão.
-   */
+  /** Aprovação por prazo vencido (RN-O-055); nulo usa o padrão da marca no servidor. */
   const [autoRelease, setAutoRelease] = useState<boolean | null>(null)
   const tenantDefaults = useContractDefaults()
   const autoReleaseValue = autoRelease ?? tenantDefaults.data?.autoReleaseOnTimeout ?? true

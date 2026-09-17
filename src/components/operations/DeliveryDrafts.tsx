@@ -35,16 +35,7 @@ const DraftChip = ({ status }: { status: string }) => (
   </span>
 )
 
-/**
- * Fila de cortes esperando decisão — o primeiro dos dois portões, do lado da marca.
- *
- * <p>Aprovar aqui libera a <b>publicação</b>, não o pagamento. O dinheiro continua atrás
- * do segundo portão, sobre o link do vídeo público — a tela diz isso explicitamente,
- * porque confundir os dois faria alguém achar que aprovou o pagamento sem querer.</p>
- *
- * <p>Um vídeo por vez: cada corte era um card com o player aberto, empilhado, e com cinco
- * deles achar o próximo virava rolagem sem fim.</p>
- */
+/** Fila de cortes (primeiro portão). Aprovar libera a publicação, não o pagamento; um vídeo por vez. */
 export function DeliveryDrafts() {
   const wide = useIsWide()
   const [filter, setFilter] = useState<string>("AwaitingReview")
@@ -52,9 +43,7 @@ export function DeliveryDrafts() {
   const [campaignFilter, setCampaignFilter] = useState("")
   const [selected, setSelected] = useState<string | null>(null)
 
-  // Busca SEM filtro e separa em memoria, como Entregas e Custodia ja' faziam. Mandar o
-  // filtro para a API punha a aba na chave do cache: cada troca era um cache diferente,
-  // uma ida ao servidor, e a tela em branco ate a resposta voltar.
+  // Busca sem filtro e separa em memória: filtro na chave do cache refazia a ida ao servidor a cada aba.
   const { data, isLoading, isError, refetch } = useDeliveryDrafts()
 
   const all = useMemo(() => data?.items ?? [], [data])

@@ -14,17 +14,7 @@ const currentFocus = () =>
     ? document.activeElement
     : null
 
-/**
- * Prende o foco dentro do modal ou da gaveta enquanto está aberto, e devolve ao elemento de antes
- * ao fechar.
- *
- * <p>Os modais do Operations são feitos à mão. Com Esc já fechando, faltava o resto do básico: o
- * Tab saía do modal e ia parar na página por trás, e ao fechar o foco se perdia no topo — quem
- * navega por teclado ou leitor de tela ficava sem saber onde estava.</p>
- *
- * <p>Ao abrir, o foco vai para o primeiro campo, pulando o botão de fechar — abrir um formulário
- * e cair no "×" obrigava a um Tab a mais sempre.</p>
- */
+/** Prende o foco no modal enquanto aberto e o devolve ao fechar. Ao abrir, pula o botão de fechar. */
 export function useFocusTrap<T extends HTMLElement>(active = true) {
   const ref = useRef<T>(null)
 
