@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react"
-import { useQueryClient } from "@tanstack/react-query"
 import { NavLink, Link, Outlet, useLocation, useNavigate } from "react-router-dom"
 import {
   House, Brain, Settings, Handshake,
@@ -96,7 +95,6 @@ function tenantColor(id: string) {
 
 export function AppShell() {
   const { user, role, signOut, activeTenantId, memberships, isZoeAdmin } = useAuth()
-  const queryClient = useQueryClient()
   // WS-F3 — mantém a conexão de tempo real viva pro app inteiro logado (não só
   // Alertas: é daqui que o badge da sidebar recebe o "novo" sem precisar navegar).
   useRealtimeConnection()
@@ -124,15 +122,6 @@ export function AppShell() {
   const [intelOpen, setIntelOpen] = useState(() => getInitialOpenState(STORAGE_INTEL_KEY))
   const [gestaoOpen, setGestaoOpen] = useState(() => getInitialOpenState(STORAGE_GESTAO_KEY))
   const [opsOpen, setOpsOpen] = useState(() => getInitialOpenState(STORAGE_OPS_KEY))
-
-  // Troca de tenant: remove só as queries do tenant anterior, nunca na montagem (um clear() geral deixava observers órfãos).
-  const previousTenantRef = useRef(activeTenantId)
-  useEffect(() => {
-    const previous = previousTenantRef.current
-    previousTenantRef.current = activeTenantId
-    if (!previous || previous === activeTenantId) return
-    queryClient.removeQueries({ predicate: (q) => q.queryKey.includes(previous) })
-  }, [activeTenantId, queryClient])
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_SIDEBAR_KEY, String(sidebarOpen)) } catch { /* storage indisponível */ }
