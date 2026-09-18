@@ -1,15 +1,17 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { AlertCircle, ArrowRight, Loader2, Sparkles, X } from "lucide-react"
 import { ApiError } from "@/lib/api"
 import { notifySuccess } from "@/lib/feedback"
 import { useEscapeKey } from "@/lib/useEscapeKey"
 import { useFocusTrap } from "@/lib/useFocusTrap"
+import { useTenantBrands } from "@/lib/api/brands"
 import {
   useChangePreview,
   useSubscriptionMutations,
   type BillingPlans,
   type ChangePreview,
   type ChangeWarning,
+  type InvoiceEstimate,
   type PendingProjection,
   type PlanSelection,
   type Subscription,
@@ -28,12 +30,15 @@ export function ChangePlanDialog({
   sub,
   onClose,
   onRequested,
+  onRetarget,
 }: {
   target: PlanSelection
   data: BillingPlans
   sub: Subscription
   onClose: () => void
   onRequested: (r: PendingProjection) => void
+  /** Trocar a combinação sem fechar o modal (comprar slot em vez de arquivar marca). */
+  onRetarget: (t: PlanSelection) => void
 }) {
   useEscapeKey(onClose)
   const dialogRef = useFocusTrap<HTMLDivElement>()
@@ -45,9 +50,12 @@ export function ChangePlanDialog({
   const current = selectionFromSubscription(sub)
   const currency = p?.currency ?? data.currency
 
+  const overflow = p?.warnings.find((w) => w.code === "brands_over_limit")
+  const brands = useBrandChoice(overflow, Boolean(p))
+
   const confirm = () => {
     setError(null)
-    change.mutate(target, {
+    change.mutate({ ...target, keepBrandIds: overflow ? brands.keep : undefined }, {
       onSuccess: (res) => {
         const mode =
           res.kind === "Downgrade" ? "scheduled" : res.kind === "ReleaseScheduled" ? "release" : "immediate"
@@ -123,7 +131,7 @@ export function ChangePlanDialog({
             <p className="text-[13.5px] text-ink-muted mt-4 mb-0 leading-relaxed">{whenText(p, sub)}</p>
 
             {p.kind !== "ReleaseScheduled" && (
-              <dl className="mt-4 rounded-[12px] border border-border-soft divide-y divide-border-soft text-[13px]">
+              <div className="mt-4 rounded-[12px] border border-border-soft divide-y divide-border-soft text-[13px]">
                 <MoneyRow
                   label="Cobrado agora"
                   hint={
@@ -133,10 +141,10 @@ export function ChangePlanDialog({
                         ? "Nada é cobrado durante o teste"
                         : "O plano atual segue pago até a data da troca"
                   }
-                  value={p.kind === "Upgrade" && p.amountDueNowCents != null ? money(p.amountDueNowCents, currency) : money(0, currency)}
+                  value={money(p.dueNow?.amountDueCents ?? 0, currency)}
                   strong={p.kind === "Upgrade"}
                 />
-                <MoneyRow
+                <InvoiceBreakdown
                   label={
                     p.kind === "TrialChange"
                       ? "Quando o teste acabar"
@@ -144,16 +152,16 @@ export function ChangePlanDialog({
                         ? `Fatura de ${day(p.nextInvoiceAt)}`
                         : "Próxima fatura"
                   }
-                  hint="Mensalidade com os planos novos"
-                  value={p.nextInvoiceCents != null ? money(p.nextInvoiceCents, currency) : "—"}
+                  estimate={p.next}
+                  currency={currency}
                 />
-              </dl>
+              </div>
             )}
 
             {p.bundleDiscountApplies && data.bundle.percentOff != null && (
               <div className="flex items-center gap-2 mt-3 text-[12.5px]" style={{ color: "var(--color-teal-500)" }}>
                 <Sparkles className="w-3.5 h-3.5" />
-                Desconto Full Platform de {data.bundle.percentOff}% incluído na mensalidade.
+                Desconto Full Platform de {data.bundle.percentOff}% já incluído acima.
               </div>
             )}
 
@@ -165,6 +173,18 @@ export function ChangePlanDialog({
                   ))}
                 </ul>
               </Notice>
+            )}
+
+            {overflow && (
+              <BrandPicker
+                choice={brands}
+                allowed={overflow.allowed ?? 0}
+                used={overflow.used ?? 0}
+                effectiveAt={p.kind === "Downgrade" ? p.effectiveAt : null}
+                extraSlotOffer={extraSlotOffer(target, data, overflow.used ?? 0)}
+                currency={currency}
+                onBuySlots={(slots) => onRetarget({ ...target, extraBrandSlots: slots })}
+              />
             )}
           </>
         )}
@@ -180,7 +200,7 @@ export function ChangePlanDialog({
           </button>
           <button
             onClick={confirm}
-            disabled={!p || change.isPending}
+            disabled={!p || change.isPending || (Boolean(overflow) && !brands.ready)}
             className="h-9 px-4 inline-flex items-center gap-1.5 rounded-lg text-[13px] font-medium text-white transition-colors disabled:opacity-50"
             style={{ background: "var(--color-teal-500)" }}
           >
@@ -211,7 +231,9 @@ function titleFor(p: ChangePreview | undefined) {
 function confirmLabel(p: ChangePreview | undefined, currency: string | null) {
   switch (p?.kind) {
     case "Upgrade":
-      return p.amountDueNowCents ? `Confirmar e pagar ${money(p.amountDueNowCents, currency)}` : "Confirmar upgrade"
+      return p.dueNow?.amountDueCents
+        ? `Confirmar e pagar ${money(p.dueNow.amountDueCents, currency)}`
+        : "Confirmar upgrade"
     case "Downgrade":
       return "Agendar downgrade"
     case "ReleaseScheduled":
@@ -240,7 +262,7 @@ function warningText(w: ChangeWarning, p: ChangePreview) {
   const quando = p.kind === "Downgrade" ? ` a partir de ${day(p.effectiveAt)}` : ""
   switch (w.code) {
     case "brands_over_limit":
-      return `Você tem ${int(w.used ?? 0)} marcas e o plano novo inclui ${int(w.allowed ?? 0)}. Nenhuma é apagada, mas não dá para incluir outra até ficar dentro do limite.`
+      return `Você tem ${int(w.used ?? 0)} marcas e o plano novo inclui ${int(w.allowed ?? 0)} — escolha abaixo quais continuam.`
     case "features_lost":
       return `Deixam de valer${quando}: ${(w.features ?? []).map((f) => FEATURE_LABELS[f] ?? f).join(", ")}.`
     case "intelligence_removed":
@@ -266,16 +288,201 @@ function SelectionLabel({ caption, selection }: { caption: string; selection: Pl
   )
 }
 
+/**
+ * A fatura aberta em parcelas. O total a pagar não é o preço de tabela: o provedor abate
+ * desconto e o crédito que sobrou de uma troca anterior no meio do ciclo. Mostrar só o total
+ * fazia a tela parecer errada — R$ 3.247,74 onde o plano diz R$ 3.300,00, sem explicação.
+ */
+function InvoiceBreakdown({
+  label,
+  estimate,
+  currency,
+}: {
+  label: string
+  estimate: InvoiceEstimate | null
+  currency: string | null
+}) {
+  if (!estimate) {
+    return <MoneyRow label={label} hint="Mensalidade com os planos novos" value="—" />
+  }
+
+  const detalhado = estimate.discountCents > 0 || estimate.creditCents > 0
+
+  return (
+    <div className="px-4 py-3">
+      <div className="flex items-center justify-between gap-4">
+        <span style={{ color: "var(--ink)" }}>{label}</span>
+        <span className="font-mono-zoe text-[15px] font-semibold" style={{ color: "var(--ink)" }}>
+          {money(estimate.amountDueCents, currency)}
+        </span>
+      </div>
+
+      {detalhado && (
+        <dl className="mt-2 space-y-1 text-[12px] text-ink-muted">
+          <BreakdownLine label="Mensalidade dos planos" value={money(estimate.subtotalCents, currency)} />
+          {estimate.discountCents > 0 && (
+            <BreakdownLine label="Desconto" value={`− ${money(estimate.discountCents, currency)}`} />
+          )}
+          {estimate.creditCents > 0 && (
+            <BreakdownLine
+              label="Crédito do seu saldo"
+              value={`− ${money(estimate.creditCents, currency)}`}
+              hint="sobra de uma troca anterior no meio do ciclo"
+            />
+          )}
+        </dl>
+      )}
+    </div>
+  )
+}
+
+function BreakdownLine({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4">
+      <dt className="m-0">
+        {label}
+        {hint && <span className="text-ink-muted-2"> · {hint}</span>}
+      </dt>
+      <dd className="m-0 font-mono-zoe shrink-0">{value}</dd>
+    </div>
+  )
+}
+
+/** Marcas extras que cobririam o excedente — só onde o tier vende slot (Pro). */
+function extraSlotOffer(target: PlanSelection, data: BillingPlans, used: number) {
+  const plan = data.plans.find((p) => p.slug === target.planSlug)
+  if (!plan?.sellsExtraBrandSlots || data.extraBrandSlotPriceCents == null) return null
+
+  const slots = Math.max(0, used - plan.brandSlots)
+  if (slots <= 0) return null
+
+  return { slots, priceCents: data.extraBrandSlotPriceCents * slots }
+}
+
+type BrandChoice = ReturnType<typeof useBrandChoice>
+
+/**
+ * Quais marcas sobrevivem ao plano menor. Pré-seleciona as mais antigas: é a operação que
+ * já está de pé, e o cliente troca o que quiser antes de confirmar.
+ */
+function useBrandChoice(overflow: ChangeWarning | undefined, previewReady: boolean) {
+  const allowed = overflow?.allowed ?? 0
+  const brands = useTenantBrands()
+  const [chosen, setChosen] = useState<string[] | null>(null)
+
+  const elegiveis = useMemo(
+    () =>
+      (brands.data?.items ?? [])
+        .filter((b) => b.status !== "Archived")
+        .slice()
+        .sort((a, b) => a.subscribedAt.localeCompare(b.subscribedAt)),
+    [brands.data],
+  )
+
+  const keep = chosen ?? elegiveis.slice(0, allowed).map((b) => b.tenantBrandId)
+
+  return {
+    brands: elegiveis,
+    loading: brands.isLoading,
+    keep,
+    ready: !previewReady || !overflow || (keep.length > 0 && keep.length <= allowed),
+    toggle: (id: string) =>
+      setChosen(keep.includes(id) ? keep.filter((k) => k !== id) : [...keep, id]),
+  }
+}
+
+function BrandPicker({
+  choice,
+  allowed,
+  used,
+  effectiveAt,
+  extraSlotOffer,
+  currency,
+  onBuySlots,
+}: {
+  choice: BrandChoice
+  allowed: number
+  used: number
+  effectiveAt: string | null
+  extraSlotOffer: { slots: number; priceCents: number } | null
+  currency: string | null
+  onBuySlots: (slots: number) => void
+}) {
+  const excedente = Math.max(0, used - allowed)
+
+  return (
+    <div className="mt-4 rounded-[12px] border border-border-soft">
+      <div className="px-4 py-3 border-b border-border-soft">
+        <div className="text-[13.5px] font-semibold" style={{ color: "var(--ink)" }}>
+          Escolha as {int(allowed)} marcas que continuam
+        </div>
+        <div className="text-[12.5px] text-ink-muted mt-0.5 leading-relaxed">
+          As outras {int(excedente)} são arquivadas{effectiveAt ? ` em ${day(effectiveAt)}` : ""}.
+          O histórico fica salvo; para reativar uma delas depois é preciso ter slot livre.
+        </div>
+      </div>
+
+      {extraSlotOffer && (
+        <button
+          onClick={() => onBuySlots(extraSlotOffer.slots)}
+          className="w-full text-left px-4 py-3 border-b border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors"
+        >
+          <div className="text-[13px]" style={{ color: "var(--color-teal-500)" }}>
+            Manter todas as {int(used)} marcas
+          </div>
+          <div className="text-[12.5px] text-ink-muted mt-0.5">
+            Acrescenta {int(extraSlotOffer.slots)} marca(s) extra por{" "}
+            {money(extraSlotOffer.priceCents, currency)}/mês. Nenhuma marca é arquivada.
+          </div>
+        </button>
+      )}
+
+      <div className="max-h-52 overflow-y-auto">
+        {choice.loading && <div className="px-4 py-3 text-[12.5px] text-ink-muted">Carregando marcas…</div>}
+        {choice.brands.map((b) => {
+          const marcada = choice.keep.includes(b.tenantBrandId)
+          const cheio = !marcada && choice.keep.length >= allowed
+          return (
+            <label
+              key={b.tenantBrandId}
+              className={`flex items-center gap-2.5 px-4 py-2 text-[13px] ${cheio ? "opacity-50" : "cursor-pointer"}`}
+            >
+              <input
+                type="checkbox"
+                checked={marcada}
+                disabled={cheio}
+                onChange={() => choice.toggle(b.tenantBrandId)}
+                className="w-4 h-4"
+                style={{ accentColor: "var(--color-teal-500)" }}
+              />
+              <span className="flex-1 truncate" style={{ color: "var(--ink)" }}>
+                {b.displayName ?? b.brandName}
+              </span>
+              <span className="text-[12px] text-ink-muted shrink-0">
+                {b.status === "Paused" ? "pausada" : `${int(b.videoCount30d)} vídeos/30d`}
+              </span>
+            </label>
+          )
+        })}
+      </div>
+
+      <div className="px-4 py-2.5 border-t border-border-soft text-[12.5px] text-ink-muted">
+        {choice.keep.length} de {allowed} selecionadas
+      </div>
+    </div>
+  )
+}
+
 function MoneyRow({ label, hint, value, strong }: { label: string; hint: string; value: string; strong?: boolean }) {
   return (
     <div className="flex items-center justify-between gap-4 px-4 py-3">
       <div>
-        <dt style={{ color: "var(--ink)" }}>{label}</dt>
+        <div style={{ color: "var(--ink)" }}>{label}</div>
         <div className="text-[12px] text-ink-muted mt-0.5">{hint}</div>
       </div>
-      <dd className={`font-mono-zoe m-0 ${strong ? "text-[15px] font-semibold" : ""}`} style={{ color: "var(--ink)" }}>
+      <span className={`font-mono-zoe ${strong ? "text-[15px] font-semibold" : ""}`} style={{ color: "var(--ink)" }}>
         {value}
-      </dd>
+      </span>
     </div>
   )
 }

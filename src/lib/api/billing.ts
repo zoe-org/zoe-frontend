@@ -108,12 +108,26 @@ export type ChangeWarning = {
   features: string[] | null
 }
 
+/**
+ * Uma fatura estimada, aberta em parcelas. O total a pagar não é o preço de tabela: o
+ * provedor abate desconto e o crédito que sobrou de uma troca anterior no meio do ciclo.
+ */
+export type InvoiceEstimate = {
+  subtotalCents: number
+  /** Positivo = abatimento por cupom. */
+  discountCents: number
+  /** Positivo = abatimento pelo saldo do cliente. */
+  creditCents: number
+  amountDueCents: number
+}
+
 export type ChangePreview = {
   kind: ChangeKind
   effectiveAt: string
-  /** Cobrado no ato. Null = o provedor não calculou. */
-  amountDueNowCents: number | null
-  nextInvoiceCents: number | null
+  /** Fatura emitida no ato (upgrade). Null quando nada é cobrado agora. */
+  dueNow: InvoiceEstimate | null
+  /** Próxima fatura recorrente. Null quando o provedor não calculou. */
+  next: InvoiceEstimate | null
   nextInvoiceAt: string | null
   currency: string | null
   bundleDiscountApplies: boolean
@@ -139,6 +153,8 @@ export type ChangeSubscriptionInput = {
   planSlug?: string | null
   operationsPlanSlug?: string | null
   extraBrandSlots?: number
+  /** Marcas que continuam quando o plano novo tem menos slots. As demais são arquivadas na data da troca. */
+  keepBrandIds?: string[]
   /** Só na assinatura inicial. Omitido = com teste; a API recusa o segundo trial do mesmo usuário. */
   withTrial?: boolean
   /**
@@ -157,6 +173,9 @@ export const TRIAL_ALREADY_USED = "trial_already_used"
 
 /** Assinatura paga recusada por falta de cartão. */
 export const PAYMENT_METHOD_REQUIRED = "payment_method_required"
+
+/** Downgrade com mais marcas do que o plano novo comporta: falta escolher quais ficam. */
+export const BRAND_SELECTION_REQUIRED = "brand_selection_required"
 
 /** `hasPaymentMethod` null = não deu para saber (sem provedor ou provedor fora do ar). */
 export type PaymentMethodStatus = {

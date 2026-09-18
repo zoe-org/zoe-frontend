@@ -156,6 +156,7 @@ export function PlanPanel() {
           sub={sub}
           onClose={() => setChanging(null)}
           onRequested={setAwaiting}
+          onRetarget={setChanging}
         />
       )}
 
@@ -760,7 +761,7 @@ function ExtraBrandDialog({
     extraBrandSlots: data.currentExtraBrandSlots + 1,
   }
   const preview = useChangePreview(target)
-  const dueNow = preview.data?.amountDueNowCents
+  const dueNow = preview.data?.dueNow?.amountDueCents
 
   const confirm = () => {
     setError(null)
