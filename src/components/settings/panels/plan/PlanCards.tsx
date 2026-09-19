@@ -43,38 +43,68 @@ export type CardContext = {
 
 type Action = { label: string; kind: "primary" | "ghost" | "disabled"; target: PlanSelection }
 
-/**
- * Rótulo do botão. Classifica como a API: pagar mais por mês é upgrade. A decisão real
- * (inclusive a data em que vale) vem da prévia do modal.
- */
-function actionFor(ctx: CardContext, target: PlanSelection, isCurrent: boolean, moduleMissing: boolean): Action {
-  const { data, sub, reativando } = ctx
+type Badge = { label: string; tone: "current" | "muted" }
 
-  if (reativando) return { label: isCurrent ? "Reativar" : "Assinar", kind: "primary", target }
-  if (!sub) return { label: "Assinar", kind: "primary", target }
+/** Selo e botão de um card, decididos juntos para não se contradizerem. */
+type CardState = { badge: Badge | null; highlight: boolean; action: Action }
+
+/** Em teste, a assinatura não é um plano: todo card é uma escolha de assinatura. */
+const isTrial = (sub: Subscription | null) => sub?.status === "Trialing" && !sub.readOnly
+
+/**
+ * Selo e rótulo do botão. Classifica como a API: pagar mais por mês é upgrade. A decisão
+ * real (inclusive a data em que vale) vem da prévia do modal.
+ *
+ * <p>Cada aba assina o que mostra: um card do Intelligence leva a "só Intelligence", e a
+ * combinação dos dois módulos mora na aba Full Platform. Antes o card mantinha o outro
+ * módulo, e quem trocava de aba acabava com os dois sem ter pedido.</p>
+ *
+ * @param partOfCurrent o tier do card faz parte da assinatura, junto com outro módulo.
+ */
+function cardFor(ctx: CardContext, target: PlanSelection, partOfCurrent: boolean): CardState {
+  const { data, sub, reativando } = ctx
+  const assinar = { label: "Assinar", kind: "primary" as const, target }
+
+  if (reativando)
+    return {
+      badge: partOfCurrent ? { label: "Plano anterior", tone: "muted" } : null,
+      highlight: false,
+      action: { ...assinar, label: partOfCurrent ? "Reativar" : "Assinar" },
+    }
+  if (!sub || isTrial(sub)) return { badge: null, highlight: false, action: assinar }
 
   const current = currentSelection(data)
   const scheduled = sub.scheduledChange
 
-  if (isCurrent) {
-    // Com downgrade agendado, o card do plano atual é o caminho para desistir dele.
-    return scheduled
-      ? { label: "Manter este plano", kind: "primary", target: current }
-      : { label: "Plano atual", kind: "disabled", target }
-  }
+  if (sameSelection(current, target))
+    return {
+      badge: { label: "Plano atual", tone: "current" },
+      highlight: true,
+      // Com downgrade agendado, o card do plano atual é o caminho para desistir dele.
+      action: scheduled
+        ? { label: "Manter este plano", kind: "primary", target: current }
+        : { label: "Plano atual", kind: "disabled", target },
+    }
+
+  const badge: Badge | null = partOfCurrent ? { label: "No seu plano atual", tone: "muted" } : null
 
   if (
     scheduled &&
     scheduled.planSlug === target.planSlug &&
-    scheduled.operationsPlanSlug === target.operationsPlanSlug
+    scheduled.operationsPlanSlug === target.operationsPlanSlug &&
+    scheduled.extraBrandSlots === target.extraBrandSlots
   )
-    return { label: `Agendado para ${day(scheduled.effectiveAt)}`, kind: "disabled", target }
+    return { badge, highlight: false, action: { label: `Agendado para ${day(scheduled.effectiveAt)}`, kind: "disabled", target } }
 
-  if (sameSelection(current, target)) return { label: "Plano atual", kind: "disabled", target }
+  // Sai um módulo que a assinatura tem: não é subir nem descer no mesmo trilho, é trocar.
+  const saiModulo =
+    (current.planSlug != null && target.planSlug == null) ||
+    (current.operationsPlanSlug != null && target.operationsPlanSlug == null)
 
-  return classify(current, target, data) === "upgrade"
-    ? { label: moduleMissing ? "Adicionar ao plano" : "Fazer upgrade", kind: "primary", target }
-    : { label: "Fazer downgrade", kind: "ghost", target }
+  const upgrade = classify(current, target, data) === "upgrade"
+  const label = saiModulo ? "Trocar para este" : upgrade ? "Fazer upgrade" : "Fazer downgrade"
+
+  return { badge, highlight: false, action: { label, kind: upgrade ? "primary" : "ghost", target } }
 }
 
 // ── Intelligence ─────────────────────────────────────────────────────────
@@ -85,12 +115,14 @@ export function IntelligenceGrid({ ctx }: { ctx: CardContext }) {
   return (
     <div className="grid gap-4 @md:grid-cols-2 @4xl:grid-cols-4">
       {data.plans.map((plan) => {
-        const isCurrent = plan.isCurrent
+        const assinado = Boolean(ctx.sub) && !ctx.reativando && !isTrial(ctx.sub)
+        // Só Intelligence: a combinação com Operations é escolha da aba Full Platform.
         const target: PlanSelection = {
           planSlug: plan.slug,
-          operationsPlanSlug: ctx.sub && !ctx.reativando ? data.currentOperationsPlanSlug : null,
-          extraBrandSlots: plan.sellsExtraBrandSlots && ctx.sub && !ctx.reativando ? data.currentExtraBrandSlots : 0,
+          operationsPlanSlug: null,
+          extraBrandSlots: plan.sellsExtraBrandSlots && assinado ? data.currentExtraBrandSlots : 0,
         }
+        const state = cardFor(ctx, target, plan.isCurrent)
 
         return (
           <PlanShell
@@ -99,15 +131,15 @@ export function IntelligenceGrid({ ctx }: { ctx: CardContext }) {
             pitch={INTELLIGENCE_PITCH[plan.slug] ?? ""}
             priceCents={plan.priceCents}
             currency={data.currency}
-            isCurrent={isCurrent}
-            reativando={ctx.reativando}
+            badge={state.badge}
+            highlight={state.highlight}
             footer={
               plan.slug === "enterprise" ? (
                 <SalesButton subject="Plano Enterprise" />
               ) : (
                 <ActionButton
                   ctx={ctx}
-                  action={actionFor(ctx, target, isCurrent, data.currentPlanSlug == null)}
+                  action={state.action}
                   busy={ctx.busyKey === plan.slug}
                   busyKey={plan.slug}
                 />
@@ -147,11 +179,9 @@ export function OperationsGrid({ ctx }: { ctx: CardContext }) {
     <div className="space-y-4">
       <div className="grid gap-4 @md:grid-cols-2 @4xl:grid-cols-3">
         {data.operationsPlans.map((plan) => {
-          const target: PlanSelection = {
-            planSlug: ctx.sub && !ctx.reativando ? data.currentPlanSlug : null,
-            operationsPlanSlug: plan.slug,
-            extraBrandSlots: ctx.sub && !ctx.reativando ? data.currentExtraBrandSlots : 0,
-          }
+          // Só Operations: a combinação com Intelligence é escolha da aba Full Platform.
+          const target: PlanSelection = { planSlug: null, operationsPlanSlug: plan.slug, extraBrandSlots: 0 }
+          const state = cardFor(ctx, target, plan.isCurrent)
 
           return (
             <PlanShell
@@ -160,12 +190,12 @@ export function OperationsGrid({ ctx }: { ctx: CardContext }) {
               pitch={OPERATIONS_PITCH[plan.slug] ?? ""}
               priceCents={plan.priceCents}
               currency={data.currency}
-              isCurrent={plan.isCurrent}
-              reativando={ctx.reativando}
+              badge={state.badge}
+              highlight={state.highlight}
               footer={
                 <ActionButton
                   ctx={ctx}
-                  action={actionFor(ctx, target, plan.isCurrent, data.currentOperationsPlanSlug == null)}
+                  action={state.action}
                   busy={ctx.busyKey === plan.slug}
                   busyKey={plan.slug}
                 />
@@ -181,8 +211,8 @@ export function OperationsGrid({ ctx }: { ctx: CardContext }) {
           pitch="Volume alto, taxa e contrato negociados."
           priceCents={null}
           currency={data.currency}
-          isCurrent={false}
-          reativando={false}
+          badge={null}
+          highlight={false}
           footer={<SalesButton subject="Operations Enterprise" />}
         >
           <Row label="Campanhas por mês" value="Ilimitadas" />
@@ -252,16 +282,17 @@ export function BundleGrid({ ctx }: { ctx: CardContext }) {
 
       <div className="rounded-[14px] border border-border-soft overflow-hidden" style={{ background: "var(--surface)" }}>
         {data.bundle.eligiblePlanSlugs.map((planSlug, i) => {
+          const assinado = Boolean(ctx.sub) && !ctx.reativando && !isTrial(ctx.sub)
           const selection: PlanSelection = {
             planSlug,
             operationsPlanSlug: opsSlug,
-            extraBrandSlots:
-              planSlug === "pro" && ctx.sub && !ctx.reativando ? data.currentExtraBrandSlots : 0,
+            extraBrandSlots: planSlug === "pro" && assinado ? data.currentExtraBrandSlots : 0,
           }
           const full = recurringCents(selection, data)
           const estimate = bundleEstimateCents(selection, data)
-          const isCurrent =
-            !ctx.reativando && data.currentPlanSlug === planSlug && data.currentOperationsPlanSlug === opsSlug
+          const state = cardFor(
+            ctx, selection,
+            data.currentPlanSlug === planSlug && data.currentOperationsPlanSlug === opsSlug)
 
           return (
             <div
@@ -269,8 +300,9 @@ export function BundleGrid({ ctx }: { ctx: CardContext }) {
               className={`flex items-center gap-4 px-6 py-4 flex-wrap ${i > 0 ? "border-t border-border-soft" : ""}`}
             >
               <div className="flex-1 min-w-[200px]">
-                <div className="text-[14px] font-semibold" style={{ color: "var(--ink)" }}>
+                <div className="text-[14px] font-semibold flex items-center gap-2 flex-wrap" style={{ color: "var(--ink)" }}>
                   {planName(planSlug)} + {planName(opsSlug)}
+                  {state.badge && <BadgeChip badge={state.badge} />}
                 </div>
                 <div className="text-[12.5px] text-ink-muted mt-0.5">
                   {INTELLIGENCE_PITCH[planSlug]}
@@ -296,7 +328,7 @@ export function BundleGrid({ ctx }: { ctx: CardContext }) {
               <div className="w-full @md:w-48">
                 <ActionButton
                   ctx={ctx}
-                  action={actionFor(ctx, selection, isCurrent, false)}
+                  action={state.action}
                   busy={ctx.busyKey === `bundle-${planSlug}`}
                   busyKey={`bundle-${planSlug}`}
                 />
@@ -321,8 +353,8 @@ function PlanShell({
   pitch,
   priceCents,
   currency,
-  isCurrent,
-  reativando,
+  badge,
+  highlight,
   footer,
   children,
 }: {
@@ -330,8 +362,8 @@ function PlanShell({
   pitch: string
   priceCents: number | null
   currency: string | null
-  isCurrent: boolean
-  reativando: boolean
+  badge: Badge | null
+  highlight: boolean
   footer: React.ReactNode
   children: React.ReactNode
 }) {
@@ -340,19 +372,12 @@ function PlanShell({
       className="rounded-[14px] border px-5 py-5 flex flex-col"
       style={{
         background: "var(--surface)",
-        borderColor: isCurrent && !reativando ? "var(--color-teal-500)" : "var(--border-soft)",
+        borderColor: highlight ? "var(--color-teal-500)" : "var(--border-soft)",
       }}
     >
-      {isCurrent && (
-        <span
-          className="self-start text-[10px] font-semibold rounded-full px-2 py-0.5 mb-2"
-          style={
-            reativando
-              ? { background: "#F3F4F6", color: "#6B7280" }
-              : { background: "var(--teal-bg)", color: "var(--color-teal-500)" }
-          }
-        >
-          {reativando ? "Plano anterior" : "Plano atual"}
+      {badge && (
+        <span className="self-start mb-2">
+          <BadgeChip badge={badge} />
         </span>
       )}
 
@@ -379,6 +404,21 @@ function PlanShell({
 
       <div className="mt-auto">{footer}</div>
     </div>
+  )
+}
+
+function BadgeChip({ badge }: { badge: Badge }) {
+  return (
+    <span
+      className="inline-block text-[10px] font-semibold rounded-full px-2 py-0.5"
+      style={
+        badge.tone === "current"
+          ? { background: "var(--teal-bg)", color: "var(--color-teal-500)" }
+          : { background: "#F3F4F6", color: "#6B7280" }
+      }
+    >
+      {badge.label}
+    </span>
   )
 }
 

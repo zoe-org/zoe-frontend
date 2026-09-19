@@ -6,9 +6,10 @@ import { EmptyBlock } from "@/components/ui/empty-block"
 import { TabPill } from "@/components/ui/tab-pill"
 import { ApiError } from "@/lib/api"
 import { useAuth } from "@/features/auth/context"
+import { useTenantBrands } from "@/lib/api/brands"
 import {
   newAttemptKey,
-  PAYMENT_METHOD_REQUIRED,
+  pendingConversion,
   projectionArrived,
   TRIAL_ALREADY_USED,
   useBillingPlans,
@@ -55,8 +56,11 @@ export function PlanPanel() {
   // O que foi PEDIDO ao provedor e ainda não virou projeção. Quem decide parar o
   // repique é o callback do react-query, fora do render — relógio em render é impuro.
   const [awaiting, setAwaiting] = useState<PendingProjection | null>(null)
-  const [changing, setChanging] = useState<PlanSelection | null>(null)
+  // Volta do cadastro de cartão: a assinatura escolhida antes reabre para confirmar.
+  const [changing, setChanging] = useState<PlanSelection | null>(resumeConversion)
   const [tab, setTab] = useModuleTab()
+  const { hasFeature } = useAuth()
+  useCardReturnCleanup()
 
   const plans = useBillingPlans(awaiting)
   const subscription = useSubscription(awaiting)
@@ -90,7 +94,14 @@ export function PlanPanel() {
     onChange: setChanging,
   }
 
-  const temOsDois = Boolean(sub && !reativando && sub.planSlug && sub.operationsPlanSlug)
+  const emTeste = sub?.status === "Trialing" && !reativando
+
+  // O teste libera os módulos do workspace: é o produto que a pessoa veio avaliar.
+  const selecaoDoTeste: PlanSelection = {
+    planSlug: hasFeature("intelligence") || !hasFeature("operations") ? "pro" : null,
+    operationsPlanSlug: hasFeature("operations") ? "operations_pro" : null,
+    extraBrandSlots: 0,
+  }
 
   return (
     <div className="@container">
@@ -98,11 +109,19 @@ export function PlanPanel() {
         {!data.billingEnabled && <ProviderOffBanner />}
         {voltandoDoCheckout && !sub && <ProjectionBanner phase="waiting" />}
         {awaiting && !arrived && <ProjectionBanner phase={espera.phase} onRetry={espera.retry} />}
-        {sub && (
+        {emTeste && sub && <TrialStatus sub={sub} />}
+        {sub && !emTeste && (
           <CurrentSubscription
             sub={sub}
             data={data}
             onKeep={() => setChanging(selectionFromSubscription(sub))}
+          />
+        )}
+        {!sub && data.trialAvailable && (
+          <TrialOffer
+            disabled={pending || !data.billingEnabled}
+            busy={start.busyKey === "trial"}
+            onStart={() => start.startTrial(selecaoDoTeste)}
           />
         )}
 
@@ -114,31 +133,22 @@ export function PlanPanel() {
 
         {tab === "intelligence" && (
           <>
-            <IntelligenceGrid ctx={ctx} />
-            <SharedSlotsNote />
-            {data.currentPlanSlug && !reativando && (
-              <ExtraBrandCard data={data} sub={sub} onRequested={setAwaiting} />
-            )}
-            {temOsDois && (
-              <RemoveModuleLink
-                label="Tirar o Intelligence do plano"
-                onClick={() => setChanging({ planSlug: null, operationsPlanSlug: sub!.operationsPlanSlug, extraBrandSlots: 0 })}
+            {sub && data.currentPlanSlug && !reativando && !emTeste && (
+              <BrandSlotsCard
+                data={data}
+                sub={sub}
+                onRequested={setAwaiting}
+                onRemoveSlot={() =>
+                  setChanging({ ...selectionFromSubscription(sub), extraBrandSlots: sub.extraBrandSlots - 1 })
+                }
               />
             )}
+            <IntelligenceGrid ctx={ctx} />
+            <SharedSlotsNote />
           </>
         )}
 
-        {tab === "operations" && (
-          <>
-            <OperationsGrid ctx={ctx} />
-            {temOsDois && (
-              <RemoveModuleLink
-                label="Tirar o Operations do plano"
-                onClick={() => setChanging({ ...selectionFromSubscription(sub!), operationsPlanSlug: null })}
-              />
-            )}
-          </>
-        )}
+        {tab === "operations" && <OperationsGrid ctx={ctx} />}
 
         {tab === "pacote" && <BundleGrid ctx={ctx} />}
 
@@ -156,6 +166,7 @@ export function PlanPanel() {
           sub={sub}
           onClose={() => setChanging(null)}
           onRequested={setAwaiting}
+          onRetarget={setChanging}
         />
       )}
 
@@ -190,9 +201,33 @@ function useModuleTab(): [ModuleTab, (t: ModuleTab) => void] {
   return [tab, setTab]
 }
 
+/** A assinatura que esperava o cartão, quando a página volta do cadastro no provedor. */
+function resumeConversion(): PlanSelection | null {
+  const outcome = new URLSearchParams(window.location.search).get("checkout")
+  if (outcome !== "card" && outcome !== "card_cancel") return null
+  const pendente = pendingConversion.take()
+  return outcome === "card" ? pendente : null
+}
+
+/** Tira o `?checkout=card` da URL: recarregar não pode reabrir a confirmação. */
+function useCardReturnCleanup() {
+  const [params, setParams] = useSearchParams()
+  const outcome = params.get("checkout")
+
+  useEffect(() => {
+    if (outcome !== "card" && outcome !== "card_cancel") return
+    const limpo = new URLSearchParams(params)
+    limpo.delete("checkout")
+    setParams(limpo, { replace: true })
+    // `params` muda a cada render; o gatilho é só o desfecho que chegou na URL.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outcome])
+}
+
 /**
- * Assinatura nova (ou reativação). Só o trial nasce direto — ele é sem cartão; plano
- * pago vai para a tela de pagamento do provedor.
+ * Assinatura nova (ou reativação). Plano pago vai direto para a tela de pagamento do
+ * provedor; o teste é um caminho à parte, pedido explicitamente — escolher um plano não
+ * pode virar teste por baixo dos panos.
  */
 function useStartFlow(data: BillingPlans | null, onRequested: (r: PendingProjection) => void) {
   const { start, checkout } = useSubscriptionMutations()
@@ -217,9 +252,11 @@ function useStartFlow(data: BillingPlans | null, onRequested: (r: PendingProject
 
   const begin = (selection: PlanSelection, key: string) => {
     if (!data) return
-    // Assinatura cancelada: o provedor não reabre a antiga, então vai direto ao pagamento.
-    if (data.currentPlanSlug || data.currentOperationsPlanSlug) return irParaCheckout(selection, key)
+    irParaCheckout(selection, key)
+  }
 
+  const startTrial = (selection: PlanSelection) => {
+    const key = "trial"
     setBusyKey(key)
     start.mutate(
       { ...selection, withTrial: true, idempotencyKey: newAttemptKey() },
@@ -228,7 +265,7 @@ function useStartFlow(data: BillingPlans | null, onRequested: (r: PendingProject
         // webhook. Por isso a mensagem fala em "solicitada", não em "concluída".
         onSuccess: () => {
           onRequested({ ...selection, mode: "immediate", since: Date.now() })
-          notifySuccess("Assinatura solicitada. Aguardando a confirmação do provedor.")
+          notifySuccess("Teste solicitado. Aguardando a confirmação do provedor.")
         },
         onError: (e) => {
           // O trial já usado não é falha: é uma escolha que o cliente ainda pode fazer,
@@ -239,9 +276,7 @@ function useStartFlow(data: BillingPlans | null, onRequested: (r: PendingProject
             setTrialUsedFor(selection)
             return
           }
-          // Falta de cartão deixou de ser erro: o checkout coleta o cartão junto com o pagamento.
-          if (code === PAYMENT_METHOD_REQUIRED) return irParaCheckout(selection, key)
-          notifyError(e, "Não foi possível concluir a assinatura.", { terminal: true })
+          notifyError(e, "Não foi possível começar o teste.", { terminal: true })
         },
         onSettled: () => setBusyKey(null),
       },
@@ -250,6 +285,7 @@ function useStartFlow(data: BillingPlans | null, onRequested: (r: PendingProject
 
   return {
     begin,
+    startTrial,
     checkout: (selection: PlanSelection) => {
       setDialogError(null)
       irParaCheckout(selection)
@@ -471,26 +507,6 @@ function CurrentSubscription({
             Período de {day(sub.currentPeriodStart)} a {day(sub.currentPeriodEnd)}
             {sub.extraBrandSlots > 0 && <> · {sub.extraBrandSlots} marca(s) extra</>}
           </div>
-          {sub.status === "Trialing" && (
-            <div className="text-[12.5px] text-ink-muted mt-1 max-w-140 leading-relaxed">
-              {/* A cota do teste é menor que a do tier. Sem dizer isso aqui, o card do
-                  plano logo abaixo anuncia outro número e a tela se contradiz. */}
-              {sub.planSlug && (
-                <>
-                  Cota do teste:{" "}
-                  <strong style={{ color: "var(--ink)" }}>{int(sub.quotaMinutes)} minutos</strong> — a
-                  cota cheia do plano vale quando a assinatura for paga.
-                </>
-              )}
-              {sub.trialEndsAt && (
-                <>
-                  {" "}
-                  O teste termina em {day(sub.trialEndsAt)}; sem método de pagamento até lá, a
-                  assinatura é cancelada e o acesso fica somente leitura.
-                </>
-              )}
-            </div>
-          )}
         </div>
       </div>
 
@@ -584,11 +600,85 @@ function SharedSlotsNote() {
   )
 }
 
-function RemoveModuleLink({ label, onClick }: { label: string; onClick: () => void }) {
+// ── Período de teste ──────────────────────────────────────────────────────
+
+/**
+ * O teste não é uma assinatura: não tem plano, só um prazo e uma cota própria. Mostrar
+ * "Pro + Operations Pro · em teste" fazia parecer que o cliente já tinha contratado — e os
+ * cards abaixo diziam "Plano atual" num plano que ninguém escolheu.
+ */
+function TrialStatus({ sub }: { sub: Subscription }) {
+  const dias = sub.trialEndsAt
+    ? Math.max(0, Math.ceil((new Date(sub.trialEndsAt).getTime() - new Date(sub.asOf).getTime()) / 86_400_000))
+    : null
+
   return (
-    <div className="text-right">
-      <button onClick={onClick} className="text-[12.5px] text-ink-muted underline hover:opacity-80">
-        {label}
+    <div className="rounded-[14px] border border-border-soft px-6 py-5" style={{ background: "var(--surface)" }}>
+      <div className="eyebrow">Período de teste</div>
+      <div className="flex items-baseline gap-2.5 mt-2 flex-wrap">
+        <span className="font-display" style={{ fontSize: 26, color: "var(--ink)" }}>
+          Teste gratuito
+        </span>
+        {dias != null && (
+          <span
+            className="text-[11.5px] font-semibold rounded-full px-2 py-0.5"
+            style={{ background: "var(--teal-bg)", color: "var(--color-teal-500)" }}
+          >
+            {dias === 1 ? "falta 1 dia" : `faltam ${dias} dias`}
+          </span>
+        )}
+      </div>
+
+      <dl className="mt-3 grid gap-x-8 gap-y-1.5 text-[12.5px] @md:grid-cols-3">
+        <TrialFact label="Termina em" value={sub.trialEndsAt ? day(sub.trialEndsAt) : "—"} />
+        <TrialFact label="Cota do teste" value={`${int(sub.quotaMinutes)} minutos`} />
+        <TrialFact label="Marcas no teste" value={int(sub.brandSlots)} />
+      </dl>
+
+      <div className="mt-4 pt-4 border-t border-border-soft text-[12.5px] text-ink-muted leading-relaxed max-w-165">
+        Para continuar depois do teste, escolha um plano abaixo. Ao assinar, o teste termina na
+        hora, a cota e as marcas passam a ser as do plano e a primeira mensalidade é cobrada.
+        Sem assinar até o fim do prazo, o acesso fica somente leitura —{" "}
+        <strong>nenhum dado é apagado</strong>.
+      </div>
+    </div>
+  )
+}
+
+function TrialFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-ink-muted">{label}</dt>
+      <dd className="m-0 mt-0.5 font-mono-zoe" style={{ color: "var(--ink)" }}>{value}</dd>
+    </div>
+  )
+}
+
+/** Teste é pedido de propósito: "Assinar" num card leva ao pagamento, nunca a um teste. */
+function TrialOffer({ disabled, busy, onStart }: { disabled: boolean; busy: boolean; onStart: () => void }) {
+  return (
+    <div
+      className="rounded-[14px] border px-6 py-5 flex items-center gap-5 flex-wrap"
+      style={{ background: "var(--teal-bg)", borderColor: "rgba(0,167,153,.28)" }}
+    >
+      <Sparkles className="w-5 h-5 shrink-0" style={{ color: "var(--color-teal-500)" }} />
+      <div className="flex-1 min-w-[260px]">
+        <div className="text-[14.5px] font-semibold" style={{ color: "var(--ink)" }}>
+          Teste grátis por 14 dias, sem cartão
+        </div>
+        <div className="text-[13px] mt-1 leading-relaxed max-w-140" style={{ color: "var(--ink-2)" }}>
+          Experimente os módulos deste workspace com cota de teste. Nada é cobrado; para
+          continuar depois, é só escolher um plano.
+        </div>
+      </div>
+      <button
+        onClick={onStart}
+        disabled={disabled || busy}
+        className="h-9 px-4 inline-flex items-center gap-1.5 rounded-lg text-[13px] font-medium text-white transition-colors disabled:opacity-50"
+        style={{ background: "var(--color-teal-500)" }}
+      >
+        {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+        Começar teste grátis
       </button>
     </div>
   )
@@ -670,57 +760,99 @@ function TrialUsedDialog({
 
 // ── Marca extra ───────────────────────────────────────────────────────────
 
-function ExtraBrandCard({
+/**
+ * Quantas marcas o plano comporta e quantas estão em uso — e, no Pro, as marcas extras:
+ * comprar e devolver. Antes só dava para comprar, e o cliente não via quantas tinha.
+ *
+ * <p>Devolver marca extra é downgrade: vale no fim do período já pago, e se as marcas em
+ * uso não couberem, o modal pede para escolher quais continuam.</p>
+ */
+function BrandSlotsCard({
   data,
   sub,
   onRequested,
+  onRemoveSlot,
 }: {
   data: BillingPlans
-  sub: Subscription | null
+  sub: Subscription
   onRequested: (r: PendingProjection) => void
+  onRemoveSlot: () => void
 }) {
   const [confirming, setConfirming] = useState(false)
+  const brands = useTenantBrands()
   const current = data.plans.find((p) => p.isCurrent)
+  if (!current) return null
 
-  // Só o Pro vende. Nos outros o card nem aparece: no Starter o limite é o gatilho
-  // de upgrade, e Max/Enterprise já são ilimitados.
-  if (!current?.sellsExtraBrandSlots || !sub) return null
-
+  const vendeSlot = current.sellsExtraBrandSlots
+  const ilimitado = current.brandSlots <= 0
+  const total = current.brandSlots + sub.extraBrandSlots
+  const emUso = (brands.data?.items ?? []).filter((b) => b.status !== "Archived").length
   const price = data.extraBrandSlotPriceCents
+  const trocaDeSlots =
+    sub.scheduledChange && sub.scheduledChange.planSlug === sub.planSlug
+      && sub.scheduledChange.extraBrandSlots !== sub.extraBrandSlots
+      ? sub.scheduledChange
+      : null
 
   return (
     <>
-      <div
-        className="rounded-[14px] border border-border-soft px-6 py-5 flex items-center gap-5 flex-wrap"
-        style={{ background: "var(--surface)" }}
-      >
-        <Sparkles className="w-5 h-5 shrink-0" style={{ color: "var(--color-teal-500)" }} />
-        <div className="flex-1 min-w-[280px]">
-          <div className="text-[14.5px] font-semibold" style={{ color: "var(--ink)" }}>
-            Marca extra
-          </div>
-          <div className="text-[13px] text-ink-muted mt-1 leading-relaxed max-w-140">
-            Um slot de marca a mais no seu plano, <strong>sem alterar a cota de minutos</strong>.
-            O proporcional até o fim do período é cobrado na hora.
-            {data.currentExtraBrandSlots > 0 && (
-              <> Você já tem {data.currentExtraBrandSlots} contratada(s).</>
+      <div className="rounded-[14px] border border-border-soft px-6 py-5" style={{ background: "var(--surface)" }}>
+        <div className="flex items-start gap-5 flex-wrap">
+          <div className="flex-1 min-w-[260px]">
+            <div className="eyebrow">Marcas do plano</div>
+            <div className="flex items-baseline gap-2 mt-2">
+              <span className="font-display" style={{ fontSize: 24, color: "var(--ink)" }}>
+                {brands.isLoading ? "—" : int(emUso)}
+              </span>
+              <span className="text-[13px] text-ink-muted">
+                {ilimitado ? "em uso · ilimitadas no plano" : `de ${int(total)} em uso`}
+              </span>
+            </div>
+            {!ilimitado && (
+              <div className="text-[12.5px] text-ink-muted mt-1">
+                {int(current.brandSlots)} incluídas no {current.slug === "pro" ? "Pro" : "plano"}
+                {sub.extraBrandSlots > 0 && <> + {int(sub.extraBrandSlots)} marca(s) extra</>}
+              </div>
+            )}
+            {trocaDeSlots && (
+              <div className="text-[12.5px] mt-1" style={{ color: "var(--color-warn)" }}>
+                Passa para {int(trocaDeSlots.extraBrandSlots)} marca(s) extra em {day(trocaDeSlots.effectiveAt)}.
+              </div>
             )}
           </div>
+
+          {vendeSlot && (
+            <div className="flex items-center gap-2 flex-wrap">
+              {price != null && (
+                <span className="text-[12.5px] text-ink-muted mr-1">
+                  Marca extra: <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>{money(price, data.currency)}</span>/mês
+                </span>
+              )}
+              <button
+                onClick={onRemoveSlot}
+                disabled={!data.billingEnabled || sub.extraBrandSlots <= 0}
+                className="h-9 px-3 inline-flex items-center justify-center rounded-lg text-[13px] font-medium border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors disabled:opacity-50"
+              >
+                Remover marca extra
+              </button>
+              <button
+                onClick={() => setConfirming(true)}
+                disabled={!data.billingEnabled}
+                className="h-9 px-3 inline-flex items-center justify-center rounded-lg text-[13px] font-medium text-white transition-colors disabled:opacity-50"
+                style={{ background: "var(--color-teal-500)" }}
+              >
+                Adicionar marca extra
+              </button>
+            </div>
+          )}
         </div>
-        {price != null && (
-          <div className="font-display" style={{ fontSize: 20, color: "var(--ink)" }}>
-            {money(price, data.currency)}
-            <span className="text-[13px] text-ink-muted">/mês</span>
+
+        {vendeSlot && (
+          <div className="mt-3 text-[12px] text-ink-muted leading-relaxed max-w-165">
+            Marca extra é um slot a mais, <strong>sem minutos</strong>. Adicionar cobra o proporcional
+            na hora; remover vale no fim do período já pago.
           </div>
         )}
-        <button
-          onClick={() => setConfirming(true)}
-          disabled={!data.billingEnabled}
-          className="h-9 px-4 inline-flex items-center justify-center rounded-lg text-[13px] font-medium text-white transition-colors disabled:opacity-50"
-          style={{ background: "var(--color-teal-500)" }}
-        >
-          Adicionar marca
-        </button>
       </div>
 
       {confirming && (
@@ -760,7 +892,7 @@ function ExtraBrandDialog({
     extraBrandSlots: data.currentExtraBrandSlots + 1,
   }
   const preview = useChangePreview(target)
-  const dueNow = preview.data?.amountDueNowCents
+  const dueNow = preview.data?.dueNow?.amountDueCents
 
   const confirm = () => {
     setError(null)
