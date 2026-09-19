@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react"
-import { useQueryClient } from "@tanstack/react-query"
 import { NavLink, Link, Outlet, useLocation, useNavigate } from "react-router-dom"
 import {
   House, Brain, Settings, Handshake,
@@ -10,9 +9,11 @@ import { useTheme } from "next-themes"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useAuth } from "@/features/auth/context"
 import { useFeature } from "@/features/auth/useFeature"
+import { useSwitchWorkspace } from "@/features/auth/useSwitchWorkspace"
 import { useAlertUnreadCount } from "@/lib/api/alerts"
 import { useSubscription } from "@/lib/api/billing"
 import { useRealtimeConnection } from "@/lib/realtime"
+import { useScrollToTop } from "@/lib/useScrollToTop"
 import { Breadcrumb } from "@/components/ui/breadcrumb"
 import { BrandSwitcher } from "@/components/layout/BrandSwitcher"
 import { NotificationBell } from "@/components/layout/NotificationBell"
@@ -93,8 +94,7 @@ function tenantColor(id: string) {
 }
 
 export function AppShell() {
-  const { user, role, signOut, activeTenantId, memberships, switchTenant, isZoeAdmin } = useAuth()
-  const queryClient = useQueryClient()
+  const { user, role, signOut, activeTenantId, memberships, isZoeAdmin } = useAuth()
   // WS-F3 — mantém a conexão de tempo real viva pro app inteiro logado (não só
   // Alertas: é daqui que o badge da sidebar recebe o "novo" sem precisar navegar).
   useRealtimeConnection()
@@ -111,22 +111,17 @@ export function AppShell() {
   const location = useLocation()
   const navigate = useNavigate()
   const openSettings = useOpenSettings()
+  const switchWorkspace = useSwitchWorkspace()
   const { resolvedTheme, setTheme } = useTheme()
   const isDark = resolvedTheme === "dark"
+
+  const mainRef = useRef<HTMLElement>(null)
+  useScrollToTop(mainRef)
 
   const [sidebarOpen, setSidebarOpen] = useState(() => getInitialOpenState(STORAGE_SIDEBAR_KEY))
   const [intelOpen, setIntelOpen] = useState(() => getInitialOpenState(STORAGE_INTEL_KEY))
   const [gestaoOpen, setGestaoOpen] = useState(() => getInitialOpenState(STORAGE_GESTAO_KEY))
   const [opsOpen, setOpsOpen] = useState(() => getInitialOpenState(STORAGE_OPS_KEY))
-
-  // Troca de tenant: remove só as queries do tenant anterior, nunca na montagem (um clear() geral deixava observers órfãos).
-  const previousTenantRef = useRef(activeTenantId)
-  useEffect(() => {
-    const previous = previousTenantRef.current
-    previousTenantRef.current = activeTenantId
-    if (!previous || previous === activeTenantId) return
-    queryClient.removeQueries({ predicate: (q) => q.queryKey.includes(previous) })
-  }, [activeTenantId, queryClient])
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_SIDEBAR_KEY, String(sidebarOpen)) } catch { /* storage indisponível */ }
@@ -337,7 +332,7 @@ export function AppShell() {
                     return (
                       <DropdownMenuItem
                         key={m.tenantId}
-                        onSelect={() => { if (!isActive) void switchTenant(m.tenantId) }}
+                        onSelect={() => { if (!isActive) switchWorkspace(m.tenantId) }}
                         className="flex items-center gap-2 cursor-pointer"
                       >
                         <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: tenantColor(m.tenantId) }} />
@@ -405,7 +400,7 @@ export function AppShell() {
         </header>
 
         {/* Content */}
-        <main className="flex-1 p-6 overflow-y-auto">
+        <main ref={mainRef} className="flex-1 p-6 overflow-y-auto">
           <BillingStateBanner />
           <TrialBanner />
           <Outlet />
