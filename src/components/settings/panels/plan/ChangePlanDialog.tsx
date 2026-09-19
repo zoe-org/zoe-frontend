@@ -6,7 +6,10 @@ import { useEscapeKey } from "@/lib/useEscapeKey"
 import { useFocusTrap } from "@/lib/useFocusTrap"
 import { useTenantBrands } from "@/lib/api/brands"
 import {
+  PAYMENT_METHOD_REQUIRED,
+  pendingConversion,
   useChangePreview,
+  usePaymentMethod,
   useSubscriptionMutations,
   type BillingPlans,
   type ChangePreview,
@@ -43,34 +46,59 @@ export function ChangePlanDialog({
   useEscapeKey(onClose)
   const dialogRef = useFocusTrap<HTMLDivElement>()
   const preview = useChangePreview(target)
-  const { change } = useSubscriptionMutations()
+  const { change, setupPaymentMethod } = useSubscriptionMutations()
+  const payment = usePaymentMethod()
   const [error, setError] = useState<string | null>(null)
 
   const p = preview.data
   const current = selectionFromSubscription(sub)
   const currency = p?.currency ?? data.currency
+  const conversao = p?.kind === "TrialConversion"
+
+  // O teste é sem cartão e a conversão cobra na hora. Sabendo antes, o botão já leva ao
+  // cadastro em vez de deixar o cliente confirmar e só então receber a recusa.
+  const semCartao = conversao && payment.data?.hasPaymentMethod === false
 
   const overflow = p?.warnings.find((w) => w.code === "brands_over_limit")
   const brands = useBrandChoice(overflow, Boolean(p))
 
+  /** Vai ao provedor cadastrar o cartão; a escolha volta junto e reabre este modal. */
+  const cadastrarCartao = () => {
+    setError(null)
+    pendingConversion.save(target)
+    setupPaymentMethod.mutate(undefined, {
+      onSuccess: ({ url }) => window.location.assign(url),
+      onError: (e) =>
+        setError(e instanceof ApiError ? e.message : "Não foi possível abrir o cadastro de cartão."),
+    })
+  }
+
   const confirm = () => {
+    if (semCartao) return cadastrarCartao()
     setError(null)
     change.mutate({ ...target, keepBrandIds: overflow ? brands.keep : undefined }, {
       onSuccess: (res) => {
         const mode =
-          res.kind === "Downgrade" ? "scheduled" : res.kind === "ReleaseScheduled" ? "release" : "immediate"
+          res.kind === "Downgrade" ? "scheduled"
+          : res.kind === "ReleaseScheduled" ? "release"
+          : res.kind === "TrialConversion" ? "conversion"
+          : "immediate"
         onRequested({ ...target, mode, since: Date.now() })
         notifySuccess(
           res.kind === "Downgrade"
             ? `Downgrade agendado para ${day(res.effectiveAt)}.`
             : res.kind === "ReleaseScheduled"
               ? "Troca agendada desfeita. O plano atual continua."
-              : "Troca confirmada. Aguardando a confirmação do provedor.",
+              : res.kind === "TrialConversion"
+                ? "Assinatura confirmada. O período de teste terminou."
+                : "Troca confirmada. Aguardando a confirmação do provedor.",
         )
         onClose()
       },
-      onError: (e) =>
-        setError(e instanceof ApiError ? e.message : "Não foi possível concluir a troca. Tente de novo."),
+      onError: (e) => {
+        if (e instanceof ApiError && e.problem?.code === PAYMENT_METHOD_REQUIRED) return cadastrarCartao()
+        setError(e instanceof ApiError ? e.message : "Não foi possível concluir a troca. Tente de novo.")
+      },
     })
   }
 
@@ -106,7 +134,15 @@ export function ChangePlanDialog({
         </div>
 
         <div className="mt-4 flex items-center gap-3 flex-wrap rounded-[12px] border border-border-soft px-4 py-3">
-          <SelectionLabel caption="Hoje" selection={current} />
+          {sub.status === "Trialing" ? (
+            // Teste não é plano: o "de" é o teste, e não a combinação usada para montá-lo.
+            <div className="min-w-0">
+              <div className="text-[11.5px] text-ink-muted">Hoje</div>
+              <div className="text-[14px] font-semibold" style={{ color: "var(--ink)" }}>Período de teste</div>
+            </div>
+          ) : (
+            <SelectionLabel caption="Hoje" selection={current} />
+          )}
           <ArrowRight className="w-4 h-4 text-ink-muted shrink-0" />
           <SelectionLabel caption={p?.kind === "Downgrade" ? `A partir de ${day(p.effectiveAt)}` : "Depois"} selection={target} />
         </div>
@@ -130,32 +166,42 @@ export function ChangePlanDialog({
           <>
             <p className="text-[13.5px] text-ink-muted mt-4 mb-0 leading-relaxed">{whenText(p, sub)}</p>
 
-            {p.kind !== "ReleaseScheduled" && (
+            {p.kind === "TrialConversion" && (
+              <div className="mt-4 rounded-[12px] border border-border-soft divide-y divide-border-soft text-[13px]">
+                <InvoiceBreakdown label="Primeira mensalidade, cobrada agora" estimate={p.dueNow} currency={currency} />
+                <MoneyRow
+                  label="Próximas mensalidades"
+                  hint={p.nextInvoiceAt ? `Todo mês, a partir de ${day(p.nextInvoiceAt)}` : "Todo mês"}
+                  value={p.next ? money(p.next.subtotalCents - p.next.discountCents, currency) : "—"}
+                />
+              </div>
+            )}
+
+            {p.kind === "Upgrade" || p.kind === "Downgrade" ? (
               <div className="mt-4 rounded-[12px] border border-border-soft divide-y divide-border-soft text-[13px]">
                 <MoneyRow
                   label="Cobrado agora"
                   hint={
                     p.kind === "Upgrade"
                       ? `Diferença proporcional até ${day(sub.currentPeriodEnd)}`
-                      : p.kind === "TrialChange"
-                        ? "Nada é cobrado durante o teste"
-                        : "O plano atual segue pago até a data da troca"
+                      : "O plano atual segue pago até a data da troca"
                   }
                   value={money(p.dueNow?.amountDueCents ?? 0, currency)}
                   strong={p.kind === "Upgrade"}
                 />
                 <InvoiceBreakdown
-                  label={
-                    p.kind === "TrialChange"
-                      ? "Quando o teste acabar"
-                      : p.nextInvoiceAt
-                        ? `Fatura de ${day(p.nextInvoiceAt)}`
-                        : "Próxima fatura"
-                  }
+                  label={p.nextInvoiceAt ? `Fatura de ${day(p.nextInvoiceAt)}` : "Próxima fatura"}
                   estimate={p.next}
                   currency={currency}
                 />
               </div>
+            ) : null}
+
+            {semCartao && (
+              <Notice tone="warn">
+                Não há cartão cadastrado. Você vai para a tela segura do Stripe cadastrar um e volta
+                aqui para confirmar a assinatura — nada é cobrado no cadastro.
+              </Notice>
             )}
 
             {p.bundleDiscountApplies && data.bundle.percentOff != null && (
@@ -181,7 +227,7 @@ export function ChangePlanDialog({
                 allowed={overflow.allowed ?? 0}
                 used={overflow.used ?? 0}
                 effectiveAt={p.kind === "Downgrade" ? p.effectiveAt : null}
-                extraSlotOffer={extraSlotOffer(target, data, overflow.used ?? 0)}
+                extraSlotOffer={extraSlotOffer(target, data, current, overflow.used ?? 0)}
                 currency={currency}
                 onBuySlots={(slots) => onRetarget({ ...target, extraBrandSlots: slots })}
               />
@@ -200,12 +246,12 @@ export function ChangePlanDialog({
           </button>
           <button
             onClick={confirm}
-            disabled={!p || change.isPending || (Boolean(overflow) && !brands.ready)}
+            disabled={!p || change.isPending || setupPaymentMethod.isPending || (Boolean(overflow) && !brands.ready)}
             className="h-9 px-4 inline-flex items-center gap-1.5 rounded-lg text-[13px] font-medium text-white transition-colors disabled:opacity-50"
             style={{ background: "var(--color-teal-500)" }}
           >
-            {change.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            {confirmLabel(p, currency)}
+            {(change.isPending || setupPaymentMethod.isPending) && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            {semCartao ? "Cadastrar cartão e assinar" : confirmLabel(p, currency)}
           </button>
         </div>
       </div>
@@ -219,8 +265,8 @@ function titleFor(p: ChangePreview | undefined) {
       return "Confirmar upgrade"
     case "Downgrade":
       return "Agendar downgrade"
-    case "TrialChange":
-      return "Trocar o plano do teste"
+    case "TrialConversion":
+      return "Assinar e encerrar o teste"
     case "ReleaseScheduled":
       return "Manter o plano atual"
     default:
@@ -238,6 +284,10 @@ function confirmLabel(p: ChangePreview | undefined, currency: string | null) {
       return "Agendar downgrade"
     case "ReleaseScheduled":
       return "Desfazer troca agendada"
+    case "TrialConversion":
+      return p.dueNow?.amountDueCents
+        ? `Assinar e pagar ${money(p.dueNow.amountDueCents, currency)}`
+        : "Assinar"
     default:
       return "Confirmar troca"
   }
@@ -249,8 +299,8 @@ function whenText(p: ChangePreview, sub: Subscription) {
       return "Vale assim que o pagamento da diferença for aprovado. A cota e os recursos novos entram na hora, sem esperar o próximo ciclo."
     case "Downgrade":
       return `Vale em ${day(p.effectiveAt)}, quando termina o período já pago. Até lá nada muda — cota, marcas e módulos seguem como estão — e o tempo restante não é devolvido.`
-    case "TrialChange":
-      return "No teste a troca vale na hora. A cota e as marcas do teste continuam as mesmas; o plano escolhido define a primeira fatura."
+    case "TrialConversion":
+      return "O período de teste termina agora e a assinatura começa hoje, com a cota e as marcas cheias do plano. A primeira mensalidade é cobrada no ato."
     case "ReleaseScheduled":
       return sub.scheduledChange
         ? `A troca agendada para ${day(sub.scheduledChange.effectiveAt)} é cancelada e o plano atual continua depois dessa data.`
@@ -348,13 +398,22 @@ function BreakdownLine({ label, value, hint }: { label: string; value: string; h
   )
 }
 
-/** Marcas extras que cobririam o excedente — só onde o tier vende slot (Pro). */
-function extraSlotOffer(target: PlanSelection, data: BillingPlans, used: number) {
+/**
+ * Marcas extras que cobririam o excedente — só onde o tier vende slot (Pro). Some quando
+ * "manter todas" daria na assinatura de hoje: aí não é alternativa, é desistir da troca.
+ */
+function extraSlotOffer(target: PlanSelection, data: BillingPlans, current: PlanSelection, used: number) {
   const plan = data.plans.find((p) => p.slug === target.planSlug)
   if (!plan?.sellsExtraBrandSlots || data.extraBrandSlotPriceCents == null) return null
 
   const slots = Math.max(0, used - plan.brandSlots)
   if (slots <= 0) return null
+
+  const voltaAoAtual =
+    current.planSlug === target.planSlug &&
+    current.operationsPlanSlug === target.operationsPlanSlug &&
+    current.extraBrandSlots === slots
+  if (voltaAoAtual) return null
 
   return { slots, priceCents: data.extraBrandSlotPriceCents * slots }
 }
@@ -417,7 +476,8 @@ function BrandPicker({
           Escolha as {int(allowed)} marcas que continuam
         </div>
         <div className="text-[12.5px] text-ink-muted mt-0.5 leading-relaxed">
-          As outras {int(excedente)} são arquivadas{effectiveAt ? ` em ${day(effectiveAt)}` : ""}.
+          {excedente === 1 ? "A outra é arquivada" : `As outras ${int(excedente)} são arquivadas`}
+          {effectiveAt ? ` em ${day(effectiveAt)}` : ""}.
           O histórico fica salvo; para reativar uma delas depois é preciso ter slot livre.
         </div>
       </div>
