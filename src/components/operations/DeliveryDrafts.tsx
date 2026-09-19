@@ -344,7 +344,7 @@ function DraftPanel({ draft, onDecided }: { draft: DeliveryDraftItem; onDecided:
               onClick={() => run("RequestChanges")}
               disabled={decide.isPending}
               className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[13px] border border-border-soft disabled:opacity-50"
-              style={{ color: "#D97706" }}
+              style={{ color: "var(--color-warn)" }}
             >
               <RotateCcw className="w-3.5 h-3.5" /> Pedir correção
             </button>

@@ -59,7 +59,7 @@ function GapsPanel({ topics, you }: { topics: SovTopic[]; you: RankedBrand }) {
   const youColor = brandColor(you.brandId, you.color)
 
   return (
-    <aside className="rounded-[14px] border border-border-soft p-5 bg-[#FAFBFC] dark:bg-[#151824]">
+    <aside className="rounded-[14px] border border-border-soft p-5 bg-inset">
       <SectionHead
         title="Espaços não ocupados"
         hint={GLOSSARY.topics}
@@ -89,7 +89,7 @@ function GapsPanel({ topics, you }: { topics: SovTopic[]; you: RankedBrand }) {
                 </div>
                 {/* Você e o líder no mesmo trilho: o contraste é o par, e um empilhado com
                     todos diluiria justamente isso. */}
-                <div className="relative h-2 rounded-full overflow-hidden bg-[#EEF0F3] dark:bg-[#1C1F2E]">
+                <div className="relative h-2 rounded-full overflow-hidden bg-tint">
                   <div className="absolute inset-y-0 left-0 opacity-35" style={{ width: `${leader.sharePct}%`, background: leaderColor }} />
                   <div className="absolute inset-y-0 left-0" style={{ width: `${mine}%`, background: youColor }} />
                 </div>
@@ -179,7 +179,7 @@ function TopicShareTable({ topics, ranked }: { topics: SovTopic[]; ranked: Ranke
 
 function StackedBar({ shares }: { shares: SovTopicShare[] }) {
   return (
-    <div className="flex h-4 rounded-md overflow-hidden bg-[#F3F4F6] dark:bg-[#1C1F2E]">
+    <div className="flex h-4 rounded-md overflow-hidden bg-tint">
       {shares.map((s) => (
         <div
           key={s.brandId}

@@ -32,20 +32,20 @@ function payoutState(it: RosterItem): { label: string; color: string; explanatio
   if (it.kycStatus === "Rejected") {
     return {
       label: "verificação recusada",
-      color: "#DC2626",
+      color: "var(--color-neg)",
       explanation: "O provedor recusou a verificação. O criador revisa os dados pela área dele — daqui não há o que fazer além de avisá-lo.",
     }
   }
   if (it.hasStripeAccount || it.kycStatus === "Pending") {
     return {
       label: "em verificação",
-      color: "#D97706",
+      color: "var(--color-warn)",
       explanation: "A conta existe e está em verificação pelo provedor. O criador conclui pela área dele.",
     }
   }
   return {
     label: "sem conta",
-    color: "#6B7280",
+    color: "var(--ink-muted)",
     explanation: "O criador ainda não conectou a conta de recebimento. Ele faz isso pela área dele; sem ela, pagamento aprovado espera.",
   }
 }
@@ -221,7 +221,7 @@ function RosterRow({ item, index, onOpen }: { item: RosterItem; index: number; o
     // A linha inteira abre a gaveta; o nome é o botão, para teclado e leitor de tela.
     <tr
       onClick={onOpen}
-      className="border-b border-border-soft hover:bg-[#FAFBFC] dark:hover:bg-[#181B28] transition-colors cursor-pointer"
+      className="border-b border-border-soft hover:bg-hover transition-colors cursor-pointer"
     >
       <td className="px-8 py-3.5">
         <div className="flex items-center gap-3">
@@ -261,7 +261,7 @@ function RosterRow({ item, index, onOpen }: { item: RosterItem; index: number; o
       <td className="py-3.5 text-[12.5px]">
         <span style={{ color: rec.color }}>{rec.label}</span>
         {isPaymentStuck(item) && (
-          <div className="text-[11px] font-medium" style={{ color: "#DC2626" }}>
+          <div className="text-[11px] font-medium" style={{ color: "var(--color-neg)" }}>
             {fmtCents(item.releasableCents ?? 0)} esperando
           </div>
         )}
@@ -422,7 +422,7 @@ function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => voi
                   <Link
                     key={c.contractId}
                     to={`/operations/contracts/${c.contractId}`}
-                    className="flex items-center gap-2 px-3.5 py-2.5 text-[12.5px] hover:bg-[#FAFBFC] dark:hover:bg-[#181B28]"
+                    className="flex items-center gap-2 px-3.5 py-2.5 text-[12.5px] hover:bg-hover"
                     style={{ borderTop: i === 0 ? undefined : "1px solid var(--border-soft)" }}
                   >
                     <span className="flex-1 truncate" style={{ color: "var(--ink)" }}>{campaignLabel(c.campaignName)}</span>
@@ -444,7 +444,7 @@ function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => voi
                   <Link
                     key={d.deliveryId}
                     to={`/operations/deliveries?contract=${d.contractId}`}
-                    className="flex items-center gap-2 px-3.5 py-2.5 text-[12.5px] hover:bg-[#FAFBFC] dark:hover:bg-[#181B28]"
+                    className="flex items-center gap-2 px-3.5 py-2.5 text-[12.5px] hover:bg-hover"
                     style={{ borderTop: i === 0 ? undefined : "1px solid var(--border-soft)" }}
                   >
                     <span className="flex-1 min-w-0">
@@ -474,7 +474,7 @@ function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => voi
                   <Link
                     key={e.escrowAccountId}
                     to="/operations/escrow"
-                    className="flex items-center gap-2 px-3.5 py-2.5 text-[12.5px] hover:bg-[#FAFBFC] dark:hover:bg-[#181B28]"
+                    className="flex items-center gap-2 px-3.5 py-2.5 text-[12.5px] hover:bg-hover"
                     style={{ borderTop: i === 0 ? undefined : "1px solid var(--border-soft)" }}
                   >
                     <span className="flex-1 truncate" style={{ color: "var(--ink)" }}>{campaignLabel(e.campaignName)}</span>

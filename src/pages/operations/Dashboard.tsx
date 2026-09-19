@@ -221,7 +221,7 @@ function MoneyPanel({
                     title={`${tEnum("escrowState", b.state)}: ${fmtCents(b.amountCents)}`}
                     style={{
                       width: `${(b.amountCents / total) * 100}%`,
-                      background: ESCROW_COLOR[b.state] ?? "#9CA3AF",
+                      background: ESCROW_COLOR[b.state] ?? "var(--ink-muted-2)",
                     }}
                   />
                 ))}
@@ -236,7 +236,7 @@ function MoneyPanel({
                 >
                   <span
                     className="w-2 h-2 rounded-full shrink-0"
-                    style={{ background: ESCROW_COLOR[b.state] ?? "#9CA3AF" }}
+                    style={{ background: ESCROW_COLOR[b.state] ?? "var(--ink-muted-2)" }}
                   />
                   <span style={{ color: "var(--ink)" }}>{tEnum("escrowState", b.state)}</span>
                   <span className="text-ink-muted font-mono-zoe">

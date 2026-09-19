@@ -196,15 +196,15 @@ export default function LoginPage() {
       {/* Right panel */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white">
         <div className="w-full max-w-sm">
-          <h1 className="text-3xl font-bold text-midnight dark:text-[#E6E8EF] mb-1">Entre na sua conta</h1>
-          <p className="text-sm text-[#6B7280] mb-8">Bem-vindo(a) de volta.</p>
+          <h1 className="text-3xl font-bold text-midnight dark:text-ink mb-1">Entre na sua conta</h1>
+          <p className="text-sm text-ink-muted mb-8">Bem-vindo(a) de volta.</p>
 
           <form onSubmit={onSubmit} className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="email">E-mail</Label>
               <Input id="email" placeholder="seu@email.com" {...form.register("email")} />
               {form.formState.errors.email && (
-                <p className="text-xs text-[#DC2626]">{form.formState.errors.email.message as string}</p>
+                <p className="text-xs text-neg">{form.formState.errors.email.message as string}</p>
               )}
             </div>
 
@@ -220,30 +220,30 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPw(!showPw)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-midnight dark:hover:text-[#E6E8EF]"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-midnight dark:hover:text-ink"
                 >
                   {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
               {form.formState.errors.password && (
-                <p className="text-xs text-[#DC2626]">{form.formState.errors.password.message as string}</p>
+                <p className="text-xs text-neg">{form.formState.errors.password.message as string}</p>
               )}
             </div>
 
             <div className="flex items-center justify-between text-sm">
-              <label className="flex items-center gap-2 text-[#6B7280]">
+              <label className="flex items-center gap-2 text-ink-muted">
                 <input
                   type="checkbox"
                   checked={remember}
                   onChange={(e) => setRemember(e.target.checked)}
-                  className="rounded border-[#E5E7EB] accent-teal-500"
+                  className="rounded border-border accent-teal-500"
                 />
                 Manter conectado
               </label>
               <Link to="/forgot-password" className="text-teal-500 hover:underline">Esqueci a senha</Link>
             </div>
 
-            {error && <p className="text-xs text-[#DC2626]">{error}</p>}
+            {error && <p className="text-xs text-neg">{error}</p>}
 
             <Button type="submit" disabled={submitting} className="w-full bg-teal-500 hover:bg-teal-500/90 text-white">
               {submitting ? "Entrando..." : "Entrar"}
@@ -251,8 +251,8 @@ export default function LoginPage() {
           </form>
 
           <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-[#E5E7EB]" /></div>
-            <div className="relative flex justify-center"><span className="bg-white px-3 text-xs text-[#6B7280]">ou</span></div>
+            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div>
+            <div className="relative flex justify-center"><span className="bg-white px-3 text-xs text-ink-muted">ou</span></div>
           </div>
 
           <div className="flex gap-5 justify-center items-center" >
@@ -264,7 +264,7 @@ export default function LoginPage() {
             </Button>
           </div>
 
-          <p className="text-center text-sm text-[#6B7280] mt-15">
+          <p className="text-center text-sm text-ink-muted mt-15">
             Ainda não tem conta?{" "}
             <Link to="/register" className="text-teal-500 font-semibold hover:underline">Comece grátis</Link>
           </p>

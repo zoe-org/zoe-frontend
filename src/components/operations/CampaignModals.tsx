@@ -451,7 +451,7 @@ export function CreateCampaignModal({ onClose }: { onClose: () => void }) {
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D]"
+            className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-tint"
             aria-label="Fechar"
           >
             <X className="w-4 h-4" />
@@ -494,7 +494,7 @@ export function CreateCampaignModal({ onClose }: { onClose: () => void }) {
           {!supportsEscrow(modality) && (
             <div
               className="rounded-lg p-3 text-[11.5px]"
-              style={{ background: "#D9770615", color: "#D97706" }}
+              style={{ background: "var(--warn-bg)", color: "var(--color-warn)" }}
             >
               <span className="font-semibold">Sem custódia nesta modalidade.</span>{" "}
               {escrowRejectionReason(modality)}
@@ -518,7 +518,7 @@ export function CreateCampaignModal({ onClose }: { onClose: () => void }) {
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-border-soft shrink-0">
           <button
             onClick={onClose}
-            className="px-3.5 py-2 rounded-lg text-[13px] font-medium border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D]"
+            className="px-3.5 py-2 rounded-lg text-[13px] font-medium border border-border-soft hover:bg-hover"
           >
             Cancelar
           </button>

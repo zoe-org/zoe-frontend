@@ -154,7 +154,7 @@ export default function OperationsContractsPage() {
                 {items.map((it) => (
                   <tr
                     key={it.contractId}
-                    className="border-b border-border-soft hover:bg-[#FAFBFC] dark:hover:bg-[#181B28] transition-colors"
+                    className="border-b border-border-soft hover:bg-hover transition-colors"
                   >
                     <td className="px-8 py-3.5">
                       <Link to={`/operations/contracts/${it.contractId}`} className="block">
@@ -189,7 +189,7 @@ export default function OperationsContractsPage() {
                         {it.status === "Draft" && !it.templateLegalReviewed && (
                           <span
                             title="O template desta modalidade ainda não passou por revisão jurídica — o contrato não sai para assinatura assim."
-                            className="text-[#D97706]"
+                            className="text-warn"
                           >
                             <ShieldAlert className="w-3.5 h-3.5" />
                           </span>
@@ -253,7 +253,7 @@ function DeleteDraftButton({ item }: { item: ContractSummary }) {
         onClick={() => setConfirming(true)}
         title="Excluir rascunho"
         aria-label={`Excluir rascunho de ${item.influencerName}`}
-        className="p-1.5 rounded-md text-ink-muted hover:text-[#DC2626] transition-colors"
+        className="p-1.5 rounded-md text-ink-muted hover:text-neg transition-colors"
       >
         <Trash2 className="w-3.5 h-3.5" />
       </button>
@@ -266,7 +266,7 @@ function DeleteDraftButton({ item }: { item: ContractSummary }) {
         onClick={deleteDraft}
         disabled={remove.isPending}
         className="text-[12px] font-medium px-2 py-1 rounded-md disabled:opacity-50"
-        style={{ background: "#DC262615", color: "#DC2626" }}
+        style={{ background: "#DC262615", color: "var(--color-neg)" }}
       >
         {remove.isPending ? "Excluindo…" : "Confirmar"}
       </button>
@@ -445,7 +445,7 @@ function CreateContractModal({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D]"
+            className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-tint"
             aria-label="Fechar"
           >
             <X className="w-4 h-4" />
@@ -557,7 +557,7 @@ function CreateContractModal({
               {/* Com o rascunho nascendo no aceite do convite, criar pela tela duplicava sem
                   ninguém perceber. Não bloqueia: dois trabalhos na mesma campanha existem. */}
               {duplicates.length > 0 && (
-                <div className="rounded-lg p-3 text-[12px]" style={{ background: "#D9770615", color: "#B45309" }}>
+                <div className="rounded-lg p-3 text-[12px]" style={{ background: "var(--warn-bg)", color: "var(--color-warn)" }}>
                   Este criador já tem {duplicates.length === 1 ? "um contrato" : `${duplicates.length} contratos`} nesta
                   campanha ({duplicates.map((c) => tEnum("contractStatus", c.status).toLowerCase()).join(", ")}).{" "}
                   <button
@@ -594,7 +594,7 @@ function CreateContractModal({
                 </label>
 
                 {escrowBlocked && (
-                  <p className="text-[11.5px] text-[#D97706] pl-6.5">{escrowBlocked}</p>
+                  <p className="text-[11.5px] text-warn pl-6.5">{escrowBlocked}</p>
                 )}
 
                 {usesEscrow && !escrowBlocked && (
@@ -670,7 +670,7 @@ function CreateContractModal({
         <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-border-soft shrink-0">
           <button
             onClick={onClose}
-            className="px-3.5 py-2 rounded-lg text-[13px] font-medium border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D]"
+            className="px-3.5 py-2 rounded-lg text-[13px] font-medium border border-border-soft hover:bg-hover"
           >
             Cancelar
           </button>

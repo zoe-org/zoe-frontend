@@ -88,7 +88,7 @@ export function MentionDrawer({
             type="button"
             onClick={onClose}
             aria-label="Fechar"
-            className="ml-auto p-1.5 -mr-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D] transition-colors"
+            className="ml-auto p-1.5 -mr-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-tint transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -139,7 +139,7 @@ export function MentionDrawer({
           </div>
 
           {/* Painel de análise Zoe */}
-          <div className="rounded-xl border border-border-soft p-5 bg-[#FAFBFC] dark:bg-[#181B28]">
+          <div className="rounded-xl border border-border-soft p-5 bg-inset">
             <div className="flex items-center justify-between mb-4">
               <span className="eyebrow">Análise Zoe</span>
               <span className="chip chip-primary inline-flex items-center gap-1 text-[10px]">
@@ -197,7 +197,7 @@ export function MentionDrawer({
                         <span className="w-24 shrink-0 text-ink-muted">
                           {SOURCE_LABEL[c.source] ?? c.source}
                         </span>
-                        <div className="flex-1 h-1.5 rounded-full bg-[#F3F4F6] dark:bg-[#1A1D2D] overflow-hidden">
+                        <div className="flex-1 h-1.5 rounded-full bg-tint overflow-hidden">
                           <div className="h-full bg-teal-500" style={{ width: `${Math.round(c.value * 100)}%` }} />
                         </div>
                         <span className="font-mono-zoe text-[11px] text-ink-muted w-10 text-right">
@@ -230,7 +230,7 @@ export function MentionDrawer({
                   <button
                     type="button"
                     onClick={() => setTranscriptOpen(true)}
-                    className="w-full text-left relative rounded-lg border border-border-soft p-3.5 bg-[#FAFBFC] dark:bg-[#181B28] hover:border-teal-500 transition-colors cursor-pointer"
+                    className="w-full text-left relative rounded-lg border border-border-soft p-3.5 bg-inset hover:border-teal-500 transition-colors cursor-pointer"
                   >
                     <p
                       className="text-[13px] leading-relaxed line-clamp-4"
@@ -303,7 +303,7 @@ export function MentionDrawer({
                     {d.keywordScores.slice(0, 14).map((k, i) => (
                       <span
                         key={i}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[12px] bg-[#F3F4F6] dark:bg-[#1A1D2D]"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[12px] bg-tint"
                         style={{ color: "var(--ink-2)" }}
                         title={k.origin === "custom" ? "Keyword do seu tenant" : "Base"}
                       >
@@ -394,7 +394,7 @@ function DrawerSkeleton() {
   return (
     <div className="space-y-3 animate-pulse">
       {[0, 1, 2].map((i) => (
-        <div key={i} className="h-3 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" style={{ width: `${90 - i * 15}%` }} />
+        <div key={i} className="h-3 rounded bg-tint" style={{ width: `${90 - i * 15}%` }} />
       ))}
     </div>
   )

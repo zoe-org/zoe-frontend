@@ -71,7 +71,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
             <div className="flex items-center justify-end gap-2 mt-6">
               <AlertDialog.Cancel
                 onClick={() => settle(false)}
-                className="h-9 px-4 rounded-lg text-[13px] font-medium border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors"
+                className="h-9 px-4 rounded-lg text-[13px] font-medium border border-border-soft hover:bg-hover transition-colors"
               >
                 {options?.cancelLabel ?? "Cancelar"}
               </AlertDialog.Cancel>

@@ -53,7 +53,7 @@ export function CampaignDetailPanel({ campaignId }: { campaignId: string }) {
   if (campaign.isLoading) {
     return (
       <div className="space-y-3 animate-pulse">
-        {[0, 1, 2].map((i) => <div key={i} className="h-24 rounded-xl bg-[#F3F4F6] dark:bg-[#1A1D2D]" />)}
+        {[0, 1, 2].map((i) => <div key={i} className="h-24 rounded-xl bg-tint" />)}
       </div>
     )
   }
@@ -80,7 +80,7 @@ export function CampaignDetailPanel({ campaignId }: { campaignId: string }) {
             {isPastEndDate(d) && (
               <span
                 className="chip text-[10.5px]"
-                style={{ color: "#B45309", background: "#D9770615" }}
+                style={{ color: "var(--color-warn)", background: "var(--warn-bg)" }}
                 title="O prazo da campanha já passou e ela segue ativa. Concluir fecha para novos contratos e convites."
               >
                 prazo encerrado
@@ -163,7 +163,7 @@ export function CampaignDetailPanel({ campaignId }: { campaignId: string }) {
         {!d.supportsEscrow && (
           <div
             className="rounded-lg p-3 text-[11.5px] mt-4"
-            style={{ background: "#D9770615", color: "#D97706" }}
+            style={{ background: "var(--warn-bg)", color: "var(--color-warn)" }}
           >
             <span className="font-semibold">Sem custódia.</span>{" "}
             {escrowRejectionReason(d.modality)}
@@ -237,7 +237,7 @@ export function CampaignDetailPanel({ campaignId }: { campaignId: string }) {
                 {dl.influencerName}
               </span>
               {dl.isReviewOverdue && (
-                <span className="text-[11px]" style={{ color: "#D97706" }}>prazo vencido</span>
+                <span className="text-[11px]" style={{ color: "var(--color-warn)" }}>prazo vencido</span>
               )}
               <span className="chip text-[10.5px]">{tEnum("deliveryStatus", dl.status)}</span>
             </Link>
@@ -278,7 +278,7 @@ function BriefingCard({ briefing: b }: { briefing: CampaignBriefing }) {
       <div className="flex items-center justify-between mb-3.5 gap-3 flex-wrap">
         <div className="eyebrow">Briefing auditável</div>
         {!b.isAuditable && (
-          <span className="text-[11px]" style={{ color: "#D97706" }}>
+          <span className="text-[11px]" style={{ color: "var(--color-warn)" }}>
             sem critério verificável
           </span>
         )}
@@ -344,7 +344,7 @@ function CampaignTransitions({ campaign }: { campaign: CampaignDetail }) {
           onClick={() => setConfirming(true)}
           disabled={update.isPending}
           className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-[13px] border border-border-soft disabled:opacity-50"
-          style={{ color: "#DC2626" }}
+          style={{ color: "var(--color-neg)" }}
         >
           <Ban className="w-3.5 h-3.5" /> Cancelar
         </button>
@@ -400,7 +400,7 @@ function ConfirmCancel({
         {contractCount > 0 && (
           <div
             className="rounded-lg p-3 text-[12.5px] mb-4"
-            style={{ background: "#D9770615", color: "#D97706" }}
+            style={{ background: "var(--warn-bg)", color: "var(--color-warn)" }}
           >
             {contractCount === 1
               ? "O contrato já criado nesta campanha continua existindo"
@@ -451,7 +451,7 @@ function CampaignFunnel({ d }: { d: CampaignDetail }) {
       <div className="flex items-center justify-between mb-3.5 gap-2 flex-wrap">
         <div className="eyebrow">Funil por criador ({rows.length})</div>
         {needsBrand > 0 && (
-          <span className="text-[11.5px] font-medium" style={{ color: "#B45309" }}>
+          <span className="text-[11.5px] font-medium" style={{ color: "var(--color-warn)" }}>
             {needsBrand} {needsBrand === 1 ? "precisa" : "precisam"} de você
           </span>
         )}

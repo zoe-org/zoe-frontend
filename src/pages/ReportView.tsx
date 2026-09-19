@@ -32,8 +32,8 @@ export default function ReportViewPage() {
   if (query.isLoading) {
     return (
       <div className="max-w-[860px] mx-auto p-10 animate-pulse">
-        <div className="h-10 w-2/3 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D] mb-4" />
-        <div className="h-40 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+        <div className="h-10 w-2/3 rounded bg-tint mb-4" />
+        <div className="h-40 rounded bg-tint" />
       </div>
     )
   }
@@ -234,7 +234,7 @@ function Distribution({ pos, neu, neg }: { pos: number; neu: number; neg: number
     <>
       <div className="flex h-2 rounded-full overflow-hidden">
         <div style={{ width: `${pct(pos)}%`, background: "var(--color-pos)" }} />
-        <div style={{ width: `${pct(neu)}%`, background: "#9AA1AE" }} />
+        <div style={{ width: `${pct(neu)}%`, background: "var(--ink-muted-2)" }} />
         <div style={{ width: `${pct(neg)}%`, background: "var(--color-neg)" }} />
       </div>
       <div className="flex justify-between mt-2 text-[11.5px] font-mono-zoe">
@@ -271,7 +271,7 @@ function ComparisonSection({ sections }: { sections: ReportBrandSection[] }) {
                 <span style={{ color: "var(--ink)" }}>{s.brandName}</span>
                 <span className="font-mono-zoe">{pct}% · {s.totalMentions}</span>
               </div>
-              <div className="h-2 rounded-sm overflow-hidden bg-[#F3F4F6] dark:bg-[#1C1F2E]">
+              <div className="h-2 rounded-sm overflow-hidden bg-tint">
                 <div style={{ width: `${pct}%`, height: "100%", background: "var(--color-teal-500)" }} />
               </div>
             </div>

@@ -232,13 +232,13 @@ function EscrowRow({
   // Reserva caída pesa mais que vencida; custódia encerrada não recebe alerta.
   const warning =
     e.authorizationLapsedAt && !e.isTerminal
-      ? { icon: AlertTriangle, text: "reserva caiu — refinanciar", color: "#DC2626", strong: true }
+      ? { icon: AlertTriangle, text: "reserva caiu — refinanciar", color: "var(--color-neg)", strong: true }
       : e.isAuthorizationExpired && !e.isTerminal
-        ? { icon: Clock, text: "autorização vencida", color: "#D97706", strong: false }
+        ? { icon: Clock, text: "autorização vencida", color: "var(--color-warn)", strong: false }
         : e.payoutAccountMissing && !e.isTerminal
-          ? { icon: Wallet, text: "criador sem conta de recebimento", color: "#D97706", strong: false }
+          ? { icon: Wallet, text: "criador sem conta de recebimento", color: "var(--color-warn)", strong: false }
           : e.payoutAccountUnverified && !e.isTerminal
-            ? { icon: Wallet, text: "aguardando verificação da conta do criador", color: "#D97706", strong: false }
+            ? { icon: Wallet, text: "aguardando verificação da conta do criador", color: "var(--color-warn)", strong: false }
             : null
 
   const WarningIcon = warning?.icon
@@ -379,7 +379,7 @@ function EscrowDrawer({ e, onClose }: { e: EscrowSummary; onClose: () => void })
           </div>
 
           {e.disputeReason && (
-            <div className="rounded-lg p-3 text-[12.5px] mt-4" style={{ background: "#DC262615", color: "#DC2626" }}>
+            <div className="rounded-lg p-3 text-[12.5px] mt-4" style={{ background: "#DC262615", color: "var(--color-neg)" }}>
               <div className="font-semibold mb-0.5">Em disputa</div>
               {e.disputeReason} A resolução é manual — fale com o suporte.
             </div>
@@ -388,7 +388,7 @@ function EscrowDrawer({ e, onClose }: { e: EscrowSummary; onClose: () => void })
           {e.payoutAccountMissing && !e.isTerminal && (
             <div
               className="rounded-lg p-3 text-[12px] mt-4 flex items-start gap-2"
-              style={{ background: "#D9770615", color: "#D97706" }}
+              style={{ background: "var(--warn-bg)", color: "var(--color-warn)" }}
             >
               <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
               <span>
@@ -404,7 +404,7 @@ function EscrowDrawer({ e, onClose }: { e: EscrowSummary; onClose: () => void })
           {e.payoutAccountUnverified && !e.isTerminal && (
             <div
               className="rounded-lg p-3 text-[12px] mt-4 flex items-start gap-2"
-              style={{ background: "#D9770615", color: "#D97706" }}
+              style={{ background: "var(--warn-bg)", color: "var(--color-warn)" }}
             >
               <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
               <span>
@@ -423,9 +423,9 @@ function EscrowDrawer({ e, onClose }: { e: EscrowSummary; onClose: () => void })
               className="rounded-lg p-3 mt-4 flex items-start gap-2.5"
               style={{ background: "#DC262612", border: "1px solid #DC2626" }}
             >
-              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" style={{ color: "#DC2626" }} />
+              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" style={{ color: "var(--color-neg)" }} />
               <div className="text-[12.5px]" style={{ color: "var(--ink-2)" }}>
-                <div className="font-semibold mb-0.5" style={{ color: "#DC2626" }}>
+                <div className="font-semibold mb-0.5" style={{ color: "var(--color-neg)" }}>
                   O dinheiro não está mais reservado
                 </div>
                 A renovação da autorização falhou em {fmtDate(e.authorizationLapsedAt)} e o

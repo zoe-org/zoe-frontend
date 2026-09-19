@@ -162,7 +162,7 @@ export default function AlertsPage() {
               onClick={exportCsv}
               disabled={eventItems.length === 0}
               title="Exporta os disparos já carregados no histórico."
-              className="inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors disabled:opacity-50 cursor-pointer"
+              className="inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] rounded-md border border-border-soft hover:bg-hover transition-colors disabled:opacity-50 cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" /> Exportar histórico
             </button>
@@ -413,7 +413,7 @@ function HistoryList({
                     onError: (e) => notifyError(e, "Não foi possível marcar como lido."),
                   })}
                   disabled={markRead.isPending}
-                  className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D] cursor-pointer disabled:opacity-50"
+                  className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-tint cursor-pointer disabled:opacity-50"
                   aria-label="Marcar como lido"
                   title="Marcar como lido"
                 >
@@ -422,7 +422,7 @@ function HistoryList({
               )}
               <button
                 onClick={() => onOpen(event)}
-                className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D] cursor-pointer"
+                className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-tint cursor-pointer"
                 aria-label={`Abrir detalhe de ${event.ruleName}`}
                 title="Ver detalhe"
               >
@@ -556,7 +556,7 @@ function RulesList({
             <div className="flex items-center gap-1 justify-self-end">
               <button
                 onClick={() => onEdit(rule)}
-                className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D] cursor-pointer"
+                className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-tint cursor-pointer"
                 aria-label={`Editar ${rule.name}`}
               >
                 <Pencil className="w-3.5 h-3.5" />
@@ -564,7 +564,7 @@ function RulesList({
               <button
                 onClick={() => confirmRemove(rule)}
                 disabled={remove.isPending}
-                className="p-1.5 rounded-md text-ink-muted hover:text-neg hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D] cursor-pointer disabled:opacity-50"
+                className="p-1.5 rounded-md text-ink-muted hover:text-neg hover:bg-tint cursor-pointer disabled:opacity-50"
                 aria-label={`Excluir ${rule.name}`}
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -643,7 +643,7 @@ function RuleModal({
             </div>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D] cursor-pointer"
+              className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-tint cursor-pointer"
               aria-label="Fechar"
             >
               <X className="w-4.5 h-4.5" />
@@ -813,7 +813,7 @@ function RuleModal({
           </div>
 
           {/* Resumo (design): a frase que a pessoa confere antes de salvar. */}
-          <div className="mt-4 mb-2 p-3.5 rounded-[10px] border border-border-soft bg-[#FAFBFC] dark:bg-[#181B28]">
+          <div className="mt-4 mb-2 p-3.5 rounded-[10px] border border-border-soft bg-inset">
             <div className="eyebrow mb-2">Resumo</div>
             <div className="text-[12.5px] leading-relaxed" style={{ color: "var(--ink-2)" }}>
               {describeRuleCondition({

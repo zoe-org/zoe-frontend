@@ -12,6 +12,6 @@
  */
 export function heatmapRamp(isDark: boolean): string[] {
   return isDark
-    ? ["#161A27", "#173D3C", "#12655C", "#00A799", "#2EC48A", "#5DE0D4", "#99F2E8"]
+    ? ["#121731", "#123A44", "#0F5F5C", "#00A799", "#2EC48A", "#5DE0D4", "#99F2E8"]
     : ["#F0FDFB", "#CCFBF4", "#99F2E8", "#5DE0D4", "#2EC48A", "#00A799", "#006B60"]
 }

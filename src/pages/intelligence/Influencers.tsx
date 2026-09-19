@@ -216,7 +216,7 @@ export default function InfluencersPage() {
             <button
               onClick={handleExport}
               disabled={filtered.length === 0}
-              className="inline-flex items-center gap-1.5 h-8 px-3 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1.5 h-8 px-3 text-[13px] rounded-md border border-border-soft hover:bg-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Download className="w-3.5 h-3.5" /> Exportar
             </button>
@@ -342,7 +342,7 @@ export default function InfluencersPage() {
 
             <div className="flex items-center gap-2.5 shrink-0">
               <span className="text-[12px] text-ink-muted">Ordenar:</span>
-              <div className="inline-flex p-0.5 rounded-lg bg-[#F3F4F6] dark:bg-[#1A1D2D]">
+              <div className="inline-flex p-0.5 rounded-lg bg-tint">
                 {SORTS.map((s) => {
                   const active = sortKey === s.key
                   return (
@@ -390,7 +390,7 @@ export default function InfluencersPage() {
                   return (
                     <tr
                       key={c.channelId}
-                      className="border-b border-border-soft hover:bg-[#FAFBFC] dark:hover:bg-[#181B28] transition-colors"
+                      className="border-b border-border-soft hover:bg-hover transition-colors"
                     >
                       <td className="px-8 py-3.5">
                         <span className="font-mono-zoe text-[11.5px] text-ink-muted-2">
@@ -419,7 +419,7 @@ export default function InfluencersPage() {
                         <div className="flex items-center gap-1.5">
                           <span
                             className="w-2 h-2 rounded-full inline-block"
-                            style={{ background: platformColor[c.platform] ?? "#9AA1AE" }}
+                            style={{ background: platformColor[c.platform] ?? "var(--ink-muted-2)" }}
                           />
                           <span className="text-[12.5px] text-ink-2">
                             {platformLabel[c.platform] ?? c.platform}
@@ -521,7 +521,7 @@ function SortableHeader({
     <th className="text-left py-3">
       <button
         onClick={() => onToggle(sortKey)}
-        className={`flex items-center gap-1 eyebrow font-semibold transition-colors ${active ? "text-ink dark:text-[#E6E8EF]" : ""}`}
+        className={`flex items-center gap-1 eyebrow font-semibold transition-colors ${active ? "text-ink dark:text-ink" : ""}`}
       >
         {label}
         <ArrowUpDown className={`w-3 h-3 ${active ? "text-teal-500" : ""}`} />
@@ -535,12 +535,12 @@ function PageSkeleton() {
   return (
     <div className="-m-6 animate-pulse">
       <div className="px-8 pt-7 pb-6 border-b border-border-soft">
-        <div className="h-9 w-96 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+        <div className="h-9 w-96 rounded bg-tint" />
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 border-b border-border-soft">
         {[0, 1, 2].map((i) => (
           <div key={i} className="p-7 border-r border-border-soft">
-            <div className="h-12 w-32 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+            <div className="h-12 w-32 rounded bg-tint" />
           </div>
         ))}
       </div>
@@ -553,7 +553,7 @@ function TableSkeleton() {
   return (
     <div className="px-8 py-6 space-y-3 animate-pulse">
       {[0, 1, 2, 3, 4].map((i) => (
-        <div key={i} className="h-10 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+        <div key={i} className="h-10 rounded bg-tint" />
       ))}
     </div>
   )
@@ -563,11 +563,11 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <AlertCircle className="w-10 h-10 text-neg mb-3" />
-      <h3 className="text-lg font-semibold text-midnight dark:text-[#E6E8EF] mb-1">Não foi possível carregar</h3>
+      <h3 className="text-lg font-semibold text-midnight dark:text-ink mb-1">Não foi possível carregar</h3>
       <p className="text-sm text-ink-muted mb-4">Tente novamente em instantes.</p>
       <button
         onClick={onRetry}
-        className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors"
+        className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-hover transition-colors"
       >
         Tentar de novo
       </button>

@@ -195,7 +195,7 @@ function RankingSection({ ranked, hasPreviousPeriod, ppHint }: {
                     {/* Barra na escala absoluta: 34% ocupa 34% do trilho. Relativa ao
                         líder, o primeiro sempre pareceria dono de tudo. */}
                     <div className="flex items-center gap-2.5">
-                      <div className="flex-1 h-2 rounded-sm overflow-hidden bg-[#F3F4F6] dark:bg-[#1C1F2E]">
+                      <div className="flex-1 h-2 rounded-sm overflow-hidden bg-tint">
                         <div style={{ width: `${b.sharePct}%`, height: "100%", background: c, transition: "width .5s" }} />
                       </div>
                       <span className="font-mono-zoe w-10 text-right" style={{ color: "var(--ink)" }}>{b.sharePct}%</span>
@@ -265,7 +265,7 @@ function TrendSection({ trend, loading }: { trend: SovTrend | undefined; loading
                 type="button"
                 onClick={() => toggle(s.brandName)}
                 aria-pressed={!off}
-                className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border border-border-soft text-[12px] transition-opacity hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D]"
+                className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border border-border-soft text-[12px] transition-opacity hover:bg-hover"
                 style={{ opacity: off ? 0.45 : 1, color: "var(--ink)" }}
               >
                 <span className="w-2.5 h-0.5 rounded-full" style={{ background: brandColor(s.brandId, s.color) }} />

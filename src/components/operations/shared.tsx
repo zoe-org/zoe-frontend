@@ -37,7 +37,7 @@ export function TableSkeleton({ rows = 4 }: { rows?: number }) {
   return (
     <div className="px-8 py-6 space-y-3 animate-pulse">
       {Array.from({ length: rows }, (_, i) => (
-        <div key={i} className="h-11 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+        <div key={i} className="h-11 rounded bg-tint" />
       ))}
     </div>
   )
@@ -46,14 +46,14 @@ export function TableSkeleton({ rows = 4 }: { rows?: number }) {
 export function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <AlertCircle className="w-10 h-10 text-[#DC2626] mb-3" />
-      <h3 className="text-lg font-semibold text-midnight dark:text-[#E6E8EF] mb-1">
+      <AlertCircle className="w-10 h-10 text-neg mb-3" />
+      <h3 className="text-lg font-semibold text-midnight dark:text-ink mb-1">
         Não foi possível carregar
       </h3>
-      <p className="text-sm text-[#6B7280] mb-4">Tente novamente em instantes.</p>
+      <p className="text-sm text-ink-muted mb-4">Tente novamente em instantes.</p>
       <button
         onClick={onRetry}
-        className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors"
+        className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-hover transition-colors"
       >
         Tentar de novo
       </button>

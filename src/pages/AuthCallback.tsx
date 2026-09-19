@@ -91,8 +91,8 @@ export default function AuthCallbackPage() {
     || (returned.error && !isLinkedOnFirstLogin(returned.error) ? federatedErrorMessage(returned.error) : "")
 
   return (
-    <div className="min-h-screen grid place-items-center bg-[#F9FAFB] p-6">
-      <div className="w-full max-w-md bg-white rounded-2xl border border-[#E5E7EB] p-8 shadow-sm text-center">
+    <div className="min-h-screen grid place-items-center bg-inset p-6">
+      <div className="w-full max-w-md bg-white rounded-2xl border border-border p-8 shadow-sm text-center">
         <ZoeLogo className="w-12 h-auto text-teal-500 mb-6 mx-auto" />
 
         {message ? (
@@ -106,7 +106,7 @@ export default function AuthCallbackPage() {
         ) : (
           <>
             <h1 className="text-xl font-bold mb-1">Entrando...</h1>
-            <p className="text-sm text-[#6B7280]">Só um momento.</p>
+            <p className="text-sm text-ink-muted">Só um momento.</p>
             <div className="mt-6 animate-spin rounded-full h-8 w-8 mx-auto border-2 border-teal-500 border-t-transparent" />
           </>
         )}

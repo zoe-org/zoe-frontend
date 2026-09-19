@@ -185,7 +185,7 @@ export function InviteCreatorModal({
         {sent ? (
           <>
             {sent.emailDelivery !== "Sent" && (
-              <div className="rounded-lg p-3 text-[12px] mb-4" style={{ background: "#D9770615", color: "#D97706" }}>
+              <div className="rounded-lg p-3 text-[12px] mb-4" style={{ background: "var(--warn-bg)", color: "var(--color-warn)" }}>
                 {sent.emailDelivery === "Disabled"
                   ? "O envio de e-mail não está configurado neste ambiente."
                   : "O e-mail não saiu."}{" "}
@@ -267,7 +267,7 @@ export function InviteCreatorModal({
                           <button
                             key={p.tenantInfluencerId}
                             onClick={() => pick(p)}
-                            className="w-full flex items-center gap-3 px-3 py-2.5 text-left border-b border-border-soft last:border-b-0 hover:bg-[#FAFBFC] dark:hover:bg-[#181B28] transition-colors"
+                            className="w-full flex items-center gap-3 px-3 py-2.5 text-left border-b border-border-soft last:border-b-0 hover:bg-hover transition-colors"
                             style={picked ? { background: "var(--color-teal-50, #F0FDFB)" } : undefined}
                           >
                             <div
@@ -364,7 +364,7 @@ export function InviteCreatorModal({
             {conflict && (
               <div
                 className="rounded-lg p-3 text-[12.5px] mt-5"
-                style={{ background: "#D9770615", color: "#B45309" }}
+                style={{ background: "var(--warn-bg)", color: "var(--color-warn)" }}
                 role="alert"
               >
                 <div className="font-medium mb-0.5">
@@ -382,7 +382,7 @@ export function InviteCreatorModal({
                       onClick={resend}
                       disabled={resendInvite.isPending}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-medium text-white disabled:opacity-50"
-                      style={{ background: "#D97706" }}
+                      style={{ background: "var(--color-warn)" }}
                     >
                       {resendInvite.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                       Reenviar convite
@@ -395,7 +395,7 @@ export function InviteCreatorModal({
                           type="checkbox"
                           checked={updateProposal}
                           onChange={(e) => setUpdateProposal(e.target.checked)}
-                          className="accent-[#D97706]"
+                          className="accent-warn"
                         />
                         Atualizar a proposta com os valores deste formulário
                       </label>

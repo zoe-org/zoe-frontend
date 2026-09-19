@@ -94,7 +94,7 @@ export function CreatorPrivacyCard() {
           onClick={requestDeletion}
           disabled={deleting || result !== null}
           className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[12.5px] font-medium border disabled:opacity-50"
-          style={{ color: "#DC2626", borderColor: "#DC262640" }}
+          style={{ color: "var(--color-neg)", borderColor: "#DC262640" }}
         >
           {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
           Pedir exclusão dos dados

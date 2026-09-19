@@ -319,7 +319,7 @@ function ProjectionBanner({
     return (
       <div
         className="flex items-start gap-3 rounded-[14px] border px-4 py-3.5"
-        style={{ background: "#FFFBEB", borderColor: "rgba(217,119,6,.32)" }}
+        style={{ background: "var(--warn-bg)", borderColor: "rgba(217,119,6,.32)" }}
       >
         <AlertCircle className="w-[17px] h-[17px] shrink-0 mt-0.5" style={{ color: "var(--color-warn)" }} />
         <div className="flex-1">
@@ -334,7 +334,7 @@ function ProjectionBanner({
           {onRetry && (
             <button
               onClick={onRetry}
-              className="mt-3 h-8 px-3 inline-flex items-center gap-1.5 rounded-lg text-[12.5px] font-medium border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors"
+              className="mt-3 h-8 px-3 inline-flex items-center gap-1.5 rounded-lg text-[12.5px] font-medium border border-border-soft hover:bg-hover transition-colors"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               Conferir de novo
@@ -374,7 +374,7 @@ function ProviderOffBanner() {
   return (
     <div
       className="flex items-start gap-3 rounded-[14px] border px-4 py-3.5"
-      style={{ background: "#FFFBEB", borderColor: "rgba(217,119,6,.32)" }}
+      style={{ background: "var(--warn-bg)", borderColor: "rgba(217,119,6,.32)" }}
     >
       <AlertCircle className="w-[17px] h-[17px] shrink-0 mt-0.5" style={{ color: "var(--color-warn)" }} />
       <div>
@@ -429,7 +429,7 @@ function CurrentSubscription({
   const pacote = !degraded && qualifiesForBundle(sub, data) && data.bundle.percentOff != null
 
   const tone = degraded
-    ? { color: "var(--color-neg)", bg: "#FEF2F2" }
+    ? { color: "var(--color-neg)", bg: "var(--neg-bg)" }
     : { color: "var(--color-teal-500)", bg: "var(--teal-bg)" }
 
   return (
@@ -461,7 +461,7 @@ function CurrentSubscription({
             {scheduled && (
               <span
                 className="text-[11.5px] font-semibold rounded-full px-2 py-0.5"
-                style={{ background: "#FFFBEB", color: "var(--color-warn)" }}
+                style={{ background: "var(--warn-bg)", color: "var(--color-warn)" }}
               >
                 encerra em {shortDay(sub.cancelAt!)}
               </span>
@@ -507,7 +507,7 @@ function CurrentSubscription({
           </div>
           <button
             onClick={onKeep}
-            className="mt-3 ml-[25px] h-8 px-3 inline-flex items-center gap-1.5 rounded-lg text-[12.5px] font-medium border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors"
+            className="mt-3 ml-[25px] h-8 px-3 inline-flex items-center gap-1.5 rounded-lg text-[12.5px] font-medium border border-border-soft hover:bg-hover transition-colors"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             Manter {describeSelection(sub)}
@@ -637,7 +637,7 @@ function TrialUsedDialog({
         {error && (
           <div
             className="flex items-start gap-3 rounded-[12px] border px-4 py-3 mt-4"
-            style={{ background: "#FEF2F2", borderColor: "rgba(220,38,38,.32)" }}
+            style={{ background: "var(--neg-bg)", borderColor: "rgba(220,38,38,.32)" }}
           >
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "var(--color-neg)" }} />
             <span className="text-[13px] leading-relaxed" style={{ color: "var(--ink-2)" }}>
@@ -649,7 +649,7 @@ function TrialUsedDialog({
         <div className="flex items-center justify-between mt-6">
           <button
             onClick={onClose}
-            className="h-9 px-4 rounded-lg text-[13px] font-medium text-ink-muted hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors"
+            className="h-9 px-4 rounded-lg text-[13px] font-medium text-ink-muted hover:bg-hover transition-colors"
           >
             Cancelar
           </button>
@@ -808,7 +808,7 @@ function ExtraBrandDialog({
 
         <div
           className="flex items-start gap-3 rounded-[12px] border px-4 py-3 mt-4"
-          style={{ background: "#FFFBEB", borderColor: "rgba(217,119,6,.32)" }}
+          style={{ background: "var(--warn-bg)", borderColor: "rgba(217,119,6,.32)" }}
         >
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "var(--color-warn)" }} />
           <span className="text-[13px] leading-relaxed" style={{ color: "var(--ink-2)" }}>
@@ -820,7 +820,7 @@ function ExtraBrandDialog({
         {error && (
           <div
             className="flex items-start gap-3 rounded-[12px] border px-4 py-3 mt-4"
-            style={{ background: "#FEF2F2", borderColor: "rgba(220,38,38,.32)" }}
+            style={{ background: "var(--neg-bg)", borderColor: "rgba(220,38,38,.32)" }}
           >
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "var(--color-neg)" }} />
             <span className="text-[13px] leading-relaxed" style={{ color: "var(--ink-2)" }}>
@@ -845,7 +845,7 @@ function ExtraBrandDialog({
         <div className="flex items-center justify-between mt-6">
           <button
             onClick={onClose}
-            className="h-9 px-4 rounded-lg text-[13px] font-medium text-ink-muted hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors"
+            className="h-9 px-4 rounded-lg text-[13px] font-medium text-ink-muted hover:bg-hover transition-colors"
           >
             Cancelar
           </button>
@@ -919,7 +919,7 @@ function BillingSection({
           key={r.label}
           onClick={open}
           disabled={disabled}
-          className="w-full flex items-center gap-4 px-6 py-4 text-left transition-colors hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] disabled:opacity-50 disabled:hover:bg-transparent border-t border-border-soft"
+          className="w-full flex items-center gap-4 px-6 py-4 text-left transition-colors hover:bg-hover disabled:opacity-50 disabled:hover:bg-transparent border-t border-border-soft"
         >
           <div className="flex-1">
             <div className="text-[14px] font-semibold" style={{ color: "var(--ink)" }}>
@@ -950,10 +950,10 @@ function BillingSection({
 function SkeletonScreen() {
   return (
     <div className="@container space-y-4 animate-pulse">
-      <div className="h-24 rounded-[14px] bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+      <div className="h-24 rounded-[14px] bg-tint" />
       <div className="grid gap-4 @md:grid-cols-2 @4xl:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="h-72 rounded-[14px] bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+          <div key={i} className="h-72 rounded-[14px] bg-tint" />
         ))}
       </div>
     </div>

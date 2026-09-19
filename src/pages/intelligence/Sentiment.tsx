@@ -74,7 +74,7 @@ export default function SentimentPage() {
 
   const series = useMemo(() => [
     { name: "Positivo", color: "var(--color-pos)", data: points.map((p) => p.positive) },
-    { name: "Neutro", color: "#9AA1AE", data: points.map((p) => p.neutral) },
+    { name: "Neutro", color: "var(--ink-muted-2)", data: points.map((p) => p.neutral) },
     { name: "Negativo", color: "var(--color-neg)", data: points.map((p) => p.negative) },
   ], [points])
 
@@ -176,7 +176,7 @@ export default function SentimentPage() {
               <div className="flex flex-col gap-3">
                 {[
                   { label: "Positivo", pct: stats.pctPos, color: "var(--color-pos)", count: stats.totalPos },
-                  { label: "Neutro", pct: stats.pctNeu, color: "#9AA1AE", count: stats.totalNeu },
+                  { label: "Neutro", pct: stats.pctNeu, color: "var(--ink-muted-2)", count: stats.totalNeu },
                   { label: "Negativo", pct: stats.pctNeg, color: "var(--color-neg)", count: stats.totalNeg },
                 ].map((d) => (
                   <div key={d.label}>
@@ -187,7 +187,7 @@ export default function SentimentPage() {
                         <span className="font-mono-zoe text-[12px] text-ink-2">{d.pct}%</span>
                       </div>
                     </div>
-                    <div className="h-1.5 bg-[#EEF0F2] dark:bg-[#1C1F2E] rounded-full overflow-hidden">
+                    <div className="h-1.5 bg-tint rounded-full overflow-hidden">
                       <div style={{ width: `${d.pct}%`, height: "100%", background: d.color }} />
                     </div>
                   </div>
@@ -214,7 +214,7 @@ export default function SentimentPage() {
                 </div>
               </div>
               {evolution.isLoading ? (
-                <div className="h-[200px] rounded bg-[#F3F4F6] dark:bg-[#1A1D2D] animate-pulse" />
+                <div className="h-[200px] rounded bg-tint animate-pulse" />
               ) : stats.total === 0 ? (
                 <EmptyBlock
                   className="h-[200px] justify-center"
@@ -235,7 +235,7 @@ export default function SentimentPage() {
               {impact.isLoading ? (
                 <div className="space-y-3 animate-pulse">
                   {[0, 1, 2, 3].map((i) => (
-                    <div key={i} className="h-10 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+                    <div key={i} className="h-10 rounded bg-tint" />
                   ))}
                 </div>
               ) : (impact.data?.items?.length ?? 0) === 0 ? (
@@ -279,7 +279,7 @@ export default function SentimentPage() {
             {topics.isLoading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-pulse">
                 {[0, 1, 2, 3, 4, 5].map((i) => (
-                  <div key={i} className="h-28 rounded-xl bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+                  <div key={i} className="h-28 rounded-xl bg-tint" />
                 ))}
               </div>
             ) : (topics.data?.items?.length ?? 0) === 0 ? (
@@ -290,7 +290,7 @@ export default function SentimentPage() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {(topics.data?.items ?? []).map((t) => (
-                  <div key={t.label} className="p-4.5 rounded-xl border border-border-soft bg-[#FAFBFC] dark:bg-[#181B28]">
+                  <div key={t.label} className="p-4.5 rounded-xl border border-border-soft bg-inset">
                     <div className="flex items-start justify-between mb-3.5">
                       <div>
                         <div className="text-[14px] font-semibold" style={{ color: "var(--ink)" }}>{t.label}</div>
@@ -302,7 +302,7 @@ export default function SentimentPage() {
                     {/* Barra empilhada pos/neu/neg (não há StackedBar nos charts). */}
                     <div className="flex h-2 rounded-full overflow-hidden">
                       <div style={{ width: `${t.pos}%`, background: "var(--color-pos)" }} />
-                      <div style={{ width: `${t.neu}%`, background: "#9AA1AE" }} />
+                      <div style={{ width: `${t.neu}%`, background: "var(--ink-muted-2)" }} />
                       <div style={{ width: `${t.neg}%`, background: "var(--color-neg)" }} />
                     </div>
                     <div className="flex justify-between mt-2.5 text-[11px] font-mono-zoe">
@@ -323,7 +323,7 @@ export default function SentimentPage() {
               <div className="text-[12px] text-ink-muted mt-1">Tamanho proporcional ao volume · cor indica sentimento</div>
             </div>
             {keywords.isLoading ? (
-              <div className="h-16 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D] animate-pulse" />
+              <div className="h-16 rounded bg-tint animate-pulse" />
             ) : (keywords.data?.items.length ?? 0) === 0 ? (
               <EmptyBlock message="Nenhum termo no período." />
             ) : (
@@ -355,16 +355,16 @@ function PageSkeleton() {
   return (
     <div className="-m-6 animate-pulse">
       <div className="px-8 pt-7 pb-6 border-b border-border-soft">
-        <div className="h-9 w-96 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+        <div className="h-9 w-96 rounded bg-tint" />
       </div>
       <div className="grid grid-cols-1 md:grid-cols-3 border-b border-border-soft">
         {[0, 1, 2].map((i) => (
           <div key={i} className="p-7 border-r border-border-soft">
-            <div className="h-12 w-32 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+            <div className="h-12 w-32 rounded bg-tint" />
           </div>
         ))}
       </div>
-      <div className="p-7"><div className="h-[200px] rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" /></div>
+      <div className="p-7"><div className="h-[200px] rounded bg-tint" /></div>
     </div>
   )
 }
@@ -396,9 +396,9 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <AlertCircle className="w-10 h-10 text-neg mb-3" />
-      <h3 className="text-lg font-semibold text-midnight dark:text-[#E6E8EF] mb-1">Não foi possível carregar</h3>
-      <p className="text-sm text-[#6B7280] mb-4">Tente novamente em instantes.</p>
-      <button onClick={onRetry} className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors">
+      <h3 className="text-lg font-semibold text-midnight dark:text-ink mb-1">Não foi possível carregar</h3>
+      <p className="text-sm text-ink-muted mb-4">Tente novamente em instantes.</p>
+      <button onClick={onRetry} className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-hover transition-colors">
         Tentar de novo
       </button>
     </div>

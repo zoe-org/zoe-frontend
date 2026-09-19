@@ -144,7 +144,7 @@ export default function SovPage() {
           <button
             onClick={exportCsv}
             disabled={ranked.length === 0}
-            className="inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] rounded-md border border-border-soft hover:bg-hover transition-colors disabled:opacity-50"
           >
             <Download className="w-3.5 h-3.5" /> Exportar
           </button>
@@ -277,8 +277,8 @@ function BarsSkeleton() {
       <div className="flex flex-col gap-4 max-w-3xl">
         {Array.from({ length: 5 }).map((_, i) => (
           <div key={i} className="space-y-2">
-            <div className="h-3.5 w-40 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
-            <div className="h-2 w-full rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+            <div className="h-3.5 w-40 rounded bg-tint" />
+            <div className="h-2 w-full rounded bg-tint" />
           </div>
         ))}
       </div>
@@ -290,9 +290,9 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <AlertCircle className="w-10 h-10 text-neg mb-3" />
-      <h3 className="text-lg font-semibold text-midnight dark:text-[#E6E8EF] mb-1">Não foi possível carregar</h3>
-      <p className="text-sm text-[#6B7280] mb-4">Tente novamente em instantes.</p>
-      <button onClick={onRetry} className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors">
+      <h3 className="text-lg font-semibold text-midnight dark:text-ink mb-1">Não foi possível carregar</h3>
+      <p className="text-sm text-ink-muted mb-4">Tente novamente em instantes.</p>
+      <button onClick={onRetry} className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-hover transition-colors">
         Tentar de novo
       </button>
     </div>

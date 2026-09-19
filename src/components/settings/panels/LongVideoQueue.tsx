@@ -34,8 +34,8 @@ const TABS: { key: LongVideoDecisionStatus; label: string }[] = [
 const PAGE_SIZE = 5
 
 const RESULT_TONE = {
-  partial: { color: "var(--color-warn)", bg: "#FFFBEB", border: "rgba(217,119,6,.32)" },
-  failure: { color: "var(--color-neg)", bg: "#FEF2F2", border: "rgba(220,38,38,.32)" },
+  partial: { color: "var(--color-warn)", bg: "var(--warn-bg)", border: "rgba(217,119,6,.32)" },
+  failure: { color: "var(--color-neg)", bg: "var(--neg-bg)", border: "rgba(220,38,38,.32)" },
 } as const
 
 type BatchResult = DecisionMessage & { tone: "partial" | "failure"; spendCapShortMinutes: number }
@@ -212,7 +212,7 @@ export function LongVideoQueue() {
       )}
 
       {tab === "Pending" && canDecide && totals.count > 0 && (
-        <div className="flex items-center gap-x-4 gap-y-2 flex-wrap px-6 py-3.5 border-t border-border-soft bg-[#FAFBFC] dark:bg-[#151824]">
+        <div className="flex items-center gap-x-4 gap-y-2 flex-wrap px-6 py-3.5 border-t border-border-soft bg-inset">
           <div className="text-[13px]" style={{ color: "var(--ink)" }}>
             <strong>{plural(totals.count, "selecionado", "selecionados")}</strong> ·{" "}
             <span className="font-mono-zoe">{int(totals.minutes)} min</span>
@@ -228,7 +228,7 @@ export function LongVideoQueue() {
             <button
               onClick={() => run("Dismiss")}
               disabled={decide.isPending}
-              className="h-9 px-4 rounded-lg text-[13px] font-medium border border-border-soft hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D] transition-colors disabled:opacity-50"
+              className="h-9 px-4 rounded-lg text-[13px] font-medium border border-border-soft hover:bg-tint transition-colors disabled:opacity-50"
             >
               Descartar
             </button>
@@ -265,7 +265,7 @@ function Pagination({ page, pageCount, total, shown, from, onChange, selectAll }
   selectAll?: () => void
 }) {
   const botao = "h-7 w-7 inline-flex items-center justify-center rounded-md border border-border-soft " +
-    "hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+    "hover:bg-tint transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
 
   return (
     <div className="flex items-center gap-x-4 gap-y-2 flex-wrap px-6 py-2.5 border-t border-border-soft">
@@ -374,7 +374,7 @@ function QueueBody({
   if (loading) {
     return (
       <div className="px-6 pb-6 space-y-2 animate-pulse">
-        {[0, 1, 2].map((i) => <div key={i} className="h-11 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />)}
+        {[0, 1, 2].map((i) => <div key={i} className="h-11 rounded bg-tint" />)}
       </div>
     )
   }

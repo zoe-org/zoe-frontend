@@ -367,7 +367,7 @@ function AuditCard({ audit }: { audit: DeliveryAudit | null }) {
       {audit.isDegraded && (
         <div
           className="flex items-start gap-1.5 rounded p-2.5 text-[11.5px] mb-3"
-          style={{ background: "#D9770615", color: "#D97706" }}
+          style={{ background: "var(--warn-bg)", color: "var(--color-warn)" }}
         >
           <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
           <span>
@@ -383,7 +383,7 @@ function AuditCard({ audit }: { audit: DeliveryAudit | null }) {
           <div key={item.criterion} className="flex items-start gap-1.5 text-[12.5px]">
             {item.passed
               ? <Check className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: "#00A799" }} />
-              : <X className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: "#DC2626" }} />}
+              : <X className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: "var(--color-neg)" }} />}
             <span style={{ color: item.passed ? "var(--ink)" : "#DC2626" }}>
               {tEnum("auditCriterion", item.criterion)}
               {item.detail && (
@@ -542,7 +542,7 @@ function ReviewPanel({ group, onDecided }: { group: DeliveryGroup; onDecided: ()
         <div
           className="flex items-center gap-1.5 rounded-lg p-2.5 text-[12px] mt-4"
           style={d.isReviewOverdue
-            ? { background: "#DC262615", color: "#DC2626" }
+            ? { background: "#DC262615", color: "var(--color-neg)" }
             : { background: "var(--bg, #F9FAFB)", color: "var(--ink-muted)" }}
         >
           <Clock className="w-3.5 h-3.5 shrink-0" />
@@ -696,7 +696,7 @@ function ReviewPanel({ group, onDecided }: { group: DeliveryGroup; onDecided: ()
                     aria-pressed={scope === id}
                     className="px-2.5 py-1.5 rounded-lg text-left border text-[12px] transition-colors"
                     style={scope === id
-                      ? { borderColor: "#D97706", background: "#D9770612", color: "#B45309" }
+                      ? { borderColor: "#D97706", background: "var(--warn-bg)", color: "var(--color-warn)" }
                       : { borderColor: "var(--border-soft)", color: "var(--ink-muted)" }}
                   >
                     <div className="font-medium">{label}</div>
@@ -716,7 +716,7 @@ function ReviewPanel({ group, onDecided }: { group: DeliveryGroup; onDecided: ()
                 )}
                 disabled={busy}
                 className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-[13px] border border-border-soft disabled:opacity-50"
-                style={{ color: "#D97706" }}
+                style={{ color: "var(--color-warn)" }}
               >
                 <RotateCcw className="w-3.5 h-3.5" /> Pedir correção
               </button>
@@ -724,7 +724,7 @@ function ReviewPanel({ group, onDecided }: { group: DeliveryGroup; onDecided: ()
                 onClick={() => decideWith("Reject", "Entrega recusada. A custódia foi para disputa.")}
                 disabled={busy}
                 className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-[13px] border border-border-soft disabled:opacity-50"
-                style={{ color: "#DC2626" }}
+                style={{ color: "var(--color-neg)" }}
               >
                 <Ban className="w-3.5 h-3.5" /> Recusar
               </button>
@@ -773,7 +773,7 @@ function GateHeader({
                 className="text-[11px] font-mono-zoe px-1.5 rounded"
                 style={gate === id
                   ? { background: "#ffffff28" }
-                  : { background: "#D9770620", color: "#B45309" }}
+                  : { background: "#D9770620", color: "var(--color-warn)" }}
                 aria-label={`${counts[id]} esperando`}
               >
                 {counts[id]}

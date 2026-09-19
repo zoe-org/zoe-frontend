@@ -38,23 +38,23 @@ export function BrandSwitcher() {
   if (selecionaveis.length === 0) return null
 
   const label = active ? (active.displayName ?? active.brandName) : "Selecione uma marca"
-  const dot = active ? brandColor(active.color, active.brandSlug) : "#9AA1AE"
+  const dot = active ? brandColor(active.color, active.brandSlug) : "var(--ink-muted-2)"
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className="border border-[#E5E7EB] dark:border-[#262A3A] flex items-center gap-1.5 text-xs text-midnight dark:text-[#E6E8EF] hover:bg-[#F9FAFB] dark:hover:bg-[#1A1D2D] px-3 py-2 rounded-md transition-colors cursor-pointer"
+          className="border border-border flex items-center gap-1.5 text-xs text-midnight dark:text-ink hover:bg-hover px-3 py-2 rounded-md transition-colors cursor-pointer"
           aria-label="Trocar marca ativa"
         >
           <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: dot }} />
           <span className="max-w-[160px] truncate">{label}</span>
-          <ChevronDown className="w-3 h-3 text-[#6B7280]" />
+          <ChevronDown className="w-3 h-3 text-ink-muted" />
         </button>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="w-64">
-        <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-[#6B7280] font-semibold">
+        <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-ink-muted font-semibold">
           Marcas monitoradas
         </DropdownMenuLabel>
 
@@ -73,12 +73,12 @@ export function BrandSwitcher() {
                   {/* Marcado, não escondido: quem troca precisa saber que está olhando
                       um concorrente antes de ler os números. */}
                   {b.relationship === "Competitor" && (
-                    <span className="text-[9.5px] uppercase tracking-wide font-semibold text-[#6B7280] shrink-0">
+                    <span className="text-[9.5px] uppercase tracking-wide font-semibold text-ink-muted shrink-0">
                       concorrente
                     </span>
                   )}
                 </div>
-                <div className="text-[11px] text-[#6B7280] truncate">
+                <div className="text-[11px] text-ink-muted truncate">
                   {b.videoCount30d} {b.videoCount30d === 1 ? "vídeo" : "vídeos"} · 30d
                 </div>
               </div>

@@ -34,7 +34,7 @@ export function UpgradeDialog() {
         >
           <Dialog.Close
             aria-label="Fechar"
-            className="absolute right-4 top-4 p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D] transition-colors"
+            className="absolute right-4 top-4 p-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-tint transition-colors"
           >
             <X className="w-4 h-4" />
           </Dialog.Close>
@@ -67,7 +67,7 @@ export function UpgradeDialog() {
             </button>
             <button
               onClick={() => setSlug(null)}
-              className="h-9 px-4 rounded-lg text-[13px] font-medium text-ink-muted hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors"
+              className="h-9 px-4 rounded-lg text-[13px] font-medium text-ink-muted hover:bg-hover transition-colors"
             >
               Agora não
             </button>

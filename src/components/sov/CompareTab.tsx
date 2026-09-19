@@ -268,7 +268,7 @@ function DuelBar({ label, value, color, strong }: { label: string; value: number
   return (
     <div className="flex items-center gap-2 mt-1">
       <span className="w-20 truncate text-[11.5px] text-ink-muted" style={{ fontWeight: strong ? 600 : 400 }}>{label}</span>
-      <div className="flex-1 h-1.5 rounded-full overflow-hidden bg-[#F3F4F6] dark:bg-[#1C1F2E]">
+      <div className="flex-1 h-1.5 rounded-full overflow-hidden bg-tint">
         <div style={{ width: `${value}%`, height: "100%", background: color }} />
       </div>
       <span className="w-9 text-right font-mono-zoe text-[11.5px]" style={{ color: "var(--ink)" }}>{value}%</span>

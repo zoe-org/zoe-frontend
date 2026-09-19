@@ -291,7 +291,7 @@ function StepPersonalData({
         </FormField>
 
         <FormField label="E-mail" hint="É o e-mail do seu convite — não muda por aqui.">
-          <Input value={email} readOnly className="bg-[#F3F4F6] text-[#6B7280]" />
+          <Input value={email} readOnly className="bg-tint text-ink-muted" />
         </FormField>
 
         <FormField
@@ -542,7 +542,7 @@ function StepPayout({
       />
 
       {linkExpired && !connected && (
-        <p className="text-[12.5px] mb-4 m-0" style={{ color: "#D97706" }}>
+        <p className="text-[12.5px] mb-4 m-0" style={{ color: "var(--color-warn)" }}>
           O link do provedor venceu antes de você terminar. É só continuar de onde parou.
         </p>
       )}

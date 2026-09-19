@@ -348,7 +348,7 @@ function PlanShell({
           className="self-start text-[10px] font-semibold rounded-full px-2 py-0.5 mb-2"
           style={
             reativando
-              ? { background: "#F3F4F6", color: "#6B7280" }
+              ? { background: "var(--tint)", color: "var(--ink-muted)" }
               : { background: "var(--teal-bg)", color: "var(--color-teal-500)" }
           }
         >
@@ -404,7 +404,7 @@ function ActionButton({
         className={`w-full h-9 inline-flex items-center justify-center gap-1.5 rounded-lg text-[13px] font-medium transition-colors disabled:opacity-50 ${
           action.kind === "primary"
             ? "text-white"
-            : "border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D]"
+            : "border border-border-soft hover:bg-hover"
         }`}
         style={action.kind === "primary" ? { background: "var(--color-teal-500)" } : undefined}
       >
@@ -420,7 +420,7 @@ function SalesButton({ subject }: { subject: string }) {
   return (
     <a
       href={`mailto:comercial@zoe.com.br?subject=${encodeURIComponent(subject)}`}
-      className="w-full h-9 inline-flex items-center justify-center rounded-lg text-[13px] font-medium border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors"
+      className="w-full h-9 inline-flex items-center justify-center rounded-lg text-[13px] font-medium border border-border-soft hover:bg-hover transition-colors"
     >
       Falar com vendas
     </a>

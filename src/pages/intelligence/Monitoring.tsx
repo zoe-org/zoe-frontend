@@ -262,7 +262,7 @@ export default function MonitoringPage() {
               onClick={exportCsv}
               disabled={items.length === 0}
               title="Exporta as menções já carregadas, com os filtros atuais"
-              className="inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] rounded-md border border-border-soft hover:bg-hover transition-colors disabled:opacity-50"
             >
               <Download className="w-3.5 h-3.5" /> Exportar
             </button>
@@ -342,7 +342,7 @@ export default function MonitoringPage() {
                 aria-label={label}
                 className={`p-1.5 rounded-md transition-colors ${
                   view === key
-                    ? "bg-[#F3F4F6] dark:bg-[#1A1D2D] text-ink"
+                    ? "bg-tint text-ink"
                     : "text-ink-muted hover:text-ink"
                 }`}
               >
@@ -439,7 +439,7 @@ export default function MonitoringPage() {
               <button
                 key={m.analysisId}
                 onClick={() => openDrawer(m)}
-                className="grid items-center gap-4 px-8 py-3.5 border-b border-border-soft w-full text-left cursor-pointer hover:bg-[#FAFBFC] dark:hover:bg-[#181B28] transition-colors"
+                className="grid items-center gap-4 px-8 py-3.5 border-b border-border-soft w-full text-left cursor-pointer hover:bg-hover transition-colors"
                 style={{ gridTemplateColumns: "110px 1fr 200px 150px 90px" }}
               >
                 <VideoThumb
@@ -507,7 +507,7 @@ export default function MonitoringPage() {
               <button
                 onClick={() => feed.fetchNextPage()}
                 disabled={feed.isFetchingNextPage}
-                className="inline-flex items-center h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors disabled:opacity-50"
+                className="inline-flex items-center h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-hover transition-colors disabled:opacity-50"
               >
                 {feed.isFetchingNextPage ? "Carregando..." : "Carregar mais menções"}
               </button>
@@ -527,7 +527,7 @@ function PageSkeleton() {
   return (
     <div className="-m-6 animate-pulse">
       <div className="px-8 pt-7 pb-6 border-b border-border-soft">
-        <div className="h-9 w-96 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+        <div className="h-9 w-96 rounded bg-tint" />
       </div>
       <FeedSkeleton />
     </div>
@@ -540,13 +540,13 @@ function FeedSkeleton() {
       {Array.from({ length: 6 }).map((_, i) => (
         <div key={i} className="flex items-center gap-4 px-8 py-3.5 border-b border-border-soft">
           {/* Mesma caixa 110×62 da thumbnail real — sem isso a linha "pula" ao carregar. */}
-          <div className="w-27.5 h-15.5 shrink-0 rounded-md bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+          <div className="w-27.5 h-15.5 shrink-0 rounded-md bg-tint" />
           <div className="flex-1 space-y-2">
-            <div className="h-3.5 w-2/3 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
-            <div className="h-3 w-1/3 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+            <div className="h-3.5 w-2/3 rounded bg-tint" />
+            <div className="h-3 w-1/3 rounded bg-tint" />
           </div>
-          <div className="h-5 w-28 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
-          <div className="h-5 w-16 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+          <div className="h-5 w-28 rounded bg-tint" />
+          <div className="h-5 w-16 rounded bg-tint" />
         </div>
       ))}
     </section>
@@ -557,9 +557,9 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <AlertCircle className="w-10 h-10 text-neg mb-3" />
-      <h3 className="text-lg font-semibold text-midnight dark:text-[#E6E8EF] mb-1">Não foi possível carregar</h3>
-      <p className="text-sm text-[#6B7280] mb-4">Tente novamente em instantes.</p>
-      <button onClick={onRetry} className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors">
+      <h3 className="text-lg font-semibold text-midnight dark:text-ink mb-1">Não foi possível carregar</h3>
+      <p className="text-sm text-ink-muted mb-4">Tente novamente em instantes.</p>
+      <button onClick={onRetry} className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-hover transition-colors">
         Tentar de novo
       </button>
     </div>

@@ -33,7 +33,7 @@ export function CoverageNotice({ tenantBrandIds, scopeLabel = "desta marca", cla
 
   return (
     <div
-      className={`flex items-start gap-2.5 flex-wrap rounded-[12px] border border-border-soft px-3.5 py-2.5 bg-[#FAFBFC] dark:bg-[#151824] ${className}`}
+      className={`flex items-start gap-2.5 flex-wrap rounded-[12px] border border-border-soft px-3.5 py-2.5 bg-inset ${className}`}
     >
       <Lock className="w-3.5 h-3.5 shrink-0 mt-0.5 text-ink-muted" />
       <div className="flex-1 min-w-60 text-[12.5px] leading-relaxed" style={{ color: "var(--ink-2)" }}>

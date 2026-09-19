@@ -57,7 +57,7 @@ export default function ContractDetailPage() {
   if (contract.isError || !data) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
-        <AlertCircle className="w-10 h-10 text-[#DC2626] mb-3" />
+        <AlertCircle className="w-10 h-10 text-neg mb-3" />
         <h3 className="text-lg font-semibold mb-1">Contrato não encontrado</h3>
         <Link to="/operations/contracts" className="text-[13px] underline" style={{ color: "var(--color-teal-500)" }}>
           Voltar para contratos
@@ -181,7 +181,7 @@ export default function ContractDetailPage() {
                   <button
                     onClick={save}
                     disabled={!dirty || saveFields.isPending}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-medium border border-border-soft disabled:opacity-40 hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D]"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-medium border border-border-soft disabled:opacity-40 hover:bg-hover"
                   >
                     {saveFields.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                     Salvar
@@ -209,7 +209,7 @@ export default function ContractDetailPage() {
           )}
 
           {pastDates.length > 0 && (
-            <div className="rounded-lg p-3 text-[12.5px] mb-4" style={{ background: "#D9770615", color: "#B45309" }}>
+            <div className="rounded-lg p-3 text-[12.5px] mb-4" style={{ background: "var(--warn-bg)", color: "var(--color-warn)" }}>
               <span className="font-medium">Datas no passado:</span>{" "}
               {pastDates.map((f) => f.label).join(", ")}. Confira antes de enviar para assinatura —
               o contrato nasceria com prazos já vencidos.
@@ -217,7 +217,7 @@ export default function ContractDetailPage() {
           )}
 
           {unreadableTotal && (
-            <div className="rounded-lg p-3 text-[12.5px] mb-4" style={{ background: "#D9770615", color: "#B45309" }}>
+            <div className="rounded-lg p-3 text-[12.5px] mb-4" style={{ background: "var(--warn-bg)", color: "var(--color-warn)" }}>
               <span className="font-medium">{totalValueField?.label ?? "Valor total"} ilegível:</span>{" "}
               “{savedTotalValue}” não é um valor em reais que a custódia consiga ler (ex.: 5.000,00).{" "}
               {data.autoAdvanceEscrow
@@ -423,7 +423,7 @@ function FieldRow({
         {field.label}
         {/* Campo que o sistema preenche nunca falta — o asterisco ali seria cobrança de
             algo que ninguém tem como digitar. */}
-        {field.isRequired && !field.isSystemManaged && <span style={{ color: "#DC2626" }}>*</span>}
+        {field.isRequired && !field.isSystemManaged && <span style={{ color: "var(--color-neg)" }}>*</span>}
         {/* A origem diz de onde o valor veio sem obrigar a pessoa a reler tudo para confiar
             nele. Some quando ela edita: a partir daí o valor é dela. */}
         {origin && (
@@ -521,7 +521,7 @@ function SignaturePanel({
       <div className="eyebrow mb-2">Assinatura</div>
 
       {!data.templateLegalReviewed && (
-        <p className="text-[12px] text-[#D97706] mb-2.5">
+        <p className="text-[12px] text-warn mb-2.5">
           Template ainda sem revisão jurídica — o envio para assinatura é recusado até a Zoe liberar.
         </p>
       )}
@@ -558,7 +558,7 @@ function SignaturePanel({
             onClick={onMarkSigned}
             disabled={pending}
             className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[12.5px] font-medium border border-dashed disabled:opacity-50"
-            style={{ borderColor: "#D97706", color: "#D97706" }}
+            style={{ borderColor: "#D97706", color: "var(--color-warn)" }}
           >
             {pending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PenLine className="w-3.5 h-3.5" />}
             Marcar como assinado
