@@ -38,18 +38,28 @@ export function BrandSwitcher() {
   if (selecionaveis.length === 0) return null
 
   const label = active ? (active.displayName ?? active.brandName) : "Selecione uma marca"
-  const dot = active ? brandColor(active.color, active.brandSlug) : "var(--ink-muted-2)"
+  const cor = active ? brandColor(active.color, active.brandSlug) : "var(--ink-muted-2)"
+  const concorrente = active?.relationship === "Competitor"
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className="border border-border flex items-center gap-1.5 text-xs text-midnight dark:text-ink hover:bg-hover px-3 py-2 rounded-md transition-colors cursor-pointer"
+          className="h-8 pl-1 pr-2.5 border border-border rounded-full flex items-center gap-2 text-[12.5px] text-ink hover:bg-hover transition-colors cursor-pointer"
           aria-label="Trocar marca ativa"
         >
-          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: dot }} />
-          <span className="max-w-[160px] truncate">{label}</span>
-          <ChevronDown className="w-3 h-3 text-ink-muted" />
+          <span
+            className="w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-[11px] font-bold text-white"
+            style={{ backgroundColor: cor }}
+          >
+            {label.charAt(0).toUpperCase()}
+          </span>
+          <span className="max-w-40 truncate font-medium">{label}</span>
+          {/* O selo diz de quem é o dado ANTES de alguém ler os números da tela. */}
+          <span className={`chip h-4.5 text-[10px] ${concorrente ? "chip-warn" : "chip-primary"}`}>
+            {concorrente ? "Concorrente" : "Própria"}
+          </span>
+          <ChevronDown className="w-3.5 h-3.5 text-ink-muted" />
         </button>
       </DropdownMenuTrigger>
 

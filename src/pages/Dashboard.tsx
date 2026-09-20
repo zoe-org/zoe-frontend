@@ -1,4 +1,4 @@
-import { useMemo, type CSSProperties } from "react"
+import { useMemo } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { AlertCircle, ArrowUp, ArrowDown, ArrowUpRight, BellRing } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
@@ -13,6 +13,7 @@ import { useTheme } from "next-themes"
 import { EmptyState } from "@/components/ui/empty-state"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { ConfidenceBadge } from "@/components/ui/confidence-badge"
+import { VideoThumb } from "@/components/ui/video-thumb"
 import { useActiveBrand } from "@/features/brands/context"
 import {
   useDashboardSummary, useInfluencers, useMentionActivity, useSentimentEvolution,
@@ -23,6 +24,8 @@ import { useVideosFeed } from "@/lib/api/videos"
 import { SEVERITY_LABEL } from "@/lib/alerts"
 import { tEnum } from "@/i18n/enums"
 import { classificationChip } from "@/lib/chip"
+import { formatScore, scoreColor } from "@/lib/score"
+import { stagger } from "@/lib/motion"
 
 function getGreeting(): string {
   const h = new Date().getHours()
@@ -45,9 +48,7 @@ function getTodayLabel(now: Date = new Date()): string {
 }
 
 const nf = new Intl.NumberFormat("pt-BR")
-
-/** Escalonamento das entradas: `style={stagger(n)}`. */
-const stagger = (i: number) => ({ "--i": i }) as CSSProperties
+const nf1 = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 })
 
 export default function DashboardPage() {
   const { user } = useAuth()
@@ -77,6 +78,16 @@ export default function DashboardPage() {
 
   const dayLabels = points.map((p) => `${p.date.slice(8, 10)}/${p.date.slice(5, 7)}`)
   const sparkVolume = points.slice(-14).map((p) => p.positive + p.neutral + p.negative)
+
+  /** Média por dia e o dia de pico — o que o total do título não conta. */
+  const ritmo = useMemo(() => {
+    if (points.length === 0 || dist.total === 0) return null
+    const porDia = points.map((p) => p.positive + p.neutral + p.negative)
+    const pico = Math.max(...porDia)
+    const iPico = porDia.indexOf(pico)
+    const d = points[iPico].date
+    return { media: dist.total / points.length, pico, picoDia: `${d.slice(8, 10)}/${d.slice(5, 7)}` }
+  }, [points, dist.total])
   const recent = feed.data?.pages[0]?.items.slice(0, 6) ?? []
 
   // ── Estados de topo ───────────────────────────────────────────────────
@@ -140,17 +151,22 @@ export default function DashboardPage() {
 
       {/* Faixa de números */}
       <section className="grid grid-cols-2 xl:grid-cols-4 border-b border-border-soft">
-        <KpiCell i={0} label="Menções · 30d" loading={summary.isLoading} className="border-r border-b xl:border-b-0">
-          {s && (
-            <>
-              <BigNumber color="var(--color-teal-500)">
-                <CountUp value={s.totalMentions} format={(n) => nf.format(Math.round(n))} />
-              </BigNumber>
-              {sparkVolume.length > 1 && (
-                <div className="mt-4"><Sparkline data={sparkVolume} height={28} color="#00A799" /></div>
-              )}
-            </>
-          )}
+        {/* Média por dia, e não o total: o total já é o título da página, e repeti-lo
+            aqui gastava a coluna mais visível com o número que a pessoa acabou de ler. */}
+        <KpiCell i={0} label="Média diária · 30d" loading={evolution.isLoading} className="border-r border-b xl:border-b-0">
+          <div className="flex items-end justify-between gap-4">
+            <BigNumber color="var(--color-teal-500)">
+              {ritmo == null ? "—" : <CountUp value={ritmo.media} format={(n) => nf1.format(n)} />}
+            </BigNumber>
+            {sparkVolume.length > 1 && (
+              <div className="w-28 shrink-0"><Sparkline data={sparkVolume} height={30} color="#00A799" /></div>
+            )}
+          </div>
+          <div className="text-[11.5px] text-ink-muted mt-3">
+            {ritmo == null
+              ? "sem menções no período"
+              : `menções por dia · pico de ${ritmo.pico} em ${ritmo.picoDia}`}
+          </div>
         </KpiCell>
 
         <KpiCell i={1} label="Score médio" loading={summary.isLoading} className="xl:border-r border-b xl:border-b-0">
@@ -158,9 +174,9 @@ export default function DashboardPage() {
             <>
               <div className="flex items-baseline gap-2">
                 <BigNumber color={s.totalMentions > 0 ? scoreColor(s.avgScore) : "var(--ink)"}>
-                  <CountUp value={s.avgScore} format={(n) => n.toFixed(2)} />
+                  <CountUp value={s.avgScore} format={(n) => formatScore(n)} />
                 </BigNumber>
-                <span className="font-mono-zoe text-[11px] text-ink-muted">de 1.00</span>
+                <span className="font-mono-zoe text-[11px] text-ink-muted">de 1,00</span>
               </div>
               <ScoreGauge value={s.totalMentions > 0 ? s.avgScore : null} />
             </>
@@ -259,13 +275,6 @@ export default function DashboardPage() {
             Ver todas →
           </Link>
         </div>
-        <div className="hidden md:grid gap-4 px-8 pb-2 font-mono-zoe text-[10px] uppercase tracking-[0.12em] text-ink-muted-2" style={{ gridTemplateColumns: RECENT_COLUMNS }}>
-          <span>Vídeo</span>
-          <span>Cobertura</span>
-          <span>Tom</span>
-          <span className="text-right">Views</span>
-          <span className="text-right">Score</span>
-        </div>
         {feed.isLoading ? (
           <RecentSkeleton />
         ) : feed.isError ? (
@@ -277,47 +286,56 @@ export default function DashboardPage() {
             hint="Assim que o pipeline analisar vídeos que a citam, as menções mais recentes aparecem aqui."
           />
         ) : (
-          recent.map((m, i) => (
-            <button
-              key={m.analysisId}
-              onClick={() => navigate("/intelligence/monitoring")}
-              className="z-row z-rise grid items-center gap-4 px-8 py-3.5 border-t border-border-soft w-full text-left cursor-pointer"
-              style={{ gridTemplateColumns: RECENT_COLUMNS, ...stagger(6 + i) }}
-            >
-              <div className="min-w-0">
-                <div className="text-[13.5px] font-medium truncate mb-0.5" style={{ color: "var(--ink)" }}>{m.title}</div>
-                <div className="flex items-center gap-2 text-[11.5px] text-ink-muted">
-                  <span className="truncate">{m.channelName}</span>
-                  <span>·</span>
-                  <span className="shrink-0">{formatDistanceToNow(new Date(m.publishedAt), { addSuffix: true, locale: ptBR })}</span>
+          /* Cartões com a miniatura, e não uma tabela: a lista em colunas é o que o
+             Monitoramento já faz melhor — aqui a pergunta é "o que saiu agora". */
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 px-8 pb-7">
+            {recent.map((m, i) => (
+              <button
+                key={m.analysisId}
+                onClick={() => navigate("/intelligence/monitoring")}
+                className="z-rise group text-left rounded-lg border border-border-soft overflow-hidden bg-surface hover:border-teal-500 hover:bg-hover transition-colors cursor-pointer"
+                style={stagger(6 + i)}
+              >
+                <div className="flex gap-3 p-3">
+                  <VideoThumb
+                    youtubeVideoId={m.youtubeVideoId}
+                    durationSeconds={m.durationSeconds}
+                    className="w-28 h-16"
+                    playSize={18}
+                  />
+                  <div className="flex-1 min-w-0 flex flex-col">
+                    <div className="text-[13px] font-medium leading-snug line-clamp-2 text-ink">{m.title}</div>
+                    <div className="text-[11px] text-ink-muted truncate mt-1">
+                      {m.channelName} · {formatDistanceToNow(new Date(m.publishedAt), { addSuffix: true, locale: ptBR })}
+                    </div>
+                    <div className="flex-1" />
+                    <div className="flex items-baseline gap-2 mt-2">
+                      <span
+                        className="font-display text-[17px] leading-none"
+                        style={{ color: m.score != null ? scoreColor(m.score) : "var(--ink-muted)" }}
+                      >
+                        {formatScore(m.score)}
+                      </span>
+                      {m.classificacao && (
+                        <span className={`${classificationChip(m.classificacao)} h-4.5 text-[10.5px]`}>
+                          {tEnum("classification", m.classificacao)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div><ConfidenceBadge pipelinePath={m.pipelinePath} confidence={m.confidence} /></div>
-              <div>
-                {m.classificacao && (
-                  <span className={classificationChip(m.classificacao)}>
-                    {tEnum("classification", m.classificacao)}
+                {/* Rodapé do cartão: o que a leitura do score assume (cobertura) e o
+                    tamanho da audiência. Separado por linha, como os blocos da página. */}
+                <div className="flex items-center gap-2 px-3 py-2 border-t border-border-soft bg-inset">
+                  <ConfidenceBadge pipelinePath={m.pipelinePath} confidence={m.confidence} />
+                  <span className="flex-1" />
+                  <span className="font-mono-zoe text-[10.5px] text-ink-muted-2">
+                    {m.views != null ? `${compact(m.views)} views` : "sem views"}
                   </span>
-                )}
-              </div>
-              <div className="text-right font-mono-zoe text-[12px] text-ink-muted">
-                {m.views != null ? compact(m.views) : "—"}
-              </div>
-              <div className="flex items-center justify-end gap-2">
-                {m.score != null && (
-                  <span className="hidden lg:block w-10 h-[3px] rounded-full bg-tint-2 overflow-hidden">
-                    <span
-                      className="block h-full rounded-full z-grow-x"
-                      style={{ width: `${Math.round(m.score * 100)}%`, background: scoreColor(m.score), ...stagger(6 + i) }}
-                    />
-                  </span>
-                )}
-                <span className="font-mono-zoe text-[13px]" style={{ color: m.score != null ? scoreColor(m.score) : "var(--ink-muted)" }}>
-                  {m.score != null ? m.score.toFixed(2) : "—"}
-                </span>
-              </div>
-            </button>
-          ))
+                </div>
+              </button>
+            ))}
+          </div>
         )}
       </section>
 
@@ -345,8 +363,6 @@ export default function DashboardPage() {
     </div>
   )
 }
-
-const RECENT_COLUMNS = "minmax(0,1fr) 170px 110px 64px 96px"
 
 // ── Abertura ────────────────────────────────────────────────────────────
 
@@ -392,7 +408,7 @@ function Briefing({ brandName, loading, total, delta, avgScore, pctPos, unread }
       : `Volume ${Math.abs(delta)}% ${delta > 0 ? "acima" : "abaixo"} dos 30 dias anteriores`
   const partes = [
     tendencia,
-    avgScore != null && `score médio de ${avgScore.toFixed(2)}`,
+    avgScore != null && `score médio de ${formatScore(avgScore)}`,
     pctPos != null && `${pctPos}% das menções em tom positivo`,
   ].filter(Boolean) as string[]
   const frase = partes.length > 1
@@ -467,16 +483,20 @@ function Delta({ value }: { value: number }) {
   const positive = value >= 0
   const Icon = positive ? ArrowUp : ArrowDown
   const color = value === 0 ? "var(--ink)" : positive ? "var(--color-pos)" : "var(--color-neg)"
+  const bg = positive ? "var(--pos-bg)" : "var(--neg-bg)"
   return (
     <>
-      <BigNumber color={color}>
-        <CountUp value={value} format={(n) => `${n >= 0 ? "+" : ""}${Math.round(n)}%`} />
-      </BigNumber>
-      <div className="mt-4">
-        <span className={`chip ${value === 0 ? "" : positive ? "chip-pos" : "chip-neg"}`}>
-          {value !== 0 && <Icon className="w-2.5 h-2.5" />} vs. 30d anteriores
-        </span>
+      <div className="flex items-center gap-2.5">
+        <BigNumber color={color}>
+          <CountUp value={value} format={(n) => `${n >= 0 ? "+" : ""}${Math.round(n)}%`} />
+        </BigNumber>
+        {value !== 0 && (
+          <span className="w-6 h-6 rounded-full flex items-center justify-center z-fade" style={{ background: bg, color }}>
+            <Icon className="w-3.5 h-3.5" strokeWidth={2.5} />
+          </span>
+        )}
       </div>
+      <div className="text-[11.5px] text-ink-muted mt-3">contra os 30 dias anteriores</div>
     </>
   )
 }
@@ -634,14 +654,18 @@ function ActivityHeatmap({ data, loading }: { data?: MentionActivity; loading: b
 
 function TopInfluencers({ rows, loading }: { rows: Influencer[]; loading: boolean }) {
   const top = rows.slice(0, 5)
-  const maxReach = Math.max(...top.map((r) => r.reach), 1)
+  // A barra mede MENÇÕES porque é por menções que a API ordena (depois alcance).
+  // Medindo alcance, o 1º da lista aparecia com a barra menor que o 3º.
+  const maxMentions = Math.max(...top.map((r) => r.mentions), 1)
 
   return (
     <div>
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="eyebrow">Quem mais fala</div>
-          <div className="text-[12px] text-ink-muted mt-1 mb-4">Top 5 canais por alcance · 30 dias</div>
+          <div className="text-[12px] text-ink-muted mt-1 mb-4">
+            Top 5 canais por número de menções · 30 dias
+          </div>
         </div>
         <Link to="/intelligence/influencers" className="text-[12.5px] text-teal-700 dark:text-teal-300 hover:text-teal-500 font-medium shrink-0">
           Ver todos →
@@ -670,19 +694,24 @@ function TopInfluencers({ rows, loading }: { rows: Influencer[]; loading: boolea
               <div className="flex-1 min-w-0">
                 <div className="flex items-baseline justify-between gap-3">
                   <span className="text-[13px] font-medium truncate text-ink">{inf.name}</span>
-                  <span className="font-mono-zoe text-[12px] shrink-0" style={{ color: scoreColor(inf.avgScore) }}>
-                    {inf.avgScore.toFixed(2)}
+                  {/* Cada número dito por extenso: "67 · 4 menções" fazia o alcance
+                      parecer contagem de menção. */}
+                  <span className="text-[11.5px] text-ink-muted shrink-0">
+                    {inf.mentions} {inf.mentions === 1 ? "menção" : "menções"}
                   </span>
                 </div>
                 <div className="flex items-center gap-2.5 mt-1.5">
                   <span className="flex-1 h-[3px] rounded-full bg-tint-2 overflow-hidden">
                     <span
                       className="block h-full rounded-full bg-teal-500 z-grow-x"
-                      style={{ width: `${Math.max(4, Math.round((inf.reach / maxReach) * 100))}%`, ...stagger(8 + i) }}
+                      style={{ width: `${Math.max(4, Math.round((inf.mentions / maxMentions) * 100))}%`, ...stagger(8 + i) }}
                     />
                   </span>
-                  <span className="font-mono-zoe text-[10.5px] text-ink-muted shrink-0">
-                    {compact(inf.reach)} · {inf.mentions} {inf.mentions === 1 ? "menção" : "menções"}
+                  <span className="text-[10.5px] text-ink-muted-2 shrink-0">
+                    <span className="font-mono-zoe">{compact(inf.reach)}</span> views ·{" "}
+                    score <span className="font-mono-zoe" style={{ color: scoreColor(inf.avgScore) }}>
+                      {formatScore(inf.avgScore)}
+                    </span>
                   </span>
                 </div>
               </div>
@@ -692,13 +721,6 @@ function TopInfluencers({ rows, loading }: { rows: Influencer[]; loading: boolea
       )}
     </div>
   )
-}
-
-/** A escala do domínio é [0,1] — o neutro é 0,5, não zero. */
-function scoreColor(score: number): string {
-  if (score >= 0.6) return "var(--color-pos)"
-  if (score <= 0.4) return "var(--color-neg)"
-  return "var(--ink-muted)"
 }
 
 function compact(n: number): string {
@@ -726,11 +748,15 @@ function PageSkeleton() {
 
 function RecentSkeleton() {
   return (
-    <div>
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="flex items-center gap-4 px-8 py-3.5 border-t border-border-soft">
-          <div className="flex-1 space-y-2"><div className="h-3.5 w-2/3 rounded z-skeleton" /><div className="h-3 w-1/3 rounded z-skeleton" /></div>
-          <div className="h-5 w-24 rounded z-skeleton" />
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 px-8 pb-7">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="rounded-lg border border-border-soft p-3 flex gap-3">
+          <div className="w-28 h-16 rounded-md z-skeleton shrink-0" />
+          <div className="flex-1 space-y-2">
+            <div className="h-3.5 w-11/12 rounded z-skeleton" />
+            <div className="h-3 w-1/2 rounded z-skeleton" />
+            <div className="h-4 w-20 rounded z-skeleton" />
+          </div>
         </div>
       ))}
     </div>

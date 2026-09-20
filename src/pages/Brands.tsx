@@ -23,6 +23,7 @@ import {
 import { isArchived, partitionBrands } from "@/lib/brands"
 import { useDashboardSummary } from "@/lib/api/dashboard"
 import { useActiveBrand } from "@/features/brands/context"
+import { formatScore } from "@/lib/score"
 
 // Paleta do design (brand-modal.jsx) para o seletor de cor.
 const PALETTE = ["#00A799", "#8B5CF6", "#EF4444", "#2563EB", "#F59E0B", "#14B8A6", "#EC4899"]
@@ -412,7 +413,7 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
   const metrics = [
     { label: "Vídeos · 30d", value: String(brand.videoCount30d) },
     { label: "Menções · 30d", value: s ? String(s.totalMentions) : "—" },
-    { label: "Score médio", value: s ? s.avgScore.toFixed(2) : "—" },
+    { label: "Score médio", value: s ? formatScore(s.avgScore) : "—" },
     { label: "Variação · 30d", value: s ? `${s.deltaPct30d >= 0 ? "+" : ""}${s.deltaPct30d}%` : "—", kind: s ? (s.deltaPct30d >= 0 ? "pos" : "neg") : undefined },
   ]
 

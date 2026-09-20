@@ -19,6 +19,7 @@ import { looksMisconfigured } from "@/lib/admin-curation"
 import { useCurationDraft } from "@/components/admin/curation-draft"
 import { CurationCard, CurationEditor } from "@/components/admin/CurationEditor"
 import { BrandEditModal } from "@/components/admin/BrandEditModal"
+import { formatScore } from "@/lib/score"
 
 /**
  * Curadoria admin de brands (ADR-021). É o **mecanismo de cura** do modelo de
@@ -309,7 +310,7 @@ function VerificationPanel({ brandId, queueItem }: { brandId: string; queueItem:
                 <span className="text-[13px] truncate flex-1" style={{ color: "var(--ink-2)" }}>{a.videoTitle}</span>
                 <span className="font-mono-zoe text-[11px] text-ink-muted shrink-0">{a.nerMode}</span>
                 <span className="font-mono-zoe text-[12px] shrink-0" style={{ color: "var(--ink)" }}>
-                  {a.score != null ? a.score.toFixed(2) : "—"}
+                  {formatScore(a.score)}
                 </span>
               </div>
             ))}

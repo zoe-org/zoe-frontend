@@ -343,6 +343,11 @@
   from { stroke-dashoffset: 1; }
   to { stroke-dashoffset: 0; }
 }
+/* Anel de score: `--arc` é a fração preenchida (dasharray "<arc> 1"). */
+@keyframes z-arc {
+  from { stroke-dashoffset: var(--arc, 1); }
+  to { stroke-dashoffset: 0; }
+}
 @keyframes z-wipe {
   from { clip-path: inset(0 100% 0 0); }
   to { clip-path: inset(0 0 0 0); }
@@ -352,29 +357,35 @@
   to { background-position: -50% 0; }
 }
 
+/* `backwards` e não `both`: o estado inicial vale durante o atraso, e ao terminar
+   o elemento volta ao seu próprio estilo — em vez de ficar preso no último quadro,
+   o que mantém uma camada de composição viva e atrapalha até a captura de tela. */
 @layer components {
   .z-rise {
-    animation: z-rise 0.6s var(--ease-out) both;
+    animation: z-rise 0.6s var(--ease-out) backwards;
     animation-delay: calc(var(--i, 0) * 55ms);
   }
   .z-fade {
-    animation: z-fade 0.5s var(--ease-out) both;
+    animation: z-fade 0.5s var(--ease-out) backwards;
     animation-delay: calc(var(--i, 0) * 12ms);
   }
   .z-grow-x {
     transform-origin: left center;
-    animation: z-grow-x 0.9s var(--ease-out) both;
+    animation: z-grow-x 0.9s var(--ease-out) backwards;
     animation-delay: calc(150ms + var(--i, 0) * 70ms);
   }
   /* Traço que se desenha: o path precisa de pathLength="1". */
   .z-draw {
     stroke-dasharray: 1;
-    animation: z-draw 1.3s var(--ease-io) both;
+    animation: z-draw 1.3s var(--ease-io) backwards;
     animation-delay: 120ms;
+  }
+  .z-arc {
+    animation: z-arc 1s var(--ease-io) backwards;
   }
   /* Revela da esquerda para a direita, como o tempo corre no eixo. */
   .z-wipe {
-    animation: z-wipe 1.1s var(--ease-io) both;
+    animation: z-wipe 1.1s var(--ease-io) backwards;
   }
   .z-skeleton {
     background: linear-gradient(90deg, var(--tint) 30%, var(--tint-2) 50%, var(--tint) 70%);
@@ -406,7 +417,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .z-rise, .z-fade, .z-grow-x, .z-draw, .z-wipe, .z-skeleton {
+  .z-rise, .z-fade, .z-grow-x, .z-draw, .z-arc, .z-wipe, .z-skeleton {
     animation: none !important;
   }
   .z-row::before {

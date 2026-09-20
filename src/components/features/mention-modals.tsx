@@ -9,6 +9,7 @@ import { useAnalysisComments, type CommentAggregate } from "@/lib/api/analyses"
 import { useVideoTranscript, type TranscriptPreview } from "@/lib/api/videos"
 import { tEnum } from "@/i18n/enums"
 import { classificationChip } from "@/lib/chip"
+import { formatScore } from "@/lib/score"
 
 /**
  * Modais de leitura longa do detalhe da menção (`src/mention-modals.jsx`):
@@ -332,7 +333,7 @@ export function CommentsModal({
                   <span className="inline-flex items-center gap-1">
                     <ThumbsUp className="w-3 h-3" /> {compactNumber(c.likesCount)}
                   </span>
-                  <span className="font-mono-zoe">score {c.score.toFixed(2)}</span>
+                  <span className="font-mono-zoe">score {formatScore(c.score)}</span>
                 </div>
               </div>
             </div>

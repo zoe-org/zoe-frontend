@@ -11,6 +11,8 @@ import { useAnalysisComments, useAnalysisDetail } from "@/lib/api/analyses"
 import { hasSelfMeasuredScore, useVideoDetail, type VideoListItem } from "@/lib/api/videos"
 import { tEnum } from "@/i18n/enums"
 import { classificationChip } from "@/lib/chip"
+import { formatScore } from "@/lib/score"
+import { stagger } from "@/lib/motion"
 
 // Rótulos das fontes de componente do score 360 (não são enums do domínio — o
 // source é string livre "audio_text"/"visual"/etc.).
@@ -82,13 +84,13 @@ export function MentionDrawer({
           className="sticky top-0 z-10 flex items-center gap-3 px-6 py-4 border-b border-border-soft"
           style={{ background: "var(--surface)" }}
         >
-          <span className="eyebrow">Detalhe da menção</span>
+          <span className="eyebrow">Menção</span>
           <span className="font-mono-zoe text-[10.5px] text-ink-muted-2">#{shortId}</span>
           <button
             type="button"
             onClick={onClose}
             aria-label="Fechar"
-            className="ml-auto p-1.5 -mr-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-tint transition-colors"
+            className="ml-auto w-8 h-8 flex items-center justify-center rounded-full border border-border-soft text-ink-muted hover:text-ink hover:bg-tint transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -138,46 +140,39 @@ export function MentionDrawer({
             </a>
           </div>
 
-          {/* Painel de análise Zoe */}
+          {/* Leitura Zoe: o número primeiro, e logo ao lado o que ele assume. */}
           <div className="rounded-xl border border-border-soft p-5 bg-inset">
             <div className="flex items-center justify-between mb-4">
-              <span className="eyebrow">Análise Zoe</span>
+              <span className="eyebrow">Leitura Zoe</span>
               <span className="chip chip-primary inline-flex items-center gap-1 text-[10px]">
                 <Sparkles className="w-2.5 h-2.5" /> IA
               </span>
             </div>
-            <div className="grid grid-cols-3 gap-5">
-              <PanelCell label="Sentimento">
-                <div className="flex items-baseline gap-2">
-                  <span className="font-display text-[26px] leading-none" style={{ color: scoreColor(item.classificacao) }}>
-                    {item.score != null ? item.score.toFixed(2) : "—"}
-                  </span>
-                </div>
-                {item.classificacao && (
-                  <span className={`mt-1.5 ${classificationChip(item.classificacao)}`}>
-                    {tEnum("classification", item.classificacao)}
-                  </span>
-                )}
-              </PanelCell>
-              <PanelCell label="Confiança">
-                <span className="font-display text-[26px] leading-none" style={{ color: "var(--ink)" }}>
-                  {item.confidence != null ? Math.round(item.confidence * 100) : "—"}
-                  {item.confidence != null && <span className="text-[14px] text-ink-muted">%</span>}
-                </span>
-              </PanelCell>
-              <PanelCell label="Cobertura">
-                {/* O mesmo selo da lista, e não um texto solto: ele carrega o
-                    tooltip e a ressalva de score auto-medido (vídeo do canal da
-                    própria marca), que aqui — onde o número aparece grande — é
-                    justamente onde não pode faltar. */}
-                <div className="mt-1">
+            <div className="flex items-center gap-5">
+              <ScoreRing score={hasSelfMeasuredScore(item) ? null : item.score} classificacao={item.classificacao} />
+              <div className="min-w-0 flex flex-col gap-2.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {item.classificacao && (
+                    <span className={classificationChip(item.classificacao)}>
+                      {tEnum("classification", item.classificacao)}
+                    </span>
+                  )}
+                  {/* O mesmo selo da lista, e não um texto solto: ele carrega o
+                      tooltip e a ressalva de score auto-medido (vídeo do canal da
+                      própria marca), que aqui — onde o número aparece grande — é
+                      justamente onde não pode faltar. */}
                   <ConfidenceBadge
                     pipelinePath={item.pipelinePath}
                     confidence={item.confidence}
                     selfMeasured={hasSelfMeasuredScore(item)}
                   />
                 </div>
-              </PanelCell>
+                <div className="text-[12.5px] text-ink-muted">
+                  {item.confidence != null
+                    ? <>Confiança da análise: <span className="font-mono-zoe text-ink-2">{Math.round(item.confidence * 100)}%</span></>
+                    : "Sem medida de confiança para esta análise."}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -197,11 +192,14 @@ export function MentionDrawer({
                         <span className="w-24 shrink-0 text-ink-muted">
                           {SOURCE_LABEL[c.source] ?? c.source}
                         </span>
-                        <div className="flex-1 h-1.5 rounded-full bg-tint overflow-hidden">
-                          <div className="h-full bg-teal-500" style={{ width: `${Math.round(c.value * 100)}%` }} />
+                        <div className="flex-1 h-1.5 rounded-full bg-tint-2 overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-teal-500 z-grow-x"
+                            style={{ width: `${Math.round(c.value * 100)}%`, ...stagger(i) }}
+                          />
                         </div>
-                        <span className="font-mono-zoe text-[11px] text-ink-muted w-10 text-right">
-                          {c.value.toFixed(2)}
+                        <span className="font-mono-zoe text-[11px] text-ink-2 w-10 text-right">
+                          {formatScore(c.value)}
                         </span>
                       </div>
                     ))}
@@ -308,7 +306,7 @@ export function MentionDrawer({
                         title={k.origin === "custom" ? "Keyword do seu tenant" : "Base"}
                       >
                         {k.keyword}
-                        <span className="font-mono-zoe text-[10px] text-ink-muted">{k.score.toFixed(2)}</span>
+                        <span className="font-mono-zoe text-[10px] text-ink-muted">{formatScore(k.score)}</span>
                         {k.origin === "custom" && <span className="w-1.5 h-1.5 rounded-full bg-teal-500" />}
                       </span>
                     ))}
@@ -339,7 +337,7 @@ export function MentionDrawer({
             href={youtubeUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 h-10 rounded-lg text-white text-[13.5px] font-medium bg-teal-500 hover:bg-teal-600 transition-colors"
+            className="flex items-center justify-center gap-2 h-10 rounded-lg text-midnight text-[13.5px] font-semibold bg-teal-500 hover:brightness-110 transition-[filter]"
           >
             <ExternalLink className="w-4 h-4" /> Abrir no YouTube
           </a>
@@ -369,11 +367,38 @@ export function MentionDrawer({
   )
 }
 
-function PanelCell({ label, children }: { label: string; children: React.ReactNode }) {
+/**
+ * Score em anel. O arco vai de 0 a 1 — a escala do domínio —, com o 0,5 marcado:
+ * sem essa marca, um 0,52 em anel parece "metade ruim" quando é neutro.
+ *
+ * `score` null = owned pelo path pesado (número existe, mas não mede audiência)
+ * ou análise sem score; o anel fica vazio em vez de fingir leitura.
+ */
+function ScoreRing({ score, classificacao }: { score: number | null; classificacao: string | null }) {
+  const cor = score == null ? "var(--ink-muted-2)" : scoreColor(classificacao)
+  const arc = score ?? 0
   return (
-    <div>
-      <div className="text-[11px] text-ink-muted mb-1.5">{label}</div>
-      {children}
+    <div className="relative w-22 h-22 shrink-0">
+      <svg viewBox="0 0 88 88" className="w-22 h-22 -rotate-90">
+        <circle cx="44" cy="44" r="38" fill="none" stroke="var(--tint-2)" strokeWidth="7" />
+        {score != null && (
+          <circle
+            cx="44" cy="44" r="38" fill="none" stroke={cor} strokeWidth="7" strokeLinecap="round"
+            pathLength={1}
+            strokeDasharray={`${arc} 1`}
+            className="z-arc"
+            style={{ "--arc": arc } as React.CSSProperties}
+          />
+        )}
+        {/* Marca do neutro (0,5): meia volta a partir do topo. */}
+        <line x1="44" y1="2" x2="44" y2="10" stroke="var(--border-soft)" strokeWidth="2" transform="rotate(180 44 44)" />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="font-display text-[21px] leading-none" style={{ color: cor }}>
+          {formatScore(score)}
+        </span>
+        <span className="font-mono-zoe text-[9px] text-ink-muted-2 mt-1">de 1,00</span>
+      </div>
     </div>
   )
 }
@@ -382,7 +407,7 @@ function Section({ title, aside, children }: { title: string; aside?: React.Reac
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <h4 className="text-xs font-semibold text-ink-muted uppercase tracking-wide">{title}</h4>
+        <h4 className="eyebrow">{title}</h4>
         {aside}
       </div>
       {children}
@@ -392,9 +417,9 @@ function Section({ title, aside, children }: { title: string; aside?: React.Reac
 
 function DrawerSkeleton() {
   return (
-    <div className="space-y-3 animate-pulse">
+    <div className="space-y-3">
       {[0, 1, 2].map((i) => (
-        <div key={i} className="h-3 rounded bg-tint" style={{ width: `${90 - i * 15}%` }} />
+        <div key={i} className="h-3 rounded z-skeleton" style={{ width: `${90 - i * 15}%` }} />
       ))}
     </div>
   )

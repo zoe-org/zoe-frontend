@@ -3,7 +3,7 @@ import { NavLink, Link, Outlet, useLocation, useNavigate } from "react-router-do
 import {
   LayoutDashboard, Activity, Smile, ChartPie, Users, Bell, Gauge, Megaphone, UsersRound,
   FileText, Package, Vault, Tag, FileChartColumn, Settings, UserCog,
-  Search, PanelLeftClose, PanelLeftOpen, ChevronsUpDown,
+  PanelLeftClose, PanelLeftOpen, ChevronsUpDown, UserRound, Palette, CreditCard,
   Sun, Moon, LogOut, Check, Plus, ShieldCheck, AlertCircle,
   type LucideIcon,
 } from "lucide-react"
@@ -120,8 +120,96 @@ function tenantColor(id: string) {
   return TENANT_PALETTE[Math.abs(h) % TENANT_PALETTE.length]
 }
 
+/**
+ * Seletor de workspace no topo da sidebar. Trocar aqui recarrega o contexto
+ * inteiro (marcas, features, cobrança), então ele fica visível — e não escondido
+ * dentro do menu do usuário, onde ninguém procurava por ele.
+ */
+function WorkspaceSwitcher({ collapsed }: { collapsed: boolean }) {
+  const { activeTenantId, memberships, role } = useAuth()
+  const switchWorkspace = useSwitchWorkspace()
+  const openSettings = useOpenSettings()
+
+  const atual = memberships.find((m) => m.tenantId === activeTenantId)
+  if (!atual) return null
+
+  const cor = tenantColor(atual.tenantId)
+  const inicial = atual.tenantName.charAt(0).toUpperCase()
+
+  return (
+    <div className={collapsed ? "px-2 pb-2" : "px-3 pb-3"}>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            aria-label="Trocar de workspace"
+            title={collapsed ? atual.tenantName : undefined}
+            className={`w-full flex items-center rounded-lg border border-border-soft bg-surface hover:bg-hover transition-colors cursor-pointer ${collapsed ? "justify-center p-1.5" : "gap-2.5 p-2"}`}
+          >
+            <span
+              className="w-7 h-7 rounded-md shrink-0 flex items-center justify-center text-[12px] font-bold text-white"
+              style={{ backgroundColor: cor }}
+            >
+              {inicial}
+            </span>
+            {!collapsed && (
+              <>
+                <span className="flex-1 min-w-0 text-left">
+                  <span className="block text-[13px] font-semibold text-ink truncate">{atual.tenantName}</span>
+                  <span className="block text-[11px] text-ink-muted truncate">{role ?? atual.role}</span>
+                </span>
+                <ChevronsUpDown className="w-3.5 h-3.5 text-ink-muted-2 shrink-0" />
+              </>
+            )}
+          </button>
+        </DropdownMenuTrigger>
+
+        <DropdownMenuContent align="start" side={collapsed ? "right" : "bottom"} className="w-60">
+          <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-ink-muted font-semibold">
+            Workspaces
+          </DropdownMenuLabel>
+          {memberships.map((m) => {
+            const isActive = m.tenantId === activeTenantId
+            return (
+              <DropdownMenuItem
+                key={m.tenantId}
+                onSelect={() => { if (!isActive) switchWorkspace(m.tenantId) }}
+                className="flex items-center gap-2.5 cursor-pointer"
+              >
+                <span
+                  className="w-6 h-6 rounded-md shrink-0 flex items-center justify-center text-[11px] font-bold text-white"
+                  style={{ backgroundColor: tenantColor(m.tenantId) }}
+                >
+                  {m.tenantName.charAt(0).toUpperCase()}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[13px] font-medium truncate">{m.tenantName}</div>
+                  <div className="text-[11px] text-ink-muted truncate">{m.role}</div>
+                </div>
+                {isActive && <Check className="w-4 h-4 text-teal-500 shrink-0" />}
+              </DropdownMenuItem>
+            )
+          })}
+
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="flex items-center gap-2 text-sm cursor-pointer"
+            onSelect={() => openSettings("workspace")}
+          >
+            <Settings className="w-4 h-4 text-ink-muted" /> Gerenciar workspace
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link to="/onboarding/tenant" className="flex items-center gap-2 text-sm cursor-pointer">
+              <Plus className="w-4 h-4 text-ink-muted" /> Criar novo workspace
+            </Link>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  )
+}
+
 export function AppShell() {
-  const { user, role, signOut, activeTenantId, memberships, isZoeAdmin } = useAuth()
+  const { user, role, signOut, isZoeAdmin } = useAuth()
   // WS-F3 — mantém a conexão de tempo real viva pro app inteiro logado (não só
   // Alertas: é daqui que o badge da sidebar recebe o "novo" sem precisar navegar).
   useRealtimeConnection()
@@ -138,7 +226,6 @@ export function AppShell() {
   const location = useLocation()
   const navigate = useNavigate()
   const openSettings = useOpenSettings()
-  const switchWorkspace = useSwitchWorkspace()
   const { resolvedTheme, setTheme } = useTheme()
   const isDark = resolvedTheme === "dark"
 
@@ -167,6 +254,10 @@ export function AppShell() {
             {sidebarOpen ? <PanelLeftClose className="h-5" /> : <PanelLeftOpen className="h-5" />}
           </button>
         </div>
+
+        {/* Workspace: quem você é dentro da conta. Fica ACIMA da navegação porque
+            troca o conteúdo de todas as telas abaixo dele. */}
+        <WorkspaceSwitcher collapsed={collapsed} />
 
         {sidebarOpen && <TrialBadge />}
 
@@ -215,74 +306,61 @@ export function AppShell() {
           )}
         </nav>
 
-        {/* Footer */}
-        <div className="border-t border-border-soft">
+        {/* Rodapé: a PESSOA. O workspace mudou para o topo da sidebar. */}
+        <div className="border-t border-border-soft p-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 aria-label="Menu do usuário"
-                className={`w-[calc(100%-1rem)] p-2 m-2 flex items-center rounded-lg hover:bg-tint cursor-pointer transition-colors text-ink-muted ${sidebarOpen ? "gap-3" : "justify-center"}`}
+                className={`w-full p-1.5 flex items-center rounded-lg hover:bg-tint cursor-pointer transition-colors ${sidebarOpen ? "gap-2.5" : "justify-center"}`}
               >
-                <Avatar className="w-9 h-9 shrink-0">
-                  <AvatarFallback className="bg-teal-500 text-white text-sm font-semibold">
+                <Avatar className="w-8 h-8 shrink-0">
+                  <AvatarFallback className="bg-teal-500 text-white text-[13px] font-semibold">
                     {user?.name?.[0]?.toUpperCase() ?? user?.email?.[0]?.toUpperCase() ?? "U"}
                   </AvatarFallback>
                 </Avatar>
                 {sidebarOpen && (
                   <>
-                    <div className="flex-1 min-w-0 text-[13px] text-left">
-                      <div className="font-semibold text-ink truncate">{user?.name ?? "User"}</div>
-                      <div className="text-ink-muted text-xs truncate">{userContext || "—"}</div>
+                    <div className="flex-1 min-w-0 text-left">
+                      <div className="text-[13px] font-medium text-ink truncate">{user?.name ?? "User"}</div>
+                      <div className="text-[11px] text-ink-muted truncate">{user?.email}</div>
                     </div>
-                    <ChevronsUpDown className="w-4 h-4 text-ink-muted" />
+                    <ChevronsUpDown className="w-3.5 h-3.5 text-ink-muted-2 shrink-0" />
                   </>
                 )}
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent side="top" align="start" className="w-64">
-              <DropdownMenuLabel className="text-xs">
-                <div className="font-semibold truncate">{user?.name ?? "User"}</div>
-                <div className="text-ink-muted font-normal truncate">{user?.email}</div>
+            <DropdownMenuContent side="top" align="start" className="w-60">
+              <DropdownMenuLabel className="flex items-center gap-2.5 py-2">
+                <Avatar className="w-8 h-8 shrink-0">
+                  <AvatarFallback className="bg-teal-500 text-white text-[13px] font-semibold">
+                    {user?.name?.[0]?.toUpperCase() ?? user?.email?.[0]?.toUpperCase() ?? "U"}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="min-w-0">
+                  <span className="block text-[13px] font-semibold truncate">{user?.name ?? "User"}</span>
+                  <span className="block text-[11px] font-normal text-ink-muted truncate">{userContext || user?.email}</span>
+                </span>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
 
-              {/* Workspaces: seleção mudou do topbar pra cá (o topbar agora é da marca). */}
-              {memberships.length > 0 && (
-                <>
-                  <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-ink-muted font-semibold">
-                    Workspaces
-                  </DropdownMenuLabel>
-                  {memberships.map((m) => {
-                    const isActive = m.tenantId === activeTenantId
-                    return (
-                      <DropdownMenuItem
-                        key={m.tenantId}
-                        onSelect={() => { if (!isActive) switchWorkspace(m.tenantId) }}
-                        className="flex items-center gap-2 cursor-pointer"
-                      >
-                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: tenantColor(m.tenantId) }} />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">{m.tenantName}</div>
-                          <div className="text-[11px] text-ink-muted truncate">{m.role}</div>
-                        </div>
-                        {isActive && <Check className="w-4 h-4 text-teal-500 shrink-0" />}
-                      </DropdownMenuItem>
-                    )
-                  })}
-                  <DropdownMenuItem asChild>
-                    <Link to="/onboarding/tenant" className="flex items-center gap-2 text-sm cursor-pointer">
-                      <Plus className="w-4 h-4" /> Criar novo workspace
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                </>
-              )}
-
               <DropdownMenuItem
                 className="flex items-center gap-2 text-sm cursor-pointer"
-                onSelect={() => openSettings()}
+                onSelect={() => openSettings("perfil")}
               >
-                <Settings className="w-4 h-4" /> Configurações
+                <UserRound className="w-4 h-4 text-ink-muted" /> Perfil
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="flex items-center gap-2 text-sm cursor-pointer"
+                onSelect={() => openSettings("aparencia")}
+              >
+                <Palette className="w-4 h-4 text-ink-muted" /> Aparência
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="flex items-center gap-2 text-sm cursor-pointer"
+                onSelect={() => openSettings("plano")}
+              >
+                <CreditCard className="w-4 h-4 text-ink-muted" /> Plano e consumo
               </DropdownMenuItem>
               <DropdownMenuSeparator />
 
@@ -304,20 +382,13 @@ export function AppShell() {
         <header className="h-15 sticky top-0 bg-surface border-b border-border-soft px-6 flex items-center gap-2 shrink-0 z-20">
           <Breadcrumb />
           <div className="flex-1" />
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-ink-muted" />
-            <input
-              type="text"
-              placeholder="Buscar menções, influenciadores, marcas..."
-              className="w-75 h-8 pl-8 pr-3 text-xs  border border-border dark:text-ink rounded-md outline-none focus:ring-1 focus:ring-teal-500"
-            />
-          </div>
+          {/* A busca saiu daqui: o campo não fazia nada. Volta quando existir busca de verdade. */}
           <BrandSwitcher />
           <button
             type="button"
             aria-label={isDark ? "Ativar modo claro" : "Ativar modo escuro"}
+            className="w-8 h-8 flex items-center justify-center rounded-full text-ink-muted hover:text-ink hover:bg-tint transition-colors cursor-pointer"
             onClick={() => setTheme(isDark ? "light" : "dark")}
-            className="text-ink-muted p-2 rounded-md hover:text-ink hover:bg-tint transition-colors cursor-pointer"
           >
             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>

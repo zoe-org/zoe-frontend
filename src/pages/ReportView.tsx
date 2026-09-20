@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom"
 import { ArrowLeft, Printer, AlertCircle } from "lucide-react"
 import { useReport, type ReportBrandSection } from "@/lib/api/reports"
+import { formatScore } from "@/lib/score"
 
 /**
  * View print-friendly de um relatório. É o "PDF" do MVP: o usuário imprime
@@ -125,7 +126,7 @@ export default function ReportViewPage() {
                 {/* KPIs */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-5 mb-7">
                   <Kpi value={`${s.totalMentions}`} label="Menções" />
-                  <Kpi value={s.avgScore.toFixed(2)} label="Sentimento médio" />
+                  <Kpi value={formatScore(s.avgScore)} label="Sentimento médio" />
                   <Kpi value={`${s.positive}`} label="Positivas" color="var(--color-pos)" />
                   <Kpi value={`${s.negative}`} label="Negativas" color="var(--color-neg)" />
                 </div>
@@ -150,7 +151,7 @@ export default function ReportViewPage() {
                               {fmtNum(v.views)} views
                             </td>
                             <td className="py-2.5 pl-4 text-right font-mono-zoe whitespace-nowrap align-top">
-                              {v.score == null ? "—" : v.score.toFixed(2)}
+                              {formatScore(v.score)}
                             </td>
                           </tr>
                         ))}
@@ -173,7 +174,7 @@ export default function ReportViewPage() {
                               {fmtNum(c.reach)} alcance
                             </td>
                             <td className="py-2.5 pl-4 text-right font-mono-zoe whitespace-nowrap">
-                              {c.avgScore.toFixed(2)}
+                              {formatScore(c.avgScore)}
                             </td>
                           </tr>
                         ))}

@@ -6,6 +6,7 @@ import {
 } from "@/lib/alerts"
 import { tEnum } from "@/i18n/enums"
 import type { AlertEvent } from "@/lib/api/alerts"
+import { formatScore } from "@/lib/score"
 
 /**
  * Detalhe do disparo (o `HistoryDrawer` do design). A linha do histórico mostra
@@ -102,7 +103,7 @@ export function AlertEventDrawer({
               <div className="eyebrow mb-2.5">O que a regra viu</div>
               <div className="rounded-lg border border-border-soft divide-y divide-border-soft">
                 {snapshot.score != null && (
-                  <SnapshotRow label="Score da análise" value={snapshot.score.toFixed(2)} />
+                  <SnapshotRow label="Score da análise" value={formatScore(snapshot.score)} />
                 )}
                 {snapshot.classification && (
                   <SnapshotRow label="Classificação" value={tEnum("classification", snapshot.classification)} />
