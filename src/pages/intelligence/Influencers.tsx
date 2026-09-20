@@ -8,6 +8,7 @@ import { EmptyBlock } from "@/components/ui/empty-block"
 import { CountUp } from "@/components/ui/count-up"
 import { InfoHint } from "@/components/ui/info-hint"
 import { SearchBox } from "@/components/ui/search-box"
+import { Stat } from "@/components/ui/stat"
 import { Segmented } from "@/components/ui/segmented"
 import { useActiveBrand } from "@/features/brands/context"
 import { CoverageNotice } from "@/components/coverage/CoverageNotice"
@@ -507,32 +508,6 @@ export default function InfluencersPage() {
 }
 
 // ── Peças ──────────────────────────────────────────────────────────────
-
-/**
- * Número do rail: menor que a manchete da faixa antiga de propósito — aqui ele
- * apoia os destaques, não disputa com eles. A ressalva mora no tooltip.
- */
-function Stat({ label, hint, color, children }: {
-  label: string
-  hint?: string
-  color?: string
-  children: React.ReactNode
-}) {
-  return (
-    <div className="min-w-0">
-      <div className="eyebrow inline-flex items-center gap-1 mb-2">
-        {label}
-        {hint && <InfoHint text={hint} />}
-      </div>
-      <div
-        className="font-display leading-none truncate"
-        style={{ fontSize: 27, color: color ?? "var(--ink)" }}
-      >
-        {children}
-      </div>
-    </div>
-  )
-}
 
 function HighlightRow({
   inf, index, hue, showTrend,

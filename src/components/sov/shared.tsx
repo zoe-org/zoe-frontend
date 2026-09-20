@@ -60,9 +60,9 @@ export function BrandSwatch({ color }: { color: string }) {
 
 export function BlockSkeleton({ rows = 4, h = "h-9" }: { rows?: number; h?: string }) {
   return (
-    <div className="space-y-3 animate-pulse">
+    <div className="space-y-3">
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className={`${h} rounded bg-tint`} />
+        <div key={i} className={`${h} rounded z-skeleton`} />
       ))}
     </div>
   )

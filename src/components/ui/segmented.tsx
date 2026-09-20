@@ -1,11 +1,14 @@
 /**
- * Controle segmentado das barras de trabalho: recorte de uma lista longa,
- * denso e dentro de um trilho.
+ * Controle segmentado das barras de trabalho: denso, dentro de um trilho.
  *
- * Diferente de `TabPill`, que é navegação entre telas/seções e por isso é
- * maior e solto. Este aqui é filtro: mora grudado na lista que governa.
- * Monitoramento e Influenciadores desenhavam esta mesma peça à mão — duas
- * cópias que já começavam a divergir em altura e tamanho de fonte.
+ * A regra contra `TabPill`: se o conteúdo é OUTRO, é navegação e usa `TabPill`
+ * (maior, solto, perto do título) — Alertas trocando Histórico por Regras. Se o
+ * conteúdo é o MESMO e muda só o recorte ou a leitura dele, é este aqui, e mora
+ * na barra grudado no que governa: o sentimento em Monitoramento, o tier em
+ * Influenciadores, as três leituras do Share of Voice.
+ *
+ * As três telas desenhavam esta peça à mão, e as cópias já divergiam em altura
+ * e tamanho de fonte.
  */
 export function Segmented<T extends string>({
   items, value, onChange, ariaLabel,

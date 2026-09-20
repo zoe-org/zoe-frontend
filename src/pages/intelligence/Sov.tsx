@@ -7,7 +7,7 @@ import { SelectFilterChip } from "@/components/ui/select-filter-chip"
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
-import { TabPill } from "@/components/ui/tab-pill"
+import { Segmented } from "@/components/ui/segmented"
 import { CoverageNotice } from "@/components/coverage/CoverageNotice"
 import { PanoramaTab } from "@/components/sov/PanoramaTab"
 import { TopicsTab } from "@/components/sov/TopicsTab"
@@ -112,16 +112,16 @@ export default function SovPage() {
   const ready = !sov.isError && !sov.isLoading && !precisaEscolher && competitors > 0
 
   return (
-    <div className="-m-6 border-t border-border-soft" style={{ background: "var(--surface)", color: "var(--ink)" }}>
-      {/* Hero */}
-      <section className="px-8 pt-7 border-b border-border-soft" style={{ background: "var(--surface)" }}>
-        <div className="flex items-start justify-between gap-6 flex-wrap">
-          <div className="max-w-160 min-w-70">
-            <div className="eyebrow mb-2.5">Intelligence · Competitivo</div>
-            <h1 className="font-display m-0" style={{ fontSize: 34, lineHeight: 1.1, color: "var(--ink)" }}>
+    <div className="-m-6" style={{ background: "var(--surface)", color: "var(--ink)" }}>
+      {/* Abertura */}
+      <section className="px-8 pt-7 pb-6 border-b border-border-soft">
+        <div className="flex items-end justify-between gap-6 flex-wrap">
+          <div className="flex-1 max-w-200 min-w-70">
+            <div className="eyebrow mb-3">Intelligence · Competitivo</div>
+            <h1 className="font-display m-0 text-ink" style={{ fontSize: 34, lineHeight: 1.1 }}>
               Share of Voice
             </h1>
-            <p className="text-[14px] text-ink-muted mt-1.5 mb-0 max-w-140 leading-relaxed">
+            <p className="text-[14.5px] leading-relaxed text-ink-muted mt-2.5 mb-0">
               Quanto da conversa em vídeo sobre o seu setor é sobre a sua marca, frente aos
               concorrentes que você declarou.
             </p>
@@ -144,22 +144,37 @@ export default function SovPage() {
           <button
             onClick={exportCsv}
             disabled={ranked.length === 0}
-            className="inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] rounded-md border border-border-soft hover:bg-hover transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 h-9 px-3.5 text-[13px] rounded-md border border-border-soft hover:bg-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Download className="w-3.5 h-3.5" /> Exportar
           </button>
         </div>
+      </section>
 
-        <div className="flex flex-wrap items-center gap-2 mt-5">
+      {/* Barra de trabalho: a leitura à esquerda, o recorte à direita. Gruda no
+          topo porque as três leituras são longas e trocar de aba no meio da
+          rolagem era subir a página inteira pra encontrar o controle. */}
+      <section
+        className="px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap sticky top-0 z-10"
+        style={{ background: "var(--surface)" }}
+      >
+        <Segmented items={TABS} value={tab} onChange={setTab} ariaLabel="Leitura do share of voice" />
+
+        <div className="flex items-center gap-2 ml-auto">
+          {!precisaEscolher && competitors > 0 && (
+            <span className="text-[12px] text-ink-muted whitespace-nowrap">
+              {competitors} {competitors === 1 ? "concorrente" : "concorrentes"}
+            </span>
+          )}
           {/* O SoV é POR marca própria (ADR-044). Com mais de uma, o seletor é a
               primeira coisa a decidir — o período vem depois. `Select` direto porque o
               `SelectFilterChip` reserva a chave vazia para "todas", e aqui o recorte é
-              obrigatório. */}
+              obrigatório; o visual acompanha o chip à mão. */}
           {ownBrands.length > 1 && (
             <Select value={selectedOwn ?? ""} onValueChange={(v) => setOwnBrandId(v)}>
               <SelectTrigger
                 aria-label="Marca própria do recorte"
-                className={`h-8 rounded-full px-3.5 text-[13px] font-medium border transition-colors ${
+                className={`h-8 rounded-lg px-3.5 text-[13px] font-medium border transition-colors ${
                   selectedOwn
                     ? "border-teal-500 text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-900/25"
                     : "border-warn text-warn"
@@ -176,17 +191,6 @@ export default function SovPage() {
             </Select>
           )}
           <SelectFilterChip value={period} onChange={setPeriod} options={PERIOD_OPTIONS} placeholder="Todo o período" />
-          {!precisaEscolher && competitors > 0 && (
-            <span className="chip text-[12px]">
-              <span className="font-mono-zoe">{competitors}</span> {competitors === 1 ? "concorrente" : "concorrentes"}
-            </span>
-          )}
-        </div>
-
-        <div className="flex flex-wrap gap-1 mt-5 pb-4">
-          {TABS.map((t) => (
-            <TabPill key={t.key} active={tab === t.key} onClick={() => setTab(t.key)} label={t.label} />
-          ))}
         </div>
       </section>
 
@@ -236,6 +240,7 @@ export default function SovPage() {
           hasPreviousPeriod={days > 0}
           trend={trend.data}
           trendLoading={trend.isLoading}
+          onCompare={() => setTab("comparar")}
         />
       )}
     </div>
@@ -246,7 +251,7 @@ export default function SovPage() {
 
 function UpsellScreen() {
   return (
-    <div className="-m-6 border-t border-border-soft" style={{ background: "var(--surface)", color: "var(--ink)" }}>
+    <div className="-m-6" style={{ background: "var(--surface)", color: "var(--ink)" }}>
       <div className="flex flex-col items-center justify-center text-center px-6 py-24 max-w-lg mx-auto">
         <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5" style={{ background: "var(--teal-bg)" }}>
           <Lock className="w-6 h-6" style={{ color: "var(--color-teal-500)" }} />
@@ -273,12 +278,12 @@ function UpsellScreen() {
 
 function BarsSkeleton() {
   return (
-    <section className="px-8 py-7 animate-pulse">
+    <section className="px-8 py-7">
       <div className="flex flex-col gap-4 max-w-3xl">
         {Array.from({ length: 5 }).map((_, i) => (
           <div key={i} className="space-y-2">
-            <div className="h-3.5 w-40 rounded bg-tint" />
-            <div className="h-2 w-full rounded bg-tint" />
+            <div className="h-3.5 w-40 rounded z-skeleton" />
+            <div className="h-2 w-full rounded z-skeleton" />
           </div>
         ))}
       </div>
@@ -290,7 +295,7 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <AlertCircle className="w-10 h-10 text-neg mb-3" />
-      <h3 className="text-lg font-semibold text-midnight dark:text-ink mb-1">Não foi possível carregar</h3>
+      <h3 className="text-lg font-semibold text-ink mb-1">Não foi possível carregar</h3>
       <p className="text-sm text-ink-muted mb-4">Tente novamente em instantes.</p>
       <button onClick={onRetry} className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-hover transition-colors">
         Tentar de novo

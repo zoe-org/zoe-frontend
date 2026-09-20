@@ -392,6 +392,7 @@
   /* Revela da esquerda para a direita, como o tempo corre no eixo. */
   .z-wipe {
     animation: z-wipe 1.1s var(--ease-io) backwards;
+    animation-delay: calc(var(--i, 0) * 55ms);
   }
   .z-skeleton {
     background: linear-gradient(90deg, var(--tint) 30%, var(--tint-2) 50%, var(--tint) 70%);
