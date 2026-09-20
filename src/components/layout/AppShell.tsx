@@ -240,7 +240,11 @@ export function AppShell() {
   }, [sidebarOpen])
 
   return (
-    <div className="min-h-screen flex text-ink bg-surface">
+    // Altura travada na viewport: quem rola é o <main>, e só ele. Com
+    // `min-h-screen` o documento também rolava, e qualquer transbordo
+    // dentro do <main> (as animações de entrada empurram o conteúdo 10px
+    // pra baixo) abria uma segunda barra de rolagem por alguns segundos.
+    <div className="h-screen overflow-hidden flex text-ink bg-surface">
       {/* Sidebar */}
       <aside className={`${sidebarOpen ? "w-60" : "w-14"} transition-[width] duration-300 ease-[cubic-bezier(0.2,0.7,0.1,1)] h-dvh border-r sticky top-0 bg-canvas text-ink-muted border-border-soft flex flex-col overflow-hidden shrink-0`}>
         {/* Logo */}
@@ -396,11 +400,28 @@ export function AppShell() {
         </header>
 
         {/* Content */}
-        <main ref={mainRef} className="flex-1 p-6 overflow-y-auto">
-          <BillingStateBanner />
-          <TrialBanner />
+        {/* O <main> não tem padding de propósito: ele é só o scrollport. Com
+            `p-6` aqui, a caixa de conteúdo começava 24px abaixo da borda e as
+            barras `sticky top-0` das telas grudavam nesse recuo em vez de
+            encostar no header. O respiro mudou pro wrapper de rota, então as 14
+            telas full-bleed seguem cancelando com o mesmo `-m-6`.
+
+            `scrollbar-gutter: stable` reserva a calha desde o primeiro quadro:
+            sem isso o conteúdo pula alguns pixels na horizontal quando a barra
+            aparece. */}
+        <main
+          ref={mainRef}
+          className="flex-1 min-h-0 overflow-y-auto"
+          style={{ scrollbarGutter: "stable" }}
+        >
+          {/* `empty:hidden`: os dois avisos somem na maior parte do tempo, e sem
+              isso o padding deles deixava uma faixa morta no topo. */}
+          <div className="px-6 pt-6 empty:hidden">
+            <BillingStateBanner />
+            <TrialBanner />
+          </div>
           {/* Remonta por rota: cada tela entra com o mesmo movimento curto. */}
-          <div key={location.pathname} className="z-rise">
+          <div key={location.pathname} className="z-rise p-6">
             <Outlet />
           </div>
         </main>

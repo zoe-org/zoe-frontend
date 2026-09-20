@@ -204,7 +204,7 @@ export default function BrandsPage() {
       <div className="grid" style={{ gridTemplateColumns: "340px 1fr", minHeight: "calc(100vh - 200px)" }}>
         {/* Lista */}
         <div className="border-r border-border-soft" style={{ background: "var(--surface)" }}>
-          <div className="px-4 py-3 border-b border-border-soft sticky top-15 z-5" style={{ background: "var(--surface)" }}>
+          <div className="px-4 py-3 border-b border-border-soft sticky top-0 z-5" style={{ background: "var(--surface)" }}>
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-ink-muted" />
               <input

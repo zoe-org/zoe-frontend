@@ -1,12 +1,14 @@
 import { useState, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
 import {
-  Download, TrendingUp, TrendingDown, Minus, ArrowUpDown, ArrowUp, AlertCircle, Users, Search,
+  Download, TrendingUp, TrendingDown, Minus, ArrowUpDown, ArrowUp, AlertCircle, Users, X,
 } from "lucide-react"
 import { EmptyState } from "@/components/ui/empty-state"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { CountUp } from "@/components/ui/count-up"
 import { InfoHint } from "@/components/ui/info-hint"
+import { SearchBox } from "@/components/ui/search-box"
+import { Segmented } from "@/components/ui/segmented"
 import { useActiveBrand } from "@/features/brands/context"
 import { CoverageNotice } from "@/components/coverage/CoverageNotice"
 import { brandVoice } from "@/features/brands/voice"
@@ -137,11 +139,6 @@ export default function InfluencersPage() {
     })
   }
 
-  const maxMentions = useMemo(
-    () => Math.max(...influencers.map((i) => i.mentions), 1),
-    [influencers],
-  )
-
   const advocates = useMemo(
     () => [...influencers].filter((i) => i.avgScore >= FALA_BEM).sort((a, b) => b.avgScore - a.avgScore),
     [influencers],
@@ -152,6 +149,9 @@ export default function InfluencersPage() {
       .sort((a, b) => a.avgScore - b.avgScore),
     [influencers],
   )
+
+  const temRecorte = tier !== "all" || busca.trim() !== ""
+  const limparRecorte = () => trocarRecorte(() => { setTier("all"); setBusca("") })
 
   const tiers: { key: Tier; label: string; count: number }[] = useMemo(() => [
     { key: "all", label: "Todos", count: influencers.length },
@@ -194,49 +194,29 @@ export default function InfluencersPage() {
     <div className="-m-6" style={{ color: "var(--ink)" }}>
       {/* Abertura */}
       <section className="px-8 pt-7 pb-6 border-b border-border-soft">
-        <div className="flex flex-wrap items-start justify-between gap-6">
-          <div className="flex-1 max-w-160 min-w-70">
+        <div className="flex flex-wrap items-end justify-between gap-6">
+          <div className="flex-1 max-w-190 min-w-70">
             <div className="eyebrow mb-3">Intelligence · Pessoas</div>
             <h1 className="font-display m-0 text-ink" style={{ fontSize: 34, lineHeight: 1.1 }}>
               Influenciadores
             </h1>
+            {/* Só o enquadramento: contagem, views e os dois grupos agora têm
+                lugar próprio na faixa abaixo. Repetir aqui gastava duas linhas
+                pra dizer o que o olho lê dois centímetros adiante. */}
             {inf.isLoading ? (
-              <div className="h-4 w-[28rem] max-w-full rounded z-skeleton mt-3" />
-            ) : influencers.length === 0 ? (
-              <p className="text-[14.5px] text-ink-muted mt-2.5 max-w-150">
-                Nenhum canal de terceiros citou {voice.aMarca} nos últimos 30 dias.
-              </p>
+              <div className="h-4 w-96 max-w-full rounded z-skeleton mt-3" />
             ) : (
               <p className="text-[14.5px] leading-relaxed text-ink-muted mt-2.5 max-w-150">
-                <span className="text-ink font-medium">{influencers.length} canais</span> citaram{" "}
-                {voice.aMarca} nos últimos 30 dias, somando{" "}
-                {fmtLargeNumber(totals?.totalReach ?? 0)} de views nos vídeos em que ela aparece.
-                {advocates.length > 0 && ` ${advocates.length} ${advocates.length === 1 ? "fala" : "falam"} bem`}
-                {attention.length > 0 && `, ${attention.length} ${attention.length === 1 ? "merece" : "merecem"} atenção`}
-                {(advocates.length > 0 || attention.length > 0) && "."}
+                {influencers.length === 0
+                  ? `Nenhum canal de terceiros citou ${voice.aMarca} nos últimos 30 dias.`
+                  : `Canais de terceiros que citaram ${voice.aMarca} no YouTube nos últimos 30 dias.`}
               </p>
             )}
-            {/* ADR-035, D4: o canal da própria marca é excluído por definição —
-                sem isto ele apareceria como o maior "influenciador" sobre si mesma,
-                que era exatamente o sintoma que a ADR corrigiu. Não há controle
-                para incluir: seria mudar a definição da métrica, não filtrá-la. */}
-            <p className="text-[11.5px] text-ink-muted-2 mt-3 leading-snug max-w-140">
-              Apenas canais de terceiros do YouTube. {voice.isOwn ? "O seu próprio canal" : `O canal da ${voice.name}`}
-              {" "}não entra neste mapa — ele não é um influenciador sobre {voice.aMarca}.
-            </p>
           </div>
+          {/* A busca não mora aqui: ela recorta a tabela, que começa dois
+              rolamentos abaixo. Junto do título, o controle ficava longe do
+              efeito — agora ela vive na barra de trabalho, colada na lista. */}
           <div className="flex items-center gap-2 shrink-0">
-            <label className="relative">
-              <span className="sr-only">Buscar canal</span>
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-ink-muted-2" />
-              <input
-                type="search"
-                value={busca}
-                onChange={(e) => trocarRecorte(() => setBusca(e.target.value))}
-                placeholder="Buscar canal..."
-                className="w-52 h-9 pl-9 pr-3 text-[13px] rounded-md border border-border-soft bg-transparent outline-none transition-colors focus:border-teal-500"
-              />
-            </label>
             <button
               onClick={handleExport}
               disabled={filtered.length === 0}
@@ -263,46 +243,13 @@ export default function InfluencersPage() {
         />
       ) : (
         <>
-          {/* Faixa de números */}
-          <section className="grid grid-cols-2 xl:grid-cols-4 border-b border-border-soft">
-            <Cell i={0} label="Canais" className="border-r border-b xl:border-b-0">
-              <BigNumber>
-                <CountUp value={influencers.length} format={(n) => nf.format(Math.round(n))} />
-              </BigNumber>
-              <Hint>
-                {influencers.length >= API_CAP
-                  ? "teto da consulta — há mais canais além destes"
-                  : "citaram a marca nos últimos 30 dias"}
-              </Hint>
-            </Cell>
-
-            <Cell i={1} label="Views somadas" className="xl:border-r border-b xl:border-b-0">
-              <BigNumber color="var(--color-teal-500)">{fmtLargeNumber(totals?.totalReach ?? 0)}</BigNumber>
-              <Hint>
-                views dos vídeos que citam a marca — não é a audiência dos canais
-              </Hint>
-            </Cell>
-
-            <Cell i={2} label="Sentimento médio" className="border-r">
-              <BigNumber color={scoreColor(totals?.avgScore ?? null)}>
-                <CountUp value={totals?.avgScore ?? 0} format={(n) => formatScore(n)} />
-              </BigNumber>
-              <Hint>média de todas as menções do período, de 0,00 a 1,00</Hint>
-            </Cell>
-
-            <Cell i={3} label="Menções">
-              <BigNumber>
-                <CountUp value={totals?.totalMentions ?? 0} format={(n) => nf.format(Math.round(n))} />
-              </BigNumber>
-              <Hint>vídeos de terceiros analisados no período</Hint>
-            </Cell>
-          </section>
-
-          {/* Destaques: os dois grupos que pedem ação, com o critério escrito. */}
-          <section className="grid grid-cols-1 lg:grid-cols-2 border-b border-border-soft">
-            <div className="p-7 border-b lg:border-b-0 lg:border-r border-border-soft z-rise" style={stagger(4)}>
+          {/* Uma faixa só: os dois grupos que pedem ação e, encostados neles, os
+              números do período. Em duas faixas empilhadas os números empurravam
+              a tabela pra baixo da dobra — e a tabela é o que a tela promete. */}
+          <section className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-[1fr_1fr_21rem] border-b border-border-soft">
+            <div className="p-6 border-b xl:border-b-0 lg:border-r border-border-soft z-rise" style={stagger(0)}>
               <div className="eyebrow">Falam bem da marca</div>
-              <div className="text-[12px] text-ink-muted mt-1 mb-4">
+              <div className="text-[12px] text-ink-muted mt-1 mb-3">
                 Sentimento médio de {formatScore(FALA_BEM)} para cima
               </div>
               {advocates.length === 0 ? (
@@ -316,9 +263,9 @@ export default function InfluencersPage() {
               )}
             </div>
 
-            <div className="p-7 z-rise" style={stagger(5)}>
+            <div className="p-6 border-b xl:border-b-0 xl:border-r border-border-soft z-rise" style={stagger(1)}>
               <div className="eyebrow">Merecem atenção</div>
-              <div className="text-[12px] text-ink-muted mt-1 mb-4">
+              <div className="text-[12px] text-ink-muted mt-1 mb-3">
                 Sentimento abaixo de {formatScore(ATENCAO)}, ou em queda contra o período anterior
               </div>
               {attention.length === 0 ? (
@@ -331,54 +278,101 @@ export default function InfluencersPage() {
                 </div>
               )}
             </div>
+
+            {/* Rail de apoio, não manchete: os números contextualizam os
+                destaques. As ressalvas que gastavam três linhas cada viraram
+                tooltip — o texto continua lá, sem custar altura de página. */}
+            <aside className="p-6 lg:col-span-2 xl:col-span-1 bg-inset z-rise" style={stagger(2)}>
+              <div className="eyebrow mb-4">Visão geral · 30 dias</div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+                <Stat
+                  label="Canais"
+                  hint={influencers.length >= API_CAP
+                    ? "Teto da consulta: há mais canais citando a marca além destes."
+                    : "Canais de terceiros que citaram a marca nos últimos 30 dias."}
+                >
+                  <CountUp value={influencers.length} format={(n) => nf.format(Math.round(n))} />
+                </Stat>
+
+                <Stat label="Menções" hint="Vídeos de terceiros analisados no período.">
+                  <CountUp value={totals?.totalMentions ?? 0} format={(n) => nf.format(Math.round(n))} />
+                </Stat>
+
+                <Stat
+                  label="Views"
+                  color="var(--color-teal-500)"
+                  hint="Views somadas dos vídeos que citam a marca — não é a audiência dos canais."
+                >
+                  {fmtLargeNumber(totals?.totalReach ?? 0)}
+                </Stat>
+
+                <Stat
+                  label="Sentimento"
+                  color={scoreColor(totals?.avgScore ?? null)}
+                  hint="Média de todas as menções do período, de 0,00 a 1,00."
+                >
+                  <CountUp value={totals?.avgScore ?? 0} format={(n) => formatScore(n)} />
+                </Stat>
+              </div>
+            </aside>
           </section>
 
-          {/* Recorte por tamanho de audiência */}
+          {/* Barra de trabalho: tudo que recorta a tabela — tier, busca e o
+              contador do resultado. Gruda no topo porque a lista é longa e o
+              controle precisa seguir ao alcance enquanto se rola. */}
           <section
-            className="px-8 py-3 border-b border-border-soft flex items-center justify-between gap-4 flex-wrap sticky top-15 z-10"
+            className="px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap sticky top-0 z-10"
             style={{ background: "var(--surface)" }}
           >
             {hasSubs ? (
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-0.5 p-1 rounded-lg border border-border-soft bg-inset">
-                  {tiers.map((t) => {
-                    const active = tier === t.key
-                    return (
-                      <button
-                        key={t.key}
-                        onClick={() => trocarRecorte(() => setTier(t.key))}
-                        aria-pressed={active}
-                        className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-[12.5px] font-medium transition-colors ${
-                          active ? "text-white" : "text-ink-muted hover:text-ink"
-                        }`}
-                        style={active ? { background: "var(--color-teal-500)" } : undefined}
-                      >
-                        {t.label}
-                        <span className="font-mono-zoe text-[11px]" style={{ opacity: active ? 0.85 : 0.65 }}>
-                          {t.count}
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
+                <Segmented
+                  items={tiers}
+                  value={tier}
+                  onChange={(k) => trocarRecorte(() => setTier(k))}
+                  ariaLabel="Recorte por tamanho de audiência"
+                />
                 <InfoHint text="Mega: 1 milhão de inscritos ou mais. Macro: de 500 mil a 1 milhão. Micro: abaixo de 500 mil. Canais sem inscritos capturados não entram em nenhum tier." />
               </div>
             ) : (
               // Sem inscritos capturados não dá pra separar por tier — melhor dizer
               // isso do que mostrar abas vazias (o collector ainda não popula).
-              <span className="text-[12px] text-ink-muted-2">
+              <span className="text-[12px] text-ink-muted-2 max-w-96">
                 Tiers por audiência aparecem quando o pipeline capturar os inscritos dos canais.
               </span>
             )}
 
-            <div className="text-[12px] text-ink-muted">
-              {filtered.length === influencers.length
-                ? `${filtered.length} ${filtered.length === 1 ? "canal" : "canais"}`
-                : `${filtered.length} de ${influencers.length} canais`}
+            <div className="flex items-center gap-2.5 ml-auto">
+              <span className="text-[12px] text-ink-muted whitespace-nowrap">
+                {filtered.length === influencers.length
+                  ? `${filtered.length} ${filtered.length === 1 ? "canal" : "canais"}`
+                  : `${filtered.length} de ${influencers.length} canais`}
+              </span>
+              {temRecorte && (
+                <button
+                  onClick={limparRecorte}
+                  className="inline-flex items-center gap-1.5 h-8 px-2.5 text-[12px] rounded-lg text-ink-muted hover:text-ink hover:bg-hover transition-colors"
+                >
+                  <X className="w-3 h-3" /> Limpar
+                </button>
+              )}
+              <SearchBox
+                value={busca}
+                onChange={(v) => trocarRecorte(() => setBusca(v))}
+                placeholder="Buscar canal…"
+                ariaLabel="Buscar canal na lista"
+                className="w-44 sm:w-56"
+              />
             </div>
           </section>
 
-          <section className="overflow-x-auto">
+          {/* `overflow-y-clip` explícito: com só `overflow-x-auto`, a spec
+              promove o eixo Y a `auto` junto (um eixo não fica `visible` ao
+              lado de outro recortado) e a seção vira scroller nos dois
+              sentidos. As linhas entram com `z-rise`, que as desloca 10px
+              pra baixo — transbordo que conta pra área rolável e abria uma
+              barra vertical fantasma até a última animação terminar. */}
+          <section className="overflow-x-auto overflow-y-clip">
             <table className="w-full text-[13px]">
               <thead>
                 <tr className="border-b border-border-soft">
@@ -440,17 +434,7 @@ export default function InfluencersPage() {
                       </td>
                       <td className="py-3.5 font-mono-zoe text-ink-2">{fmtLargeNumber(c.reach)}</td>
                       <td className="py-3.5">
-                        {/* Régua junto do número: mostra o peso do canal na lista
-                            sem precisar comparar linha a linha. */}
-                        <div className="flex items-center gap-2.5 max-w-32">
-                          <span className="font-mono-zoe text-[13px] text-ink w-6">{c.mentions}</span>
-                          <span className="flex-1 h-[3px] rounded-full bg-tint-2 overflow-hidden">
-                            <span
-                              className="block h-full rounded-full bg-teal-500 z-grow-x"
-                              style={{ width: `${Math.max(6, Math.round((c.mentions / maxMentions) * 100))}%`, ...stagger(Math.min(idx, 12)) }}
-                            />
-                          </span>
-                        </div>
+                        <span className="font-mono-zoe text-[13px] text-ink">{c.mentions}</span>
                       </td>
                       <td className="py-3.5">
                         <span className={`chip text-[11px] ${scoreChipClass(c.avgScore)}`}>
@@ -468,8 +452,23 @@ export default function InfluencersPage() {
                 })}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-8 py-16 text-center text-ink-muted text-sm">
-                      Nenhum canal com esse recorte.
+                    <td colSpan={7} className="px-8 py-16 text-center">
+                      <p className="text-ink-muted text-sm">
+                        {busca.trim() ? (
+                          <>
+                            Nenhum canal com <span className="text-ink font-medium">“{busca.trim()}”</span> no nome
+                            {tier !== "all" && ` entre os ${tierLabel[tier].toLowerCase()}`}.
+                          </>
+                        ) : (
+                          "Nenhum canal com esse recorte."
+                        )}
+                      </p>
+                      <button
+                        onClick={limparRecorte}
+                        className="mt-3 inline-flex items-center h-8 px-3 text-[12.5px] rounded-md border border-border-soft hover:bg-hover transition-colors"
+                      >
+                        Limpar recorte
+                      </button>
                     </td>
                   </tr>
                 )}
@@ -509,30 +508,30 @@ export default function InfluencersPage() {
 
 // ── Peças ──────────────────────────────────────────────────────────────
 
-function Cell({ i, label, className, children }: {
-  i: number
+/**
+ * Número do rail: menor que a manchete da faixa antiga de propósito — aqui ele
+ * apoia os destaques, não disputa com eles. A ressalva mora no tooltip.
+ */
+function Stat({ label, hint, color, children }: {
   label: string
-  className?: string
+  hint?: string
+  color?: string
   children: React.ReactNode
 }) {
   return (
-    <div className={`px-6 pt-6 pb-6 min-h-[150px] border-border-soft z-rise ${className ?? ""}`} style={stagger(i)}>
-      <div className="eyebrow mb-3">{label}</div>
-      {children}
+    <div className="min-w-0">
+      <div className="eyebrow inline-flex items-center gap-1 mb-2">
+        {label}
+        {hint && <InfoHint text={hint} />}
+      </div>
+      <div
+        className="font-display leading-none truncate"
+        style={{ fontSize: 27, color: color ?? "var(--ink)" }}
+      >
+        {children}
+      </div>
     </div>
   )
-}
-
-function BigNumber({ color, children }: { color?: string; children: React.ReactNode }) {
-  return (
-    <span className="font-display leading-none" style={{ fontSize: 38, color: color ?? "var(--ink)" }}>
-      {children}
-    </span>
-  )
-}
-
-function Hint({ children }: { children: React.ReactNode }) {
-  return <p className="text-[11.5px] text-ink-muted mt-3 leading-snug max-w-56">{children}</p>
 }
 
 function HighlightRow({
@@ -608,10 +607,12 @@ function PageSkeleton() {
         <div className="h-3 w-44 rounded z-skeleton mb-4" />
         <div className="h-9 w-80 max-w-full rounded z-skeleton" />
       </div>
-      <div className="grid grid-cols-2 xl:grid-cols-4 border-b border-border-soft">
-        {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="p-6 border-r border-border-soft">
-            <div className="h-10 w-28 rounded z-skeleton" />
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_1fr_21rem] border-b border-border-soft">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="p-6 border-b xl:border-b-0 xl:border-r border-border-soft space-y-3">
+            <div className="h-3 w-32 rounded z-skeleton" />
+            <div className="h-9 rounded z-skeleton" />
+            <div className="h-9 rounded z-skeleton" />
           </div>
         ))}
       </div>

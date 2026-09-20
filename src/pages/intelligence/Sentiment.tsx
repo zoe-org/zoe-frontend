@@ -16,6 +16,7 @@ import {
 import { deltaChip } from "@/lib/chip"
 import { formatScoreDelta } from "@/lib/score"
 import { stagger } from "@/lib/motion"
+import { InfoHint } from "@/components/ui/info-hint"
 
 function keywordColor(sentiment: string): string {
   if (sentiment === "Positive") return "var(--color-pos)"
@@ -141,8 +142,8 @@ export default function SentimentPage() {
     <div className="-m-6" style={{ color: "var(--ink)" }}>
       {/* Abertura: a leitura do saldo em uma frase, antes de qualquer gráfico. */}
       <section className="px-8 pt-7 pb-6 border-b border-border-soft">
-        <div className="flex flex-wrap items-start justify-between gap-6">
-          <div className="flex-1 max-w-180 min-w-70">
+        <div className="flex flex-wrap items-end justify-between gap-6">
+          <div className="flex-1 max-w-200 min-w-70">
             <div className="eyebrow mb-3">Intelligence · Análise</div>
             <h1 className="font-display m-0 text-ink" style={{ fontSize: 34, lineHeight: 1.1 }}>
               Sentimento
@@ -155,7 +156,7 @@ export default function SentimentPage() {
                 quando houver vídeos analisados no período.
               </p>
             ) : (
-              <p className="text-[14.5px] leading-relaxed text-ink-muted mt-2.5 max-w-150">
+              <p className="text-[14.5px] leading-relaxed text-ink-muted mt-2.5 max-w-200">
                 Nos {periodLabel}, o que dizem de {nomeMarca} está{" "}
                 <span className="text-ink font-medium">{leituraDoSaldo(stats.net)}</span>:{" "}
                 {stats.pctPos}% das {nf.format(stats.total)} menções são positivas e {stats.pctNeg}% negativas.
@@ -192,7 +193,7 @@ export default function SentimentPage() {
         <>
           {/* Faixa de números */}
           <section className="grid grid-cols-2 xl:grid-cols-4 border-b border-border-soft">
-            <Cell i={0} label="Saldo do período" className="border-r border-b xl:border-b-0">
+            <Cell i={0} label="Saldo do período" className="border-r border-b xl:border-b-0" hint="O saldo é calculado como a diferença entre menções positivas e negativas, dividido pelo total. Vai de −1,00 a +1,00.">
               {carregando ? (
                 <div className="h-10 w-28 rounded z-skeleton" />
               ) : (
@@ -203,9 +204,6 @@ export default function SentimentPage() {
                   <NetRuler value={stats.net} />
                 </>
               )}
-              <p className="text-[11.5px] text-ink-muted mt-3 leading-snug">
-                Positivas menos negativas, dividido pelo total. Vai de −1,00 a +1,00.
-              </p>
             </Cell>
 
             <Cell i={1} label="Contra o período anterior" className="xl:border-r border-b xl:border-b-0">
@@ -464,15 +462,17 @@ export default function SentimentPage() {
 
 // ── Peças ──────────────────────────────────────────────────────────────
 
-function Cell({ i, label, className, children }: {
+function Cell({ i, label, className, hint, children }: {
   i: number
   label: string
   className?: string
+  hint?: string
   children: React.ReactNode
 }) {
   return (
-    <div className={`px-6 pt-6 pb-6 min-h-[168px] border-border-soft z-rise ${className ?? ""}`} style={stagger(i)}>
-      <div className="eyebrow mb-3">{label}</div>
+    <div className={`px-6 pt-6 pb-6 min-h-[168px] flex flex-col border-border-soft z-rise ${className ?? ""}`} style={stagger(i)}>
+      <div className="eyebrow mb-3 inline-flex items-center gap-1">{label}{hint && <InfoHint text={hint} />}</div>
+      
       {children}
     </div>
   )
@@ -538,7 +538,7 @@ function EarnedOnlyNote() {
   const voice = brandVoice(useActiveBrand().active)
 
   return (
-    <p className="text-[11.5px] text-ink-muted-2 mt-3 leading-snug max-w-140">
+    <p className="text-[11.5px] text-ink-muted-2 mt-3 leading-snug max-w-200">
       Considera apenas conteúdo de terceiros. Vídeos publicados em {voice.oCanalProprio}
       {" "}ficam de fora por definição — o roteiro é de quem publica, então medi-los
       seria medir {voice.aMarca} falando de si.{" "}

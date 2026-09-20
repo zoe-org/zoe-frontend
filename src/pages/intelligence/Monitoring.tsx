@@ -10,6 +10,7 @@ import { ConfidenceBadge } from "@/components/ui/confidence-badge"
 import { coverageSaysOwnedContent } from "@/components/ui/coverage-labels"
 import { VideoThumb } from "@/components/ui/video-thumb"
 import { SelectFilterChip } from "@/components/ui/select-filter-chip"
+import { Segmented } from "@/components/ui/segmented"
 import { useActiveBrand } from "@/features/brands/context"
 import { toCsv, downloadCsv } from "@/lib/csv"
 import { startOfToday, windowFrom } from "@/lib/date-window"
@@ -292,39 +293,21 @@ export default function MonitoringPage() {
       {/* Barra de trabalho: o que estou vendo (abas) e como (ordem e formato).
           Gruda no topo porque o feed é longo e a régua precisa acompanhar. */}
       <section
-        className="px-8 py-3 border-b border-border-soft flex items-center justify-between gap-4 flex-wrap sticky top-15 z-10"
+        className="px-8 py-3 border-b border-border-soft flex items-center justify-between gap-4 flex-wrap sticky top-0 z-10"
         style={{ background: "var(--surface)" }}
       >
-        <div className="flex items-center gap-0.5 p-1 rounded-lg border border-border-soft bg-inset">
-          {SENT_TABS.map((tab) => {
-            const active = sent === tab.key
-            const count = tabCount(tab.key)
-            return (
-              <button
-                key={tab.key || "all"}
-                onClick={() => setParam("sent", tab.key)}
-                aria-pressed={active}
-                className={`inline-flex items-center gap-1.5 h-7 px-3 text-[12.5px] font-medium rounded-md transition-colors ${
-                  active ? "text-white" : "text-ink-muted hover:text-ink"
-                }`}
-                style={active ? { background: tab.color } : undefined}
-              >
-                {tab.label}
-                {count !== undefined && (
-                  <span className="font-mono-zoe text-[11px]" style={{ opacity: active ? 0.85 : 0.65 }}>
-                    {count}
-                  </span>
-                )}
-              </button>
-            )
-          })}
-        </div>
+        <Segmented
+          items={SENT_TABS.map((tab) => ({ ...tab, count: tabCount(tab.key) }))}
+          value={sent}
+          onChange={(key) => setParam("sent", key)}
+          ariaLabel="Recorte por sentimento"
+        />
 
         <div className="flex items-center gap-2 shrink-0">
           {temFiltro && (
             <button
               onClick={limparFiltros}
-              className="inline-flex items-center gap-1.5 h-7 px-2.5 text-[12px] rounded-md text-ink-muted hover:text-ink hover:bg-hover transition-colors"
+              className="inline-flex items-center gap-1.5 h-8 px-2.5 text-[12px] rounded-lg text-ink-muted hover:text-ink hover:bg-hover transition-colors"
             >
               <X className="w-3 h-3" /> Limpar filtros
             </button>
@@ -361,7 +344,7 @@ export default function MonitoringPage() {
                 aria-pressed={view === key}
                 title={label}
                 aria-label={label}
-                className={`p-1.5 rounded-md transition-colors ${
+                className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors ${
                   view === key ? "bg-tint text-ink" : "text-ink-muted hover:text-ink"
                 }`}
               >
@@ -375,7 +358,7 @@ export default function MonitoringPage() {
       {/* Recorte: período, score e origem do canal, com o resultado ao lado. */}
       {view !== "grid" ? (
       <section 
-        className="px-8 py-2.5 border-b border-border-soft grid items-center gap-4 font-mono-zoe text-[11.5px] text-ink"
+        className="px-8 py-2.5 border-b border-border-soft grid items-center gap-4 text-ink-muted eyebrow font-semibold"
         style={{ gridTemplateColumns: "1fr 150px 100px 60px 80px" }}
       >
         <p>

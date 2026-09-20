@@ -1,4 +1,8 @@
-import { AlertCircle, Search, X } from "lucide-react"
+import { AlertCircle } from "lucide-react"
+
+// SearchBox virou primitiva de `ui/` (Intelligence também usa). Reexportado
+// aqui porque as telas do módulo importam tudo desta barrica.
+export { SearchBox } from "@/components/ui/search-box"
 
 /**
  * Componentes compartilhados das telas de Operations. Formatação mora em <code>operations-format.ts</code> por causa do Fast Refresh.
@@ -57,45 +61,6 @@ export function ErrorState({ onRetry }: { onRetry: () => void }) {
       >
         Tentar de novo
       </button>
-    </div>
-  )
-}
-
-/** Busca das listagens, filtrada no cliente: as listas do módulo chegam inteiras, sem paginação. */
-export function SearchBox({
-  value, onChange, placeholder, className,
-}: {
-  value: string
-  onChange: (v: string) => void
-  placeholder: string
-  className?: string
-}) {
-  return (
-    <div className={`relative ${className ?? "w-full sm:max-w-[260px]"}`}>
-      <Search
-        className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none"
-        style={{ color: "var(--ink-muted)" }}
-      />
-      <input
-        type="search"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        aria-label={placeholder}
-        className="h-8 w-full rounded-lg border border-input bg-transparent pl-8 pr-7 text-[13px] outline-none transition-colors focus-visible:border-ring"
-        style={{ color: "var(--ink)" }}
-      />
-      {value && (
-        <button
-          type="button"
-          onClick={() => onChange("")}
-          aria-label="Limpar busca"
-          className="absolute right-2 top-1/2 -translate-y-1/2 hover:opacity-60"
-          style={{ color: "var(--ink-muted)" }}
-        >
-          <X className="w-3 h-3" />
-        </button>
-      )}
     </div>
   )
 }

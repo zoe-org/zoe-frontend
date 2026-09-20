@@ -359,7 +359,13 @@
 
 /* `backwards` e não `both`: o estado inicial vale durante o atraso, e ao terminar
    o elemento volta ao seu próprio estilo — em vez de ficar preso no último quadro,
-   o que mantém uma camada de composição viva e atrapalha até a captura de tela. */
+   o que mantém uma camada de composição viva e atrapalha até a captura de tela.
+
+   CUIDADO ao usar `.z-rise` dentro de um container com `overflow` recortado: o
+   `translateY` inicial não mexe no layout, mas conta para a área rolável. Num
+   container com `overflow-x-auto` (que promove o eixo Y a `auto`), isso abre uma
+   barra vertical que só some quando a última animação escalonada termina. Feche o
+   eixo Y com `overflow-y-clip` nesses casos. */
 @layer components {
   .z-rise {
     animation: z-rise 0.6s var(--ease-out) backwards;
