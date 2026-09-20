@@ -1,11 +1,10 @@
 import { useState } from "react"
+import { Modal, ModalFooter } from "@/components/ui/modal"
 import { Link } from "react-router-dom"
 import {
   Loader2, UserPlus, Pencil, Play, CheckCircle2, Ban,
 } from "lucide-react"
 import { notifyError, notifySuccess } from "@/lib/feedback"
-import { useEscapeKey } from "@/lib/useEscapeKey"
-import { useFocusTrap } from "@/lib/useFocusTrap"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { StatusChip } from "@/components/ui/status-chip"
 import { RoleGate } from "@/features/auth/RoleGate"
@@ -52,7 +51,7 @@ export function CampaignDetailPanel({ campaignId }: { campaignId: string }) {
 
   if (campaign.isLoading) {
     return (
-      <div className="space-y-3 animate-pulse">
+      <div className="space-y-3 ">
         {[0, 1, 2].map((i) => <div key={i} className="h-24 rounded-xl bg-tint" />)}
       </div>
     )
@@ -372,59 +371,38 @@ function ConfirmCancel({
   onConfirm: () => void
   onClose: () => void
 }) {
-  useEscapeKey(onClose)
-  const dialogRef = useFocusTrap<HTMLDivElement>()
   return (
-    <div
-      className="fixed inset-0 z-[90] flex items-center justify-center p-4"
-      style={{ background: "rgba(7,9,26,0.32)", backdropFilter: "blur(2px)" }}
-      onClick={onClose}
+    <Modal
+      eyebrow="Campanhas"
+      title={`Cancelar “${campaignName}”?`}
+      description="É definitivo: campanha cancelada não volta a rascunho, não aceita novo contrato nem novo criador, e deixa de poder ser editada."
+      size="sm"
+      onClose={onClose}
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          cancelLabel="Voltar"
+          onSubmit={onConfirm}
+          submitLabel="Cancelar campanha"
+          pending={busy}
+          tone="danger"
+        />
+      }
     >
-      <div
-        className="w-full max-w-md rounded-xl border border-border-soft shadow-2xl p-6"
-        style={{ background: "var(--surface)" }}
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Cancelar campanha"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="font-display m-0 mb-2" style={{ fontSize: 20, color: "var(--ink)" }}>
-          Cancelar “{campaignName}”?
-        </h2>
-        <p className="text-[13.5px] text-ink-muted mb-2">
-          É definitivo: campanha cancelada não volta a rascunho, não aceita novo contrato
-          nem novo criador, e deixa de poder ser editada.
-        </p>
-        {/* O que já foi assinado não desaparece — e o dinheiro tem vida própria. */}
-        {contractCount > 0 && (
-          <div
-            className="rounded-lg p-3 text-[12.5px] mb-4"
-            style={{ background: "var(--warn-bg)", color: "var(--color-warn)" }}
-          >
-            {contractCount === 1
-              ? "O contrato já criado nesta campanha continua existindo"
-              : `Os ${contractCount} contratos já criados nesta campanha continuam existindo`}
-            {" "}e não é o cancelamento que resolve o dinheiro deles — custódia em aberto
-            precisa ser devolvida na tela de custódia.
-          </div>
-        )}
-        <div className="flex gap-2">
-          <button onClick={onClose} className="flex-1 px-4 py-2.5 rounded-lg text-[13.5px] border border-border-soft">
-            Voltar
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={busy}
-            className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[13.5px] font-medium text-white disabled:opacity-50"
-            style={{ background: "#DC2626" }}
-          >
-            {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            Cancelar campanha
-          </button>
+      {/* O que já foi assinado não desaparece — e o dinheiro tem vida própria. */}
+      {contractCount > 0 && (
+        <div
+          className="rounded-lg p-3 text-[12.5px]"
+          style={{ background: "var(--warn-bg)", color: "var(--color-warn)" }}
+        >
+          {contractCount === 1
+            ? "O contrato já criado nesta campanha continua existindo"
+            : `Os ${contractCount} contratos já criados nesta campanha continuam existindo`}
+          {" "}e não é o cancelamento que resolve o dinheiro deles — custódia em aberto
+          precisa ser devolvida na tela de custódia.
         </div>
-      </div>
-    </div>
+      )}
+    </Modal>
   )
 }
 

@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
-  AlertCircle, Bell, BellOff, Check, ChevronRight, Download, ExternalLink, Mail, Pencil, Plus, Trash2, X,
+  Activity, AlertCircle, BarChart3, Bell, BellOff, Check, ChevronRight, Download, ExternalLink, Hash,
+  Lock, Mail, Pencil, Plus, Trash2, X,
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -10,11 +11,13 @@ import { EmptyBlock } from "@/components/ui/empty-block"
 import { AlertEventDrawer } from "@/components/features/AlertEventDrawer"
 import { Segmented } from "@/components/ui/segmented"
 import { StatBand } from "@/components/ui/stat-band"
+import { SelectField } from "@/components/ui/select-field"
 import { EmptyState } from "@/components/ui/empty-state"
 import { RoleGate } from "@/features/auth/RoleGate"
 import { useActiveBrand } from "@/features/brands/context"
 import { ApiError } from "@/lib/api"
 import { toCsv, downloadCsv } from "@/lib/csv"
+import { formatScore, scoreColor } from "@/lib/score"
 import { stagger } from "@/lib/motion"
 import {
   useAlertEvents, useAlertRules, useCreateAlertRule, useDeleteAlertRule,
@@ -235,7 +238,7 @@ export default function AlertsPage() {
     <div className="-m-6" style={{ background: "var(--surface)", color: "var(--ink)" }}>
       {/* Abertura */}
       <section className="px-8 pt-7 pb-6 border-b border-border-soft">
-        <div className="flex items-start justify-between gap-6 flex-wrap">
+        <div className="flex items-end justify-between gap-6 flex-wrap">
           <div className="flex-1 max-w-190 min-w-70">
             <div className="eyebrow mb-3">Intelligence · Vigilância</div>
             <h1 className="font-display m-0 text-ink" style={{ fontSize: 34, lineHeight: 1.1 }}>
@@ -391,9 +394,9 @@ function MarkAllButton({ unreadCount }: { unreadCount: number }) {
       })}
       disabled={unreadCount === 0 || markAll.isPending}
       title="Marca como lido só para você. O badge dos colegas não muda."
-      className="h-8 px-3 rounded-lg border border-border-soft text-[12.5px] font-medium text-ink-muted hover:text-ink transition-colors cursor-pointer disabled:opacity-50"
+      className="h-9 px-3.5 rounded-lg border border-border-soft text-[12.5px] font-medium text-ink-muted hover:text-ink transition-colors cursor-pointer disabled:opacity-50"
     >
-      Marcar todos como lidos
+      <Check className="inline-block mr-1 w-3.5 h-3.5" />Marcar todos como lidos
     </button>
   )
 }
@@ -723,6 +726,36 @@ function RulesPanel({
   )
 }
 
+/** Ícone de cada gatilho nos cartões — a âncora visual do "o que vigiar". */
+const RULE_TYPE_ICON: Record<AlertRuleType, typeof Activity> = {
+  SentimentBelow: Activity,
+  MentionVolumeAbove: BarChart3,
+  KeywordMatch: Hash,
+}
+
+/** Subtítulo de cada gatilho no seletor — o "desc" dos cartões do design. */
+const RULE_TYPE_HINT: Record<AlertRuleType, string> = {
+  SentimentBelow: "Uma menção nova fica abaixo do score que você definir.",
+  MentionVolumeAbove: `A marca passa de um número de menções em ${MENTION_VOLUME_WINDOW_LABEL}.`,
+  KeywordMatch: "A menção cita uma palavra que você quer vigiar.",
+}
+
+/** Ponto de partida de cada gatilho, nas unidades dele. */
+const DEFAULT_THRESHOLD: Record<AlertRuleType, string> = {
+  SentimentBelow: "0,40",
+  MentionVolumeAbove: "20",
+  KeywordMatch: "",
+}
+
+/** Nome sugerido a partir do gatilho e da marca — "Queda de sentimento · Itaú". */
+function suggestName(type: AlertRuleType, brandName: string): string {
+  const base =
+    type === "SentimentBelow" ? "Queda de sentimento"
+      : type === "MentionVolumeAbove" ? "Pico de menções"
+        : "Palavra-chave"
+  return brandName ? `${base} · ${brandName}` : base
+}
+
 function RuleModal({
   rule, defaultBrandId, onClose,
 }: { rule: AlertRule | null; defaultBrandId: string; onClose: () => void }) {
@@ -730,15 +763,59 @@ function RuleModal({
   const create = useCreateAlertRule()
   const update = useUpdateAlertRule()
 
-  const [form, setForm] = useState<AlertRuleForm>(() => (rule ? ruleToForm(rule) : emptyRuleForm(defaultBrandId)))
+  /**
+   * Ponto de partida do formulário. `emptyRuleForm` nasce com nome e limiar
+   * vazios — ela é a factory do domínio e outras chamadas dependem disso. Aqui
+   * a tela preenche os dois: sem limiar o slider abriria em 0,00 (que reprova na
+   * validação), e sem nome a dica "sugerido a partir do que você escolheu"
+   * seria mentira na primeira olhada.
+   */
+  const [form, setForm] = useState<AlertRuleForm>(() => {
+    if (rule) return ruleToForm(rule)
+    const base = emptyRuleForm(defaultBrandId)
+    const b = brands.find((x) => x.brandId === defaultBrandId)
+    return {
+      ...base,
+      threshold: DEFAULT_THRESHOLD[base.type],
+      name: suggestName(base.type, b?.displayName ?? b?.brandName ?? ""),
+    }
+  })
   const [submitted, setSubmitted] = useState(false)
+  // Enquanto ninguém digitou, o nome acompanha o gatilho e a marca. Depois do
+  // primeiro toque ele é da pessoa e a sugestão para de mexer nele.
+  const [nameTouched, setNameTouched] = useState(rule !== null)
 
   const errors = validateAlertRuleForm(form)
   const showError = (field: keyof typeof errors) => (submitted ? errors[field] : undefined)
   const pending = create.isPending || update.isPending
 
+  const brandName = rule
+    ? rule.brandName
+    : (brands.find((b) => b.brandId === form.brandId)?.displayName
+      ?? brands.find((b) => b.brandId === form.brandId)?.brandName
+      ?? "")
+
   const set = <K extends keyof AlertRuleForm>(key: K, value: AlertRuleForm[K]) =>
-    setForm((f) => ({ ...f, [key]: value }))
+    setForm((f) => {
+      const next = { ...f, [key]: value }
+      // Trocar de gatilho troca a UNIDADE do limiar: 0,40 de score não é 0,40
+      // menções. Carregar o valor antigo para o tipo novo é pior que recomeçar.
+      if (key === "type" && value !== f.type) {
+        next.threshold = DEFAULT_THRESHOLD[value as AlertRuleType]
+      }
+      if (!nameTouched && (key === "type" || key === "brandId")) {
+        const nome = brands.find((b) => b.brandId === next.brandId)
+        next.name = suggestName(next.type, nome?.displayName ?? nome?.brandName ?? "")
+      }
+      return next
+    })
+
+  // Escape fecha: um diálogo que só sai no clique fora prende quem usa teclado.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [onClose])
 
   const submit = () => {
     setSubmitted(true)
@@ -760,10 +837,20 @@ function RuleModal({
     }
   }
 
-  const inputClass = (invalid?: string) =>
-    `w-full px-3 py-2.5 text-[13px] rounded-lg border bg-transparent outline-none focus:border-teal-500 ${
+  const fieldClass = (invalid?: string) =>
+    `w-full h-9.5 px-3 text-[13.5px] rounded-[11px] border bg-transparent outline-none transition-colors focus:border-teal-500 ${
       invalid ? "border-[color:var(--color-neg)]" : "border-border-soft"
     }`
+
+  const limiar = Number(form.threshold.replace(",", ".")) || 0
+  const canais = form.emailEnabled ? "no app e por e-mail" : "no app"
+  const marca = brandName || "a marca"
+  const resumo =
+    form.type === "SentimentBelow"
+      ? `Quando uma menção nova de ${marca} ficar abaixo de ${formatScore(limiar)} de score, você recebe um alerta ${SEVERITY_LABEL[form.severity].toLowerCase()} ${canais}.`
+      : form.type === "MentionVolumeAbove"
+        ? `Quando ${marca} passar de ${form.threshold || "N"} menções em ${MENTION_VOLUME_WINDOW_LABEL}, você recebe um alerta ${SEVERITY_LABEL[form.severity].toLowerCase()} ${canais}.`
+        : `Quando uma menção nova de ${marca} citar “${form.keyword.trim() || "…"}”, você recebe um alerta ${SEVERITY_LABEL[form.severity].toLowerCase()} ${canais}.`
 
   return (
     <div
@@ -772,250 +859,340 @@ function RuleModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-xl border border-border-soft shadow-2xl overflow-hidden flex flex-col max-h-[88vh]"
+        className="w-full max-w-[680px] rounded-[20px] border border-border-soft shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
         style={{ background: "var(--surface)" }}
         role="dialog"
         aria-modal="true"
         aria-label={rule ? "Editar regra de alerta" : "Nova regra de alerta"}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-7 pt-6 pb-4 shrink-0">
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="eyebrow mb-1.5">Automação</div>
-              <h2 className="font-display m-0" style={{ fontSize: 24, color: "var(--ink)" }}>
-                {rule ? "Editar regra" : "Nova regra de alerta"}
-              </h2>
-            </div>
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-tint cursor-pointer"
-              aria-label="Fechar"
-            >
-              <X className="w-4.5 h-4.5" />
-            </button>
+        {/* Cabeçalho */}
+        <div className="flex items-start gap-4 px-6 pt-5 pb-4 border-b border-border-soft shrink-0">
+          <div className="flex-1 min-w-0">
+            <div className="eyebrow mb-2">Alertas</div>
+            <h2 className="font-display m-0" style={{ fontSize: 23, lineHeight: 1.1, color: "var(--ink)" }}>
+              {rule ? "Editar regra" : "Nova regra de alerta"}
+            </h2>
+            <p className="text-[13px] text-ink-muted mt-2 mb-0">
+              A regra vigia as menções novas da marca escolhida. O histórico já analisado não dispara de novo.
+            </p>
           </div>
+          <button
+            onClick={onClose}
+            className="w-[30px] h-[30px] rounded-full border border-border-soft flex items-center justify-center text-ink-muted hover:text-ink hover:bg-tint cursor-pointer shrink-0"
+            aria-label="Fechar"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
 
-        <div className="px-7 pb-2 overflow-y-auto">
-          <label className="block text-[13px] font-semibold text-ink-2 mb-1.5">Nome da regra</label>
-          <input
-            value={form.name}
-            onChange={(e) => set("name", e.target.value)}
-            maxLength={NAME_MAX_LENGTH}
-            placeholder="Ex.: Queda de sentimento em vídeo grande"
-            className={inputClass(showError("name"))}
-          />
-          {showError("name") && <p className="text-[11.5px] text-neg mt-1">{errors.name}</p>}
+        <div className="px-6 py-5 overflow-y-auto flex flex-col gap-5">
 
-          <label className="block text-[13px] font-semibold text-ink-2 mt-5 mb-1.5">Marca monitorada</label>
-          {rule ? (
-            // A marca não muda na edição: o PUT do backend não a aceita. Mostrar um
-            // select editável aqui prometeria algo que a API descarta em silêncio.
-            <div className="px-3 py-2.5 text-[13px] rounded-lg border border-border-soft text-ink-muted">
-              {rule.brandName} <span className="text-[11.5px]">· não editável</span>
-            </div>
-          ) : (
-            <select
-              value={form.brandId}
-              onChange={(e) => set("brandId", e.target.value)}
-              className={inputClass(showError("brandId"))}
-            >
-              {brands.map((b) => (
-                <option key={b.brandId} value={b.brandId}>{b.displayName ?? b.brandName}</option>
-              ))}
-            </select>
-          )}
-          {showError("brandId") && <p className="text-[11.5px] text-neg mt-1">{errors.brandId}</p>}
-
-          {/* Gatilho como cards (design), mas com os 3 tipos que o backend avalia —
-              os 5 do design (pico negativo, influenciador, tópico, SoV, logo)
-              pressupõem sinais que não chegam na ingestão. */}
-          <label className="block text-[13px] font-semibold text-ink-2 mt-5 mb-1.5">O que dispara essa regra?</label>
-          <div className="flex flex-col gap-2">
-            {RULE_TYPES.map((t) => {
-              const active = form.type === t
-              return (
-                <button
-                  key={t}
-                  onClick={() => set("type", t)}
-                  className="flex items-center gap-3 px-4 py-3 rounded-[10px] text-left transition-colors cursor-pointer"
-                  style={{
-                    border: `1.5px solid ${active ? "var(--color-teal-500)" : "var(--border-soft)"}`,
-                    background: active ? "rgba(0, 167, 153, 0.08)" : "transparent",
-                  }}
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[13.5px] font-semibold" style={{ color: "var(--ink)" }}>
-                      {RULE_TYPE_LABEL[t]}
-                    </div>
-                    <div className="text-[12px] text-ink-muted">{RULE_TYPE_HINT[t]}</div>
-                  </div>
-                  {active && <Check className="w-4 h-4 shrink-0" style={{ color: "var(--color-teal-500)" }} strokeWidth={2.5} />}
-                </button>
-              )
-            })}
-          </div>
-
-          {form.type === "SentimentBelow" && (
-            <>
-              <label className="block text-[13px] font-semibold text-ink-2 mt-5 mb-1.5">Limite de sentimento</label>
-              <input
-                value={form.threshold}
-                onChange={(e) => set("threshold", e.target.value)}
-                inputMode="decimal"
-                placeholder="0,40"
-                className={inputClass(showError("threshold"))}
-              />
-              <p className="text-[11.5px] text-ink-muted mt-1.5">
-                A escala vai de <strong>0 (pior)</strong> a <strong>1 (melhor)</strong>, com 0,5 neutro. Dispara quando o
-                sentimento do vídeo fica <em>abaixo</em> deste valor.
-              </p>
-            </>
-          )}
-
-          {form.type === "MentionVolumeAbove" && (
-            <>
-              <label className="block text-[13px] font-semibold text-ink-2 mt-5 mb-1.5">Número de menções</label>
-              <input
-                value={form.threshold}
-                onChange={(e) => set("threshold", e.target.value)}
-                inputMode="numeric"
-                placeholder="50"
-                className={inputClass(showError("threshold"))}
-              />
-              <p className="text-[11.5px] text-ink-muted mt-1.5">
-                Dispara quando a marca passa deste número de menções nas últimas{" "}
-                <strong>{MENTION_VOLUME_WINDOW_LABEL}</strong>. A janela é fixa nesta versão.
-              </p>
-            </>
-          )}
-
-          {form.type === "KeywordMatch" && (
-            <>
-              <label className="block text-[13px] font-semibold text-ink-2 mt-5 mb-1.5">Palavra-chave</label>
-              <input
-                value={form.keyword}
-                onChange={(e) => set("keyword", e.target.value)}
-                maxLength={KEYWORD_MAX_LENGTH}
-                placeholder="Ex.: recall"
-                className={inputClass(showError("keyword"))}
-              />
-              <p className="text-[11.5px] text-ink-muted mt-1.5">
-                Busca por trecho, sem diferenciar maiúsculas — “itaú” encontra “Banco Itaú S.A.”.
-              </p>
-            </>
-          )}
-          {showError("threshold") && <p className="text-[11.5px] text-neg mt-1">{errors.threshold}</p>}
-          {showError("keyword") && <p className="text-[11.5px] text-neg mt-1">{errors.keyword}</p>}
-
-          <label className="block text-[13px] font-semibold text-ink-2 mt-5 mb-1.5">Gravidade</label>
-          <div className="flex gap-2">
-            {SEVERITIES.map((s) => {
-              const active = form.severity === s
-              return (
-                <button
-                  key={s}
-                  onClick={() => set("severity", s)}
-                  className="flex-1 px-3 py-2 rounded-lg border text-[13px] font-semibold transition-colors cursor-pointer"
-                  style={{
-                    borderColor: active ? SEVERITY_COLOR[s] : "var(--border-soft)",
-                    color: active ? SEVERITY_COLOR[s] : "var(--ink-muted)",
-                  }}
-                >
-                  {SEVERITY_LABEL[s]}
-                </button>
-              )
-            })}
-          </div>
-
-          <label className="block text-[13px] font-semibold text-ink-2 mt-5 mb-1.5">Onde você quer ser avisada</label>
+          {/* O que vigiar — três cartões, os três gatilhos que o backend avalia.
+              Os cinco do mock antigo (pico negativo, influenciador, tópico, SoV,
+              logo) pressupõem sinais que não chegam na ingestão. */}
           <div>
-            {/* InApp é obrigatório: a factory do domínio o força de volta. Deixá-lo
-                desmarcável criaria a expectativa falsa de silenciar o histórico. */}
-            <div className="flex items-center gap-3 py-3 border-b border-border-soft opacity-70">
-              <Bell className="w-4 h-4 text-ink-muted shrink-0" />
-              <span className="text-[13.5px] flex-1" style={{ color: "var(--ink)" }}>
-                No app <span className="text-ink-muted text-[11.5px]">· sempre ativo</span>
-              </span>
-              <span className="relative w-9 h-5 rounded-full block" style={{ background: "var(--color-teal-500)" }}>
-                <span className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow" style={{ left: 18 }} />
-              </span>
+            <div className="eyebrow mb-3">O que vigiar</div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5" role="radiogroup" aria-label="O que vigiar">
+              {RULE_TYPES.map((t) => {
+                const active = form.type === t
+                const Icon = RULE_TYPE_ICON[t]
+                return (
+                  <button
+                    key={t}
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => set("type", t)}
+                    className="p-3.5 rounded-[14px] text-left transition-colors cursor-pointer"
+                    style={{
+                      border: `1px solid ${active ? "var(--color-teal-500)" : "var(--border-soft)"}`,
+                      background: active ? "var(--teal-bg)" : "transparent",
+                    }}
+                  >
+                    <span className="flex items-center justify-between">
+                      <span
+                        className="w-7 h-7 rounded-[9px] flex items-center justify-center"
+                        style={{
+                          background: active ? "var(--color-teal-500)" : "var(--tint)",
+                          color: active ? "#fff" : "var(--ink-muted)",
+                        }}
+                      >
+                        <Icon className="w-[15px] h-[15px]" />
+                      </span>
+                      <span
+                        className="w-[15px] h-[15px] rounded-full flex items-center justify-center"
+                        style={{ border: `1.5px solid ${active ? "var(--color-teal-500)" : "var(--border-soft)"}` }}
+                      >
+                        {active && (
+                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--color-teal-500)" }} />
+                        )}
+                      </span>
+                    </span>
+                    <span className="block text-[13px] font-semibold mt-2.5" style={{ color: "var(--ink)" }}>
+                      {RULE_TYPE_LABEL[t]}
+                    </span>
+                    <span className="block text-[11.5px] leading-snug text-ink-muted mt-1.5">
+                      {RULE_TYPE_HINT[t]}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
-            <div className="flex items-center gap-3 py-3">
-              <span className="text-[13.5px] flex-1 pl-7" style={{ color: "var(--ink)" }}>E-mail</span>
+          </div>
+
+          {/* Configuração do gatilho escolhido */}
+          <div className="p-4 rounded-[15px] border border-border-soft bg-inset">
+            {form.type === "SentimentBelow" && (
+              <div>
+                <div className="flex items-baseline justify-between gap-3 mb-4">
+                  <label htmlFor="limiar" className="text-[13px] font-medium" style={{ color: "var(--ink)" }}>
+                    Disparar quando o score ficar abaixo de
+                  </label>
+                  <span className="font-mono-zoe font-display" style={{ fontSize: 20, color: scoreColor(limiar) }}>
+                    {formatScore(limiar)}
+                  </span>
+                </div>
+                {/* Trilho colorido com o range por cima, transparente: a escala se
+                    lê de relance e o controle continua sendo um input de verdade,
+                    alcançável por teclado. */}
+                <div className="relative h-[18px] flex items-center">
+                  <span
+                    className="block w-full h-1.5 rounded-full"
+                    style={{ background: "linear-gradient(90deg, var(--color-neg), var(--ink-muted-2) 50%, var(--color-pos))" }}
+                  />
+                  <span
+                    className="absolute w-[18px] h-[18px] rounded-full pointer-events-none"
+                    style={{
+                      left: `calc(${limiar * 100}% - 9px)`,
+                      background: "var(--surface)",
+                      border: `2px solid ${scoreColor(limiar)}`,
+                    }}
+                  />
+                  <input
+                    id="limiar"
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={limiar}
+                    onChange={(e) => set("threshold", formatScore(Number(e.target.value)))}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    aria-label="Limite de sentimento"
+                  />
+                </div>
+                <div className="flex justify-between font-mono-zoe text-[10px] text-ink-muted-2 mt-3">
+                  <span>0,00 · totalmente negativo</span>
+                  <span>0,50 · neutro</span>
+                  <span>1,00 · totalmente positivo</span>
+                </div>
+              </div>
+            )}
+
+            {form.type === "MentionVolumeAbove" && (
+              <div className="flex items-center gap-3 flex-wrap">
+                <label htmlFor="volume" className="text-[13px] font-medium" style={{ color: "var(--ink)" }}>
+                  Disparar acima de
+                </label>
+                <input
+                  id="volume"
+                  value={form.threshold}
+                  onChange={(e) => set("threshold", e.target.value)}
+                  inputMode="numeric"
+                  placeholder="20"
+                  className={`w-20 h-9.5 px-3 text-[13.5px] font-mono-zoe rounded-[11px] border bg-transparent outline-none transition-colors focus:border-teal-500 ${
+                    showError("threshold") ? "border-[color:var(--color-neg)]" : "border-border-soft"
+                  }`}
+                />
+                <span className="text-[13px]" style={{ color: "var(--ink)" }}>
+                  menções em {MENTION_VOLUME_WINDOW_LABEL}
+                </span>
+                {/* A janela é fixa no backend: um seletor aqui seria ignorado. */}
+                <span className="chip text-[10.5px] ml-auto">janela fixa</span>
+              </div>
+            )}
+
+            {form.type === "KeywordMatch" && (
+              <div>
+                <label htmlFor="kw" className="block text-[13px] font-medium mb-2.5" style={{ color: "var(--ink)" }}>
+                  Palavra ou expressão
+                </label>
+                <input
+                  id="kw"
+                  value={form.keyword}
+                  onChange={(e) => set("keyword", e.target.value)}
+                  maxLength={KEYWORD_MAX_LENGTH}
+                  placeholder="ex.: recall, processo, alergia"
+                  className={fieldClass(showError("keyword"))}
+                />
+                <p className="text-[11.5px] text-ink-muted mt-2 mb-0">
+                  Busca por trecho, sem diferenciar maiúsculas — “itaú” encontra “Banco Itaú S.A.”. Até{" "}
+                  {KEYWORD_MAX_LENGTH} caracteres.
+                </p>
+              </div>
+            )}
+
+            {showError("threshold") && <p className="text-[11.5px] text-neg mt-2 mb-0">{errors.threshold}</p>}
+            {showError("keyword") && <p className="text-[11.5px] text-neg mt-2 mb-0">{errors.keyword}</p>}
+          </div>
+
+          {/* Marca + gravidade */}
+          <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-3.5">
+            <div>
+              <label htmlFor="marca" className="block text-[12.5px] font-medium text-ink-2 mb-2">Marca</label>
+              {rule ? (
+                // A marca não muda na edição: o PUT do backend não a aceita. Um
+                // select editável aqui prometeria algo que a API descarta em silêncio.
+                <div className="h-9.5 px-3 flex items-center text-[13px] rounded-[11px] border border-border-soft text-ink-muted">
+                  {rule.brandName} <span className="text-[11.5px] ml-1.5">· não editável</span>
+                </div>
+              ) : (
+                <SelectField
+                  id="marca"
+                  value={form.brandId}
+                  onChange={(v) => set("brandId", v)}
+                  invalid={showError("brandId")}
+                  options={brands.map((b) => ({
+                    key: b.brandId,
+                    label: b.displayName ?? b.brandName,
+                  }))}
+                />
+              )}
+              {showError("brandId") && <p className="text-[11.5px] text-neg mt-1 mb-0">{errors.brandId}</p>}
+            </div>
+
+            <div>
+              <span className="block text-[12.5px] font-medium text-ink-2 mb-2">Gravidade</span>
+              <div className="flex gap-0.5 p-0.5 rounded-[11px] border border-border-soft bg-inset">
+                {SEVERITIES.map((sev) => {
+                  const active = form.severity === sev
+                  return (
+                    <button
+                      key={sev}
+                      onClick={() => set("severity", sev)}
+                      aria-pressed={active}
+                      className="flex-1 h-8 rounded-[9px] text-[12.5px] font-medium text-center transition-colors cursor-pointer"
+                      style={active
+                        ? { background: `color-mix(in srgb, ${SEVERITY_COLOR[sev]} 16%, transparent)`, color: SEVERITY_COLOR[sev] }
+                        : { color: "var(--ink-muted)" }}
+                    >
+                      {SEVERITY_LABEL[sev]}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Nome */}
+          <div>
+            <label htmlFor="nome" className="block text-[12.5px] font-medium text-ink-2 mb-2">Nome da regra</label>
+            <input
+              id="nome"
+              value={form.name}
+              onChange={(e) => { setNameTouched(true); set("name", e.target.value) }}
+              maxLength={NAME_MAX_LENGTH}
+              placeholder="Ex.: Queda de sentimento · Itaú"
+              className={fieldClass(showError("name"))}
+            />
+            {showError("name")
+              ? <p className="text-[11.5px] text-neg mt-2 mb-0">{errors.name}</p>
+              : (
+                <p className="text-[11.5px] text-ink-muted mt-2 mb-0">
+                  Sugerido a partir do que você escolheu — é assim que o alerta aparece no feed e no e-mail.
+                </p>
+              )}
+          </div>
+
+          {/* Onde avisar */}
+          <div>
+            <span className="block text-[12.5px] font-medium text-ink-2 mb-2.5">Onde avisar</span>
+            <div className="flex flex-col gap-2">
+              {/* InApp é obrigatório: a factory do domínio o força de volta.
+                  Deixá-lo desmarcável criaria a expectativa falsa de silenciar o
+                  histórico — por isso é um selo, não um interruptor. */}
+              <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-[12px] border border-border-soft bg-inset">
+                <Bell className="w-4 h-4 text-ink-muted shrink-0" />
+                <span className="flex-1 text-[13px]" style={{ color: "var(--ink)" }}>No app</span>
+                <span className="chip chip-primary text-[10.5px] inline-flex items-center gap-1">
+                  <Lock className="w-2.5 h-2.5" /> sempre
+                </span>
+              </div>
+
               <button
                 onClick={() => set("emailEnabled", !form.emailEnabled)}
-                aria-label="Notificar por e-mail"
-                className="relative w-9 h-5 rounded-full transition-colors cursor-pointer"
-                style={{ background: form.emailEnabled ? "var(--color-teal-500)" : "var(--border-soft)" }}
+                aria-pressed={form.emailEnabled}
+                className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-[12px] border border-border-soft bg-inset text-left cursor-pointer hover:bg-hover transition-colors"
               >
+                <Mail className="w-4 h-4 text-ink-muted shrink-0" />
+                <span className="flex-1 text-[13px]" style={{ color: "var(--ink)" }}>
+                  E-mail para quem tem acesso à marca
+                </span>
                 <span
-                  className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all"
-                  style={{ left: form.emailEnabled ? 18 : 2 }}
-                />
+                  className="relative w-[34px] h-5 rounded-full transition-colors shrink-0"
+                  style={{ background: form.emailEnabled ? "var(--color-teal-500)" : "var(--border-soft)" }}
+                >
+                  <span
+                    className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all"
+                    style={{ left: form.emailEnabled ? 16 : 2 }}
+                  />
+                </span>
+              </button>
+
+              <button
+                onClick={() => set("isEnabled", !form.isEnabled)}
+                aria-pressed={form.isEnabled}
+                className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-[12px] border border-border-soft bg-inset text-left cursor-pointer hover:bg-hover transition-colors"
+              >
+                <Activity className="w-4 h-4 text-ink-muted shrink-0" />
+                <span className="flex-1 text-[13px]" style={{ color: "var(--ink)" }}>
+                  Começar vigiando agora
+                </span>
+                <span
+                  className="relative w-[34px] h-5 rounded-full transition-colors shrink-0"
+                  style={{ background: form.isEnabled ? "var(--color-teal-500)" : "var(--border-soft)" }}
+                >
+                  <span
+                    className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all"
+                    style={{ left: form.isEnabled ? 16 : 2 }}
+                  />
+                </span>
               </button>
             </div>
           </div>
 
-          {/* Resumo (design): a frase que a pessoa confere antes de salvar. */}
-          <div className="mt-4 mb-2 p-3.5 rounded-[10px] border border-border-soft bg-inset">
-            <div className="eyebrow mb-2">Resumo</div>
-            <div className="text-[12.5px] leading-relaxed" style={{ color: "var(--ink-2)" }}>
-              {describeRuleCondition({
-                type: form.type,
-                threshold: form.type === "KeywordMatch" ? null : Number(form.threshold.replace(",", ".")) || null,
-                keyword: form.keyword.trim() || null,
-              })}
-              {" · avisa "}
-              {form.emailEnabled ? "no app e por e-mail" : "no app"}
-              {form.isEnabled ? "" : " · criada pausada"}.
-            </div>
-          </div>
-
-          <button
-            onClick={() => set("isEnabled", !form.isEnabled)}
-            className="w-full flex items-center gap-3 py-2 mb-2 text-left cursor-pointer"
+          {/* Resumo: a frase que a pessoa confere antes de salvar. */}
+          <div
+            className="p-4 rounded-[14px] border"
+            style={{ borderColor: "var(--color-teal-500)", background: "var(--teal-bg)" }}
           >
-            <span
-              className="relative w-9 h-5 rounded-full transition-colors shrink-0"
-              style={{ background: form.isEnabled ? "var(--color-teal-500)" : "var(--border-soft)" }}
-            >
-              <span
-                className="absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all"
-                style={{ left: form.isEnabled ? 18 : 2 }}
-              />
-            </span>
-            <span className="text-[13px]" style={{ color: "var(--ink)" }}>
-              Regra ativa <span className="text-ink-muted text-[11.5px]">· desligue para pausar sem excluir</span>
-            </span>
-          </button>
+            <div className="eyebrow" style={{ color: "var(--color-teal-500)" }}>Resumo</div>
+            <p className="text-[13.5px] leading-relaxed mt-2.5 mb-0" style={{ color: "var(--ink)" }}>
+              {resumo}
+              {!form.isEnabled && " A regra é criada pausada."}
+            </p>
+          </div>
         </div>
 
-        <div className="flex justify-between items-center gap-2 px-7 py-4 border-t border-border-soft shrink-0">
+        {/* Rodapé */}
+        <div className="flex items-center gap-2.5 px-6 py-4 border-t border-border-soft shrink-0 bg-inset">
+          <span className="flex-1 text-[11.5px] text-ink-muted">
+            Você pode desligar a regra depois sem perder o histórico.
+          </span>
           <button
             onClick={onClose}
-            className="px-3.5 py-2 rounded-lg text-[13px] font-medium text-ink-muted hover:text-ink cursor-pointer"
+            className="h-9 px-4 rounded-lg border border-border-soft text-[13px] font-medium text-ink-muted hover:text-ink hover:bg-hover transition-colors cursor-pointer"
           >
             Cancelar
           </button>
           <button
             onClick={submit}
             disabled={pending}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-medium text-white bg-teal-500 hover:bg-teal-600 disabled:opacity-60 cursor-pointer"
+            className="inline-flex items-center gap-1.5 h-9 px-5 rounded-lg text-[13px] font-semibold text-white bg-teal-500 hover:bg-teal-600 disabled:opacity-60 cursor-pointer"
           >
-            <Check className="w-3.5 h-3.5" />
             {pending ? "Salvando…" : rule ? "Salvar alterações" : "Criar regra"}
           </button>
         </div>
       </div>
     </div>
   )
-}
-
-/** Subtítulo de cada gatilho no seletor — o "desc" dos cards do design. */
-const RULE_TYPE_HINT: Record<AlertRuleType, string> = {
-  SentimentBelow: "O sentimento de um vídeo fica abaixo do limite",
-  MentionVolumeAbove: `A marca passa de N menções em ${MENTION_VOLUME_WINDOW_LABEL}`,
-  KeywordMatch: "Uma palavra aparece nas menções, temas ou keywords",
 }

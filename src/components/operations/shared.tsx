@@ -21,27 +21,11 @@ export function Field({
   )
 }
 
-/** Select nativo com o visual do módulo. */
-export function Select({
-  value, onChange, children,
-}: { value: string; onChange: (v: string) => void; children: React.ReactNode }) {
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-[13px] outline-none transition-colors focus-visible:border-ring"
-      style={{ color: "var(--ink)" }}
-    >
-      {children}
-    </select>
-  )
-}
-
 export function TableSkeleton({ rows = 4 }: { rows?: number }) {
   return (
-    <div className="px-8 py-6 space-y-3 animate-pulse">
+    <div className="px-8 py-6 space-y-3">
       {Array.from({ length: rows }, (_, i) => (
-        <div key={i} className="h-11 rounded bg-tint" />
+        <div key={i} className="h-11 rounded z-skeleton" />
       ))}
     </div>
   )

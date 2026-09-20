@@ -3,6 +3,7 @@ import { Plus, Trash2, Copy, X, Mail, AlertCircle, Loader2, Check, Tag, Send } f
 import { notifyError, notifySuccess } from "@/lib/feedback"
 import { useConfirm } from "@/features/confirm/context"
 import { useAuth } from "@/features/auth/context"
+import { SelectField } from "@/components/ui/select-field"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import {
   useMembers, useInvites, useTeamMutations,
@@ -72,20 +73,22 @@ function RoleCell({
 
   const meta = ROLE_META[member.role]
   return (
-    <select
-      value={member.role}
-      disabled={pending}
-      onChange={(e) => onChange(e.target.value as TenantRole)}
-      title="Alterar papel do membro"
-      className="font-semibold cursor-pointer rounded-md border border-border-soft bg-transparent outline-none focus:border-teal-500 disabled:opacity-50 hover:bg-tint transition-colors"
-      style={{ fontSize: 12, padding: "3px 8px", color: meta.color }}
-    >
-      {ROLE_ORDER.map((r) => (
-        <option key={r} value={r} disabled={r === "Owner" && !isOwner} style={{ color: "var(--ink)" }}>
-          {r}
-        </option>
-      ))}
-    </select>
+    // Gatilho compacto (cabe na célula) e menu do app, não o do sistema.
+    <span style={{ color: meta.color }}>
+      <SelectField
+        value={member.role}
+        onChange={(v) => onChange(v as TenantRole)}
+        disabled={pending}
+        ariaLabel="Alterar papel do membro"
+        className="data-[size=default]:h-7 px-2 text-[12px] font-semibold rounded-md border-border-soft hover:bg-tint disabled:opacity-50"
+        options={ROLE_ORDER.map((r) => ({
+          key: r,
+          label: r,
+          // Só quem é Owner promove a Owner.
+          disabled: r === "Owner" && !isOwner,
+        }))}
+      />
+    </span>
   )
 }
 

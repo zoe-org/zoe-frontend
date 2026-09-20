@@ -16,6 +16,8 @@ import {
   TableSkeleton, ErrorState, SearchBox, NoResults, PlatformCover,
 } from "@/components/operations/shared"
 import { QueueLayout, QueueRow, QueueSection } from "@/components/operations/ReviewQueue"
+import { Segmented } from "@/components/ui/segmented"
+import { SelectField } from "@/components/ui/select-field"
 import { sectionsByCampaign, visibleItems } from "@/lib/queue-sections"
 import { ContractTimeline } from "@/components/operations/ContractTimeline"
 import { useIsWide, useQueueKeys, waitingLabel } from "@/lib/queue-navigation"
@@ -77,8 +79,40 @@ export default function OperationsDeliveriesPage() {
   }
 
   return (
-    <div className="flex flex-col gap-5">
-      <GateHeader gate={gate} onChange={setGate} counts={counts} />
+    // Full-bleed, como o resto da plataforma. Antes era uma pilha de blocos
+    // dentro do padding padrão, e cada uma das duas filas trazia o PRÓPRIO
+    // `<h1>` — o título da página trocava ao alternar de fila.
+    <div className="-m-6" style={{ color: "var(--ink)" }}>
+      <section className="px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
+        <div className="flex-1 max-w-190 min-w-70">
+          <div className="eyebrow mb-3">Operations · Qualidade</div>
+          <h1 className="font-display m-0" style={{ fontSize: 34, lineHeight: 1.1, color: "var(--ink)" }}>
+            Entregas
+          </h1>
+          <p className="text-[14.5px] leading-relaxed text-ink-muted mt-2.5 mb-0 max-w-150">
+            Duas portas de qualidade: aprovar o corte libera a publicação, aprovar a entrega
+            publicada libera o pagamento.
+          </p>
+        </div>
+      </section>
+
+      {/* Barra de trabalho: qual fila. É recorte do mesmo trabalho, não
+          navegação entre telas — daí `Segmented` e não `TabPill`. */}
+      <section
+        className="px-8 py-3 border-b border-border-soft flex items-center gap-4 flex-wrap sticky top-0 z-10"
+        style={{ background: "var(--surface)" }}
+      >
+        <Segmented
+          items={[
+            { key: "drafts", label: "Cortes por aprovar", count: counts.drafts },
+            { key: "published", label: "Entregas publicadas", count: counts.published },
+          ]}
+          value={gate}
+          onChange={(k) => setGate(k as Gate)}
+          ariaLabel="Fila de entregas"
+        />
+      </section>
+
       {gate === "drafts"
         ? <DeliveryDrafts />
         : (
@@ -214,19 +248,8 @@ function PublishedQueue({
 
   return (
     <>
-      <div>
-        <div className="eyebrow mb-2">Operations · Qualidade</div>
-        <h1 className="font-display m-0" style={{ fontSize: 32, lineHeight: 1.1, color: "var(--ink)" }}>
-          Entregas
-        </h1>
-        <p className="text-[14px] text-ink-muted mt-1.5 max-w-[620px]">
-          A entrega é o link do vídeo já publicado — é sobre o conteúdo público que a
-          conformidade se verifica. Aprovar libera a custódia para pagamento.
-        </p>
-      </div>
-
-      <div className="flex gap-2 flex-wrap items-center justify-between">
-        <div className="flex gap-1 flex-wrap">
+      <section className="px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap">
+        <div className="flex gap-1.5 flex-wrap">
           {TABS.map(([k, label]) => (
             <button
               key={k}
@@ -247,23 +270,34 @@ function PublishedQueue({
           ))}
         </div>
         {hasItems && (
-          <div className="flex gap-2 flex-wrap items-center">
+          <div className="flex gap-2 flex-wrap items-center ml-auto">
             {(campaignOptions.length > 1 || campaignFilter) && (
-              <select
+              <SelectField
                 value={campaignFilter}
-                onChange={(e) => setCampaignFilter(e.target.value)}
-                aria-label="Filtrar por campanha"
-                className="h-9 px-2.5 rounded-lg border border-border-soft text-[12.5px] bg-transparent max-w-[220px]"
-                style={{ color: "var(--ink)" }}
-              >
-                <option value="">Todas as campanhas</option>
-                {campaignOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-              </select>
+                onChange={setCampaignFilter}
+                ariaLabel="Filtrar por campanha"
+                className="data-[size=default]:h-8 px-3 text-[12.5px] rounded-lg border-border-soft max-w-[220px]"
+                options={[
+                  { key: "", label: "Todas as campanhas" },
+                  ...campaignOptions.map(([id, name]) => ({ key: id, label: name })),
+                ]}
+              />
             )}
-            <SearchBox value={search} onChange={setSearch} placeholder="Buscar por criador, campanha…" />
+            <SearchBox
+              value={search}
+              onChange={setSearch}
+              placeholder="Buscar por criador, campanha…"
+              className="w-48 sm:w-60"
+            />
           </div>
         )}
-      </div>
+      </section>
+
+      {/* O que esta fila decide — a frase saiu do `<h1>` que trocava. */}
+      <p className="px-8 pt-4 pb-0 m-0 text-[12.5px] text-ink-muted max-w-160">
+        A entrega é o link do vídeo já publicado — é sobre o conteúdo público que a
+        conformidade se verifica. Aprovar libera a custódia para pagamento.
+      </p>
 
       {isLoading ? (
         <TableSkeleton rows={3} />
@@ -740,49 +774,3 @@ function ReviewPanel({ group, onDecided }: { group: DeliveryGroup; onDecided: ()
   )
 }
 
-/** Alterna entre os dois portões, acima do título. */
-function GateHeader({
-  gate, onChange, counts,
-}: {
-  gate: Gate
-  onChange: (g: Gate) => void
-  counts: Record<Gate, number>
-}) {
-  const options: [Gate, string, string][] = [
-    ["drafts", "Cortes por aprovar", "Antes de publicar"],
-    ["published", "Entregas publicadas", "Libera pagamento"],
-  ]
-
-  return (
-    <div className="flex gap-2 flex-wrap">
-      {options.map(([id, label, hint]) => (
-        <button
-          key={id}
-          onClick={() => onChange(id)}
-          className="px-4 py-2.5 rounded-lg text-left transition-colors border"
-          style={
-            gate === id
-              ? { background: "var(--color-teal-500)", color: "#fff", borderColor: "transparent" }
-              : { color: "var(--ink-muted)", borderColor: "var(--border-soft)" }
-          }
-        >
-          <div className="text-[13px] font-semibold inline-flex items-center gap-1.5">
-            {label}
-            {counts[id] > 0 && (
-              <span
-                className="text-[11px] font-mono-zoe px-1.5 rounded"
-                style={gate === id
-                  ? { background: "#ffffff28" }
-                  : { background: "#D9770620", color: "var(--color-warn)" }}
-                aria-label={`${counts[id]} esperando`}
-              >
-                {counts[id]}
-              </span>
-            )}
-          </div>
-          <div className="text-[11px]" style={{ opacity: 0.75 }}>{hint}</div>
-        </button>
-      ))}
-    </div>
-  )
-}

@@ -1,15 +1,15 @@
 import { useMemo, useState } from "react"
-import { X, Loader2, Copy, Check } from "lucide-react"
+import { Loader2, Copy, Check } from "lucide-react"
 import { notifyError, notifySuccess } from "@/lib/feedback"
-import { useEscapeKey } from "@/lib/useEscapeKey"
-import { useFocusTrap } from "@/lib/useFocusTrap"
 import { MoneyInput } from "@/components/ui/money-input"
 import { parseBRLToCents } from "@/lib/money"
 import { ApiError } from "@/lib/api"
 import { Input } from "@/components/ui/input"
+import { Modal, ModalFooter } from "@/components/ui/modal"
 import { tEnum } from "@/i18n/enums"
 import { fmtDate, initials } from "@/lib/operations-format"
-import { Field, Select } from "@/components/operations/shared"
+import { Field } from "@/components/operations/shared"
+import { SelectField } from "@/components/ui/select-field"
 import {
   useRoster, useRosterMutations, useCampaigns, useCampaign, INFLUENCER_INVITE_PATH,
   type RosterItem, type InviteInfluencerResponse, type CampaignBriefing,
@@ -44,8 +44,6 @@ export function InviteCreatorModal({
   const [resent, setResent] = useState(false)
   /** No reenvio, trocar a proposta pelos valores do formulário. Ligado: é por isso que se reenvia. */
   const [updateProposal, setUpdateProposal] = useState(true)
-  useEscapeKey(onClose)
-  const dialogRef = useFocusTrap<HTMLDivElement>()
   /** Convite recusado por já existir, mostrado no modal junto do que foi preenchido. */
   const [conflict, setConflict] = useState<{ code: string; message: string } | null>(null)
 
@@ -151,38 +149,37 @@ export function InviteCreatorModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-[90] flex items-center justify-center p-4"
-      style={{ background: "rgba(7,9,26,0.32)", backdropFilter: "blur(2px)" }}
-      onClick={onClose}
+    <Modal
+      eyebrow="Proposta de trabalho"
+      title={sent ? (resent ? "Convite reenviado" : "Convite criado") : "Convidar influenciador"}
+      description={sent
+        ? undefined
+        : "Escolha quem já trabalhou com você ou convide alguém novo por e-mail."}
+      size="lg"
+      onClose={onClose}
+      footer={sent
+        ? (
+          <ModalFooter
+            onCancel={onClose}
+            cancelLabel="Fechar"
+            onSubmit={onClose}
+            submitLabel="Concluir"
+          />
+        )
+        : (
+          <ModalFooter
+            onCancel={onClose}
+            onSubmit={submit}
+            submitLabel="Enviar convite"
+            pending={invite.isPending}
+            disabled={!email.trim() || !fullName.trim()}
+            hint={!email.trim() || !fullName.trim()
+              ? "Escolha alguém do elenco ou preencha nome e e-mail."
+              : undefined}
+          />
+        )}
     >
-      <div
-        className="w-full max-w-lg rounded-xl border border-border-soft shadow-2xl p-6 overflow-y-auto max-h-[88vh]"
-        style={{ background: "var(--surface)" }}
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Convidar influenciador"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between mb-5">
-          <div>
-            <div className="eyebrow mb-1">Proposta de trabalho</div>
-            <h2 className="font-display m-0" style={{ fontSize: 20, color: "var(--ink)" }}>
-              {sent ? (resent ? "Convite reenviado" : "Convite criado") : "Convidar influenciador"}
-            </h2>
-            {!sent && (
-              <p className="text-[12.5px] text-ink-muted m-0 mt-1">
-                Escolha quem já trabalhou com você ou convide alguém novo por e-mail.
-              </p>
-            )}
-          </div>
-          <button onClick={onClose} className="text-ink-muted hover:opacity-70" aria-label="Fechar">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {sent ? (
+      {sent ? (
           <>
             {sent.emailDelivery !== "Sent" && (
               <div className="rounded-lg p-3 text-[12px] mb-4" style={{ background: "var(--warn-bg)", color: "var(--color-warn)" }}>
@@ -216,17 +213,10 @@ export function InviteCreatorModal({
                 : "As campanhas você amarra depois — este convite não o prende a nenhuma ação."}
             </p>
 
-            <button
-              onClick={onClose}
-              className="w-full px-4 py-2.5 rounded-lg text-[14px] font-medium text-white"
-              style={{ background: "var(--color-teal-500)" }}
-            >
-              Fechar
-            </button>
           </>
-        ) : (
+      ) : (
           <>
-            <div className="flex gap-1 p-1 rounded-lg mb-5" style={{ background: "var(--surface-2, #F3F4F6)" }}>
+            <div className="flex gap-1 p-1 rounded-lg bg-inset">
               {([["roster", "Quem você já trabalhou"], ["email", "Convidar por e-mail"]] as const).map(
                 ([id, label]) => (
                   <button
@@ -309,12 +299,15 @@ export function InviteCreatorModal({
 
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Campanha" hint="Em branco convida só para o elenco.">
-                  <Select value={campaignId} onChange={(v) => { setCampaignId(v); setConflict(null) }}>
-                    <option value="">Sem campanha</option>
-                    {campaigns.map((c) => (
-                      <option key={c.campaignId} value={c.campaignId}>{c.name}</option>
-                    ))}
-                  </Select>
+                  <SelectField
+                    value={campaignId}
+                    onChange={(v) => { setCampaignId(v); setConflict(null) }}
+                    ariaLabel="Campanha"
+                    options={[
+                      { key: "", label: "Sem campanha" },
+                      ...campaigns.map((c) => ({ key: c.campaignId, label: c.name })),
+                    ]}
+                  />
                 </Field>
                 <Field label="Modalidade" hint="Vem da campanha — o contrato herda.">
                   <div
@@ -410,29 +403,9 @@ export function InviteCreatorModal({
               </div>
             )}
 
-            <div className="flex gap-2 mt-6">
-              <button onClick={onClose} className="flex-1 px-4 py-2.5 rounded-lg text-[14px] border border-border-soft">
-                Cancelar
-              </button>
-              <button
-                onClick={submit}
-                disabled={invite.isPending || !email.trim() || !fullName.trim()}
-                title={
-                  !email.trim() || !fullName.trim()
-                    ? "Escolha alguém do elenco ou preencha nome e e-mail."
-                    : undefined
-                }
-                className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[14px] font-medium text-white disabled:opacity-50"
-                style={{ background: "var(--color-teal-500)" }}
-              >
-                {invite.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                Enviar convite
-              </button>
-            </div>
           </>
-        )}
-      </div>
-    </div>
+      )}
+    </Modal>
   )
 }
 

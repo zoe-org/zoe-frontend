@@ -193,6 +193,15 @@ export default function MonitoringPage() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const openDrawer = (item: VideoListItem) => { setSelected(item); setDrawerOpen(true) }
 
+  // Vizinhos da menção aberta: o drawer navega sem fechar. O índice é
+  // recalculado da lista atual porque ela cresce com "carregar mais" e muda de
+  // ordem com os filtros — guardar a posição daria o vizinho errado.
+  const selectedIndex = selected ? items.findIndex((i) => i.analysisId === selected.analysisId) : -1
+  const goTo = (offset: number) => {
+    const alvo = items[selectedIndex + offset]
+    if (alvo) setSelected(alvo)
+  }
+
   /**
    * Export CSV das menções carregadas (respeita os filtros ativos). Título e
    * canal vêm do YouTube — input hostil — então TODO valor passa pelo
@@ -550,7 +559,15 @@ export default function MonitoringPage() {
         </section>
       )}
 
-      <MentionDrawer item={selected} brandId={brandId} open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      <MentionDrawer
+        item={selected}
+        brandId={brandId}
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        position={selectedIndex >= 0 ? { index: selectedIndex, total: items.length } : undefined}
+        onPrev={selectedIndex > 0 ? () => goTo(-1) : undefined}
+        onNext={selectedIndex >= 0 && selectedIndex < items.length - 1 ? () => goTo(1) : undefined}
+      />
     </div>
   )
 }

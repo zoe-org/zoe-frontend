@@ -25,22 +25,29 @@ export default function OperationsDashboardPage() {
   const d = q.data
 
   return (
-    <div className="flex flex-col gap-7">
-      <div>
-        <div className="eyebrow mb-2">Operations · Painel</div>
-        <h1 className="font-display m-0" style={{ fontSize: 32, lineHeight: 1.1, color: "var(--ink)" }}>
-          Visão geral
-        </h1>
-        <p className="text-[14px] text-ink-muted mt-1.5 max-w-[620px]">
-          O que está parado, onde está o dinheiro e o tamanho da operação — nesta ordem,
-          porque só a primeira parte pede alguma coisa de você.
-        </p>
-      </div>
+    // Abertura full-bleed como o resto da plataforma; os painéis seguem em
+    // cartões dentro de um container com respiro — num painel os cartões são o
+    // agrupamento certo, diferente das listas, que sangram até a borda.
+    <div className="-m-6" style={{ color: "var(--ink)" }}>
+      <section className="px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
+        <div className="flex-1 max-w-190 min-w-70">
+          <div className="eyebrow mb-3">Operations · Painel</div>
+          <h1 className="font-display m-0" style={{ fontSize: 34, lineHeight: 1.1, color: "var(--ink)" }}>
+            Visão geral
+          </h1>
+          <p className="text-[14.5px] leading-relaxed text-ink-muted mt-2.5 mb-0 max-w-150">
+            O que está parado, onde está o dinheiro e o tamanho da operação — nesta ordem,
+            porque só a primeira parte pede alguma coisa de você.
+          </p>
+        </div>
+      </section>
 
-      <PendingPanel pending={d.pending} />
-      <MoneyPanel money={d.money} byState={d.escrowByState} />
-      <RisksPanel risks={d.risks} />
-      <VolumePanel volume={d.volume} />
+      <div className="px-8 py-7 flex flex-col gap-8">
+        <PendingPanel pending={d.pending} />
+        <MoneyPanel money={d.money} byState={d.escrowByState} />
+        <RisksPanel risks={d.risks} />
+        <VolumePanel volume={d.volume} />
+      </div>
     </div>
   )
 }

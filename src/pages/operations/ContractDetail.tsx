@@ -9,6 +9,8 @@ import { MoneyInput } from "@/components/ui/money-input"
 import { ApiError } from "@/lib/api"
 import { Input } from "@/components/ui/input"
 import { RoleGate } from "@/features/auth/RoleGate"
+import { StatusChip } from "@/components/ui/status-chip"
+import { CONTRACT_STATUS_COLOR } from "@/lib/status-colors"
 import { tEnum } from "@/i18n/enums"
 import { fmtDate } from "@/lib/operations-format"
 import { ChargeBreakdown, TableSkeleton } from "@/components/operations/shared"
@@ -40,7 +42,6 @@ export default function ContractDetailPage() {
   /** Faltantes apontados pelo servidor na última tentativa de envio. */
   const [serverMissing, setServerMissing] = useState<string[]>([])
   /** Só os campos vazios, porque o contrato já nasce quase todo preenchido. */
-  const [emptyOnly, setEmptyOnly] = useState(false)
   const saveDefault = useUpdateContractDefaults()
   const tenantDefaults = useContractDefaults()
 
@@ -90,11 +91,20 @@ export default function ContractDetailPage() {
   // na primeira tecla e levaria o foco junto. Ele sai do filtro depois de salvar.
   const savedValues = new Map(data.fields.map((f) => [f.placeholder, f.value]))
   const isEmpty = (f: ContractField) => !f.isSystemManaged && !(savedValues.get(f.placeholder) ?? "").trim()
-  const emptyFields = fields.filter(isEmpty)
-  // Obrigatório vazio primeiro: é ele que trava o envio.
-  const visibleFields = emptyOnly
-    ? [...emptyFields].sort((a, b) => Number(missing.has(b.placeholder)) - Number(missing.has(a.placeholder)))
-    : fields
+  /**
+   * Quatro grupos, na ordem da pergunta que a pessoa faz: o que me trava, o que
+   * já está feito, o que eu poderia preencher, e o que o sistema resolveu.
+   *
+   * Era um grid único com todos os campos — num template real são uns 50, e o
+   * que trava o envio ficava perdido no meio. O recorte "só os vazios" existia
+   * justamente para contornar isso, e deixou de ser necessário.
+   */
+  const grupos = {
+    faltando: fields.filter((f) => f.isRequired && !f.isSystemManaged && isEmpty(f)),
+    preenchidos: fields.filter((f) => !f.isSystemManaged && !isEmpty(f)),
+    opcionais: fields.filter((f) => !f.isRequired && !f.isSystemManaged && isEmpty(f)),
+    doSistema: fields.filter((f) => f.isSystemManaged),
+  }
 
   const currentDefaults = new Map((tenantDefaults.data?.fields ?? []).map((c) => [c.placeholder, (c.value ?? "").trim()]))
 
@@ -155,52 +165,25 @@ export default function ContractDetailPage() {
   }
 
   return (
-    <div className="-m-6 border-t border-border-soft" style={{ color: "var(--ink)" }}>
-      <Header data={data} progress={progress} />
+    <div className="-m-6" style={{ color: "var(--ink)" }}>
+      <Header
+        data={data}
+        progress={progress}
+        isDraft={isDraft}
+        dirty={dirty}
+        onSave={save}
+        onSend={send}
+        saving={saveFields.isPending}
+        sending={sendForSignature.isPending}
+      />
 
       <div className="px-8 py-6 grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-8" style={{ background: "var(--surface)" }}>
         {/* Campos */}
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <h2 className="text-[15px] font-semibold m-0">Campos do contrato</h2>
-              <button
-                onClick={() => setEmptyOnly((v) => !v)}
-                aria-pressed={emptyOnly}
-                className="px-2.5 py-1 rounded-full text-[11.5px] font-medium border transition-colors"
-                style={emptyOnly
-                  ? { background: "var(--color-teal-500)", borderColor: "transparent", color: "#fff" }
-                  : { borderColor: "var(--border-soft)", color: "var(--ink-muted)" }}
-              >
-                Só os vazios ({emptyFields.length})
-              </button>
-            </div>
-            <RoleGate minRole="Admin">
-              <div className="flex items-center gap-2">
-                {isDraft && (
-                  <button
-                    onClick={save}
-                    disabled={!dirty || saveFields.isPending}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-medium border border-border-soft disabled:opacity-40 hover:bg-hover"
-                  >
-                    {saveFields.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                    Salvar
-                  </button>
-                )}
-                {isDraft && (
-                  <button
-                    onClick={send}
-                    disabled={sendForSignature.isPending}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12.5px] font-medium text-white disabled:opacity-50"
-                    style={{ background: "var(--color-teal-500)" }}
-                  >
-                    {sendForSignature.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                    Enviar para assinatura
-                  </button>
-                )}
-              </div>
-            </RoleGate>
-          </div>
+          {/* Salvar e Enviar subiram para o cabeçalho da página: são ações do
+              contrato, não da seção de campos, e viviam longe da barra de
+              progresso que diz se o envio passa. */}
+          <h2 className="text-[15px] font-semibold m-0 mb-4">Campos do contrato</h2>
 
           {!isDraft && (
             <p className="text-[12.5px] text-ink-muted mb-4">
@@ -208,21 +191,31 @@ export default function ContractDetailPage() {
             </p>
           )}
 
-          {pastDates.length > 0 && (
-            <div className="rounded-lg p-3 text-[12.5px] mb-4" style={{ background: "var(--warn-bg)", color: "var(--color-warn)" }}>
-              <span className="font-medium">Datas no passado:</span>{" "}
-              {pastDates.map((f) => f.label).join(", ")}. Confira antes de enviar para assinatura —
-              o contrato nasceria com prazos já vencidos.
-            </div>
-          )}
-
-          {unreadableTotal && (
-            <div className="rounded-lg p-3 text-[12.5px] mb-4" style={{ background: "var(--warn-bg)", color: "var(--color-warn)" }}>
-              <span className="font-medium">{totalValueField?.label ?? "Valor total"} ilegível:</span>{" "}
-              “{savedTotalValue}” não é um valor em reais que a custódia consiga ler (ex.: 5.000,00).{" "}
-              {data.autoAdvanceEscrow
-                ? "Com pagamento automático, o envio para assinatura é recusado até corrigir."
-                : "Assim, ela não abre sozinha depois da assinatura — e o valor assinado já não muda."}
+          {/* Um bloco só, em lista. Eram caixas âmbar empilhadas — em pior caso
+              três, e o formulário começava abaixo da dobra. */}
+          {(pastDates.length > 0 || unreadableTotal) && (
+            <div
+              className="rounded-lg p-3.5 mb-4"
+              style={{ background: "var(--warn-bg)", color: "var(--color-warn)" }}
+            >
+              <div className="text-[12.5px] font-semibold mb-2">Confira antes de enviar</div>
+              <ul className="list-disc pl-4 m-0 flex flex-col gap-1.5 text-[12.5px]">
+                {pastDates.length > 0 && (
+                  <li>
+                    <span className="font-medium">Datas no passado:</span>{" "}
+                    {pastDates.map((f) => f.label).join(", ")}. O contrato nasceria com prazos já vencidos.
+                  </li>
+                )}
+                {unreadableTotal && (
+                  <li>
+                    <span className="font-medium">{totalValueField?.label ?? "Valor total"} ilegível:</span>{" "}
+                    “{savedTotalValue}” não é um valor em reais que a custódia consiga ler (ex.: 5.000,00).{" "}
+                    {data.autoAdvanceEscrow
+                      ? "Com pagamento automático, o envio para assinatura é recusado até corrigir."
+                      : "Assim, ela não abre sozinha depois da assinatura — e o valor assinado já não muda."}
+                  </li>
+                )}
+              </ul>
             </div>
           )}
 
@@ -230,8 +223,8 @@ export default function ContractDetailPage() {
               só, e outro deste criador nesta campanha já a levou. */}
           {proposalUsedBy && (
             <div
-              className="rounded-lg p-3 text-[12.5px] mb-4 border border-border-soft"
-              style={{ background: "var(--bg, #F9FAFB)", color: "var(--ink-2)" }}
+              className="rounded-lg p-3 text-[12.5px] mb-4 border border-border-soft bg-inset"
+              style={{ color: "var(--ink-2)" }}
             >
               <span className="font-medium" style={{ color: "var(--ink)" }}>Sem a proposta do convite:</span>{" "}
               ela já foi usada em{" "}
@@ -247,9 +240,8 @@ export default function ContractDetailPage() {
             </div>
           )}
 
-          {/* Duas colunas para campos curtos; texto longo ocupa a linha inteira. */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-4">
-            {visibleFields.map((f) => (
+          {(() => {
+            const render = (f: ContractField) => (
               <div key={f.placeholder} className={isWideField(f) ? "md:col-span-2" : undefined}>
                 <FieldRow
                   field={f}
@@ -262,14 +254,55 @@ export default function ContractDetailPage() {
                   savingDefault={saveDefault.isPending && saveDefault.variables?.[f.placeholder] !== undefined}
                 />
               </div>
-            ))}
-          </div>
+            )
+            return (
+              <div className="flex flex-col gap-3">
+                {grupos.faltando.length > 0 && (
+                  <FieldGroup
+                    title="Faltam preencher"
+                    count={grupos.faltando.length}
+                    hint="sem estes o envio é recusado"
+                    tone="var(--color-warn)"
+                    defaultOpen
+                  >
+                    {grupos.faltando.map(render)}
+                  </FieldGroup>
+                )}
 
-          {emptyOnly && emptyFields.length === 0 && (
-            <p className="text-[12.5px] text-ink-muted mt-2">
-              Nenhum campo vazio — tudo veio herdado ou já foi preenchido.
-            </p>
-          )}
+                {grupos.preenchidos.length > 0 && (
+                  <FieldGroup title="Preenchidos" count={grupos.preenchidos.length} defaultOpen>
+                    {grupos.preenchidos.map(render)}
+                  </FieldGroup>
+                )}
+
+                {grupos.opcionais.length > 0 && (
+                  <FieldGroup
+                    title="Opcionais em branco"
+                    count={grupos.opcionais.length}
+                    hint="o contrato sai sem eles"
+                  >
+                    {grupos.opcionais.map(render)}
+                  </FieldGroup>
+                )}
+
+                {grupos.doSistema.length > 0 && (
+                  <FieldGroup
+                    title="Preenchidos pelo sistema"
+                    count={grupos.doSistema.length}
+                    hint="somente leitura"
+                  >
+                    {grupos.doSistema.map(render)}
+                  </FieldGroup>
+                )}
+
+                {grupos.faltando.length === 0 && isDraft && (
+                  <p className="text-[12.5px] text-ink-muted m-0">
+                    Nenhum obrigatório em aberto — o contrato pode ir para assinatura.
+                  </p>
+                )}
+              </div>
+            )
+          })()}
         </div>
 
         {/* Coluna lateral */}
@@ -336,52 +369,167 @@ function AutoReleasePanel({ data }: { data: ContractDetail }) {
   )
 }
 
-function Header({
-  data, progress,
-}: { data: ContractDetail; progress: { required: number; filled: number } }) {
-  const pct = progress.required === 0 ? 100 : Math.round((progress.filled / progress.required) * 100)
+/** Um fato do contrato, com o rótulo que diz o que o valor significa. */
+function Fact({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <section className="px-8 pt-6 pb-5 border-b border-border-soft" style={{ background: "var(--surface)" }}>
-      <Link
-        to="/operations/contracts"
-        className="inline-flex items-center gap-1.5 text-[12.5px] text-ink-muted hover:text-ink mb-3"
+    <div className="min-w-0">
+      <div className="eyebrow">{label}</div>
+      <div className="text-[13px] mt-1" style={{ color: "var(--ink)" }}>{children}</div>
+    </div>
+  )
+}
+
+function Header({
+  data, progress, isDraft, dirty, onSave, onSend, saving, sending,
+}: {
+  data: ContractDetail
+  progress: { required: number; filled: number }
+  isDraft: boolean
+  dirty: boolean
+  onSave: () => void
+  onSend: () => void
+  saving: boolean
+  sending: boolean
+}) {
+  const pct = progress.required === 0 ? 100 : Math.round((progress.filled / progress.required) * 100)
+  const completo = progress.filled >= progress.required
+  return (
+    <>
+      <section className="px-8 pt-6 pb-5 border-b border-border-soft" style={{ background: "var(--surface)" }}>
+        <Link
+          to="/operations/contracts"
+          className="inline-flex items-center gap-1.5 text-[12.5px] text-ink-muted hover:text-ink mb-3"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" /> Contratos
+        </Link>
+
+        <div className="flex items-start justify-between gap-6 flex-wrap">
+          <div className="min-w-0">
+            <div className="eyebrow mb-2">
+              {tEnum("contractModality", data.modality ?? "")} · template v{data.templateVersion}
+              {data.hybridCode && ` · ${data.hybridCode}`}
+            </div>
+            {/* O estado vira selo ao lado do nome. Na lista corrida de antes ele
+                tinha o mesmo peso de "3 correções" — e é ele que decide o que
+                dá pra fazer nesta tela. */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="font-display m-0" style={{ fontSize: 30, lineHeight: 1.1, color: "var(--ink)" }}>
+                {data.influencerName}
+              </h1>
+              <StatusChip status={data.status} kind="contractStatus" colors={CONTRACT_STATUS_COLOR} />
+            </div>
+            {data.signedAt && (
+              <div className="text-[13px] text-ink-muted mt-1.5">
+                Assinado em {fmtDate(data.signedAt)}
+              </div>
+            )}
+          </div>
+
+          {/* Progresso e ação juntos: o preenchimento dos obrigatórios É a
+              condição do envio, e eles viviam em cantos opostos da tela. */}
+          <div className="flex items-end gap-4 flex-wrap">
+            {isDraft && (
+              <div className="min-w-44">
+                <div className="flex items-center justify-between text-[12px] text-ink-muted mb-1.5">
+                  <span>Obrigatórios</span>
+                  <span className="font-mono-zoe">{progress.filled}/{progress.required}</span>
+                </div>
+                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--border-soft)" }}>
+                  <div
+                    className="h-full transition-[width] duration-300"
+                    style={{ width: `${pct}%`, background: completo ? "var(--color-teal-500)" : "var(--color-warn)" }}
+                  />
+                </div>
+              </div>
+            )}
+
+            <RoleGate minRole="Admin">
+              {isDraft && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={onSave}
+                    disabled={!dirty || saving}
+                    className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-md text-[13px] font-medium border border-border-soft disabled:opacity-40 disabled:cursor-not-allowed hover:bg-hover transition-colors cursor-pointer"
+                  >
+                    {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                    Salvar
+                  </button>
+                  <button
+                    onClick={onSend}
+                    disabled={sending}
+                    title={completo ? undefined : "Faltam campos obrigatórios — o envio vai ser recusado."}
+                    className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-md text-[13px] font-medium text-white disabled:opacity-50 transition-colors cursor-pointer"
+                    style={{ background: "var(--color-teal-500)" }}
+                  >
+                    {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                    Enviar para assinatura
+                  </button>
+                </div>
+              )}
+            </RoleGate>
+          </div>
+        </div>
+      </section>
+
+      {/* As regras do contrato, cada uma com rótulo. Eram seis fatos numa frase
+          só separada por "·", onde o SLA de revisão lia igual ao estado. */}
+      <section
+        className="px-8 py-3.5 border-b border-border-soft flex items-start gap-x-10 gap-y-3 flex-wrap"
+        style={{ background: "var(--surface)" }}
       >
-        <ArrowLeft className="w-3.5 h-3.5" /> Contratos
-      </Link>
+        <Fact label="Custódia">{data.usesEscrow ? "Prevista no contrato" : "Sem custódia"}</Fact>
+        <Fact label="Prazo de revisão">{data.reviewSlaDays} dias</Fact>
+        <Fact label="Correções">até {data.maxResubmissions}</Fact>
+        <Fact label="Se o prazo vencer">
+          {data.autoReleaseOnTimeout ? "Aprova automaticamente" : "Espera você"}
+        </Fact>
+      </section>
+    </>
+  )
+}
 
-      <div className="flex items-start justify-between gap-6 flex-wrap">
-        <div>
-          <div className="eyebrow mb-2">
-            {tEnum("contractModality", data.modality ?? "")} · template v{data.templateVersion}
-            {data.hybridCode && ` · ${data.hybridCode}`}
-          </div>
-          <h1 className="font-display m-0" style={{ fontSize: 30, lineHeight: 1.1, color: "var(--ink)" }}>
-            {data.influencerName}
-          </h1>
-          <div className="text-[13px] text-ink-muted mt-1.5">
-            {tEnum("contractStatus", data.status)}
-            {data.signedAt && ` · assinado em ${fmtDate(data.signedAt)}`}
-            {" · "}
-            {data.usesEscrow ? "com custódia" : "sem custódia"}
-            {" · revisão em "}{data.reviewSlaDays} dias
-            {" · "}{data.maxResubmissions} correções
-            {data.autoReleaseOnTimeout && " · aprova se o prazo de revisão vencer"}
-          </div>
+/**
+ * Grupo de campos recolhível.
+ *
+ * O que trava o envio abre sozinho; o resto começa fechado. Num template de 50
+ * campos, abrir tudo é entregar um muro — e a pergunta que traz alguém aqui é
+ * quase sempre "o que falta para eu mandar isto".
+ */
+function FieldGroup({
+  title, count, hint, tone, defaultOpen = false, children,
+}: {
+  title: string
+  count: number
+  hint?: string
+  tone?: string
+  defaultOpen?: boolean
+  children: React.ReactNode
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <section className="rounded-xl border border-border-soft overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="w-full flex items-center gap-2.5 px-4 py-3 text-left hover:bg-hover transition-colors cursor-pointer"
+      >
+        <ChevronRight
+          className={`w-4 h-4 shrink-0 transition-transform ${open ? "rotate-90" : ""}`}
+          style={{ color: "var(--ink-muted)" }}
+        />
+        <span className="text-[13.5px] font-semibold" style={{ color: tone ?? "var(--ink)" }}>
+          {title}
+        </span>
+        <span className="font-mono-zoe text-[11.5px] text-ink-muted-2">{count}</span>
+        {hint && <span className="text-[11.5px] text-ink-muted ml-auto truncate">{hint}</span>}
+      </button>
+      {open && (
+        // Duas colunas para campos curtos; texto longo ocupa a linha inteira.
+        <div className="px-4 pb-4 pt-1 grid grid-cols-1 md:grid-cols-2 gap-x-5 gap-y-4">
+          {children}
         </div>
-
-        <div className="min-w-52">
-          <div className="flex items-center justify-between text-[12px] text-ink-muted mb-1.5">
-            <span>Obrigatórios</span>
-            <span className="font-mono-zoe">{progress.filled}/{progress.required}</span>
-          </div>
-          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--border-soft)" }}>
-            <div
-              className="h-full transition-[width] duration-300"
-              style={{ width: `${pct}%`, background: pct === 100 ? "var(--color-teal-500)" : "#D97706" }}
-            />
-          </div>
-        </div>
-      </div>
+      )}
     </section>
   )
 }
