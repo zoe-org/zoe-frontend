@@ -214,10 +214,12 @@ export default function DashboardPage() {
                   />
                 ))}
               </div>
+              {/* 
               <div className="flex gap-3 mt-2.5 font-mono-zoe text-[10.5px] text-ink-muted">
                 <span>{dist.pctNeu}% neutras</span>
                 <span>{dist.pctNeg}% negativas</span>
               </div>
+              */}
             </>
           )}
         </KpiCell>
@@ -308,26 +310,17 @@ export default function DashboardPage() {
                     <div className="text-[11px] text-ink-muted truncate mt-1">
                       {m.channelName} · {formatDistanceToNow(new Date(m.publishedAt), { addSuffix: true, locale: ptBR })}
                     </div>
-                    <div className="flex-1" />
-                    <div className="flex items-baseline gap-2 mt-2">
-                      <span
-                        className="font-display text-[17px] leading-none"
-                        style={{ color: m.score != null ? scoreColor(m.score) : "var(--ink-muted)" }}
-                      >
-                        {formatScore(m.score)}
-                      </span>
-                      {m.classificacao && (
-                        <span className={`${classificationChip(m.classificacao)} h-4.5 text-[10.5px]`}>
-                          {tEnum("classification", m.classificacao)}
-                        </span>
-                      )}
-                    </div>
                   </div>
                 </div>
                 {/* Rodapé do cartão: o que a leitura do score assume (cobertura) e o
                     tamanho da audiência. Separado por linha, como os blocos da página. */}
                 <div className="flex items-center gap-2 px-3 py-2 border-t border-border-soft bg-inset">
                   <ConfidenceBadge pipelinePath={m.pipelinePath} confidence={m.confidence} />
+                  {m.classificacao && (
+                    <span className={`${classificationChip(m.classificacao)} text-[11.5px]`}>
+                      {tEnum("classification", m.classificacao)}
+                    </span>
+                  )}
                   <span className="flex-1" />
                   <span className="font-mono-zoe text-[10.5px] text-ink-muted-2">
                     {m.views != null ? `${compact(m.views)} views` : "sem views"}

@@ -41,7 +41,6 @@ const SENT_TABS = [
   { key: "Positive", label: "Positivo", color: "var(--color-pos)" },
   { key: "Neutral", label: "Neutro", color: "#6B7280" },
   { key: "Negative", label: "Negativo", color: "var(--color-neg)" },
-  { key: "Inconclusive", label: "Indeterminado", color: "#6B7280" },
 ] as const
 
 const PERIODS = [
@@ -243,15 +242,26 @@ export default function MonitoringPage() {
       {/* Abertura */}
       <section className="px-8 pt-7 pb-6 border-b border-border-soft">
         <div className="flex flex-wrap items-end justify-between gap-6">
-          <div className="flex-1 max-w-160 min-w-70">
+          <div className="flex-1 max-w-200 min-w-70">
             <div className="eyebrow mb-3">Intelligence · Feed</div>
             <h1 className="font-display m-0 text-ink" style={{ fontSize: 34, lineHeight: 1.1 }}>
               Monitoramento
             </h1>
-            <p className="text-[14px] text-ink-muted mt-2 max-w-140">
-              Tudo o que foi dito sobre {brand.active?.displayName ?? brand.active?.brandName ?? "a marca"} em
-              vídeo, áudio e comentários — na ordem em que saiu.
-            </p>
+            <div className="flex items-center mt-2 gap-1 text-[14px]">
+              <p className=" text-ink-muted">
+                Tudo o que foi dito sobre {brand.active?.displayName ?? brand.active?.brandName ?? "a marca"} em
+                vídeo, áudio e comentários.
+              </p>
+              
+              {summary.data && (
+                <p className="text-[14px] text-ink-muted">
+                  <span className="font-mono-zoe text-ink">{summary.data.total}
+                    {summary.data.total === 1 ? " menção" : " menções"}
+                  </span>
+                  {period ? ` nos últimos ${period} dias` : " no período"}.
+                </p>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {/* Seletor de marca vive no header agora (BrandSwitcher). */}
@@ -311,6 +321,27 @@ export default function MonitoringPage() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          {temFiltro && (
+            <button
+              onClick={limparFiltros}
+              className="inline-flex items-center gap-1.5 h-7 px-2.5 text-[12px] rounded-md text-ink-muted hover:text-ink hover:bg-hover transition-colors"
+            >
+              <X className="w-3 h-3" /> Limpar filtros
+            </button>
+          )}
+          <SelectFilterChip
+            value={period} onChange={(v) => setParam("period", v)}
+            options={PERIODS} placeholder="Todo o período"
+          />
+          <SelectFilterChip
+            value={min} onChange={(v) => setParam("min", v)}
+            options={MIN_SCORES} placeholder="Qualquer score"
+          />
+          <SelectFilterChip
+            value={rel} onChange={(v) => setParam("rel", v)}
+            options={CHANNEL_RELATIONS} placeholder="Terceiros"
+          />
+        
           <SelectFilterChip
             value={sort}
             onChange={(v) => setParam("sort", v)}
@@ -342,36 +373,28 @@ export default function MonitoringPage() {
       </section>
 
       {/* Recorte: período, score e origem do canal, com o resultado ao lado. */}
-      <section className="px-8 py-2.5 border-b border-border-soft flex flex-wrap items-center gap-2">
-        <SelectFilterChip
-          value={period} onChange={(v) => setParam("period", v)}
-          options={PERIODS} placeholder="Todo o período"
-        />
-        <SelectFilterChip
-          value={min} onChange={(v) => setParam("min", v)}
-          options={MIN_SCORES} placeholder="Qualquer score"
-        />
-        <SelectFilterChip
-          value={rel} onChange={(v) => setParam("rel", v)}
-          options={CHANNEL_RELATIONS} placeholder="Terceiros"
-        />
-        {temFiltro && (
-          <button
-            onClick={limparFiltros}
-            className="inline-flex items-center gap-1.5 h-7 px-2.5 text-[12px] rounded-md text-ink-muted hover:text-ink hover:bg-hover transition-colors"
-          >
-            <X className="w-3 h-3" /> Limpar filtros
-          </button>
-        )}
-        <div className="flex-1" />
-        {summary.data && (
-          <div className="text-[12px] text-ink-muted">
-            <span className="font-mono-zoe text-ink">{summary.data.total}</span>{" "}
-            {summary.data.total === 1 ? "menção" : "menções"}
-            {period ? ` nos últimos ${period} dias` : " no período"}
-          </div>
-        )}
+      {view !== "grid" ? (
+      <section 
+        className="px-8 py-2.5 border-b border-border-soft grid items-center gap-4 font-mono-zoe text-[11.5px] text-ink"
+        style={{ gridTemplateColumns: "1fr 150px 100px 60px 80px" }}
+      >
+        <p>
+          VÍDEO
+        </p>
+        <p>
+          COBERTURA
+        </p>
+        <p>
+          AUDIÊNCIA
+        </p>
+        <p>
+          SCORE
+        </p>
+        <p>
+          TOM
+        </p>
       </section>
+      ) : null}
 
       {blockedCount > 0 && brand.active && (
         <BlockedFeedNotice blockedCount={blockedCount} tenantBrandId={brand.active.tenantBrandId} />
@@ -465,7 +488,7 @@ export default function MonitoringPage() {
                 className="z-row z-rise grid items-center gap-4 px-8 py-3.5 border-b border-border-soft w-full text-left cursor-pointer"
                 // O escalonamento para na 12ª linha: mais do que isso e a última
                 // demoraria quase um segundo para aparecer.
-                style={{ gridTemplateColumns: "110px 1fr 200px 150px 110px", ...stagger(Math.min(i, 12)) }}
+                style={{ gridTemplateColumns: "110px 1fr 150px 100px 60px 80px", ...stagger(Math.min(i, 12)) }}
               >
                 <VideoThumb
                   youtubeVideoId={m.youtubeVideoId}
@@ -478,20 +501,6 @@ export default function MonitoringPage() {
                   </div>
                   <div className="flex items-center gap-2 text-[11.5px] text-ink-muted flex-wrap">
                     <span className="truncate font-medium text-ink-2">{m.channelName}</span>
-                    {m.views != null && (
-                      <>
-                        <span>·</span>
-                        <span className="font-mono-zoe">{compactNumber(m.views)} views</span>
-                      </>
-                    )}
-                    {m.commentsCount != null && m.commentsCount > 0 && (
-                      <>
-                        <span>·</span>
-                        <span className="font-mono-zoe">
-                          {compactNumber(m.commentsCount)} {m.commentsCount === 1 ? "comentário" : "comentários"}
-                        </span>
-                      </>
-                    )}
                     <span>·</span>
                     <span>{formatDistanceToNow(new Date(m.publishedAt), { addSuffix: true, locale: ptBR })}</span>
                   </div>
@@ -510,30 +519,35 @@ export default function MonitoringPage() {
                     && !coverageSaysOwnedContent(m.pipelinePath, hasSelfMeasuredScore(m))
                     && <OwnedTag />}
                 </div>
+                
+                <p className="text-[12px] text-ink-muted flex flex-col">
+                {m.views != null && (
+                      <>
+                        <span className="font-mono-zoe">{compactNumber(m.views)} views</span>
+                      </>
+                    )}
+                    {m.commentsCount != null && m.commentsCount > 0 && (
+                      <>
+                        <span className="font-mono-zoe">
+                          {compactNumber(m.commentsCount)} {m.commentsCount === 1 ? "coment." : "coment."}
+                        </span>
+                      </>
+                    )}
+                </p>
+
+                <span
+                  className="font-mono-zoe text-[13px] shrink-0"
+                  style={{ color: hasSelfMeasuredScore(m) || m.score == null ? "var(--ink-muted-2)" : scoreColor(m.score) }}
+                >
+                  {scoreLabel(m)}
+                </span>
+
                 <div>
                   {m.classificacao && (
                     <span className={classificationChip(m.classificacao)}>
                       {tEnum("classification", m.classificacao)}
                     </span>
                   )}
-                </div>
-                {/* Score com régua: o número sozinho não diz onde ele cai na escala
-                    [0,1], e é o que separa "morno" de "ruim" numa varredura rápida. */}
-                <div className="flex items-center gap-2 justify-end">
-                  {!hasSelfMeasuredScore(m) && m.score != null && (
-                    <span className="hidden xl:block flex-1 h-[3px] rounded-full bg-tint-2 overflow-hidden">
-                      <span
-                        className="block h-full rounded-full z-grow-x"
-                        style={{ width: `${Math.round(m.score * 100)}%`, background: scoreColor(m.score), ...stagger(Math.min(i, 12)) }}
-                      />
-                    </span>
-                  )}
-                  <span
-                    className="font-mono-zoe text-[13px] shrink-0"
-                    style={{ color: hasSelfMeasuredScore(m) || m.score == null ? "var(--ink-muted-2)" : scoreColor(m.score) }}
-                  >
-                    {scoreLabel(m)}
-                  </span>
                 </div>
               </button>
             ))
