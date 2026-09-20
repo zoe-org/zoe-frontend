@@ -387,7 +387,9 @@ export function AppShell() {
           <Breadcrumb />
           <div className="flex-1" />
           {/* A busca saiu daqui: o campo não fazia nada. Volta quando existir busca de verdade. */}
-          <BrandSwitcher />
+          {/* Só Alertas lê várias marcas de uma vez (a API de disparos
+              aceita `brandId` nulo). Ver `allBrands` no BrandContext. */}
+          <BrandSwitcher allowAll={location.pathname.startsWith("/alerts")} />
           <button
             type="button"
             aria-label={isDark ? "Ativar modo claro" : "Ativar modo escuro"}

@@ -12,6 +12,15 @@ export type BrandContextValue = {
   brandId: string | null
   active: TenantBrandSummary | null
   setBrand: (id: string) => void
+  /**
+   * Recorte "todas as marcas". Só as telas que agregam marcas o respeitam —
+   * hoje, Alertas. Dashboard, Monitoramento, Sentimento, SoV e Influenciadores
+   * pedem um `brandId` à API e continuam lendo `brandId`, que segue apontando
+   * pra última marca escolhida. Por isso é um sinalizador à parte e não
+   * `brandId: null`: anular a marca quebraria as outras cinco telas.
+   */
+  allBrands: boolean
+  setAllBrands: (v: boolean) => void
   isLoading: boolean
   isError: boolean
   refetch: () => void
