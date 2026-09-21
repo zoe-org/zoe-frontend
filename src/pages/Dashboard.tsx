@@ -1,9 +1,10 @@
 import { useMemo } from "react"
 import { Link, useNavigate } from "react-router-dom"
-import { AlertCircle, ArrowUp, ArrowDown, ArrowUpRight, BellRing } from "lucide-react"
+import { AlertCircle, ArrowUp, ArrowDown, ArrowUpRight, BellRing, BrainCircuit, Gauge } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { useAuth } from "@/features/auth/context"
+import { useFeature } from "@/features/auth/useFeature"
 import { CoverageNotice } from "@/components/coverage/CoverageNotice"
 import { CompetitorChannelCard } from "@/components/owned/CompetitorChannelCard"
 import { Heatmap, Sparkline, StackedArea } from "@/components/ui/charts"
@@ -26,6 +27,7 @@ import { tEnum } from "@/i18n/enums"
 import { classificationChip } from "@/lib/chip"
 import { formatScore, scoreColor } from "@/lib/score"
 import { stagger } from "@/lib/motion"
+import OperationsDashboardPage from "@/pages/operations/Dashboard"
 
 function getGreeting(): string {
   const h = new Date().getHours()
@@ -51,6 +53,102 @@ const nf = new Intl.NumberFormat("pt-BR")
 const nf1 = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 })
 
 export default function DashboardPage() {
+  const hasIntelligence = useFeature("intelligence")
+  const hasOperations = useFeature("operations")
+
+  if (hasIntelligence && hasOperations) return <FullPlatformDashboard />
+  if (hasOperations) return <OperationsDashboardPage />
+  if (hasIntelligence) return <IntelligenceDashboard />
+
+  return (
+    <EmptyState
+      title="Nenhum módulo ativo"
+      description="Este workspace ainda não tem acesso ao Intelligence ou ao Operations."
+    />
+  )
+}
+
+function FullPlatformDashboard() {
+  const { user } = useAuth()
+  const displayName = user?.name?.split(" ")[0] ?? user?.email?.split("@")[0] ?? ""
+
+  return (
+    <div className="-m-6">
+      <section className="px-8 pt-7 pb-7 border-b border-border-soft bg-surface">
+        <div className="eyebrow mb-3">
+          {getGreeting()}, {displayName} · {getTodayLabel()}
+        </div>
+        <h1 className="font-display m-0 max-w-220" style={{ fontSize: 34, lineHeight: 1.1, color: "var(--ink)" }}>
+          Intelligence e operação, no mesmo pulso.
+        </h1>
+        <p className="text-[14px] leading-relaxed text-ink-muted mt-2.5 mb-0 max-w-190">
+          A leitura de marca acompanha a marca ativa. A operação reúne todo o workspace,
+          independentemente da marca selecionada.
+        </p>
+      </section>
+
+      <ModuleSection
+        id="intelligence"
+        icon={<BrainCircuit className="w-4 h-4" />}
+        module="Intelligence"
+        scope="Marca ativa"
+        description="Menções, sentimento e sinais que merecem atenção."
+        href="/intelligence/monitoring"
+        action="Abrir monitoramento"
+      >
+        <IntelligenceDashboard embedded />
+      </ModuleSection>
+
+      <ModuleSection
+        id="operations"
+        icon={<Gauge className="w-4 h-4" />}
+        module="Operations"
+        scope="Workspace inteiro"
+        description="Pendências, dinheiro em custódia e volume operacional."
+        href="/operations"
+        action="Abrir painel"
+      >
+        <OperationsDashboardPage embedded />
+      </ModuleSection>
+    </div>
+  )
+}
+
+function ModuleSection({ id, icon, module, scope, description, href, action, children }: {
+  id: string
+  icon: React.ReactNode
+  module: string
+  scope: string
+  description: string
+  href: string
+  action: string
+  children: React.ReactNode
+}) {
+  return (
+    <section id={id} className="border-b border-border-soft last:border-b-0">
+      <div className="px-8 py-5 flex flex-wrap items-center justify-between gap-4 bg-inset border-b border-border-soft">
+        <div className="flex items-start gap-3">
+          <span className="w-8 h-8 rounded-md border border-border-soft bg-surface flex items-center justify-center text-teal-500 shrink-0">
+            {icon}
+          </span>
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-[16px] font-semibold text-ink m-0">{module}</h2>
+              <span className="chip text-[10.5px]">{scope}</span>
+            </div>
+            <p className="text-[12.5px] text-ink-muted mt-0.5 mb-0">{description}</p>
+          </div>
+        </div>
+        <Link to={href} className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-teal-700 dark:text-teal-300 hover:text-teal-500">
+          {action} <ArrowUpRight className="w-3.5 h-3.5" />
+        </Link>
+      </div>
+      {children}
+    </section>
+  )
+}
+
+function IntelligenceDashboard({ embedded = false }: { embedded?: boolean }) {
   const { user } = useAuth()
   const navigate = useNavigate()
   const displayName = user?.name?.split(" ")[0] ?? user?.email?.split("@")[0] ?? ""
@@ -108,9 +206,9 @@ export default function DashboardPage() {
   const brandName = brand.active?.displayName ?? brand.active?.brandName ?? ""
 
   return (
-    <div className="-m-6">
+    <div className={embedded ? "" : "-m-6"}>
       {/* Abertura: o resumo do período escrito em frase, com os números reais. */}
-      <section className="px-8 pt-7 pb-7 border-b border-border-soft">
+      {!embedded && <section className="px-8 pt-7 pb-7 border-b border-border-soft">
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div className="flex-1 min-w-70">
             <div className="eyebrow mb-3">
@@ -145,7 +243,17 @@ export default function DashboardPage() {
             <ArrowUpRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
           </Link>
         </div>
-      </section>
+      </section>}
+
+      {embedded && (
+        <div className="px-8 py-4 border-b border-border-soft bg-surface flex flex-wrap items-center gap-2 text-[12px]">
+          <span className="text-ink-muted">Análise de</span>
+          <span className="font-semibold text-ink">{brandName}</span>
+          {brand.active?.relationship === "Competitor" && (
+            <span className="chip chip-warn">Marca concorrente</span>
+          )}
+        </div>
+      )}
 
       <CoverageNotice tenantBrandIds={[brand.active?.tenantBrandId]} className="mx-8 mt-4" />
 

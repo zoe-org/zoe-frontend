@@ -2,7 +2,7 @@ import { Link } from "react-router-dom"
 import { ESCROW_STATE_COLOR } from "@/lib/status-colors"
 import {
   AlertTriangle, ArrowRight, CheckCircle2, FileText, Film, Megaphone, Users,
-  Wallet, PenLine, Banknote,
+  Wallet, PenLine, Banknote, CircleDollarSign, ShieldAlert,
 } from "lucide-react"
 import { tEnum } from "@/i18n/enums"
 import { TableSkeleton, ErrorState } from "@/components/operations/shared"
@@ -16,31 +16,40 @@ const ESCROW_COLOR = ESCROW_STATE_COLOR
 /**
  * Painel do Operations: o que espera alguém, onde está o dinheiro e só então os totais, todos somados no servidor.
  */
-export default function OperationsDashboardPage() {
+export default function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   const q = useOperationsDashboard()
 
   if (q.isLoading) return <TableSkeleton rows={5} />
   if (q.isError || !q.data) return <ErrorState onRetry={() => q.refetch()} />
 
   const d = q.data
+  const pendingTotal = Object.values(d.pending).reduce((total, value) => total + value, 0)
+  const riskTotal = Object.values(d.risks).reduce((total, value) => total + value, 0)
+
+  if (embedded) return <OperationsOverview data={d} />
 
   return (
     // Abertura full-bleed como o resto da plataforma; os painéis seguem em
     // cartões dentro de um container com respiro — num painel os cartões são o
     // agrupamento certo, diferente das listas, que sangram até a borda.
-    <div className="-m-6" style={{ color: "var(--ink)" }}>
-      <section className="px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
-        <div className="flex-1 max-w-190 min-w-70">
-          <div className="eyebrow mb-3">Operations · Painel</div>
+    <div className={embedded ? "" : "-m-6"} style={{ color: "var(--ink)" }}>
+      {!embedded && <section className="px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
+        <div className="flex-1 max-w-220 min-w-70">
+          <div className="eyebrow mb-3">Operations · Workspace inteiro</div>
           <h1 className="font-display m-0" style={{ fontSize: 34, lineHeight: 1.1, color: "var(--ink)" }}>
-            Visão geral
+            Centro de operações
           </h1>
           <p className="text-[14.5px] leading-relaxed text-ink-muted mt-2.5 mb-0 max-w-150">
-            O que está parado, onde está o dinheiro e o tamanho da operação — nesta ordem,
-            porque só a primeira parte pede alguma coisa de você.
+            Acompanhe o que está parado, onde está o dinheiro e o tamanho da operação.
+            Estes números não mudam quando você troca a marca ativa.
           </p>
+          <div className="flex flex-wrap gap-x-5 gap-y-2 mt-5" aria-label="Resumo operacional">
+            <SummaryMetric value={pendingTotal} label="pendências" emphasis={pendingTotal > 0} />
+            <SummaryMetric value={fmtCents(d.money.inCustodyCents)} label="em custódia" />
+            <SummaryMetric value={riskTotal} label="riscos" warning={riskTotal > 0} />
+          </div>
         </div>
-      </section>
+      </section>}
 
       <div className="px-8 py-7 flex flex-col gap-8">
         <PendingPanel pending={d.pending} />
@@ -48,6 +57,269 @@ export default function OperationsDashboardPage() {
         <RisksPanel risks={d.risks} />
         <VolumePanel volume={d.volume} />
       </div>
+    </div>
+  )
+}
+
+function OperationsOverview({ data: d }: { data: OperationsDashboard }) {
+  const reviewQueue = d.pending.draftsAwaitingReview + d.pending.deliveriesAwaitingReview
+  const riskTotal = Object.values(d.risks).reduce((total, value) => total + value, 0)
+  const activeRate = d.volume.totalCampaigns === 0
+    ? 0
+    : Math.round((d.volume.activeCampaigns / d.volume.totalCampaigns) * 100)
+
+  return (
+    <div>
+      <section className="grid grid-cols-2 xl:grid-cols-4 border-b border-border-soft">
+        <OverviewKpi
+          label="Campanhas ativas"
+          value={d.volume.activeCampaigns}
+          detail={`${activeRate}% das ${d.volume.totalCampaigns} campanhas`}
+          href="/operations/campaigns"
+          icon={<Megaphone className="w-4 h-4" />}
+        />
+        <OverviewKpi
+          label="Aguardando revisão"
+          value={reviewQueue}
+          detail={`${d.pending.draftsAwaitingReview} cortes · ${d.pending.deliveriesAwaitingReview} entregas`}
+          href="/operations/deliveries"
+          icon={<Film className="w-4 h-4" />}
+          emphasis={reviewQueue > 0}
+        />
+        <OverviewKpi
+          label="Em custódia"
+          value={fmtCents(d.money.inCustodyCents)}
+          detail={`${fmtCents(d.money.pendingDepositCents)} aguardando depósito`}
+          href="/operations/escrow"
+          icon={<CircleDollarSign className="w-4 h-4" />}
+        />
+        <OverviewKpi
+          label="Pronto para liberar"
+          value={d.pending.escrowsReleasable}
+          detail={d.pending.escrowsReleasable > 0 ? "pagamentos dependem de ação" : "nenhum pagamento pendente"}
+          href="/operations/escrow"
+          icon={<Banknote className="w-4 h-4" />}
+          emphasis={d.pending.escrowsReleasable > 0}
+        />
+      </section>
+
+      <section className="grid grid-cols-1 lg:grid-cols-[1.45fr_1fr] border-b border-border-soft">
+        <div className="p-7 lg:border-r border-b lg:border-b-0 border-border-soft">
+          <OperationalFlow pending={d.pending} />
+        </div>
+        <div className="p-7">
+          <OperationsHealth data={d} riskTotal={riskTotal} />
+        </div>
+      </section>
+
+      <section className="grid grid-cols-1 lg:grid-cols-[1.45fr_1fr]">
+        <div className="p-7 lg:border-r border-b lg:border-b-0 border-border-soft">
+          <EscrowFlow money={d.money} byState={d.escrowByState} />
+        </div>
+        <div className="p-7">
+          <OperationReach volume={d.volume} />
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function OverviewKpi({ label, value, detail, href, icon, emphasis }: {
+  label: string
+  value: number | string
+  detail: string
+  href: string
+  icon: React.ReactNode
+  emphasis?: boolean
+}) {
+  return (
+    <Link
+      to={href}
+      className="group min-h-38 px-6 py-5 border-r border-b xl:border-b-0 border-border-soft last:border-r-0 hover:bg-hover transition-colors"
+    >
+      <div className="flex items-center justify-between gap-3 text-ink-muted mb-4">
+        <span className="eyebrow">{label}</span>
+        <span className="group-hover:text-teal-500 transition-colors">{icon}</span>
+      </div>
+      <div
+        className="font-mono-zoe font-semibold leading-none"
+        style={{ fontSize: 27, color: emphasis ? "var(--color-teal-500)" : "var(--ink)" }}
+      >
+        {value}
+      </div>
+      <div className="text-[11.5px] text-ink-muted mt-3">{detail}</div>
+    </Link>
+  )
+}
+
+function OperationalFlow({ pending: p }: { pending: OperationsDashboard["pending"] }) {
+  const stages = [
+    { label: "Contratos em rascunho", value: p.contractDrafts, href: "/operations/contracts" },
+    { label: "Aguardando assinatura", value: p.contractsAwaitingSignature, href: "/operations/contracts" },
+    { label: "Cortes por aprovar", value: p.draftsAwaitingReview, href: "/operations/deliveries?stage=drafts" },
+    { label: "Entregas por conferir", value: p.deliveriesAwaitingReview, href: "/operations/deliveries" },
+    { label: "Pagamentos liberáveis", value: p.escrowsReleasable, href: "/operations/escrow" },
+  ]
+  const peak = Math.max(1, ...stages.map((stage) => stage.value))
+
+  return (
+    <section>
+      <div className="flex items-end justify-between gap-4 mb-5">
+        <div>
+          <div className="eyebrow">Fila operacional</div>
+          <p className="text-[12px] text-ink-muted mt-1 mb-0">Onde o trabalho está acumulando agora</p>
+        </div>
+        <Link to="/operations" className="text-[12px] font-medium text-teal-700 dark:text-teal-300 hover:text-teal-500">
+          Ver painel →
+        </Link>
+      </div>
+      <div className="space-y-3.5">
+        {stages.map((stage) => (
+          <Link key={stage.label} to={stage.href} className="group grid grid-cols-[minmax(0,1fr)_2.5rem] gap-4 items-center">
+            <div>
+              <div className="flex justify-between gap-4 text-[12px] mb-1.5">
+                <span className="text-ink group-hover:text-teal-500 transition-colors">{stage.label}</span>
+                <span className="font-mono-zoe text-ink-muted">{stage.value}</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-tint-2 overflow-hidden">
+                <span
+                  className="block h-full rounded-full transition-[width] duration-500"
+                  style={{ width: `${(stage.value / peak) * 100}%`, background: stage.value > 0 ? "var(--color-teal-500)" : "var(--border)" }}
+                />
+              </div>
+            </div>
+            <ArrowRight className="w-3.5 h-3.5 text-ink-muted-2 group-hover:text-teal-500 group-hover:translate-x-0.5 transition-all" />
+          </Link>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function OperationsHealth({ data: d, riskTotal }: { data: OperationsDashboard; riskTotal: number }) {
+  const signals = [
+    { value: d.risks.stuckFinancialCommands, label: "falhas financeiras", href: "/operations/escrow", severe: true },
+    { value: d.risks.contractsBlockedByLegalReview, label: "contratos bloqueados", href: "/operations/contracts" },
+    { value: d.risks.creatorsWithoutPayoutAccount, label: "criadores sem conta", href: "/operations/influencers" },
+    { value: d.pending.escrowsAwaitingDeposit, label: "custódias sem depósito", href: "/operations/escrow" },
+  ].filter((signal) => signal.value > 0)
+
+  return (
+    <section>
+      <div className="flex items-center justify-between gap-3 mb-5">
+        <div>
+          <div className="eyebrow">Saúde da operação</div>
+          <p className="text-[12px] text-ink-muted mt-1 mb-0">Bloqueios que podem atrasar o fluxo</p>
+        </div>
+        <ShieldAlert className="w-4 h-4" style={{ color: riskTotal > 0 ? "#D97706" : "var(--color-teal-500)" }} />
+      </div>
+      {signals.length === 0 ? (
+        <div className="min-h-40 flex flex-col justify-center items-center text-center border-y border-border-soft">
+          <CheckCircle2 className="w-6 h-6 text-teal-500 mb-2" />
+          <div className="text-[13px] font-medium text-ink">Fluxo saudável</div>
+          <div className="text-[11.5px] text-ink-muted mt-1">Nenhum bloqueio operacional detectado.</div>
+        </div>
+      ) : (
+        <div className="divide-y divide-border-soft border-y border-border-soft">
+          {signals.map((signal) => (
+            <Link key={signal.label} to={signal.href} className="flex items-center gap-3 py-3 group">
+              <span className="font-mono-zoe text-[16px] font-semibold" style={{ color: signal.severe ? "#DC2626" : "#D97706" }}>
+                {signal.value}
+              </span>
+              <span className="text-[12.5px] text-ink flex-1 group-hover:text-teal-500">{signal.label}</span>
+              <ArrowRight className="w-3.5 h-3.5 text-ink-muted-2" />
+            </Link>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function EscrowFlow({ money: m, byState }: {
+  money: OperationsDashboard["money"]
+  byState: OperationsDashboard["escrowByState"]
+}) {
+  const total = byState.reduce((sum, state) => sum + state.amountCents, 0)
+
+  return (
+    <section>
+      <div className="eyebrow">Fluxo financeiro</div>
+      <p className="text-[12px] text-ink-muted mt-1 mb-5">Distribuição do dinheiro nas custódias do workspace</p>
+      <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2 mb-4">
+        <div>
+          <div className="font-mono-zoe text-[24px] font-semibold text-ink">{fmtCents(total)}</div>
+          <div className="text-[11px] text-ink-muted mt-1">movimentado nas custódias abertas</div>
+        </div>
+        <div className="text-[11.5px] text-ink-muted">
+          {fmtCents(m.netReleasedToCreatorsCents)} já liberados a criadores
+        </div>
+      </div>
+      {total > 0 ? (
+        <>
+          <div className="flex h-2 rounded-full overflow-hidden bg-tint-2">
+            {byState.filter((state) => state.amountCents > 0).map((state) => (
+              <span
+                key={state.state}
+                title={`${tEnum("escrowState", state.state)}: ${fmtCents(state.amountCents)}`}
+                style={{ width: `${(state.amountCents / total) * 100}%`, background: ESCROW_COLOR[state.state] ?? "var(--ink-muted-2)" }}
+              />
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-2 mt-3">
+            {byState.filter((state) => state.amountCents > 0).map((state) => (
+              <span key={state.state} className="inline-flex items-center gap-1.5 text-[11px] text-ink-muted">
+                <span className="w-2 h-2 rounded-full" style={{ background: ESCROW_COLOR[state.state] ?? "var(--ink-muted-2)" }} />
+                {tEnum("escrowState", state.state)} · {state.count}
+              </span>
+            ))}
+          </div>
+        </>
+      ) : (
+        <div className="py-5 border-y border-border-soft text-[12.5px] text-ink-muted">Nenhuma custódia aberta.</div>
+      )}
+    </section>
+  )
+}
+
+function OperationReach({ volume: v }: { volume: OperationsDashboard["volume"] }) {
+  const items = [
+    { value: v.creators, label: "criadores no elenco", href: "/operations/influencers" },
+    { value: v.signedContracts, label: "contratos assinados", href: "/operations/contracts" },
+    { value: v.approvedDeliveries, label: "entregas aprovadas", href: "/operations/deliveries" },
+  ]
+
+  return (
+    <section>
+      <div className="eyebrow">Alcance operacional</div>
+      <p className="text-[12px] text-ink-muted mt-1 mb-3">Base acumulada do workspace</p>
+      <div className="divide-y divide-border-soft border-y border-border-soft">
+        {items.map((item) => (
+          <Link key={item.label} to={item.href} className="flex items-baseline justify-between gap-4 py-3 group">
+            <span className="text-[12px] text-ink-muted group-hover:text-teal-500">{item.label}</span>
+            <span className="font-mono-zoe text-[18px] font-semibold text-ink">{item.value}</span>
+          </Link>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function SummaryMetric({ value, label, emphasis, warning }: {
+  value: number | string
+  label: string
+  emphasis?: boolean
+  warning?: boolean
+}) {
+  return (
+    <div className="flex items-baseline gap-1.5">
+      <span
+        className="font-mono-zoe text-[14px] font-semibold"
+        style={{ color: warning ? "#DC2626" : emphasis ? "var(--color-teal-500)" : "var(--ink)" }}
+      >
+        {value}
+      </span>
+      <span className="text-[11.5px] text-ink-muted">{label}</span>
     </div>
   )
 }
