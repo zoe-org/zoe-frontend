@@ -76,7 +76,9 @@ describe("proximosPassos", () => {
       kycStatus, canReceivePayout: false, payoutBlockedReason: `motivo ${kycStatus}`,
     }))[0]
 
-    expect(blocked("Pending").title).toBe("Conta de recebimento em verificação")
+    // Pending não afirma "em verificação": esta camada não sabe se a bola está com o
+    // criador ou com o provedor — só a tela de recebimento, que consulta na hora, sabe.
+    expect(blocked("Pending").title).toBe("Conferir a conta de recebimento")
     expect(blocked("Pending").detail).toBe("motivo Pending")
     expect(blocked("Rejected").title).toBe("Revisar os dados da conta de recebimento")
   })

@@ -89,8 +89,11 @@ export function nextSteps(w: CreatorWorkspace): NextStep[] {
       key: "recebimento",
       title: w.kycStatus === "Rejected"
         ? "Revisar os dados da conta de recebimento"
+        // "em verificação" era afirmação forte demais para o que esta camada sabe: aqui
+        // só temos o estado salvo, não de quem o provedor está esperando. Quem responde
+        // isso é a tela de recebimento, que consulta na hora — este título só leva lá.
         : w.kycStatus === "Pending"
-          ? "Conta de recebimento em verificação"
+          ? "Conferir a conta de recebimento"
           : "Conectar a conta de recebimento",
       detail: w.payoutBlockedReason,
       target: { route: "/creator/payout" },

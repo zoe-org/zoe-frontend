@@ -234,6 +234,13 @@ export type PayoutStatus = {
   kycStatus: string
   pendingRequirements: string[]
   disabledReason: string | null
+  /**
+   * Pendências que dependem do criador. Maior que zero significa que o cadastro
+   * está parado esperando ELE — e a tela não pode dizer "estamos verificando".
+   */
+  awaitingUser: number
+  /** Pendências em análise do provedor: aí a espera é legítima. */
+  awaitingProvider: number
 }
 
 export type DataDeletionResult = {
