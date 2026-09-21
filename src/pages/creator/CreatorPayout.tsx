@@ -157,13 +157,13 @@ export default function CreatorPayoutPage() {
               <div className="flex items-start gap-3">
                 <div
                   className="w-9 h-9 rounded-lg grid place-items-center shrink-0"
-                  style={{ background: verified || inVerification ? "#00A79915" : "#D9770615" }}
+                  style={{ background: verified || inVerification ? "#00A79915" : "var(--warn-bg)" }}
                 >
                   {/* Em verificação usa o tom de progresso, não o de alerta: a pessoa fez
                       a parte dela, quem está devendo resposta é o provedor. */}
                   {verified || inVerification
                     ? <ShieldCheck className="w-4.5 h-4.5" style={{ color: "var(--color-teal-500)" }} />
-                    : <Wallet className="w-4.5 h-4.5" style={{ color: "#D97706" }} />}
+                    : <Wallet className="w-4.5 h-4.5" style={{ color: "var(--color-warn)" }} />}
                 </div>
 
                 <div className="min-w-0 flex-1">
@@ -208,7 +208,7 @@ export default function CreatorPayoutPage() {
                 className="rounded-lg border border-border-soft p-3.5 mb-5 flex items-start gap-2.5"
                 style={{ background: "#D9770610" }}
               >
-                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" style={{ color: "#D97706" }} />
+                <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" style={{ color: "var(--color-warn)" }} />
                 <p className="text-[12.5px] text-ink-2 m-0">
                   O link do cadastro venceu — eles duram poucos minutos por segurança.
                   Clique em <strong>Continuar cadastro</strong> para abrir um novo; o que

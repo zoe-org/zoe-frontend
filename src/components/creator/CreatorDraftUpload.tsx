@@ -95,13 +95,13 @@ export function CreatorDraftUpload({ engagement }: { engagement: CreatorEngageme
         <div
           className="w-9 h-9 rounded-lg grid place-items-center shrink-0"
           style={{
-            background: approved ? "#00A79915" : changesRequested ? "#DC262615" : "#D9770615",
+            background: approved ? "#00A79915" : changesRequested ? "#DC262615" : "var(--warn-bg)",
           }}
         >
           {approved ? <Check className="w-4 h-4" style={{ color: "var(--color-teal-500)" }} />
-            : changesRequested ? <RotateCcw className="w-4 h-4" style={{ color: "#DC2626" }} />
-            : awaiting ? <Clock className="w-4 h-4" style={{ color: "#D97706" }} />
-            : <Upload className="w-4 h-4" style={{ color: "#D97706" }} />}
+            : changesRequested ? <RotateCcw className="w-4 h-4" style={{ color: "var(--color-neg)" }} />
+            : awaiting ? <Clock className="w-4 h-4" style={{ color: "var(--color-warn)" }} />
+            : <Upload className="w-4 h-4" style={{ color: "var(--color-warn)" }} />}
         </div>
 
         <div className="min-w-0 flex-1">
@@ -109,7 +109,7 @@ export function CreatorDraftUpload({ engagement }: { engagement: CreatorEngageme
             className="text-[13.5px] font-medium mb-1"
             style={{
               color: approved ? "var(--color-teal-500)"
-                : changesRequested ? "#DC2626" : "#D97706",
+                : changesRequested ? "var(--color-neg)" : "var(--color-warn)",
             }}
           >
             {approved ? "Corte aprovado — pode publicar"
@@ -134,9 +134,9 @@ export function CreatorDraftUpload({ engagement }: { engagement: CreatorEngageme
               style={{ background: "#DC262610", color: "var(--ink-2)" }}
             >
               <div className="flex items-start gap-2">
-                <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: "#DC2626" }} />
+                <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: "var(--color-neg)" }} />
                 <div>
-                  <div className="font-medium mb-0.5" style={{ color: "#DC2626" }}>
+                  <div className="font-medium mb-0.5" style={{ color: "var(--color-neg)" }}>
                     O que a marca pediu
                   </div>
                   {draft.decisionNotes}
@@ -208,7 +208,7 @@ export function CreatorDraftUpload({ engagement }: { engagement: CreatorEngageme
                   {!upload.isPending && (
                     <button
                       onClick={() => { setFile(null); if (inputRef.current) inputRef.current.value = "" }}
-                      className="text-[11.5px] text-ink-muted hover:text-[#DC2626] shrink-0"
+                      className="text-[11.5px] text-ink-muted hover:text-neg shrink-0"
                     >
                       trocar
                     </button>

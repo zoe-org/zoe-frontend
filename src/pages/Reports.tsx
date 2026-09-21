@@ -132,7 +132,7 @@ export default function ReportsPage() {
             <button
               disabled
               title="Agendamento chega com a geração automática"
-              className="inline-flex items-center gap-1.5 px-3 py-[7px] rounded-lg text-[13px] font-medium border border-[#E5E7EB] dark:border-[#262A3A] bg-[var(--surface)] opacity-45 cursor-not-allowed"
+              className="inline-flex items-center gap-1.5 px-3 py-[7px] rounded-lg text-[13px] font-medium border border-border bg-[var(--surface)] opacity-45 cursor-not-allowed"
             >
               <Calendar className="w-3.5 h-3.5 text-ink-muted" /> Agendar
             </button>
@@ -152,7 +152,7 @@ export default function ReportsPage() {
         {templates.isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 animate-pulse">
             {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="h-36 rounded-[14px] bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+              <div key={i} className="h-36 rounded-[14px] bg-tint" />
             ))}
           </div>
         ) : (templates.data?.items.length ?? 0) === 0 ? (
@@ -230,7 +230,7 @@ export default function ReportsPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar…"
-              className="w-50 rounded-lg py-1.5 pl-7.5 pr-2.5 text-[12.5px] border border-[#E5E7EB] dark:border-[#262A3A] outline-none focus:ring-1 focus:ring-teal-500"
+              className="w-50 rounded-lg py-1.5 pl-7.5 pr-2.5 text-[12.5px] border border-border outline-none focus:ring-1 focus:ring-teal-500"
               style={{ background: "var(--surface)", color: "var(--ink)" }}
             />
           </div>
@@ -238,13 +238,13 @@ export default function ReportsPage() {
       </section>
 
       {/* Biblioteca */}
-      <section className="flex-1 p-7 bg-[#F9FAFB] dark:bg-[#0B0D18]">
+      <section className="flex-1 p-7 bg-inset">
         {list.isError && !forbidden ? (
           <ErrorState onRetry={() => list.refetch()} />
         ) : list.isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 animate-pulse">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="h-80 rounded-[14px] bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+              <div key={i} className="h-80 rounded-[14px] bg-tint" />
             ))}
           </div>
         ) : filtered.length === 0 ? (
@@ -307,7 +307,7 @@ function ReportCard({
       disabled={deleting}
       title="Apagar relatório"
       aria-label="Apagar relatório"
-      className="p-1.5 rounded-lg text-ink-muted hover:text-[var(--color-neg)] hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D] transition-colors disabled:opacity-50"
+      className="p-1.5 rounded-lg text-ink-muted hover:text-[var(--color-neg)] hover:bg-tint transition-colors disabled:opacity-50"
     >
       {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
     </button>
@@ -322,7 +322,7 @@ function ReportCard({
         <PreviewThumb tone={failed ? "neg" : "neu"} />
         {generating && (
           <div className="absolute inset-0 rounded-md flex flex-col items-center justify-center gap-2 bg-white/85 dark:bg-black/60">
-            <div className="w-15 h-[3px] rounded-sm overflow-hidden relative bg-[#E5E7EB] dark:bg-[#262A3A]">
+            <div className="w-15 h-[3px] rounded-sm overflow-hidden relative bg-tint-2">
               <div
                 className="absolute left-0 top-0 h-full w-2/5 animate-pulse"
                 style={{ background: "var(--color-teal-500)" }}
@@ -351,14 +351,14 @@ function ReportCard({
         <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-border-soft">
           <button
             onClick={onOpen}
-            className="flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-[5px] rounded-lg text-[12px] font-medium border border-[#E5E7EB] dark:border-[#262A3A] hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors"
+            className="flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-[5px] rounded-lg text-[12px] font-medium border border-border hover:bg-hover transition-colors"
           >
             <ExternalLink className="w-3 h-3" /> Abrir
           </button>
           <button
             onClick={onOpen}
             title="Abrir para imprimir / salvar em PDF"
-            className="p-1.5 rounded-lg hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D] transition-colors"
+            className="p-1.5 rounded-lg hover:bg-tint transition-colors"
           >
             <Download className="w-3.5 h-3.5 text-ink-muted" />
           </button>
@@ -379,18 +379,18 @@ function ReportCard({
 /** Miniatura de página do design — puramente decorativa. */
 function PreviewThumb({ tone }: { tone: "pos" | "neu" | "neg" }) {
   const accent =
-    tone === "pos" ? "var(--color-pos)" : tone === "neg" ? "var(--color-neg)" : "#9AA1AE"
+    tone === "pos" ? "var(--color-pos)" : tone === "neg" ? "var(--color-neg)" : "var(--ink-muted-2)"
   return (
     <div
-      className="rounded-md border border-[#E5E7EB] dark:border-[#262A3A] p-2.5 flex flex-col gap-1 overflow-hidden"
+      className="rounded-md border border-border p-2.5 flex flex-col gap-1 overflow-hidden"
       style={{ aspectRatio: "4 / 5", background: "var(--surface)" }}
     >
       <div className="h-1 w-2/5 rounded-sm" style={{ background: accent }} />
       <div className="h-2 w-4/5 rounded-sm mt-0.5 bg-[#1F2937] dark:bg-[#C9CEDA]" />
-      <div className="h-[3px] w-3/5 rounded-sm bg-[#E5E7EB] dark:bg-[#262A3A]" />
+      <div className="h-[3px] w-3/5 rounded-sm bg-tint-2" />
       <div className="flex-1 mt-1 grid grid-cols-2 gap-[3px]">
-        <div className="rounded-sm bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
-        <div className="rounded-sm bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+        <div className="rounded-sm bg-tint" />
+        <div className="rounded-sm bg-tint" />
       </div>
       <div className="h-3.5 rounded-sm" style={{ background: `color-mix(in srgb, ${accent} 13%, transparent)` }} />
     </div>
@@ -431,11 +431,11 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <AlertCircle className="w-10 h-10 text-neg mb-3" />
-      <h3 className="text-lg font-semibold text-midnight dark:text-[#E6E8EF] mb-1">Não foi possível carregar</h3>
-      <p className="text-sm text-[#6B7280] mb-4">Tente novamente em instantes.</p>
+      <h3 className="text-lg font-semibold text-midnight dark:text-ink mb-1">Não foi possível carregar</h3>
+      <p className="text-sm text-ink-muted mb-4">Tente novamente em instantes.</p>
       <button
         onClick={onRetry}
-        className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors"
+        className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-hover transition-colors"
       >
         Tentar de novo
       </button>

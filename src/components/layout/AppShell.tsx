@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from "react"
 import { NavLink, Link, Outlet, useLocation, useNavigate } from "react-router-dom"
 import {
-  House, Brain, Settings, Handshake,
-  ChevronDown, ChevronUp, Search, PanelLeftClose, PanelLeftOpen, ChevronsUpDown,
+  LayoutDashboard, Activity, Smile, ChartPie, Users, Bell, Gauge, Megaphone, UsersRound,
+  FileText, Package, Vault, Tag, FileChartColumn, Settings, UserCog,
+  PanelLeftClose, PanelLeftOpen, ChevronsUpDown, UserRound, Palette, CreditCard,
   Sun, Moon, LogOut, Check, Plus, ShieldCheck, AlertCircle,
+  type LucideIcon,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -26,9 +28,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import ZoeLogo from "@/assets/zoe-logo.svg?react"
 
-const STORAGE_INTEL_KEY = "zoe_sidebar_intel_open"
-const STORAGE_GESTAO_KEY = "zoe_sidebar_gestao_open"
-const STORAGE_OPS_KEY = "zoe_sidebar_ops_open"
 const STORAGE_SIDEBAR_KEY = "zoe_sidebar_open"
 
 function getInitialOpenState(key: string): boolean {
@@ -57,29 +56,57 @@ const AlertsBadge = () => {
   )
 }
 
-const SubNavItem = ({ to, children, badge, end }: { to: string, children: React.ReactNode, badge?: React.ReactNode, end?: boolean }) => (
+/**
+ * Item da sidebar. Ativo: fundo tingido, ícone teal e uma régua reta na borda
+ * esquerda — a mesma linha que separa os blocos das páginas.
+ */
+const NavItem = ({ to, icon: Icon, children, badge, end, collapsed }: {
+  to: string
+  icon: LucideIcon
+  children: string
+  badge?: React.ReactNode
+  /** Rota raiz de uma seção: sem `end`, ficaria ativa em todas as subpáginas. */
+  end?: boolean
+  collapsed: boolean
+}) => (
   <NavLink
     to={to}
-    // O painel e a raiz da secao: sem `end`, ele ficaria marcado como ativo em toda
-    // subpagina de Operations e dois itens do menu apareceriam selecionados ao mesmo tempo.
     end={end}
+    title={collapsed ? children : undefined}
     className={({ isActive }) =>
-      `relative flex items-center font-medium justify-between py-1.5 pl-4 text-[13.5px] transition-colors ${isActive
-        ? "text-teal-500 dark:text-teal-300"
-        : "text-[#697788] dark:text-[#8A91A3] hover:text-midnight dark:hover:text-[#E6E8EF]"
+      `group relative flex items-center gap-2.5 h-8 rounded-md text-[13.5px] transition-colors ${collapsed ? "justify-center px-2" : "px-2.5"} ${isActive
+        ? "bg-tint text-ink font-medium"
+        : "text-ink-muted hover:text-ink hover:bg-hover"
       }`
     }
   >
     {({ isActive }) => (
       <>
-        {isActive && (
-          <span className="absolute -left-[1.5px] top-1/2 -translate-y-1/2 w-[1.5px] h-5 bg-teal-500 rounded-full" />
-        )}
-        <span>{children}</span>
-        {badge}
+        <span
+          className={`absolute -left-2 top-1.5 bottom-1.5 w-[2px] rounded-full bg-teal-500 transition-transform duration-300 ${isActive ? "scale-y-100" : "scale-y-0"}`}
+        />
+        <Icon
+          className={`w-4 h-4 shrink-0 transition-colors ${isActive ? "text-teal-500 dark:text-teal-300" : "text-ink-muted-2 group-hover:text-ink-muted"}`}
+          strokeWidth={2}
+        />
+        {!collapsed && <span className="flex-1 truncate">{children}</span>}
+        {!collapsed && badge}
       </>
     )}
   </NavLink>
+)
+
+const NavSection = ({ label, collapsed, children }: { label: string; collapsed: boolean; children: React.ReactNode }) => (
+  <div className="flex flex-col gap-0.5">
+    {collapsed ? (
+      <div className="mx-auto my-2.5 h-px w-5 bg-border-soft" />
+    ) : (
+      <div className="font-mono-zoe text-[10px] uppercase tracking-[0.14em] text-ink-muted-2 px-2.5 pt-4 pb-1.5">
+        {label}
+      </div>
+    )}
+    {children}
+  </div>
 )
 
 /** Hash determinístico → cor consistente por tenant (bolinha do workspace). */
@@ -93,8 +120,96 @@ function tenantColor(id: string) {
   return TENANT_PALETTE[Math.abs(h) % TENANT_PALETTE.length]
 }
 
+/**
+ * Seletor de workspace no topo da sidebar. Trocar aqui recarrega o contexto
+ * inteiro (marcas, features, cobrança), então ele fica visível — e não escondido
+ * dentro do menu do usuário, onde ninguém procurava por ele.
+ */
+function WorkspaceSwitcher({ collapsed }: { collapsed: boolean }) {
+  const { activeTenantId, memberships, role } = useAuth()
+  const switchWorkspace = useSwitchWorkspace()
+  const openSettings = useOpenSettings()
+
+  const atual = memberships.find((m) => m.tenantId === activeTenantId)
+  if (!atual) return null
+
+  const cor = tenantColor(atual.tenantId)
+  const inicial = atual.tenantName.charAt(0).toUpperCase()
+
+  return (
+    <div className={collapsed ? "px-2 pb-2" : "px-3 pb-3"}>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            aria-label="Trocar de workspace"
+            title={collapsed ? atual.tenantName : undefined}
+            className={`w-full flex items-center rounded-lg border border-border-soft bg-surface hover:bg-hover transition-colors cursor-pointer ${collapsed ? "justify-center p-1.5" : "gap-2.5 p-2"}`}
+          >
+            <span
+              className="w-7 h-7 rounded-md shrink-0 flex items-center justify-center text-[12px] font-bold text-white"
+              style={{ backgroundColor: cor }}
+            >
+              {inicial}
+            </span>
+            {!collapsed && (
+              <>
+                <span className="flex-1 min-w-0 text-left">
+                  <span className="block text-[13px] font-semibold text-ink truncate">{atual.tenantName}</span>
+                  <span className="block text-[11px] text-ink-muted truncate">{role ?? atual.role}</span>
+                </span>
+                <ChevronsUpDown className="w-3.5 h-3.5 text-ink-muted-2 shrink-0" />
+              </>
+            )}
+          </button>
+        </DropdownMenuTrigger>
+
+        <DropdownMenuContent align="start" side={collapsed ? "right" : "bottom"} className="w-60">
+          <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-ink-muted font-semibold">
+            Workspaces
+          </DropdownMenuLabel>
+          {memberships.map((m) => {
+            const isActive = m.tenantId === activeTenantId
+            return (
+              <DropdownMenuItem
+                key={m.tenantId}
+                onSelect={() => { if (!isActive) switchWorkspace(m.tenantId) }}
+                className="flex items-center gap-2.5 cursor-pointer"
+              >
+                <span
+                  className="w-6 h-6 rounded-md shrink-0 flex items-center justify-center text-[11px] font-bold text-white"
+                  style={{ backgroundColor: tenantColor(m.tenantId) }}
+                >
+                  {m.tenantName.charAt(0).toUpperCase()}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[13px] font-medium truncate">{m.tenantName}</div>
+                  <div className="text-[11px] text-ink-muted truncate">{m.role}</div>
+                </div>
+                {isActive && <Check className="w-4 h-4 text-teal-500 shrink-0" />}
+              </DropdownMenuItem>
+            )
+          })}
+
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="flex items-center gap-2 text-sm cursor-pointer"
+            onSelect={() => openSettings("workspace")}
+          >
+            <Settings className="w-4 h-4 text-ink-muted" /> Gerenciar workspace
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link to="/onboarding/tenant" className="flex items-center gap-2 text-sm cursor-pointer">
+              <Plus className="w-4 h-4 text-ink-muted" /> Criar novo workspace
+            </Link>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  )
+}
+
 export function AppShell() {
-  const { user, role, signOut, activeTenantId, memberships, isZoeAdmin } = useAuth()
+  const { user, role, signOut, isZoeAdmin } = useAuth()
   // WS-F3 — mantém a conexão de tempo real viva pro app inteiro logado (não só
   // Alertas: é daqui que o badge da sidebar recebe o "novo" sem precisar navegar).
   useRealtimeConnection()
@@ -111,7 +226,6 @@ export function AppShell() {
   const location = useLocation()
   const navigate = useNavigate()
   const openSettings = useOpenSettings()
-  const switchWorkspace = useSwitchWorkspace()
   const { resolvedTheme, setTheme } = useTheme()
   const isDark = resolvedTheme === "dark"
 
@@ -119,245 +233,138 @@ export function AppShell() {
   useScrollToTop(mainRef)
 
   const [sidebarOpen, setSidebarOpen] = useState(() => getInitialOpenState(STORAGE_SIDEBAR_KEY))
-  const [intelOpen, setIntelOpen] = useState(() => getInitialOpenState(STORAGE_INTEL_KEY))
-  const [gestaoOpen, setGestaoOpen] = useState(() => getInitialOpenState(STORAGE_GESTAO_KEY))
-  const [opsOpen, setOpsOpen] = useState(() => getInitialOpenState(STORAGE_OPS_KEY))
+  const collapsed = !sidebarOpen
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_SIDEBAR_KEY, String(sidebarOpen)) } catch { /* storage indisponível */ }
   }, [sidebarOpen])
 
-  useEffect(() => {
-    try { localStorage.setItem(STORAGE_INTEL_KEY, String(intelOpen)) } catch { /* storage indisponível */ }
-  }, [intelOpen])
-
-  useEffect(() => {
-    try { localStorage.setItem(STORAGE_GESTAO_KEY, String(gestaoOpen)) } catch { /* storage indisponível */ }
-  }, [gestaoOpen])
-
-  useEffect(() => {
-    try { localStorage.setItem(STORAGE_OPS_KEY, String(opsOpen)) } catch { /* storage indisponível */ }
-  }, [opsOpen])
-
-  // Deriva a abertura das seções a partir da rota durante o render (não em efeito),
-  // pra evitar o passe de render em cascata que um setState em useEffect causaria.
-  const [lastPathname, setLastPathname] = useState(location.pathname)
-  if (location.pathname !== lastPathname) {
-    setLastPathname(location.pathname)
-    if (
-      location.pathname.startsWith("/intelligence") ||
-      location.pathname === "/alerts"
-    ) {
-      setIntelOpen(true)
-    }
-    if (
-      location.pathname === "/brands" ||
-      location.pathname === "/reports" ||
-      location.pathname === "/users"
-    ) {
-      setGestaoOpen(true)
-    }
-    if (location.pathname.startsWith("/operations")) {
-      setOpsOpen(true)
-    }
-  }
-
   return (
-    <div className="min-h-screen flex text-midnight position-relative bg-surface  dark:text-[#E6E8EF]">
+    // Altura travada na viewport: quem rola é o <main>, e só ele. Com
+    // `min-h-screen` o documento também rolava, e qualquer transbordo
+    // dentro do <main> (as animações de entrada empurram o conteúdo 10px
+    // pra baixo) abria uma segunda barra de rolagem por alguns segundos.
+    <div className="h-screen overflow-hidden flex text-ink bg-surface">
       {/* Sidebar */}
-      <aside className={`${sidebarOpen ? "w-60" : "w-14"} transition-[width] duration-200 h-dvh border-r sticky top-0 text-[#697788] dark:text-[#8A91A3] border-[#E5E7EB] dark:border-[#1C1F2E] flex flex-col overflow-hidden shrink-0`}>
+      <aside className={`${sidebarOpen ? "w-60" : "w-14"} transition-[width] duration-300 ease-[cubic-bezier(0.2,0.7,0.1,1)] h-dvh border-r sticky top-0 bg-canvas text-ink-muted border-border-soft flex flex-col overflow-hidden shrink-0`}>
         {/* Logo */}
         <div className={`h-fit flex items-center my-4 ${sidebarOpen ? "px-4 justify-between" : "justify-center"}`}>
           {sidebarOpen && <ZoeLogo className="w-12 h-full text-teal-500" />}
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="cursor-pointer dark:text-[#8A91A3] hover:text-ink dark:hover:text-[#E6E8EF] transition-colors"
+            aria-label={sidebarOpen ? "Recolher menu" : "Expandir menu"}
+            className="cursor-pointer text-ink-muted-2 hover:text-ink transition-colors"
           >
             {sidebarOpen ? <PanelLeftClose className="h-5" /> : <PanelLeftOpen className="h-5" />}
           </button>
         </div>
 
+        {/* Workspace: quem você é dentro da conta. Fica ACIMA da navegação porque
+            troca o conteúdo de todas as telas abaixo dele. */}
+        <WorkspaceSwitcher collapsed={collapsed} />
+
         {sidebarOpen && <TrialBadge />}
 
-        {/* Navigation */}
-        <nav className={`flex-1 py-2 space-y-1 overflow-y-auto ${sidebarOpen ? "pl-2 pr-4" : "px-2"}`}>
-          <NavLink
-            to="/dashboard"
-            className={({ isActive }) =>
-              `flex items-center gap-2 py-2 font-medium text-[14px] transition-colors rounded-md ${sidebarOpen ? "px-3" : "justify-center px-2"} ${isActive
-                ? "text-[#00A799] dark:text-teal-300"
-                : "text-[#697788] dark:text-[#8A91A3] hover:text-midnight dark:hover:text-[#E6E8EF]"
-              }`
-            }
-          >
-            <House className="w-[18px] h-[18px] shrink-0" strokeWidth={2.5} />
-            {sidebarOpen && <span>Dashboard</span>}
-          </NavLink>
+        {/* Navegação: seções planas, sempre abertas. */}
+        <nav className={`flex-1 pb-3 overflow-y-auto ${sidebarOpen ? "px-3" : "px-2"}`}>
+          <NavItem to="/dashboard" icon={LayoutDashboard} collapsed={collapsed}>Dashboard</NavItem>
 
           {hasIntelligence && (
-            <>
-              <button
-                onClick={() => sidebarOpen ? setIntelOpen(!intelOpen) : setSidebarOpen(true)}
-                className={`w-full flex items-center py-2 rounded-md text-[14px] font-medium transition-colors text-[#697788] dark:text-[#8A91A3] ${sidebarOpen ? "pl-3 justify-between" : "justify-center px-2"}`}
-              >
-                <span className={`flex items-center ${sidebarOpen ? "gap-2" : ""}`}>
-                  <Brain className="w-[18px] h-[18px] shrink-0" strokeWidth={2.5} />
-                  {sidebarOpen && <span>Intelligence</span>}
-                </span>
-                {sidebarOpen && (intelOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
-              </button>
-
-              {sidebarOpen && intelOpen && (
-                <div className="ml-[21px] border-l-2 border-[#E5E7EB] dark:border-[#1C1F2E] flex flex-col mt-0 mb-2">
-                  <SubNavItem to="/intelligence/monitoring">Monitoramento</SubNavItem>
-                  <SubNavItem to="/intelligence/sentiment">Sentimento</SubNavItem>
-                  {hasSov && <SubNavItem to="/intelligence/sov">Share of Voice</SubNavItem>}
-                  <SubNavItem to="/intelligence/influencers">Influenciadores</SubNavItem>
-                  <SubNavItem to="/alerts" badge={<AlertsBadge />}>Alertas</SubNavItem>
-                </div>
-              )}
-            </>
+            <NavSection label="Intelligence" collapsed={collapsed}>
+              <NavItem to="/intelligence/monitoring" icon={Activity} collapsed={collapsed}>Monitoramento</NavItem>
+              <NavItem to="/intelligence/sentiment" icon={Smile} collapsed={collapsed}>Sentimento</NavItem>
+              {hasSov && <NavItem to="/intelligence/sov" icon={ChartPie} collapsed={collapsed}>Share of Voice</NavItem>}
+              <NavItem to="/intelligence/influencers" icon={Users} collapsed={collapsed}>Influenciadores</NavItem>
+              <NavItem to="/alerts" icon={Bell} collapsed={collapsed} badge={<AlertsBadge />}>Alertas</NavItem>
+            </NavSection>
           )}
 
           {hasOperations && (
-            <>
-              <button
-                onClick={() => sidebarOpen ? setOpsOpen(!opsOpen) : setSidebarOpen(true)}
-                className={`w-full flex items-center py-2 rounded-md text-[14px] font-medium transition-colors text-[#697788] dark:text-[#8A91A3] ${sidebarOpen ? "pl-3 justify-between" : "justify-center px-2"}`}
-              >
-                <span className={`flex items-center ${sidebarOpen ? "gap-2" : ""}`}>
-                  <Handshake className="w-[18px] h-[18px] shrink-0" strokeWidth={2.5} />
-                  {sidebarOpen && <span>Operations</span>}
-                </span>
-                {sidebarOpen && (opsOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
-              </button>
-
-              {sidebarOpen && opsOpen && (
-                <div className="ml-[21px] border-l-2 border-[#E5E7EB] dark:border-[#1C1F2E] flex flex-col mt-0 mb-2">
-                  {/* A ordem do menu é a ordem do fluxo: campanha → elenco →
-                      contrato → entrega → custódia. */}
-                  <SubNavItem to="/operations" end>Painel</SubNavItem>
-                  <SubNavItem to="/operations/campaigns">Campanhas</SubNavItem>
-                  <SubNavItem to="/operations/influencers">Elenco</SubNavItem>
-                  <SubNavItem to="/operations/contracts">Contratos</SubNavItem>
-                  <SubNavItem to="/operations/deliveries">Entregas</SubNavItem>
-                  <SubNavItem to="/operations/escrow">Custódia</SubNavItem>
-                </div>
-              )}
-            </>
+            <NavSection label="Operations" collapsed={collapsed}>
+              {/* A ordem do menu é a ordem do fluxo: campanha → elenco →
+                  contrato → entrega → custódia. */}
+              <NavItem to="/operations" end icon={Gauge} collapsed={collapsed}>Painel</NavItem>
+              <NavItem to="/operations/campaigns" icon={Megaphone} collapsed={collapsed}>Campanhas</NavItem>
+              <NavItem to="/operations/influencers" icon={UsersRound} collapsed={collapsed}>Elenco</NavItem>
+              <NavItem to="/operations/contracts" icon={FileText} collapsed={collapsed}>Contratos</NavItem>
+              <NavItem to="/operations/deliveries" icon={Package} collapsed={collapsed}>Entregas</NavItem>
+              <NavItem to="/operations/escrow" icon={Vault} collapsed={collapsed}>Custódia</NavItem>
+            </NavSection>
           )}
 
           {(hasOperations || hasIntelligence) && (
-            <>
-              <button
-                onClick={() => sidebarOpen ? setGestaoOpen(!gestaoOpen) : setSidebarOpen(true)}
-                className={`w-full flex items-center py-2 rounded-md text-[14px] font-medium transition-colors text-[#697788] dark:text-[#8A91A3] ${sidebarOpen ? "pl-3 justify-between" : "justify-center px-2"}`}
-              >
-                <span className={`flex items-center ${sidebarOpen ? "gap-2" : ""}`}>
-                  <Settings className="w-[18px] h-[18px] shrink-0" strokeWidth={2.5} />
-                  {sidebarOpen && <span>Gestão</span>}
-                </span>
-                {sidebarOpen && (gestaoOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />)}
-              </button>
-
-              {sidebarOpen && gestaoOpen && (
-                <div className="ml-[21px] border-l-2 border-[#E5E7EB] dark:border-[#1C1F2E] flex flex-col mt-0 mb-2">
-                  {hasIntelligence && <SubNavItem to="/brands">Marcas</SubNavItem>}
-                  {hasReports && <SubNavItem to="/reports">Relatórios</SubNavItem>}
-                  {/* Consumo e Plano saíram daqui: contrato e fatura não são trabalho
-                      do dia, e agora vivem no diálogo de configurações. */}
-                  <SubNavItem to="/users">Usuários</SubNavItem>
-                </div>
-              )}
-            </>
+            <NavSection label="Gestão" collapsed={collapsed}>
+              {hasIntelligence && <NavItem to="/brands" icon={Tag} collapsed={collapsed}>Marcas</NavItem>}
+              {hasReports && <NavItem to="/reports" icon={FileChartColumn} collapsed={collapsed}>Relatórios</NavItem>}
+              {/* Consumo e Plano vivem no diálogo de configurações, não no menu. */}
+              <NavItem to="/users" icon={UserCog} collapsed={collapsed}>Usuários</NavItem>
+            </NavSection>
           )}
 
           {/* Admin Zoe — curadoria de brands (ADR-021). Só aparece pro grupo
               `zoe-admin`; a autoridade real é a policy ZoeAdmin no backend. */}
           {isZoeAdmin && (
-            <NavLink
-              to="/admin/brands"
-              className={({ isActive }) =>
-                `flex items-center gap-2 py-2 font-medium text-[14px] transition-colors rounded-md ${sidebarOpen ? "px-3" : "justify-center px-2"} ${isActive
-                  ? "text-teal-500 dark:text-teal-300"
-                  : "text-[#697788] dark:text-[#8A91A3] hover:text-midnight dark:hover:text-[#E6E8EF]"
-                }`
-              }
-            >
-              <ShieldCheck className="w-[18px] h-[18px] shrink-0" strokeWidth={2.5} />
-              {sidebarOpen && <span>Curadoria</span>}
-            </NavLink>
+            <NavSection label="Zoe" collapsed={collapsed}>
+              <NavItem to="/admin/brands" icon={ShieldCheck} collapsed={collapsed}>Curadoria</NavItem>
+            </NavSection>
           )}
         </nav>
 
-        {/* Footer */}
-        <div className="border-t border-[#E5E7EB] dark:border-[#1C1F2E]">
+        {/* Rodapé: a PESSOA. O workspace mudou para o topo da sidebar. */}
+        <div className="border-t border-border-soft p-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 aria-label="Menu do usuário"
-                className={`w-[calc(100%-1rem)] p-2 m-2 flex items-center rounded-lg hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D] cursor-pointer transition-colors text-[#697788] dark:text-[#8A91A3] ${sidebarOpen ? "gap-3" : "justify-center"}`}
+                className={`w-full p-1.5 flex items-center rounded-lg hover:bg-tint cursor-pointer transition-colors ${sidebarOpen ? "gap-2.5" : "justify-center"}`}
               >
-                <Avatar className="w-9 h-9 shrink-0">
-                  <AvatarFallback className="bg-teal-500 text-white text-sm font-semibold">
+                <Avatar className="w-8 h-8 shrink-0">
+                  <AvatarFallback className="bg-teal-500 text-white text-[13px] font-semibold">
                     {user?.name?.[0]?.toUpperCase() ?? user?.email?.[0]?.toUpperCase() ?? "U"}
                   </AvatarFallback>
                 </Avatar>
                 {sidebarOpen && (
                   <>
-                    <div className="flex-1 min-w-0 text-[13px] text-left">
-                      <div className="font-semibold text-[#111827] dark:text-[#E6E8EF] truncate">{user?.name ?? "User"}</div>
-                      <div className="text-[#6B7280] dark:text-[#8A91A3] text-xs truncate">{userContext || "—"}</div>
+                    <div className="flex-1 min-w-0 text-left">
+                      <div className="text-[13px] font-medium text-ink truncate">{user?.name ?? "User"}</div>
+                      <div className="text-[11px] text-ink-muted truncate">{user?.email}</div>
                     </div>
-                    <ChevronsUpDown className="w-4 h-4 text-[#6B7280] dark:text-[#8A91A3]" />
+                    <ChevronsUpDown className="w-3.5 h-3.5 text-ink-muted-2 shrink-0" />
                   </>
                 )}
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent side="top" align="start" className="w-64">
-              <DropdownMenuLabel className="text-xs">
-                <div className="font-semibold truncate">{user?.name ?? "User"}</div>
-                <div className="text-[#6B7280] font-normal truncate">{user?.email}</div>
+            <DropdownMenuContent side="top" align="start" className="w-60">
+              <DropdownMenuLabel className="flex items-center gap-2.5 py-2">
+                <Avatar className="w-8 h-8 shrink-0">
+                  <AvatarFallback className="bg-teal-500 text-white text-[13px] font-semibold">
+                    {user?.name?.[0]?.toUpperCase() ?? user?.email?.[0]?.toUpperCase() ?? "U"}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="min-w-0">
+                  <span className="block text-[13px] font-semibold truncate">{user?.name ?? "User"}</span>
+                  <span className="block text-[11px] font-normal text-ink-muted truncate">{userContext || user?.email}</span>
+                </span>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
 
-              {/* Workspaces: seleção mudou do topbar pra cá (o topbar agora é da marca). */}
-              {memberships.length > 0 && (
-                <>
-                  <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-[#6B7280] font-semibold">
-                    Workspaces
-                  </DropdownMenuLabel>
-                  {memberships.map((m) => {
-                    const isActive = m.tenantId === activeTenantId
-                    return (
-                      <DropdownMenuItem
-                        key={m.tenantId}
-                        onSelect={() => { if (!isActive) switchWorkspace(m.tenantId) }}
-                        className="flex items-center gap-2 cursor-pointer"
-                      >
-                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: tenantColor(m.tenantId) }} />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">{m.tenantName}</div>
-                          <div className="text-[11px] text-[#6B7280] truncate">{m.role}</div>
-                        </div>
-                        {isActive && <Check className="w-4 h-4 text-teal-500 shrink-0" />}
-                      </DropdownMenuItem>
-                    )
-                  })}
-                  <DropdownMenuItem asChild>
-                    <Link to="/onboarding/tenant" className="flex items-center gap-2 text-sm cursor-pointer">
-                      <Plus className="w-4 h-4" /> Criar novo workspace
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                </>
-              )}
-
               <DropdownMenuItem
                 className="flex items-center gap-2 text-sm cursor-pointer"
-                onSelect={() => openSettings()}
+                onSelect={() => openSettings("perfil")}
               >
-                <Settings className="w-4 h-4" /> Configurações
+                <UserRound className="w-4 h-4 text-ink-muted" /> Perfil
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="flex items-center gap-2 text-sm cursor-pointer"
+                onSelect={() => openSettings("aparencia")}
+              >
+                <Palette className="w-4 h-4 text-ink-muted" /> Aparência
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="flex items-center gap-2 text-sm cursor-pointer"
+                onSelect={() => openSettings("plano")}
+              >
+                <CreditCard className="w-4 h-4 text-ink-muted" /> Plano e consumo
               </DropdownMenuItem>
               <DropdownMenuSeparator />
 
@@ -376,23 +383,18 @@ export function AppShell() {
       {/* Main area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Topbar */}
-        <header className="h-15 sticky top-0 bg-surface border-b border-[#E5E7EB] dark:border-[#1C1F2E] px-6 flex items-center gap-2 shrink-0 z-20">
+        <header className="h-15 sticky top-0 bg-surface border-b border-border-soft px-6 flex items-center gap-2 shrink-0 z-20">
           <Breadcrumb />
           <div className="flex-1" />
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#6B7280]" />
-            <input
-              type="text"
-              placeholder="Buscar menções, influenciadores, marcas..."
-              className="w-75 h-8 pl-8 pr-3 text-xs  border border-[#E5E7EB] dark:border-[#262A3A] dark:text-[#E6E8EF] rounded-md outline-none focus:ring-1 focus:ring-teal-500"
-            />
-          </div>
-          <BrandSwitcher />
+          {/* A busca saiu daqui: o campo não fazia nada. Volta quando existir busca de verdade. */}
+          {/* Só Alertas lê várias marcas de uma vez (a API de disparos
+              aceita `brandId` nulo). Ver `allBrands` no BrandContext. */}
+          <BrandSwitcher allowAll={location.pathname.startsWith("/alerts")} />
           <button
             type="button"
             aria-label={isDark ? "Ativar modo claro" : "Ativar modo escuro"}
+            className="w-8 h-8 flex items-center justify-center rounded-full text-ink-muted hover:text-ink hover:bg-tint transition-colors cursor-pointer"
             onClick={() => setTheme(isDark ? "light" : "dark")}
-            className="text-[#6B7280] p-2 rounded-md hover:text-ink hover:bg-muted dark:hover:text-[#E6E8EF] transition-colors cursor-pointer"
           >
             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
@@ -400,10 +402,30 @@ export function AppShell() {
         </header>
 
         {/* Content */}
-        <main ref={mainRef} className="flex-1 p-6 overflow-y-auto">
-          <BillingStateBanner />
-          <TrialBanner />
-          <Outlet />
+        {/* O <main> não tem padding de propósito: ele é só o scrollport. Com
+            `p-6` aqui, a caixa de conteúdo começava 24px abaixo da borda e as
+            barras `sticky top-0` das telas grudavam nesse recuo em vez de
+            encostar no header. O respiro mudou pro wrapper de rota, então as 14
+            telas full-bleed seguem cancelando com o mesmo `-m-6`.
+
+            `scrollbar-gutter: stable` reserva a calha desde o primeiro quadro:
+            sem isso o conteúdo pula alguns pixels na horizontal quando a barra
+            aparece. */}
+        <main
+          ref={mainRef}
+          className="flex-1 min-h-0 overflow-y-auto"
+          style={{ scrollbarGutter: "stable" }}
+        >
+          {/* `empty:hidden`: os dois avisos somem na maior parte do tempo, e sem
+              isso o padding deles deixava uma faixa morta no topo. */}
+          <div className="px-6 pt-6 empty:hidden">
+            <BillingStateBanner />
+            <TrialBanner />
+          </div>
+          {/* Remonta por rota: cada tela entra com o mesmo movimento curto. */}
+          <div key={location.pathname} className="z-rise p-6">
+            <Outlet />
+          </div>
         </main>
       </div>
 

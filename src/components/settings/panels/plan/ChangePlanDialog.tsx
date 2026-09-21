@@ -126,7 +126,7 @@ export function ChangePlanDialog({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D]"
+            className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-tint"
             aria-label="Fechar"
           >
             <X className="w-4 h-4" />
@@ -149,8 +149,8 @@ export function ChangePlanDialog({
 
         {preview.isLoading && (
           <div className="mt-4 space-y-2 animate-pulse">
-            <div className="h-4 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D] w-3/4" />
-            <div className="h-16 rounded-[12px] bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+            <div className="h-4 rounded bg-tint w-3/4" />
+            <div className="h-16 rounded-[12px] bg-tint" />
           </div>
         )}
 
@@ -240,7 +240,7 @@ export function ChangePlanDialog({
         <div className="flex items-center justify-between gap-3 mt-6">
           <button
             onClick={onClose}
-            className="h-9 px-4 rounded-lg text-[13px] font-medium text-ink-muted hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors"
+            className="h-9 px-4 rounded-lg text-[13px] font-medium text-ink-muted hover:bg-hover transition-colors"
           >
             Cancelar
           </button>
@@ -550,8 +550,8 @@ function MoneyRow({ label, hint, value, strong }: { label: string; hint: string;
 function Notice({ tone, children }: { tone: "warn" | "neg"; children: React.ReactNode }) {
   const style =
     tone === "warn"
-      ? { bg: "#FFFBEB", border: "rgba(217,119,6,.32)", color: "var(--color-warn)" }
-      : { bg: "#FEF2F2", border: "rgba(220,38,38,.32)", color: "var(--color-neg)" }
+      ? { bg: "var(--warn-bg)", border: "rgba(217,119,6,.32)", color: "var(--color-warn)" }
+      : { bg: "var(--neg-bg)", border: "rgba(220,38,38,.32)", color: "var(--color-neg)" }
 
   return (
     <div

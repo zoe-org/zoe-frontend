@@ -1,29 +1,36 @@
-import { useState, type ReactNode } from "react"
+import { useState } from "react"
 import { Link } from "react-router-dom"
 import { useActiveBrand } from "@/features/brands/context"
-import { ChevronRight } from "lucide-react"
+import { ArrowRight, ChevronRight } from "lucide-react"
 import { MultiLine } from "@/components/ui/charts"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { InfoHint } from "@/components/ui/info-hint"
 import type { SovTrend } from "@/lib/api/dashboard"
-import { brandColor, formatScore, GLOSSARY, positionSummary, readSentiment, type RankedBrand } from "@/lib/sov"
+import { Stat } from "@/components/ui/stat"
+import {
+  brandColor, formatScore, GLOSSARY, nearestRival, positionSummary, readSentiment,
+  type RankedBrand,
+} from "@/lib/sov"
+import { stagger } from "@/lib/motion"
 import { BlockSkeleton, BrandSwatch, DeltaPp, SectionHead, SentimentChip } from "./shared"
 
 const NO_PREVIOUS =
   " Com \"Todo o período\" não existe período anterior para comparar, e a variação não aparece."
 
-export function PanoramaTab({ ranked, periodLabel, hasPreviousPeriod, trend, trendLoading }: {
+export function PanoramaTab({ ranked, periodLabel, hasPreviousPeriod, trend, trendLoading, onCompare }: {
   ranked: RankedBrand[]
   periodLabel: string
   /** Falso em "Todo o período": sem janela anterior, todo delta é zero por construção. */
   hasPreviousPeriod: boolean
   trend: SovTrend | undefined
   trendLoading: boolean
+  /** Leva pra aba Comparar já mirando o alvo mais próximo. */
+  onCompare?: () => void
 }) {
   const ppHint = GLOSSARY.pp + (hasPreviousPeriod ? "" : NO_PREVIOUS)
   return (
     <>
-      <PositionSection ranked={ranked} periodLabel={periodLabel} hasPreviousPeriod={hasPreviousPeriod} />
+      <PositionSection ranked={ranked} periodLabel={periodLabel} hasPreviousPeriod={hasPreviousPeriod} onCompare={onCompare} />
       <RankingSection ranked={ranked} hasPreviousPeriod={hasPreviousPeriod} ppHint={ppHint} />
       <TrendSection trend={trend} loading={trendLoading} />
     </>
@@ -32,10 +39,11 @@ export function PanoramaTab({ ranked, periodLabel, hasPreviousPeriod, trend, tre
 
 // ── Sua posição ───────────────────────────────────────────────────────────
 
-function PositionSection({ ranked, periodLabel, hasPreviousPeriod }: {
+function PositionSection({ ranked, periodLabel, hasPreviousPeriod, onCompare }: {
   ranked: RankedBrand[]
   periodLabel: string
   hasPreviousPeriod: boolean
+  onCompare?: () => void
 }) {
   const you = ranked.find((b) => b.isYou)
 
@@ -55,7 +63,10 @@ function PositionSection({ ranked, periodLabel, hasPreviousPeriod }: {
   const summary = positionSummary(ranked)
 
   return (
-    <section className="grid grid-cols-1 lg:grid-cols-[1.25fr_1fr] gap-x-10 gap-y-6 px-8 py-7 border-b border-border-soft">
+    <section
+      className="grid grid-cols-1 lg:grid-cols-[1.25fr_1fr] gap-x-10 gap-y-6 px-8 py-7 border-b border-border-soft z-rise"
+      style={stagger(0)}
+    >
       <div>
         <div className="eyebrow mb-3">Sua posição · {periodLabel.toLowerCase()}</div>
         <div className="flex items-baseline gap-3 flex-wrap mb-3">
@@ -69,52 +80,80 @@ function PositionSection({ ranked, periodLabel, hasPreviousPeriod }: {
         {summary && (
           <p className="text-[14px] leading-relaxed max-w-140 m-0" style={{ color: "var(--ink-2)" }}>{summary}</p>
         )}
+        <RivalTarget ranked={ranked} onCompare={onCompare} />
       </div>
 
-      <dl className="grid grid-cols-3 gap-4 self-end m-0">
-        <Metric
+      <div className="grid grid-cols-3 gap-4 self-end">
+        <Stat
           label="Share"
           hint={GLOSSARY.sov}
-          value={`${you.sharePct}%`}
-          foot={hasPreviousPeriod
-            ? <DeltaPp value={you.deltaPp} />
-            : <span className="text-[11.5px] text-ink-muted-2">sem comparação</span>}
-        />
-        <Metric
+          foot={hasPreviousPeriod ? <DeltaPp value={you.deltaPp} /> : "sem comparação"}
+        >
+          {you.sharePct}%
+        </Stat>
+        <Stat
           label="Sentimento"
           hint={GLOSSARY.sentiment}
-          value={formatScore(you.avgScore)}
-          valueColor={sent.color}
-          foot={<span className="text-[11.5px]" style={{ color: sent.color }}>{sent.label}</span>}
-        />
-        <Metric
-          label="Menções"
-          hint={GLOSSARY.mentions}
-          value={you.mentions.toLocaleString("pt-BR")}
-          foot={<span className="text-[11.5px] text-ink-muted-2">vídeos analisados</span>}
-        />
-      </dl>
+          color={sent.color}
+          foot={<span style={{ color: sent.color }}>{sent.label}</span>}
+        >
+          {formatScore(you.avgScore)}
+        </Stat>
+        <Stat label="Menções" hint={GLOSSARY.mentions} foot="vídeos analisados">
+          {you.mentions.toLocaleString("pt-BR")}
+        </Stat>
+      </div>
     </section>
   )
 }
 
-function Metric({ label, hint, value, valueColor, foot }: {
-  label: string
-  hint: string
-  value: string
-  valueColor?: string
-  foot: ReactNode
-}) {
+/**
+ * O concorrente que decide a próxima posição, com a distância em pp e o atalho
+ * pra comparação.
+ *
+ * O ranking mostra todo mundo e o resumo cita o líder; nenhum dos dois responde
+ * "quem eu preciso passar agora" — que em 3º lugar não é o líder, é o 2º. A
+ * regra de qual marca é essa já vive testada em `nearestRival`.
+ */
+function RivalTarget({ ranked, onCompare }: { ranked: RankedBrand[]; onCompare?: () => void }) {
+  const you = ranked.find((b) => b.isYou)
+  const alvo = nearestRival(ranked)
+  if (!you || !alvo) return null
+
+  const lidera = you.rank === 1
+  const gap = Math.abs(you.sharePct - alvo.sharePct)
+
   return (
-    <div className="min-w-0">
-      <dt className="flex items-center gap-1 text-[12px] text-ink-muted">
-        {label}
-        <InfoHint text={hint} />
-      </dt>
-      <dd className="m-0 mt-1 font-display" style={{ fontSize: 26, lineHeight: 1.1, color: valueColor ?? "var(--ink)" }}>
-        {value}
-      </dd>
-      <dd className="m-0 mt-1">{foot}</dd>
+    <div className="flex items-center gap-4 flex-wrap mt-5 rounded-[14px] border border-border-soft bg-inset px-4 py-3">
+      <div className="min-w-0">
+        <div className="eyebrow mb-1.5">{lidera ? "Quem pode te passar" : "Alvo mais próximo"}</div>
+        <div className="flex items-center gap-2 min-w-0">
+          <BrandSwatch color={brandColor(alvo.brandId, alvo.color)} />
+          <span className="text-[13.5px] font-semibold truncate" style={{ color: "var(--ink)" }}>
+            {alvo.brandName}
+          </span>
+          <span className="text-[12.5px] text-ink-muted whitespace-nowrap">
+            {/* Mesmo share com posições diferentes é desempate por menções: dizer
+                "0pp atrás" leria como erro de conta. */}
+            {gap === 0 ? (
+              <>mesmo share · decide no volume</>
+            ) : (
+              <>
+                <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>{gap}pp</span>
+                {lidera ? " atrás de você" : " à sua frente"}
+              </>
+            )}
+          </span>
+        </div>
+      </div>
+      {onCompare && (
+        <button
+          onClick={onCompare}
+          className="ml-auto inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] font-medium rounded-lg border border-border-soft hover:bg-hover transition-colors shrink-0"
+        >
+          Comparar <ArrowRight className="w-3.5 h-3.5" />
+        </button>
+      )}
     </div>
   )
 }
@@ -134,12 +173,12 @@ function RankingSection({ ranked, hasPreviousPeriod, ppHint }: {
   // Só vira link o que o tenant assina: marca fora da lista não pode ser a ativa.
   const assinadas = new Set(brands.map((x) => x.brandId))
   return (
-    <section className="px-8 py-7 border-b border-border-soft">
+    <section className="px-8 py-7 border-b border-border-soft z-rise" style={stagger(1)}>
       <SectionHead
         title="Ranking do conjunto"
         sub="Share e sentimento lado a lado: share alto com sentimento baixo é exposição, não vantagem. Clique num concorrente para abrir o Dashboard dele."
       />
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto overflow-y-clip">
         <table className="w-full text-[13px] min-w-160">
           <thead>
             <tr className="text-ink-muted text-[12px]">
@@ -160,13 +199,13 @@ function RankingSection({ ranked, hasPreviousPeriod, ppHint }: {
             </tr>
           </thead>
           <tbody>
-            {ranked.map((b) => {
+            {ranked.map((b, i) => {
               const c = brandColor(b.brandId, b.color)
               return (
                 <tr
                   key={b.brandId}
-                  className="border-t border-border-soft"
-                  style={b.isYou ? { background: "var(--teal-bg)" } : undefined}
+                  className="border-t border-border-soft z-rise"
+                  style={{ ...stagger(Math.min(i, 12)), ...(b.isYou ? { background: "var(--teal-bg)" } : {}) }}
                 >
                   <td className="py-3 pl-1 font-mono-zoe text-[11.5px] text-ink-muted-2">{b.rank}</td>
                   <td className="py-3 pr-3">
@@ -195,8 +234,13 @@ function RankingSection({ ranked, hasPreviousPeriod, ppHint }: {
                     {/* Barra na escala absoluta: 34% ocupa 34% do trilho. Relativa ao
                         líder, o primeiro sempre pareceria dono de tudo. */}
                     <div className="flex items-center gap-2.5">
-                      <div className="flex-1 h-2 rounded-sm overflow-hidden bg-[#F3F4F6] dark:bg-[#1C1F2E]">
-                        <div style={{ width: `${b.sharePct}%`, height: "100%", background: c, transition: "width .5s" }} />
+                      <div className="flex-1 h-2 rounded-full overflow-hidden bg-tint">
+                        {/* `transition` continua para a troca de período; o
+                            `z-grow-x` é só a entrada. */}
+                        <div
+                          className="h-full rounded-full z-grow-x"
+                          style={{ width: `${b.sharePct}%`, background: c, transition: "width .5s", ...stagger(Math.min(i, 12)) }}
+                        />
                       </div>
                       <span className="font-mono-zoe w-10 text-right" style={{ color: "var(--ink)" }}>{b.sharePct}%</span>
                     </div>
@@ -248,7 +292,7 @@ function TrendSection({ trend, loading }: { trend: SovTrend | undefined; loading
   const emptyColumn = (i: number) => series.every((s) => (s.data[i] ?? 0) === 0)
 
   return (
-    <section className="px-8 py-7">
+    <section className="px-8 py-7 z-rise" style={stagger(2)}>
       <SectionHead
         title="Evolução do share"
         hint={GLOSSARY.trend}
@@ -265,7 +309,7 @@ function TrendSection({ trend, loading }: { trend: SovTrend | undefined; loading
                 type="button"
                 onClick={() => toggle(s.brandName)}
                 aria-pressed={!off}
-                className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full border border-border-soft text-[12px] transition-opacity hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D]"
+                className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-border-soft text-[12px] transition-opacity hover:bg-hover"
                 style={{ opacity: off ? 0.45 : 1, color: "var(--ink)" }}
               >
                 <span className="w-2.5 h-0.5 rounded-full" style={{ background: brandColor(s.brandId, s.color) }} />

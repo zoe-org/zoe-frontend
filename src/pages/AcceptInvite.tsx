@@ -83,14 +83,14 @@ export default function AcceptInvitePage() {
   const tenantName = result?.kind === "success" ? result.tenantName : (preview?.tenantName ?? "")
 
   return (
-    <div className="min-h-screen grid place-items-center bg-[#F9FAFB] p-6">
-      <div className="w-full max-w-md bg-white rounded-2xl border border-[#E5E7EB] p-8 shadow-sm text-center">
+    <div className="min-h-screen grid place-items-center bg-inset p-6">
+      <div className="w-full max-w-md bg-white rounded-2xl border border-border p-8 shadow-sm text-center">
         <ZoeLogo className="w-12 h-auto text-teal-500 mb-6 mx-auto" />
 
         {(status === "loading" || status === "accepting") && (
           <>
             <h1 className="text-xl font-bold mb-1">Validando convite...</h1>
-            <p className="text-sm text-[#6B7280]">Só um momento.</p>
+            <p className="text-sm text-ink-muted">Só um momento.</p>
             <div className="mt-6 animate-spin rounded-full h-8 w-8 mx-auto border-2 border-teal-500 border-t-transparent" />
           </>
         )}
@@ -100,8 +100,8 @@ export default function AcceptInvitePage() {
             <h1 className="text-xl font-bold mb-1">
               Você foi convidado(a) para <span className="text-teal-500">{preview.tenantName}</span>
             </h1>
-            <p className="text-sm text-[#6B7280] mb-6">
-              {preview.inviterName} convidou <strong className="text-midnight dark:text-[#E6E8EF]">{preview.email}</strong>.
+            <p className="text-sm text-ink-muted mb-6">
+              {preview.inviterName} convidou <strong className="text-midnight dark:text-ink">{preview.email}</strong>.
               Entre ou crie sua conta com esse e-mail para aceitar.
             </p>
             <Button
@@ -126,7 +126,7 @@ export default function AcceptInvitePage() {
         {status === "success" && (
           <>
             <h1 className="text-xl font-bold mb-1">Você entrou em <span className="text-teal-500">{tenantName}</span></h1>
-            <p className="text-sm text-[#6B7280] mb-6">Bem-vindo(a) ao workspace.</p>
+            <p className="text-sm text-ink-muted mb-6">Bem-vindo(a) ao workspace.</p>
             <Button onClick={() => nav("/dashboard", { replace: true })} className="w-full bg-teal-500 hover:bg-teal-500/90 text-white">
               Ir para o dashboard
             </Button>

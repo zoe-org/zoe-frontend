@@ -23,6 +23,7 @@ import {
 import { isArchived, partitionBrands } from "@/lib/brands"
 import { useDashboardSummary } from "@/lib/api/dashboard"
 import { useActiveBrand } from "@/features/brands/context"
+import { formatScore } from "@/lib/score"
 
 // Paleta do design (brand-modal.jsx) para o seletor de cor.
 const PALETTE = ["#00A799", "#8B5CF6", "#EF4444", "#2563EB", "#F59E0B", "#14B8A6", "#EC4899"]
@@ -203,7 +204,7 @@ export default function BrandsPage() {
       <div className="grid" style={{ gridTemplateColumns: "340px 1fr", minHeight: "calc(100vh - 200px)" }}>
         {/* Lista */}
         <div className="border-r border-border-soft" style={{ background: "var(--surface)" }}>
-          <div className="px-4 py-3 border-b border-border-soft sticky top-15 z-5" style={{ background: "var(--surface)" }}>
+          <div className="px-4 py-3 border-b border-border-soft sticky top-0 z-5" style={{ background: "var(--surface)" }}>
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-ink-muted" />
               <input
@@ -238,7 +239,7 @@ export default function BrandsPage() {
                   <button
                     onClick={toggleArchived}
                     aria-expanded={archivedOpen}
-                    className="flex w-full items-center justify-between px-4 py-2.5 border-b border-border-soft text-left bg-[#FAFBFC] dark:bg-[#151824] hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D] transition-colors"
+                    className="flex w-full items-center justify-between px-4 py-2.5 border-b border-border-soft text-left bg-inset hover:bg-tint transition-colors"
                   >
                     <span className="eyebrow">Arquivadas · {archived.length}</span>
                     <ChevronDown
@@ -297,7 +298,7 @@ function BrandRow({ brand: b, active, onSelect }: {
   return (
     <button
       onClick={onSelect}
-      className="block w-full text-left px-4 py-3.5 border-b border-border-soft transition-colors hover:bg-[#FAFBFC] dark:hover:bg-[#181B28]"
+      className="block w-full text-left px-4 py-3.5 border-b border-border-soft transition-colors hover:bg-hover"
       style={{
         background: active ? "var(--teal-bg)" : "transparent",
         borderLeft: `3px solid ${active ? "var(--color-teal-500)" : "transparent"}`,
@@ -412,7 +413,7 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
   const metrics = [
     { label: "Vídeos · 30d", value: String(brand.videoCount30d) },
     { label: "Menções · 30d", value: s ? String(s.totalMentions) : "—" },
-    { label: "Score médio", value: s ? s.avgScore.toFixed(2) : "—" },
+    { label: "Score médio", value: s ? formatScore(s.avgScore) : "—" },
     { label: "Variação · 30d", value: s ? `${s.deltaPct30d >= 0 ? "+" : ""}${s.deltaPct30d}%` : "—", kind: s ? (s.deltaPct30d >= 0 ? "pos" : "neg") : undefined },
   ]
 
@@ -462,7 +463,7 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
         <div className="flex-1" />
         <button
           onClick={onOpenDashboard}
-          className="inline-flex items-center gap-1.5 h-8 px-3 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors shrink-0"
+          className="inline-flex items-center gap-1.5 h-8 px-3 text-[13px] rounded-md border border-border-soft hover:bg-hover transition-colors shrink-0"
         >
           Ver no dashboard
           <ExternalLink className="w-3.5 h-3.5" />
@@ -476,7 +477,7 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
             <div key={met.label} className={`px-5 py-5 ${i < metrics.length - 1 ? "lg:border-r" : ""} border-border-soft ${i < 2 ? "border-b lg:border-b-0" : ""} ${i === 0 ? "border-r lg:border-r" : ""}`}>
               <div className="eyebrow">{met.label}</div>
               {summary.isLoading && met.value === "—" ? (
-                <div className="h-8 w-20 mt-2 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D] animate-pulse" />
+                <div className="h-8 w-20 mt-2 rounded bg-tint animate-pulse" />
               ) : (
                 <div className="font-display mt-2" style={{ fontSize: 34, lineHeight: 1, color: "var(--ink)" }}>{met.value}</div>
               )}
@@ -491,13 +492,13 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
         <div className="border border-border-soft rounded-xl p-5">
           <div className="eyebrow mb-3.5">Palavras-chave monitoradas</div>
           {keywords.isLoading ? (
-            <div className="h-8 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D] animate-pulse" />
+            <div className="h-8 rounded bg-tint animate-pulse" />
           ) : (
             <div className="flex flex-wrap gap-2">
               {(keywords.data?.items ?? []).map((k) => (
                 <span
                   key={k.id}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[12.5px] font-mono-zoe bg-[#F3F4F6] dark:bg-[#1A1D2D]"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[12.5px] font-mono-zoe bg-tint"
                   style={{ color: "var(--ink-2)" }}
                 >
                   “{k.keyword}”
@@ -530,7 +531,7 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
               <button
                 type="submit"
                 disabled={!newKeyword.trim() || m.addKeyword.isPending}
-                className="inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] rounded-md border border-border-soft hover:bg-hover transition-colors disabled:opacity-50"
               >
                 <Plus className="w-3 h-3" /> {m.addKeyword.isPending ? "..." : "adicionar"}
               </button>
@@ -690,7 +691,7 @@ function CompetitiveSetCard({ brand, canManage }: {
 
       <div className="mt-4">
         {set.isLoading ? (
-          <div className="h-8 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D] animate-pulse" />
+          <div className="h-8 rounded bg-tint animate-pulse" />
         ) : competitors.length === 0 ? (
           // RN-I-064 por conjunto: sem concorrente declarado o SoV não tem denominador,
           // e mostrar 100% seria pior que dizer que falta montar.
@@ -706,7 +707,7 @@ function CompetitiveSetCard({ brand, canManage }: {
             {competitors.map((c) => (
               <span
                 key={c.brandId}
-                className="inline-flex items-center gap-2 pl-2 pr-2.5 py-1.5 rounded-md text-[12.5px] bg-[#F3F4F6] dark:bg-[#1A1D2D]"
+                className="inline-flex items-center gap-2 pl-2 pr-2.5 py-1.5 rounded-md text-[12.5px] bg-tint"
                 style={{ color: "var(--ink-2)" }}
               >
                 <span
@@ -946,7 +947,7 @@ function BrandModal({ open, onClose }: { open: boolean; onClose: () => void }) {
               <button
                 onClick={close}
                 aria-label="Fechar"
-                className="p-1.5 rounded-md text-ink-muted hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D] transition-colors"
+                className="p-1.5 rounded-md text-ink-muted hover:bg-tint transition-colors"
               >
                 <X className="w-4.5 h-4.5" />
               </button>
@@ -963,11 +964,11 @@ function BrandModal({ open, onClose }: { open: boolean; onClose: () => void }) {
                 >
                   <div
                     className="h-[3px] rounded-sm mb-1.5 transition-colors"
-                    style={{ background: i <= step ? "var(--color-teal-500)" : "#E5E7EB" }}
+                    style={{ background: i <= step ? "var(--color-teal-500)" : "var(--tint-2)" }}
                   />
                   <div
                     className="text-[11px] font-semibold"
-                    style={{ color: i === step ? "var(--color-teal-700)" : i < step ? "var(--ink-muted)" : "#9CA3AF" }}
+                    style={{ color: i === step ? "var(--color-teal-700)" : i < step ? "var(--ink-muted)" : "var(--ink-muted-2)" }}
                   >
                     {s}
                   </div>
@@ -1074,7 +1075,7 @@ function BrandModal({ open, onClose }: { open: boolean; onClose: () => void }) {
                           disabled={!channelDraft.trim() || resolvingChannel}
                           onClick={addChannel}
                           aria-label="Adicionar canal"
-                          className="h-10 px-3.5 text-[13px] rounded-lg border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors disabled:opacity-50"
+                          className="h-10 px-3.5 text-[13px] rounded-lg border border-border-soft hover:bg-hover transition-colors disabled:opacity-50"
                         >
                           {resolvingChannel
                             ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -1090,7 +1091,7 @@ function BrandModal({ open, onClose }: { open: boolean; onClose: () => void }) {
                             <span
                               key={ch}
                               title={ch}
-                              className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-md text-[12px] font-mono-zoe bg-[#F3F4F6] dark:bg-[#1A1D2D]"
+                              className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-md text-[12px] font-mono-zoe bg-tint"
                               style={{ color: "var(--ink-2)" }}
                             >
                               {/* Título quando o YouTube confirmou: é o que
@@ -1214,7 +1215,7 @@ function BrandModal({ open, onClose }: { open: boolean; onClose: () => void }) {
                       {keywords.map((k) => (
                         <span
                           key={k}
-                          className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1.5 rounded-md text-[12.5px] font-mono-zoe bg-[#F3F4F6] dark:bg-[#1A1D2D]"
+                          className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1.5 rounded-md text-[12.5px] font-mono-zoe bg-tint"
                           style={{ color: "var(--ink-2)" }}
                         >
                           “{k}”
@@ -1244,12 +1245,12 @@ function BrandModal({ open, onClose }: { open: boolean; onClose: () => void }) {
             {step > 0 ? (
               <button
                 onClick={() => setStep(step - 1)}
-                className="h-9 px-4 text-[13px] rounded-lg border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors"
+                className="h-9 px-4 text-[13px] rounded-lg border border-border-soft hover:bg-hover transition-colors"
               >
                 Voltar
               </button>
             ) : (
-              <button onClick={close} className="h-9 px-4 text-[13px] rounded-lg text-ink-muted hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D] transition-colors">
+              <button onClick={close} className="h-9 px-4 text-[13px] rounded-lg text-ink-muted hover:bg-tint transition-colors">
                 Cancelar
               </button>
             )}
@@ -1383,12 +1384,12 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function PageSkeleton() {
   return (
     <div className="-m-6 animate-pulse">
-      <div className="px-8 pt-7 pb-5 border-b border-border-soft"><div className="h-9 w-48 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" /></div>
+      <div className="px-8 pt-7 pb-5 border-b border-border-soft"><div className="h-9 w-48 rounded bg-tint" /></div>
       <div className="grid" style={{ gridTemplateColumns: "340px 1fr" }}>
         <div className="border-r border-border-soft p-4 space-y-3">
-          {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-12 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />)}
+          {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-12 rounded bg-tint" />)}
         </div>
-        <div className="p-8"><div className="h-24 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" /></div>
+        <div className="p-8"><div className="h-24 rounded bg-tint" /></div>
       </div>
     </div>
   )
@@ -1400,7 +1401,7 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
       <AlertCircle className="w-10 h-10 text-neg mb-3" />
       <h3 className="text-lg font-semibold mb-1" style={{ color: "var(--ink)" }}>Não foi possível carregar</h3>
       <p className="text-sm text-ink-muted mb-4">Tente novamente em instantes.</p>
-      <button onClick={onRetry} className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors">
+      <button onClick={onRetry} className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-hover transition-colors">
         Tentar de novo
       </button>
     </div>

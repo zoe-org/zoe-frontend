@@ -58,7 +58,7 @@ export function WorkspacePanel({ onNavigate }: { onNavigate: () => void }) {
                 disabled={isActive}
                 className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
                   i > 0 ? "border-t border-border-soft" : ""
-                } ${isActive ? "cursor-default" : "hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D]"}`}
+                } ${isActive ? "cursor-default" : "hover:bg-hover"}`}
               >
                 <span
                   className="w-2 h-2 rounded-full shrink-0"
@@ -85,7 +85,7 @@ export function WorkspacePanel({ onNavigate }: { onNavigate: () => void }) {
         <Link
           to="/onboarding/tenant"
           onClick={onNavigate}
-          className="mt-3 h-9 px-3.5 inline-flex items-center gap-1.5 rounded-lg text-[13px] font-medium border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors"
+          className="mt-3 h-9 px-3.5 inline-flex items-center gap-1.5 rounded-lg text-[13px] font-medium border border-border-soft hover:bg-hover transition-colors"
           style={{ color: "var(--ink)" }}
         >
           <Plus className="w-3.5 h-3.5" />

@@ -1,4 +1,5 @@
 import { EmptyBlock } from "@/components/ui/empty-block"
+import { stagger } from "@/lib/motion"
 import type { SovTopic, SovTopicShare } from "@/lib/api/dashboard"
 import {
   brandColor, findTopicGaps, GLOSSARY, isLowVolume, leaderOf, MIN_TOPIC_VOLUME, type RankedBrand,
@@ -40,7 +41,9 @@ export function TopicsTab({ topics, loading, ranked }: {
     <section className="px-8 py-7">
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-x-10 gap-y-8 items-start">
         {you && (
-          <div className="xl:order-2 xl:sticky xl:top-4">
+          // 72px = os 56 da barra de trabalho + respiro. Com `top-4` o painel
+          // subia por trás dela.
+          <div className="xl:order-2 xl:sticky xl:top-18">
             <GapsPanel topics={topics} you={you} />
           </div>
         )}
@@ -59,7 +62,7 @@ function GapsPanel({ topics, you }: { topics: SovTopic[]; you: RankedBrand }) {
   const youColor = brandColor(you.brandId, you.color)
 
   return (
-    <aside className="rounded-[14px] border border-border-soft p-5 bg-[#FAFBFC] dark:bg-[#151824]">
+    <aside className="rounded-[14px] border border-border-soft p-5 bg-inset">
       <SectionHead
         title="Espaços não ocupados"
         hint={GLOSSARY.topics}
@@ -75,10 +78,14 @@ function GapsPanel({ topics, you }: { topics: SovTopic[]; you: RankedBrand }) {
         </p>
       ) : (
         <div className="flex flex-col">
-          {gaps.map(({ topic, mine, leader }) => {
+          {gaps.map(({ topic, mine, leader }, i) => {
             const leaderColor = brandColor(leader.brandId, leader.color)
             return (
-              <div key={topic.topic} className="border-t border-border-soft py-3 first:border-t-0 first:pt-0 last:pb-0">
+              <div
+                key={topic.topic}
+                className="border-t border-border-soft py-3 first:border-t-0 first:pt-0 last:pb-0 z-rise"
+                style={stagger(i)}
+              >
                 <div className="flex items-baseline justify-between gap-3 mb-2">
                   <span className="text-[13.5px] font-semibold truncate" style={{ color: "var(--ink)" }} title={topic.topic}>
                     {topic.topic}
@@ -89,9 +96,15 @@ function GapsPanel({ topics, you }: { topics: SovTopic[]; you: RankedBrand }) {
                 </div>
                 {/* Você e o líder no mesmo trilho: o contraste é o par, e um empilhado com
                     todos diluiria justamente isso. */}
-                <div className="relative h-2 rounded-full overflow-hidden bg-[#EEF0F3] dark:bg-[#1C1F2E]">
-                  <div className="absolute inset-y-0 left-0 opacity-35" style={{ width: `${leader.sharePct}%`, background: leaderColor }} />
-                  <div className="absolute inset-y-0 left-0" style={{ width: `${mine}%`, background: youColor }} />
+                <div className="relative h-2 rounded-full overflow-hidden bg-tint">
+                  <div
+                    className="absolute inset-y-0 left-0 opacity-35 z-grow-x"
+                    style={{ width: `${leader.sharePct}%`, background: leaderColor, ...stagger(i) }}
+                  />
+                  <div
+                    className="absolute inset-y-0 left-0 z-grow-x"
+                    style={{ width: `${mine}%`, background: youColor, ...stagger(i) }}
+                  />
                 </div>
                 <div className="flex items-center justify-between gap-2 mt-1.5 text-[11.5px] text-ink-muted">
                   <span>você <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>{mine}%</span></span>
@@ -147,11 +160,15 @@ function TopicShareTable({ topics, ranked }: { topics: SovTopic[]; ranked: Ranke
         <span className="text-right">Você · liderança</span>
       </div>
 
-      {topics.map((t) => {
+      {topics.map((t, i) => {
         const low = isLowVolume(t)
         const mine = t.shares.find((s) => s.isYou)
         return (
-          <div key={t.topic} className={`${ROW} py-2.5 border-t border-border-soft`} style={{ opacity: low ? 0.55 : 1 }}>
+          <div
+            key={t.topic}
+            className={`${ROW} py-2.5 border-t border-border-soft z-rise`}
+            style={{ opacity: low ? 0.55 : 1, ...stagger(Math.min(i, 12)) }}
+          >
             <div className="min-w-0">
               <div className="text-[13px] font-medium truncate" style={{ color: "var(--ink)" }} title={t.topic}>
                 {t.topic}
@@ -162,7 +179,7 @@ function TopicShareTable({ topics, ranked }: { topics: SovTopic[]; ranked: Ranke
               </div>
             </div>
 
-            <StackedBar shares={t.shares} />
+            <StackedBar shares={t.shares} index={i} />
 
             <div className="flex items-center md:justify-end gap-2 flex-wrap">
               <span className="text-[11.5px] text-ink-muted whitespace-nowrap">
@@ -177,9 +194,12 @@ function TopicShareTable({ topics, ranked }: { topics: SovTopic[]; ranked: Ranke
   )
 }
 
-function StackedBar({ shares }: { shares: SovTopicShare[] }) {
+function StackedBar({ shares, index }: { shares: SovTopicShare[]; index: number }) {
   return (
-    <div className="flex h-4 rounded-md overflow-hidden bg-[#F3F4F6] dark:bg-[#1C1F2E]">
+    // `z-wipe`, e não `z-grow-x`: a barra é empilhada, e escalar cada pedaço
+    // separadamente distorceria a divisão durante a entrada. O corte varrendo da
+    // esquerda mantém as proporções corretas desde o primeiro quadro.
+    <div className="flex h-4 rounded-md overflow-hidden bg-tint z-wipe" style={stagger(Math.min(index, 12))}>
       {shares.map((s) => (
         <div
           key={s.brandId}

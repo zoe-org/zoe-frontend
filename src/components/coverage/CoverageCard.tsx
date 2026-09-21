@@ -76,7 +76,7 @@ function OfferSection({ tenantBrandId, brandName, blockedCount, data, loading, e
   const confirm = useConfirm()
   const [now] = useState(() => new Date())
 
-  if (loading) return <div className="h-16 mt-4 rounded-lg bg-[#F3F4F6] dark:bg-[#1A1D2D] animate-pulse" />
+  if (loading) return <div className="h-16 mt-4 rounded-lg bg-tint animate-pulse" />
   if (error || !data) {
     return (
       <p className="text-[12.5px] text-ink-muted mt-3 pl-7">
@@ -132,7 +132,7 @@ function OfferSection({ tenantBrandId, brandName, blockedCount, data, loading, e
       {open && (
         <div
           className="flex items-center gap-3 flex-wrap rounded-lg border px-4 py-3"
-          style={{ background: "#FFFBEB", borderColor: "rgba(217,119,6,.32)" }}
+          style={{ background: "var(--warn-bg)", borderColor: "rgba(217,119,6,.32)" }}
         >
           <div className="flex-1 min-w-60 text-[13px] leading-relaxed" style={{ color: "var(--ink-2)" }}>
             <strong>Pagamento em aberto</strong> de {brl(open.amountCents)}, iniciado em{" "}
@@ -148,7 +148,7 @@ function OfferSection({ tenantBrandId, brandName, blockedCount, data, loading, e
           <button
             onClick={check}
             disabled={sync.isPending}
-            className="h-8 px-3 inline-flex items-center gap-1.5 rounded-lg text-[12.5px] font-medium border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors disabled:opacity-50"
+            className="h-8 px-3 inline-flex items-center gap-1.5 rounded-lg text-[12.5px] font-medium border border-border-soft hover:bg-hover transition-colors disabled:opacity-50"
           >
             {sync.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
             Já paguei, conferir

@@ -48,7 +48,7 @@ export function CompetitorChannelCard({ brandId, brandName }: { brandId: string;
       </div>
 
       {!hasSov ? (
-        <div className="flex items-start gap-3 rounded-[12px] border border-border-soft px-4 py-3.5 bg-[#FAFBFC] dark:bg-[#151824] max-w-160">
+        <div className="flex items-start gap-3 rounded-[12px] border border-border-soft px-4 py-3.5 bg-inset max-w-160">
           <Lock className="w-4 h-4 mt-0.5 shrink-0 text-ink-muted" />
           <div className="text-[13px] leading-relaxed" style={{ color: "var(--ink-2)" }}>
             A reação da audiência nos canais de concorrentes faz parte do Share of Voice.{" "}
@@ -59,8 +59,8 @@ export function CompetitorChannelCard({ brandId, brandName }: { brandId: string;
         </div>
       ) : reaction.isLoading ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 animate-pulse">
-          <div className="h-40 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
-          <div className="h-40 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+          <div className="h-40 rounded bg-tint" />
+          <div className="h-40 rounded bg-tint" />
         </div>
       ) : reaction.isError || !reaction.data ? (
         <EmptyBlock message={apiMessage(reaction.error, "Não foi possível carregar a reação nos canais oficiais.")} />
@@ -215,9 +215,9 @@ function CommentSentimentBar({ positives, neutrals, negatives }: { positives: nu
   const seg = (n: number) => `${(n / total) * 100}%`
   return (
     <div>
-      <div className="flex h-2 rounded-full overflow-hidden bg-[#F3F4F6] dark:bg-[#1C1F2E]">
+      <div className="flex h-2 rounded-full overflow-hidden bg-tint">
         <div style={{ width: seg(positives), background: "var(--color-pos)" }} />
-        <div style={{ width: seg(neutrals), background: "#9CA3AF" }} />
+        <div style={{ width: seg(neutrals), background: "var(--ink-muted-2)" }} />
         <div style={{ width: seg(negatives), background: "var(--color-neg)" }} />
       </div>
       <div className="flex items-center gap-4 mt-2 text-[11.5px] text-ink-muted flex-wrap">
@@ -239,7 +239,7 @@ function SignalGaps({ commentsDisabled, withoutSignal }: { commentsDisabled: num
   return (
     <div className="mt-5 flex flex-col gap-2">
       {commentsDisabled > 0 && (
-        <div className="flex items-start gap-2 px-3 py-2 rounded-lg" style={{ background: "#FFFBEB" }}>
+        <div className="flex items-start gap-2 px-3 py-2 rounded-lg" style={{ background: "var(--warn-bg)" }}>
           <MessageSquareOff className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: "var(--color-warn)" }} aria-hidden />
           <div className="text-[12px] leading-snug" style={{ color: "#78350F" }}>
             <strong>

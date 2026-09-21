@@ -20,6 +20,8 @@ import {
   type RosterItem,
 } from "@/lib/api/operations"
 import { AUDIENCE_SIZES } from "@/lib/api/creator"
+import { SelectField } from "@/components/ui/select-field"
+import { stagger } from "@/lib/motion"
 
 /** Valor da aba do filtro de pagamento travado — não é um estado de relacionamento. */
 const PAYMENT_STUCK = "pagamento-travado"
@@ -32,20 +34,20 @@ function payoutState(it: RosterItem): { label: string; color: string; explanatio
   if (it.kycStatus === "Rejected") {
     return {
       label: "verificação recusada",
-      color: "#DC2626",
+      color: "var(--color-neg)",
       explanation: "O provedor recusou a verificação. O criador revisa os dados pela área dele — daqui não há o que fazer além de avisá-lo.",
     }
   }
   if (it.hasStripeAccount || it.kycStatus === "Pending") {
     return {
       label: "em verificação",
-      color: "#D97706",
+      color: "var(--color-warn)",
       explanation: "A conta existe e está em verificação pelo provedor. O criador conclui pela área dele.",
     }
   }
   return {
     label: "sem conta",
-    color: "#6B7280",
+    color: "var(--ink-muted)",
     explanation: "O criador ainda não conectou a conta de recebimento. Ele faz isso pela área dele; sem ela, pagamento aprovado espera.",
   }
 }
@@ -105,64 +107,92 @@ export default function OperationsRosterPage() {
 
   const selectedCreator = selectedId ? all.find((i) => i.influencerId === selectedId) ?? null : null
 
-  return (
-    <div className="-m-6 border-t border-border-soft" style={{ color: "var(--ink)" }}>
-      <RelationshipTabs items={all} value={rel} onChange={setRel} />
+  const temRecorte = Boolean(search || area || audience || rel)
+  const limparRecorte = () => { setSearch(""); setArea(""); setAudience(""); setRel("") }
 
-      <section className="px-8 pt-7 pb-5 border-b border-border-soft" style={{ background: "var(--surface)" }}>
+  return (
+    <div className="-m-6" style={{ color: "var(--ink)" }}>
+      {/* Abertura: só o enquadramento. A contagem foi pra barra, ao lado do
+          recorte que a muda — repetida aqui ela envelhecia a cada filtro. */}
+      <section className="px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
         <div className="flex items-start justify-between gap-6 flex-wrap">
-          <div>
-            <div className="eyebrow mb-2.5">Operations · Elenco</div>
+          <div className="flex-1 max-w-190 min-w-70">
+            <div className="eyebrow mb-3">Operations · Elenco</div>
             <h1 className="font-display m-0" style={{ fontSize: 34, lineHeight: 1.1, color: "var(--ink)" }}>
               Criadores
             </h1>
-            <div className="text-[14px] text-ink-muted mt-1.5 max-w-140">
-              <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>
-                {all.length} {all.length === 1 ? "criador" : "criadores"}
-              </span>{" "}
-              no elenco deste workspace. A pessoa é única na plataforma — se ela já
-              trabalha com outra marca, o cadastro só cria o vínculo com você.
-            </div>
+            <p className="text-[14.5px] leading-relaxed text-ink-muted mt-2.5 mb-0 max-w-150">
+              A pessoa é única na plataforma — se ela já trabalha com outra marca, o cadastro
+              só cria o vínculo com você.
+            </p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {areas.length > 1 && (
-              <select
-                value={area}
-                onChange={(e) => setArea(e.target.value)}
-                aria-label="Filtrar por área"
-                className="h-9 px-2.5 rounded-lg border border-border-soft text-[12.5px] bg-transparent max-w-[200px]"
-                style={{ color: "var(--ink)" }}
-              >
-                <option value="">Todas as áreas</option>
-                {areas.map((a) => <option key={a} value={a}>{a}</option>)}
-              </select>
-            )}
-            {audienceOptions.length > 1 && (
-              <select
-                value={audience}
-                onChange={(e) => setAudience(e.target.value)}
-                aria-label="Filtrar por audiência"
-                className="h-9 px-2.5 rounded-lg border border-border-soft text-[12.5px] bg-transparent max-w-[200px]"
-                style={{ color: "var(--ink)" }}
-              >
-                <option value="">Qualquer audiência</option>
-                {audienceOptions.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
-              </select>
-            )}
-            {all.length > 0 && (
-              <SearchBox value={search} onChange={setSearch} placeholder="Buscar por nome, e-mail, área…" />
-            )}
           <RoleGate minRole="Admin">
             {/* Única entrada no elenco é o convite, que dá ao criador a conta que conecta o recebimento. */}
             <button
               onClick={() => setInviteOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-medium text-white transition-colors"
+              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-md text-[13px] font-medium text-white transition-colors shrink-0 cursor-pointer"
               style={{ background: "var(--color-teal-500)" }}
             >
               <UserPlus className="w-3.5 h-3.5" /> Convidar criador
             </button>
           </RoleGate>
-          </div>
+        </div>
+      </section>
+
+      {/* Barra de trabalho: o recorte à esquerda, o resultado e os filtros à
+          direita. Gruda no topo porque o elenco cresce e rola. */}
+      <section
+        className="px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap sticky top-0 z-10"
+        style={{ background: "var(--surface)" }}
+      >
+        <RelationshipTabs items={all} value={rel} onChange={setRel} />
+
+        <div className="flex items-center gap-2 ml-auto flex-wrap">
+          <span className="text-[12px] text-ink-muted whitespace-nowrap">
+            {items.length === all.length
+              ? `${all.length} ${all.length === 1 ? "criador" : "criadores"}`
+              : `${items.length} de ${all.length} criadores`}
+          </span>
+          {temRecorte && (
+            <button
+              onClick={limparRecorte}
+              className="inline-flex items-center gap-1.5 h-8 px-2.5 text-[12px] rounded-lg text-ink-muted hover:text-ink hover:bg-hover transition-colors cursor-pointer"
+            >
+              <X className="w-3 h-3" /> Limpar
+            </button>
+          )}
+          {areas.length > 1 && (
+            <SelectField
+              value={area}
+              onChange={setArea}
+              ariaLabel="Filtrar por área"
+              className="data-[size=default]:h-8 px-3 text-[12.5px] rounded-lg border-border-soft max-w-[190px]"
+              options={[
+                { key: "", label: "Todas as áreas" },
+                ...areas.map((a) => ({ key: a, label: a })),
+              ]}
+            />
+          )}
+          {audienceOptions.length > 1 && (
+            <SelectField
+              value={audience}
+              onChange={setAudience}
+              ariaLabel="Filtrar por audiência"
+              className="data-[size=default]:h-8 px-3 text-[12.5px] rounded-lg border-border-soft max-w-[190px]"
+              options={[
+                { key: "", label: "Qualquer audiência" },
+                ...audienceOptions.map((a) => ({ key: a.value, label: a.label })),
+              ]}
+            />
+          )}
+          {all.length > 0 && (
+            <SearchBox
+              value={search}
+              onChange={setSearch}
+              placeholder="Buscar por nome, e-mail, área…"
+              className="w-44 sm:w-56"
+            />
+          )}
         </div>
       </section>
 
@@ -184,7 +214,9 @@ export default function OperationsRosterPage() {
             hint="Convide um criador: ele entra no elenco ao aceitar e passa a poder ser contratado."
           />
         ) : (
-          <div className="overflow-x-auto">
+          // `overflow-y-clip`: com só `overflow-x-auto` a spec promove o eixo Y
+          // a `auto`, e o `z-rise` das linhas abriria uma barra fantasma.
+          <div className="overflow-x-auto overflow-y-clip">
             <table className="w-full text-[13px]">
               <thead>
                 <tr className="border-b border-border-soft">
@@ -221,7 +253,8 @@ function RosterRow({ item, index, onOpen }: { item: RosterItem; index: number; o
     // A linha inteira abre a gaveta; o nome é o botão, para teclado e leitor de tela.
     <tr
       onClick={onOpen}
-      className="border-b border-border-soft hover:bg-[#FAFBFC] dark:hover:bg-[#181B28] transition-colors cursor-pointer"
+      className="border-b border-border-soft hover:bg-hover transition-colors cursor-pointer z-rise"
+      style={stagger(Math.min(index, 12))}
     >
       <td className="px-8 py-3.5">
         <div className="flex items-center gap-3">
@@ -261,7 +294,7 @@ function RosterRow({ item, index, onOpen }: { item: RosterItem; index: number; o
       <td className="py-3.5 text-[12.5px]">
         <span style={{ color: rec.color }}>{rec.label}</span>
         {isPaymentStuck(item) && (
-          <div className="text-[11px] font-medium" style={{ color: "#DC2626" }}>
+          <div className="text-[11px] font-medium" style={{ color: "var(--color-neg)" }}>
             {fmtCents(item.releasableCents ?? 0)} esperando
           </div>
         )}
@@ -422,7 +455,7 @@ function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => voi
                   <Link
                     key={c.contractId}
                     to={`/operations/contracts/${c.contractId}`}
-                    className="flex items-center gap-2 px-3.5 py-2.5 text-[12.5px] hover:bg-[#FAFBFC] dark:hover:bg-[#181B28]"
+                    className="flex items-center gap-2 px-3.5 py-2.5 text-[12.5px] hover:bg-hover"
                     style={{ borderTop: i === 0 ? undefined : "1px solid var(--border-soft)" }}
                   >
                     <span className="flex-1 truncate" style={{ color: "var(--ink)" }}>{campaignLabel(c.campaignName)}</span>
@@ -444,7 +477,7 @@ function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => voi
                   <Link
                     key={d.deliveryId}
                     to={`/operations/deliveries?contract=${d.contractId}`}
-                    className="flex items-center gap-2 px-3.5 py-2.5 text-[12.5px] hover:bg-[#FAFBFC] dark:hover:bg-[#181B28]"
+                    className="flex items-center gap-2 px-3.5 py-2.5 text-[12.5px] hover:bg-hover"
                     style={{ borderTop: i === 0 ? undefined : "1px solid var(--border-soft)" }}
                   >
                     <span className="flex-1 min-w-0">
@@ -474,7 +507,7 @@ function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => voi
                   <Link
                     key={e.escrowAccountId}
                     to="/operations/escrow"
-                    className="flex items-center gap-2 px-3.5 py-2.5 text-[12.5px] hover:bg-[#FAFBFC] dark:hover:bg-[#181B28]"
+                    className="flex items-center gap-2 px-3.5 py-2.5 text-[12.5px] hover:bg-hover"
                     style={{ borderTop: i === 0 ? undefined : "1px solid var(--border-soft)" }}
                   >
                     <span className="flex-1 truncate" style={{ color: "var(--ink)" }}>{campaignLabel(e.campaignName)}</span>
@@ -548,7 +581,7 @@ function RelationshipTabs({
   if (present.length <= 1 && stuckCount === 0) return null
 
   return (
-    <div className="flex gap-1 flex-wrap">
+    <div className="flex gap-1.5 flex-wrap">
       <TabButton label="Todos" count={items.length} active={value === ""} onClick={() => onChange("")} />
       {present.map((k) => (
         <TabButton
@@ -575,18 +608,24 @@ function RelationshipTabs({
 function TabButton({
   label, count, active, onClick, warning = false,
 }: { label: string; count: number; active: boolean; onClick: () => void; warning?: boolean }) {
-  const color = warning ? "#DC2626" : "var(--color-teal-500)"
+  // Token, e não hex fixo: `#DC2626` não acompanhava o modo escuro.
+  const color = warning ? "var(--color-neg)" : "var(--color-teal-500)"
   return (
     <button
       onClick={onClick}
-      className="px-3 py-1.5 rounded-lg text-[12.5px] font-medium transition-colors"
+      aria-pressed={active}
+      className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12.5px] font-medium transition-colors cursor-pointer"
       style={
         active
           ? { background: color, color: "#fff" }
-          : { color: warning ? "#DC2626" : "var(--ink-muted)", border: `1px solid ${warning ? "#DC262640" : "var(--border-soft)"}` }
+          : {
+            color: warning ? color : "var(--ink-muted)",
+            border: `1px solid ${warning ? "color-mix(in srgb, var(--color-neg) 35%, transparent)" : "var(--border-soft)"}`,
+          }
       }
     >
-      {label} <span style={{ opacity: 0.7 }}>({count})</span>
+      {label}
+      <span className="font-mono-zoe text-[11px]" style={{ opacity: active ? 0.85 : 0.65 }}>{count}</span>
     </button>
   )
 }

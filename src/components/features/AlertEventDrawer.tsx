@@ -6,6 +6,7 @@ import {
 } from "@/lib/alerts"
 import { tEnum } from "@/i18n/enums"
 import type { AlertEvent } from "@/lib/api/alerts"
+import { formatScore } from "@/lib/score"
 
 /**
  * Detalhe do disparo (o `HistoryDrawer` do design). A linha do histórico mostra
@@ -57,7 +58,7 @@ export function AlertEventDrawer({
             type="button"
             onClick={onClose}
             aria-label="Fechar"
-            className="ml-auto p-1.5 -mr-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D] transition-colors"
+            className="ml-auto p-1.5 -mr-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-tint transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -102,7 +103,7 @@ export function AlertEventDrawer({
               <div className="eyebrow mb-2.5">O que a regra viu</div>
               <div className="rounded-lg border border-border-soft divide-y divide-border-soft">
                 {snapshot.score != null && (
-                  <SnapshotRow label="Score da análise" value={snapshot.score.toFixed(2)} />
+                  <SnapshotRow label="Score da análise" value={formatScore(snapshot.score)} />
                 )}
                 {snapshot.classification && (
                   <SnapshotRow label="Classificação" value={tEnum("classification", snapshot.classification)} />
@@ -124,7 +125,7 @@ export function AlertEventDrawer({
               href={youtubeUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 inline-flex items-center justify-center gap-1.5 h-9 px-3 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors"
+              className="flex-1 inline-flex items-center justify-center gap-1.5 h-9 px-3 text-[13px] rounded-md border border-border-soft hover:bg-hover transition-colors"
             >
               <ExternalLink className="w-3.5 h-3.5" /> Ver vídeo no YouTube
             </a>

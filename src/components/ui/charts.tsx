@@ -59,8 +59,8 @@ export function Sparkline({
   return (
     <div ref={boxRef} style={{ width: widthProp ?? "100%" }}>
       <svg width={width} height={height} style={{ display: "block" }}>
-        <path d={area} fill={color} fillOpacity={fillOpacity} />
-        <path d={d} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+        <path d={area} fill={color} fillOpacity={fillOpacity} className="z-fade" />
+        <path d={d} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" pathLength={1} className="z-draw" />
       </svg>
     </div>
   )
@@ -105,7 +105,7 @@ export function AreaLine({
 
   const [hover, setHover] = useState<number | null>(null)
   const svgRef = useRef<SVGSVGElement>(null)
-  const gradId = `grad-${color.replace("#", "")}`
+  const gradId = `grad-${color.replace(/[^a-zA-Z0-9]/g, "")}`
 
   const onMove = (e: React.MouseEvent<SVGSVGElement>) => {
     if (!svgRef.current) return
@@ -138,7 +138,7 @@ export function AreaLine({
             <stop offset="100%" stopColor={color} stopOpacity={0} />
           </linearGradient>
         </defs>
-        <path d={areaPath} fill={`url(#${gradId})`} />
+        <path d={areaPath} fill={`url(#${gradId})`} className="z-fade" />
         <path
           d={linePath}
           fill="none"
@@ -146,6 +146,8 @@ export function AreaLine({
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
+          pathLength={1}
+          className="z-draw"
         />
         {hover !== null && (
           <g>
@@ -163,7 +165,7 @@ export function AreaLine({
               cy={points[hover][1]}
               r="4"
               fill={color}
-              stroke="#fff"
+              stroke="var(--surface)"
               strokeWidth="2"
             />
           </g>
@@ -177,8 +179,8 @@ export function AreaLine({
             top: `${(points[hover][1] / height) * 100}%`,
             transform: "translate(-50%, -120%)",
             pointerEvents: "none",
-            background: "#07091A",
-            color: "#fff",
+            background: "var(--ink)",
+            color: "var(--surface)",
             padding: "6px 8px",
             fontSize: 11.5,
             borderRadius: 6,
@@ -329,9 +331,19 @@ export function MultiLine({
               strokeWidth={strong ? 3 : 2}
               strokeLinecap="round"
               strokeLinejoin="round"
+              pathLength={1}
+              className="z-draw"
             />
             {pts.map(([x, y], i) => (
-              <circle key={i} cx={x} cy={y} r={hover === i ? 4 : strong ? 3 : 2.5} fill={s.color} />
+              <circle
+                key={i}
+                cx={x}
+                cy={y}
+                r={hover === i ? 4 : strong ? 3 : 2.5}
+                fill={s.color}
+                className="z-fade"
+                style={{ "--i": 40 + i * 3 } as React.CSSProperties}
+              />
             ))}
           </g>
         )
@@ -404,11 +416,14 @@ export function MultiLine({
 }
 
 type HeatmapProps = {
+  /** Intensidade normalizada [0,1] — decide a cor. */
   data: number[][]
+  /** Contagem crua, mesma forma de `data`. É o que o tooltip mostra. */
+  counts?: number[][]
   width?: number
 }
 
-export function Heatmap({ data, width = 560 }: HeatmapProps) {
+export function Heatmap({ data, counts, width = 560 }: HeatmapProps) {
   const rows = data.length
   const cols = data[0]?.length ?? 0
   const labelW = 32
@@ -456,7 +471,8 @@ export function Heatmap({ data, width = 560 }: HeatmapProps) {
                 fill={color(v)}
                 onMouseEnter={() => setHover({ ri, ci, v })}
                 onMouseLeave={() => setHover(null)}
-                style={{ cursor: "pointer" }}
+                className="z-fade"
+                style={{ cursor: "pointer", "--i": ci + ri * 3 } as React.CSSProperties}
               />
             ))}
           </g>
@@ -484,8 +500,8 @@ export function Heatmap({ data, width = 560 }: HeatmapProps) {
             top: hover.ri * (cellH + cellGap) - 12,
             transform: "translate(-50%, -100%)",
             pointerEvents: "none",
-            background: "#07091A",
-            color: "#fff",
+            background: "var(--ink)",
+            color: "var(--surface)",
             padding: "6px 8px",
             fontSize: 11.5,
             borderRadius: 6,
@@ -493,9 +509,333 @@ export function Heatmap({ data, width = 560 }: HeatmapProps) {
             fontFamily: "var(--font-mono)",
           }}
         >
-          {days[hover.ri]} {String(hover.ci).padStart(2, "0")}h · {Math.round(hover.v * 80)} menções
+          {days[hover.ri]} {String(hover.ci).padStart(2, "0")}h
+          {counts && (
+            <> · {counts[hover.ri][hover.ci]} {counts[hover.ri][hover.ci] === 1 ? "menção" : "menções"}</>
+          )}
         </div>
       )}
     </div>
   )
+}
+
+type StackedSeries = { name: string; color: string; data: number[] }
+
+/**
+ * Área empilhada: cada faixa é uma série, o topo é o total. Traço reto entre os
+ * pontos, e não curva: com curva, uma faixa podia passar por cima da vizinha entre
+ * dois dias e desenhar um volume que não existiu.
+ */
+export function StackedArea({
+  series,
+  labels,
+  height = 200,
+  totalColor = "var(--color-teal-500)",
+}: {
+  series: StackedSeries[]
+  /** Um rótulo por coluna (o dia). */
+  labels: string[]
+  height?: number
+  totalColor?: string
+}) {
+  const [boxRef, width] = useContainerWidth<HTMLDivElement>(600)
+  const [hover, setHover] = useState<number | null>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
+
+  const pad = { t: 10, r: 8, b: 22, l: 28 }
+  const W = width - pad.l - pad.r
+  const H = height - pad.t - pad.b
+  const len = labels.length
+  const totals = labels.map((_, i) => series.reduce((acc, s) => acc + (s.data[i] ?? 0), 0))
+  const vmax = Math.max(...totals, 1)
+  const xOf = (i: number) => pad.l + (len <= 1 ? W / 2 : (i / (len - 1)) * W)
+  const yOf = (v: number) => pad.t + (1 - v / vmax) * H
+
+  const bands = series.reduce<{ lower: number[]; out: (StackedSeries & { d: string })[] }>(
+    (acc, s) => {
+      const upper = acc.lower.map((l, i) => l + (s.data[i] ?? 0))
+      const top = upper.map((v, i) => `${i ? "L" : "M"}${xOf(i)} ${yOf(v)}`).join(" ")
+      const bottom = acc.lower
+        .map((v, i) => `L${xOf(i)} ${yOf(v)}`)
+        .reverse()
+        .join(" ")
+      return { lower: upper, out: [...acc.out, { ...s, d: `${top} ${bottom} Z` }] }
+    },
+    { lower: new Array(len).fill(0), out: [] },
+  ).out
+  const totalPath = totals.map((v, i) => `${i ? "L" : "M"}${xOf(i)} ${yOf(v)}`).join(" ")
+
+  const grid = [0, 0.5, 1].map((f) => ({ v: Math.round(vmax * f), y: yOf(vmax * f) }))
+  const tickEvery = Math.max(1, Math.ceil(len / 6))
+
+  const onMove = (e: ReactPointerEvent<SVGSVGElement>) => {
+    const svg = svgRef.current
+    if (!svg || len === 0) return
+    const rect = svg.getBoundingClientRect()
+    const x = ((e.clientX - rect.left) / rect.width) * width
+    const i = len === 1 ? 0 : Math.round(((x - pad.l) / W) * (len - 1))
+    setHover(Math.max(0, Math.min(len - 1, i)))
+  }
+
+  const leftPct = hover == null ? 0 : (xOf(hover) / width) * 100
+
+  return (
+    <div ref={boxRef} className="relative">
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${width} ${height}`}
+        width="100%"
+        height={height}
+        style={{ display: "block", touchAction: "pan-y" }}
+        onPointerMove={onMove}
+        onPointerLeave={() => setHover(null)}
+      >
+        {grid.map((g) => (
+          <g key={g.y}>
+            <line x1={pad.l} x2={pad.l + W} y1={g.y} y2={g.y} stroke="currentColor" strokeOpacity="0.08" />
+            <text x={pad.l - 6} y={g.y + 3} fontSize="9.5" fill="currentColor" opacity="0.45" textAnchor="end" fontFamily="var(--font-mono)">
+              {g.v}
+            </text>
+          </g>
+        ))}
+        <g className="z-wipe">
+          {bands.map((b) => (
+            <path key={b.name} d={b.d} fill={b.color} fillOpacity={0.78} />
+          ))}
+        </g>
+        <path
+          d={totalPath}
+          fill="none"
+          stroke={totalColor}
+          strokeWidth="1.75"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          pathLength={1}
+          className="z-draw"
+        />
+        {hover != null && (
+          <g>
+            <line x1={xOf(hover)} x2={xOf(hover)} y1={pad.t} y2={pad.t + H} stroke="currentColor" strokeOpacity="0.3" strokeDasharray="3 3" />
+            <circle cx={xOf(hover)} cy={yOf(totals[hover])} r="3.5" fill={totalColor} stroke="var(--surface)" strokeWidth="2" />
+          </g>
+        )}
+        {labels.map((lb, i) =>
+          i % tickEvery === 0 || i === len - 1 ? (
+            <text
+              key={i}
+              x={xOf(i)}
+              y={height - 5}
+              fontSize="10"
+              fill="currentColor"
+              opacity="0.5"
+              // As pontas ancoram para dentro: centrado, o último rótulo saía do gráfico.
+              textAnchor={i === 0 ? "start" : i === len - 1 ? "end" : "middle"}
+              fontFamily="var(--font-mono)"
+            >
+              {lb}
+            </text>
+          ) : null,
+        )}
+      </svg>
+      {hover != null && (
+        <div
+          className="absolute top-1 pointer-events-none z-10 rounded-lg border border-border-soft px-3 py-2 text-[12px] shadow-sm min-w-40"
+          style={{
+            left: `${leftPct}%`,
+            transform: leftPct > 55 ? "translateX(calc(-100% - 12px))" : "translateX(12px)",
+            background: "var(--surface)",
+          }}
+        >
+          <div className="flex items-baseline justify-between gap-4 mb-1.5">
+            <span className="font-medium" style={{ color: "var(--ink)" }}>{labels[hover]}</span>
+            <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>{totals[hover]}</span>
+          </div>
+          {[...series].reverse().map((s) => (
+            <div key={s.name} className="flex items-center justify-between gap-4 py-px">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-sm" style={{ background: s.color }} />
+                <span className="text-ink-muted">{s.name}</span>
+              </span>
+              <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>{s.data[hover] ?? 0}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export type NetPoint = {
+  label: string
+  /** Saldo do dia em [-1,1]; null quando não houve menção (não é zero — é ausência). */
+  net: number | null
+  /** Saldo da média móvel em [-1,1]. É a linha desenhada. */
+  avg: number
+  total: number
+}
+
+/**
+ * Saldo de sentimento no tempo, com o zero no meio.
+ *
+ * Desenha a MÉDIA MÓVEL, não o dia solto: num dia de duas menções o saldo pula de
+ * +1 para −1 e a linha vira ruído. Os dias aparecem como pontinhos por trás, para
+ * a média não esconder onde havia pouca coisa medida.
+ */
+export function NetLine({
+  data,
+  height = 220,
+  window: windowSize,
+}: {
+  data: NetPoint[]
+  height?: number
+  /** Tamanho da janela da média, só para o rótulo do tooltip. */
+  window: number
+}) {
+  const [boxRef, width] = useContainerWidth<HTMLDivElement>(600)
+  const [hover, setHover] = useState<number | null>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
+
+  const pad = { t: 14, r: 10, b: 22, l: 34 }
+  const W = width - pad.l - pad.r
+  const H = height - pad.t - pad.b
+  const len = data.length
+  const xOf = (i: number) => pad.l + (len <= 1 ? W / 2 : (i / (len - 1)) * W)
+  const yOf = (v: number) => pad.t + (1 - (v + 1) / 2) * H
+  const zeroY = yOf(0)
+
+  const linePath = monotonePath(data.map((d, i) => [xOf(i), yOf(d.avg)] as const))
+  const areaPath = `${linePath} L ${xOf(len - 1)} ${zeroY} L ${xOf(0)} ${zeroY} Z`
+  const uid = `net-${len}-${Math.round(width)}`
+
+  const onMove = (e: ReactPointerEvent<SVGSVGElement>) => {
+    const svg = svgRef.current
+    if (!svg || len === 0) return
+    const rect = svg.getBoundingClientRect()
+    const x = ((e.clientX - rect.left) / rect.width) * width
+    const i = len === 1 ? 0 : Math.round(((x - pad.l) / W) * (len - 1))
+    setHover(Math.max(0, Math.min(len - 1, i)))
+  }
+
+  const ticks = [1, 0.5, 0, -0.5, -1]
+  const leftPct = hover == null ? 0 : (xOf(hover) / width) * 100
+  const tickEvery = Math.max(1, Math.ceil(len / 6))
+
+  return (
+    <div ref={boxRef} className="relative">
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${width} ${height}`}
+        width="100%"
+        height={height}
+        style={{ display: "block", touchAction: "pan-y" }}
+        onPointerMove={onMove}
+        onPointerLeave={() => setHover(null)}
+      >
+        <defs>
+          {/* O verde só pinta acima do zero e o vermelho só abaixo: é o recorte que
+              faz "saldo negativo" ser visível sem precisar ler o eixo. */}
+          <clipPath id={`${uid}-up`}>
+            <rect x="0" y={pad.t} width={width} height={Math.max(0, zeroY - pad.t)} />
+          </clipPath>
+          <clipPath id={`${uid}-down`}>
+            <rect x="0" y={zeroY} width={width} height={Math.max(0, pad.t + H - zeroY)} />
+          </clipPath>
+        </defs>
+
+        {ticks.map((t) => (
+          <g key={t}>
+            <line
+              x1={pad.l} x2={pad.l + W} y1={yOf(t)} y2={yOf(t)}
+              stroke="currentColor"
+              strokeOpacity={t === 0 ? 0.28 : 0.08}
+              strokeDasharray={t === 0 ? "4 4" : undefined}
+            />
+            <text
+              x={pad.l - 7} y={yOf(t) + 3} fontSize="9.5" fill="currentColor"
+              opacity={t === 0 ? 0.6 : 0.45} textAnchor="end" fontFamily="var(--font-mono)"
+            >
+              {t > 0 ? `+${t.toFixed(1).replace(".", ",")}` : t.toFixed(1).replace(".", ",")}
+            </text>
+          </g>
+        ))}
+
+        <path d={areaPath} fill="var(--color-pos)" fillOpacity="0.16" clipPath={`url(#${uid}-up)`} className="z-fade" />
+        <path d={areaPath} fill="var(--color-neg)" fillOpacity="0.16" clipPath={`url(#${uid}-down)`} className="z-fade" />
+
+        {/* Dias com menção, por trás da média: mostram onde havia pouco medido. */}
+        {data.map((d, i) => (
+          d.net == null ? null : (
+            <circle
+              key={i} cx={xOf(i)} cy={yOf(d.net)} r="2"
+              fill="currentColor" opacity="0.22"
+              className="z-fade"
+              style={{ "--i": 20 + i } as React.CSSProperties}
+            />
+          )
+        ))}
+
+        <path
+          d={linePath}
+          fill="none"
+          stroke="var(--color-teal-500)"
+          strokeWidth="2.25"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          pathLength={1}
+          className="z-draw"
+        />
+
+        {hover != null && (
+          <g>
+            <line x1={xOf(hover)} x2={xOf(hover)} y1={pad.t} y2={pad.t + H} stroke="currentColor" strokeOpacity="0.3" strokeDasharray="3 3" />
+            <circle cx={xOf(hover)} cy={yOf(data[hover].avg)} r="4" fill="var(--color-teal-500)" stroke="var(--surface)" strokeWidth="2" />
+          </g>
+        )}
+
+        {data.map((d, i) =>
+          i % tickEvery === 0 || i === len - 1 ? (
+            <text
+              key={i} x={xOf(i)} y={height - 5} fontSize="10" fill="currentColor" opacity="0.5"
+              textAnchor={i === 0 ? "start" : i === len - 1 ? "end" : "middle"}
+              fontFamily="var(--font-mono)"
+            >
+              {d.label}
+            </text>
+          ) : null,
+        )}
+      </svg>
+
+      {hover != null && (
+        <div
+          className="absolute top-1 pointer-events-none z-10 rounded-lg border border-border-soft px-3 py-2 text-[12px] shadow-sm min-w-48"
+          style={{
+            left: `${leftPct}%`,
+            transform: leftPct > 55 ? "translateX(calc(-100% - 12px))" : "translateX(12px)",
+            background: "var(--surface)",
+          }}
+        >
+          <div className="font-medium mb-1.5" style={{ color: "var(--ink)" }}>{data[hover].label}</div>
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-ink-muted">Média de {windowSize} dias</span>
+            <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>{formatSigned(data[hover].avg)}</span>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-ink-muted">No dia</span>
+            <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>
+              {data[hover].net == null ? "sem menção" : formatSigned(data[hover].net as number)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-ink-muted">Menções</span>
+            <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>{data[hover].total}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function formatSigned(v: number): string {
+  const s = Math.abs(v).toFixed(2).replace(".", ",")
+  return v >= 0 ? `+${s}` : `−${s}`
 }

@@ -90,7 +90,7 @@ function TenantTaxId({
           placeholder="00.000.000/0000-00"
           inputMode="numeric"
           aria-label="CNPJ"
-          className="flex-1 min-w-[170px] h-9 px-3 text-[13px] rounded-lg border border-border-soft bg-[#FAFBFC] dark:bg-[#181B28]"
+          className="flex-1 min-w-[170px] h-9 px-3 text-[13px] rounded-lg border border-border-soft bg-inset"
           style={{ color: "var(--ink)" }}
         />
         <button

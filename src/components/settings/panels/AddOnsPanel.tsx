@@ -19,7 +19,7 @@ export function AddOnsPanel({ onGoToPlan }: { onGoToPlan: () => void }) {
   if (catalog.isLoading) {
     return (
       <div className="space-y-3 animate-pulse">
-        {[0, 1].map((i) => <div key={i} className="h-20 rounded-[14px] bg-[#F3F4F6] dark:bg-[#1A1D2D]" />)}
+        {[0, 1].map((i) => <div key={i} className="h-20 rounded-[14px] bg-tint" />)}
       </div>
     )
   }
@@ -43,9 +43,9 @@ export function AddOnsPanel({ onGoToPlan }: { onGoToPlan: () => void }) {
             >
               <div
                 className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
-                style={{ background: active ? "var(--teal-bg)" : "#F3F4F6" }}
+                style={{ background: active ? "var(--teal-bg)" : "var(--tint)" }}
               >
-                <Sparkles className="w-4 h-4" style={{ color: active ? "var(--color-teal-500)" : "#9AA1AE" }} />
+                <Sparkles className="w-4 h-4" style={{ color: active ? "var(--color-teal-500)" : "var(--ink-muted-2)" }} />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
@@ -64,7 +64,7 @@ export function AddOnsPanel({ onGoToPlan }: { onGoToPlan: () => void }) {
 
       <button
         onClick={onGoToPlan}
-        className="h-9 px-3.5 inline-flex items-center rounded-lg text-[13px] font-medium border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors"
+        className="h-9 px-3.5 inline-flex items-center rounded-lg text-[13px] font-medium border border-border-soft hover:bg-hover transition-colors"
         style={{ color: "var(--ink)" }}
       >
         Ver planos e assinatura
