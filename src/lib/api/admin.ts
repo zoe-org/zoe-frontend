@@ -133,6 +133,28 @@ export type VerifyPayload = {
 /** Espelha MergeAnalysesPolicy do domínio. */
 export type MergeAnalysesPolicy = "PreferTarget" | "Reprocessed"
 
+// Espelha ContractTemplateSummary
+export type AdminContractTemplate = {
+  templateId: string
+  /** Nome do enum ContractModality — traduzir com `tEnum("contractModality", …)`. */
+  modality: string
+  version: number
+  status: string
+  isLegalReviewed: boolean
+  fieldsCount: number
+  supportsEscrow: boolean
+  /** Rascunhos que pinaram este template; enquanto não há parecer, nenhum deles é enviado. */
+  draftContractsWaiting: number
+  updatedAt: string
+}
+
+export type AdminContractTemplatesResponse = {
+  items: AdminContractTemplate[]
+  pendingLegalReview: number
+  /** Só os rascunhos presos pelo gate — os de template já revisado não entram. */
+  draftContractsWaiting: number
+}
+
 const opts = { noTenant: true } as const
 
 export const adminApi = {
@@ -169,6 +191,12 @@ export const adminApi = {
 
   reprocess: (brandId: string) =>
     apiClient.post(`/api/admin/brands/${brandId}/reprocess`, {}, opts),
+
+  contractTemplates: (signal?: AbortSignal) =>
+    apiClient.get<AdminContractTemplatesResponse>("/api/admin/contract-templates", { ...opts, signal }),
+
+  markTemplateLegalReviewed: (modality: string, notes?: string) =>
+    apiClient.post(`/api/admin/contract-templates/${modality}/mark-legal-reviewed`, { notes }, opts),
 
   merge: (sourceId: string, targetId: string, analysesPolicy: MergeAnalysesPolicy, notes?: string) =>
     apiClient.post(
@@ -230,6 +258,32 @@ export function useUpdateCuration(brandId: string | null) {
       void qc.invalidateQueries({ queryKey: ["admin-pending-brands"] })
       if (brandId) void qc.invalidateQueries({ queryKey: ["admin-brand-verification", brandId] })
     },
+  })
+}
+
+/**
+ * Catálogo global de templates com o estado do gate jurídico (§4.3). `enabled`
+ * recebe o gate de admin **e** o de aba ativa, como `useAdminBrands`.
+ */
+export function useContractTemplates(enabled: boolean) {
+  return useQuery({
+    queryKey: ["admin-contract-templates"],
+    queryFn: ({ signal }) => adminApi.contractTemplates(signal),
+    enabled,
+    staleTime: 30_000,
+  })
+}
+
+/**
+ * Registra o parecer jurídico de uma modalidade. **Sem volta pelo domínio**: o
+ * template só volta a mudar publicando versão nova. A confirmação é da tela.
+ */
+export function useMarkTemplateLegalReviewed() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (v: { modality: string; notes?: string }) =>
+      adminApi.markTemplateLegalReviewed(v.modality, v.notes),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-contract-templates"] }),
   })
 }
 
