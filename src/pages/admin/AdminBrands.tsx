@@ -568,12 +568,12 @@ function GlobalBrandRow({ brand, onEdit }: { brand: AdminBrand; onEdit: () => vo
         {brand.analysesCount.toLocaleString("pt-BR")}
       </td>
       <td className="px-4 py-3 text-right">
-        {/* A coluna que denuncia channel id errado: declara canal, tem análise,
-            e nada ficou owned. Era sinal que só existia no audit log. */}
+        {/* Declara canal, tem análise, e nada ficou owned. O aviso descreve o
+            fato: a causa pode ser channel id errado OU nenhuma coleta do canal. */}
         <span
           className="font-mono-zoe text-[12.5px]"
           style={{ color: suspeita ? "var(--color-warn)" : "var(--ink-2)" }}
-          title={suspeita ? "Declara canal oficial e tem análises, mas nenhuma classificada como mídia própria — provável channel id errado." : undefined}
+          title={suspeita ? "Declara canal oficial e tem análises, mas nenhuma classificada como mídia própria. Confira o channel id; se estiver certo, o canal ainda não teve vídeo coletado e analisado." : undefined}
         >
           {suspeita && <AlertTriangle className="inline w-3 h-3 mr-1 -mt-0.5" />}
           {brand.ownedAnalysesCount.toLocaleString("pt-BR")}

@@ -516,8 +516,9 @@ function ImpactStep({
 
       {looksMisconfigured(brand) && (
         <p className="text-[11.5px] text-ink-muted-2 mt-3 leading-snug">
-          Lembrete: esta marca declara canal oficial mas não tem nenhuma análise classificada como mídia própria — se o
-          objetivo é corrigir isso, confira o channel id no primeiro passo.
+          Lembrete: esta marca declara canal oficial mas não tem nenhuma análise classificada como mídia própria.
+          Confira o channel id no primeiro passo; se estiver certo, é porque nenhum vídeo do canal foi coletado e
+          analisado ainda.
         </p>
       )}
     </>
