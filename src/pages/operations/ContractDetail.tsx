@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react"
 import { Link, useParams } from "react-router-dom"
 import {
-  ArrowLeft, Loader2, AlertCircle, Lock, Send, Save, PenLine, ChevronRight, BookmarkPlus, RefreshCw,
+  Loader2, AlertCircle, Lock, Send, Save, PenLine, ChevronRight, BookmarkPlus, RefreshCw,
 } from "lucide-react"
 import { notifyError, notifyInfo, notifySuccess } from "@/lib/feedback"
 import { parseBRLToCents } from "@/lib/money"
@@ -396,13 +396,6 @@ function Header({
   return (
     <>
       <section className="px-8 pt-6 pb-5 border-b border-border-soft" style={{ background: "var(--surface)" }}>
-        <Link
-          to="/operations/contracts"
-          className="inline-flex items-center gap-1.5 text-[12.5px] text-ink-muted hover:text-ink mb-3"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" /> Contratos
-        </Link>
-
         <div className="flex items-start justify-between gap-6 flex-wrap">
           <div className="min-w-0">
             <div className="eyebrow mb-2">
