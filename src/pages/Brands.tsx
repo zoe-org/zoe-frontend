@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import {
-  Search, Plus, X, Check, AlertCircle, ExternalLink, ShieldCheck, Clock, Loader2, ChevronDown, Archive, RotateCcw,
+  Plus, X, Check, AlertCircle, ExternalLink, ShieldCheck, Clock, Loader2, ChevronDown, Archive, RotateCcw,
 } from "lucide-react"
 import { useAuth } from "@/features/auth/context"
 import { ApiError } from "@/lib/api"
@@ -14,6 +14,9 @@ import { useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { notifyError, notifySuccess } from "@/lib/feedback"
 import { useConfirm } from "@/features/confirm/context"
+import { SearchBox } from "@/components/operations/shared"
+import { StatBand, type Stat } from "@/components/ui/stat-band"
+import { stagger } from "@/lib/motion"
 import { CoverageCard } from "@/components/coverage/CoverageCard"
 import {
   useTenantBrands, useBrandKeywords, useBrandMutations, useSubscribeFlow,
@@ -179,17 +182,19 @@ export default function BrandsPage() {
   }
 
   return (
-    <div className="-m-6 border-t border-border-soft" style={{ color: "var(--ink)" }}>
+    <div className="-m-6" style={{ color: "var(--ink)" }}>
       {/* Hero */}
-      <section className="px-8 pt-7 pb-5 border-b border-border-soft" style={{ background: "var(--surface)" }}>
-        <div className="flex items-start justify-between gap-6">
+      <section className="px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
+        <div className="flex items-end justify-between gap-6">
           <div>
-            <div className="eyebrow mb-2.5">Gestão · Workspace</div>
+            <div className="eyebrow mb-3">Gestão · Workspace</div>
             <h1 className="font-display m-0" style={{ fontSize: 34, lineHeight: 1.1, color: "var(--ink)" }}>Marcas</h1>
-            <div className="text-[14px] text-ink-muted mt-1.5 max-w-140">
-              {monitoredCount} {monitoredCount === 1 ? "marca monitorada" : "marcas monitoradas"} ·{" "}
-              <span className="font-mono-zoe">{totalVideos}</span> vídeos analisados nos últimos 30 dias.
-            </div>
+            {/* A contagem mora no topo da lista, onde a busca a altera. Aqui
+                ela envelhecia a cada letra digitada. */}
+            <p className="text-[14.5px] leading-relaxed text-ink-muted mt-2.5 mb-0 max-w-200">
+              Cada marca assinada tem o próprio monitoramento, palavras-chave e conjunto
+              competitivo.
+            </p>
           </div>
           <button
             onClick={() => setNewOpen(true)}
@@ -205,14 +210,13 @@ export default function BrandsPage() {
         {/* Lista */}
         <div className="border-r border-border-soft" style={{ background: "var(--surface)" }}>
           <div className="px-4 py-3 border-b border-border-soft sticky top-0 z-5" style={{ background: "var(--surface)" }}>
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-ink-muted" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Buscar marca…"
-                className="w-full h-8 pl-8 pr-3 text-[13px] rounded-md border border-border-soft bg-transparent outline-none focus:border-teal-500"
-              />
+            <SearchBox value={query} onChange={setQuery} placeholder="Buscar marca…" className="w-full" />
+            <div className="flex items-center gap-1.5 mt-2 text-[11.5px] text-ink-muted">
+              <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>{monitoredCount}</span>
+              <span>{monitoredCount === 1 ? "marca monitorada" : "marcas monitoradas"}</span>
+              <span>·</span>
+              <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>{totalVideos}</span>
+              <span>vídeos · 30d</span>
             </div>
           </div>
 
@@ -220,10 +224,11 @@ export default function BrandsPage() {
             <div className="px-4 py-10 text-center text-[13px] text-ink-muted">Nenhuma marca encontrada.</div>
           ) : (
             <>
-              {monitored.map((b) => (
+              {monitored.map((b, i) => (
                 <BrandRow
                   key={b.tenantBrandId}
                   brand={b}
+                  index={i}
                   active={selected?.tenantBrandId === b.tenantBrandId}
                   onSelect={() => setSelectedId(b.tenantBrandId)}
                 />
@@ -289,19 +294,21 @@ export default function BrandsPage() {
 
 // ── Linha da lista ──────────────────────────────────────────────────────
 
-function BrandRow({ brand: b, active, onSelect }: {
+function BrandRow({ brand: b, active, onSelect, index = 0 }: {
   brand: TenantBrandSummary
   active: boolean
   onSelect: () => void
+  index?: number
 }) {
   const archived = isArchived(b)
   return (
     <button
       onClick={onSelect}
-      className="block w-full text-left px-4 py-3.5 border-b border-border-soft transition-colors hover:bg-hover"
+      className="block w-full text-left px-4 py-3.5 border-b border-border-soft transition-colors hover:bg-hover cursor-pointer z-rise"
       style={{
         background: active ? "var(--teal-bg)" : "transparent",
         borderLeft: `3px solid ${active ? "var(--color-teal-500)" : "transparent"}`,
+        ...stagger(Math.min(index, 12)),
       }}
     >
       <div className={`flex items-center gap-3 ${archived ? "opacity-60" : ""}`}>
@@ -436,10 +443,19 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
       onError: (e) => notifyError(e, "Não foi possível atualizar a assinatura."),
     })
 
+  const metricItems: Stat[] = metrics.map((met) => ({
+    label: met.label,
+    value: met.value,
+    tone: met.kind === "pos" ? "pos" : met.kind === "neg" ? "neg" : undefined,
+  }))
+
   return (
-    <div className="p-8 overflow-y-auto">
+    // Seções full-bleed com divisória, como as telas da plataforma. Era uma
+    // pilha de cartões `rounded-xl` — métricas, palavras-chave, assinatura,
+    // conjunto competitivo —, todos com o mesmo peso e moldura.
+    <div className="overflow-y-auto">
       {/* Cabeçalho */}
-      <div className="flex items-center gap-4 mb-7">
+      <div className="flex items-center gap-4 px-8 pt-7 pb-6 border-b border-border-soft">
         <Avatar name={brand.brandName} slug={brand.brandSlug} color={brand.color} size={64} radius={14} font={26} />
         <div className="min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -463,36 +479,34 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
         <div className="flex-1" />
         <button
           onClick={onOpenDashboard}
-          className="inline-flex items-center gap-1.5 h-8 px-3 text-[13px] rounded-md border border-border-soft hover:bg-hover transition-colors shrink-0"
+          className="inline-flex items-center gap-1.5 h-9 px-3.5 text-[13px] rounded-md border border-border-soft hover:bg-hover transition-colors shrink-0 cursor-pointer"
         >
           Ver no dashboard
           <ExternalLink className="w-3.5 h-3.5" />
         </button>
       </div>
 
-      {/* Métricas */}
-      <div className="border border-border-soft rounded-xl mb-5 overflow-hidden">
-        <div className="grid grid-cols-2 lg:grid-cols-4">
-          {metrics.map((met, i) => (
-            <div key={met.label} className={`px-5 py-5 ${i < metrics.length - 1 ? "lg:border-r" : ""} border-border-soft ${i < 2 ? "border-b lg:border-b-0" : ""} ${i === 0 ? "border-r lg:border-r" : ""}`}>
-              <div className="eyebrow">{met.label}</div>
-              {summary.isLoading && met.value === "—" ? (
-                <div className="h-8 w-20 mt-2 rounded bg-tint animate-pulse" />
-              ) : (
-                <div className="font-display mt-2" style={{ fontSize: 34, lineHeight: 1, color: "var(--ink)" }}>{met.value}</div>
-              )}
+      {/* Métricas: a mesma faixa de Custódia e Alertas. */}
+      {summary.isLoading ? (
+        <div className="grid grid-cols-2 lg:grid-cols-4 border-b border-border-soft">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="px-6 py-5 border-r border-border-soft">
+              <div className="h-3 w-24 rounded z-skeleton mb-3" />
+              <div className="h-9 w-20 rounded z-skeleton" />
             </div>
           ))}
         </div>
-      </div>
+      ) : (
+        <StatBand items={metricItems} />
+      )}
 
       {/* Keywords + Assinatura */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] border-b border-border-soft">
         {/* Palavras-chave */}
-        <div className="border border-border-soft rounded-xl p-5">
+        <div className="px-8 py-7 border-b lg:border-b-0 lg:border-r border-border-soft">
           <div className="eyebrow mb-3.5">Palavras-chave monitoradas</div>
           {keywords.isLoading ? (
-            <div className="h-8 rounded bg-tint animate-pulse" />
+            <div className="h-8 rounded z-skeleton" />
           ) : (
             <div className="flex flex-wrap gap-2">
               {(keywords.data?.items ?? []).map((k) => (
@@ -545,7 +559,7 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
         </div>
 
         {/* Assinatura */}
-        <div className="border border-border-soft rounded-xl p-5">
+        <div className="px-8 py-7">
           <div className="eyebrow mb-3.5">Assinatura</div>
           <div className="flex flex-col gap-3.5">
             <Field label="Relacionamento">
@@ -666,7 +680,7 @@ function CompetitiveSetCard({ brand, canManage }: {
   }
 
   return (
-    <div className="border border-border-soft rounded-xl p-5 mt-5">
+    <div className="px-8 py-7 border-b border-border-soft">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <div className="eyebrow mb-1.5">Conjunto competitivo</div>
@@ -691,7 +705,7 @@ function CompetitiveSetCard({ brand, canManage }: {
 
       <div className="mt-4">
         {set.isLoading ? (
-          <div className="h-8 rounded bg-tint animate-pulse" />
+          <div className="h-8 rounded z-skeleton" />
         ) : competitors.length === 0 ? (
           // RN-I-064 por conjunto: sem concorrente declarado o SoV não tem denominador,
           // e mostrar 100% seria pior que dizer que falta montar.
@@ -1383,13 +1397,13 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function PageSkeleton() {
   return (
-    <div className="-m-6 animate-pulse">
-      <div className="px-8 pt-7 pb-5 border-b border-border-soft"><div className="h-9 w-48 rounded bg-tint" /></div>
+    <div className="-m-6">
+      <div className="px-8 pt-7 pb-5 border-b border-border-soft"><div className="h-9 w-48 rounded z-skeleton" /></div>
       <div className="grid" style={{ gridTemplateColumns: "340px 1fr" }}>
         <div className="border-r border-border-soft p-4 space-y-3">
-          {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-12 rounded bg-tint" />)}
+          {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-12 rounded z-skeleton" />)}
         </div>
-        <div className="p-8"><div className="h-24 rounded bg-tint" /></div>
+        <div className="p-8"><div className="h-24 rounded z-skeleton" /></div>
       </div>
     </div>
   )

@@ -3,9 +3,8 @@ import { ESCROW_STATE_COLOR } from "@/lib/status-colors"
 import { Link } from "react-router-dom"
 import { Loader2, Wallet, AlertTriangle, Clock, X } from "lucide-react"
 import { notifyError, notifySuccess } from "@/lib/feedback"
-import { useEscapeKey } from "@/lib/useEscapeKey"
-import { useFocusTrap } from "@/lib/useFocusTrap"
 import { EmptyBlock } from "@/components/ui/empty-block"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { RoleGate } from "@/features/auth/RoleGate"
 import { tEnum } from "@/i18n/enums"
 import { fmtDate, matches, campaignLabel } from "@/lib/operations-format"
@@ -64,6 +63,7 @@ export default function OperationsEscrowPage() {
   }, [items, stateFilter, search])
 
   const current = items.find((e) => e.escrowAccountId === selected) ?? null
+  const [lastOpened, setLastOpened] = useState<EscrowSummary | null>(null)
 
   const kpis: Stat[] = [
     {
@@ -101,7 +101,7 @@ export default function OperationsEscrowPage() {
     <div className="-m-6" style={{ color: "var(--ink)" }}>
       <section className="px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
         <div className="flex-1 max-w-190 min-w-70">
-          <div className="eyebrow mb-3">Operations · Custódia</div>
+          <div className="eyebrow mb-3">Operations · Financeiro</div>
           <h1 className="font-display m-0" style={{ fontSize: 34, lineHeight: 1.1, color: "var(--ink)" }}>
             Custódia
           </h1>
@@ -179,7 +179,7 @@ export default function OperationsEscrowPage() {
                   key={e.escrowAccountId}
                   e={e}
                   index={i}
-                  onOpen={() => setSelected(e.escrowAccountId)}
+                  onOpen={() => { setLastOpened(e); setSelected(e.escrowAccountId) }}
                 />
               ))}
             </div>
@@ -187,7 +187,8 @@ export default function OperationsEscrowPage() {
         </>
       )}
 
-      {current && <EscrowDrawer e={current} onClose={() => setSelected(null)} />}
+      {/* O item segue montado enquanto a gaveta anima a saída. */}
+      <EscrowDrawer e={current ?? lastOpened} open={current !== null} onClose={() => setSelected(null)} />
     </div>
   )
 }
@@ -300,10 +301,15 @@ function EscrowRow({
   )
 }
 
-function EscrowDrawer({ e, onClose }: { e: EscrowSummary; onClose: () => void }) {
+function EscrowDrawer({ e, open, onClose }: {
+  e: EscrowSummary | null
+  open: boolean
+  onClose: () => void
+}) {
+  // Hook antes do guard: a gaveta segue montada enquanto anima a saída.
   const { apply } = useEscrowMutations()
-  useEscapeKey(onClose)
-  const dialogRef = useFocusTrap<HTMLDivElement>()
+
+  if (!e) return null
 
   const can = (action: EscrowAction) => e.allowedTriggers.includes(ESCROW_ACTION_TRIGGER[action])
 
@@ -332,22 +338,32 @@ function EscrowDrawer({ e, onClose }: { e: EscrowSummary; onClose: () => void })
   ]
 
   return (
-    <>
-      <div className="fixed inset-0 z-40" style={{ background: "rgba(11,15,26,.5)" }} onClick={onClose} />
-      <div
-        ref={dialogRef}
-        className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-[440px] overflow-y-auto border-l border-border-soft"
-        style={{ background: "var(--surface)" }}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Custódia"
+    // `Sheet`, como as outras gavetas da plataforma: mesmo overlay, mesma
+    // animação e foco resolvido pelo Radix, no lugar da casca à mão.
+    <Sheet open={open} onOpenChange={(v) => { if (!v) onClose() }}>
+      <SheetContent
+        side="right"
+        // X embutido desligado: ele é absoluto e some sob o cabeçalho fixo.
+        showCloseButton={false}
+        // Inline porque o `SheetContent` embute `sm:max-w-sm`, que vence
+        // utilitário por especificidade.
+        style={{ width: 480, maxWidth: "94vw" }}
+        className="p-0 overflow-y-auto gap-0"
       >
+        <SheetHeader className="sr-only">
+          <SheetTitle>Custódia de {e.influencerName}</SheetTitle>
+        </SheetHeader>
+
         <div
           className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b border-border-soft"
           style={{ background: "var(--surface)" }}
         >
           <div className="eyebrow">Custódia</div>
-          <button onClick={onClose} className="text-ink-muted hover:opacity-70" aria-label="Fechar">
+          <button
+            onClick={onClose}
+            aria-label="Fechar"
+            className="w-8 h-8 flex items-center justify-center rounded-full border border-border-soft text-ink-muted hover:text-ink hover:bg-tint transition-colors cursor-pointer"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -531,8 +547,8 @@ function EscrowDrawer({ e, onClose }: { e: EscrowSummary; onClose: () => void })
             )}
           </RoleGate>
         </div>
-      </div>
-    </>
+      </SheetContent>
+    </Sheet>
   )
 }
 

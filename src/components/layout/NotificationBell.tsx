@@ -57,7 +57,7 @@ export function NotificationBell() {
       <PopoverTrigger asChild>
         <button
           aria-label={unread > 0 ? `Alertas — ${unread} não lidos` : "Alertas"}
-          className="relative text-ink-muted p-2 rounded-md hover:text-ink hover:bg-muted dark:hover:text-ink transition-colors cursor-pointer"
+          className="relative text-ink-muted p-2 rounded-full hover:text-ink hover:bg-muted dark:hover:text-ink transition-colors cursor-pointer"
         >
           <Bell className="w-4 h-4" />
           {/* O ponto só existe quando há algo não lido. Antes era fixo no markup:

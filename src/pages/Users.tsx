@@ -4,6 +4,8 @@ import { notifyError, notifySuccess } from "@/lib/feedback"
 import { useConfirm } from "@/features/confirm/context"
 import { useAuth } from "@/features/auth/context"
 import { SelectField } from "@/components/ui/select-field"
+import { TabPill } from "@/components/ui/tab-pill"
+import { stagger } from "@/lib/motion"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import {
   useMembers, useInvites, useTeamMutations,
@@ -183,29 +185,26 @@ export default function UsersPage() {
   ]
 
   return (
-    <div className="-m-6 min-h-[calc(100dvh-3.75rem)] flex flex-col border-t border-border-soft" style={{ color: "var(--ink)" }}>
+    <div className="-m-6 min-h-[calc(100dvh-3.75rem)] flex flex-col" style={{ color: "var(--ink)" }}>
       {/* Hero */}
-      <section className="px-8 pt-7 pb-5 border-b border-border-soft" style={{ background: "var(--surface)" }}>
-        <div className="flex items-start justify-between gap-6 flex-wrap">
-          <div>
-            <div className="eyebrow mb-2.5">Gestão · Equipe</div>
+      <section className="px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
+        <div className="flex items-end justify-between gap-6 flex-wrap">
+          <div className="flex-1 max-w-190 min-w-70">
+            <div className="eyebrow mb-3">Gestão · Equipe</div>
             <h1 className="font-display m-0" style={{ fontSize: 34, lineHeight: 1.1, color: "var(--ink)" }}>
               Usuários
             </h1>
-            <div className="text-[14px] text-ink-muted mt-1.5 max-w-140">
-              <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>
-                {memberList.length} {memberList.length === 1 ? "pessoa" : "pessoas"}
-              </span>{" "}
-              com acesso a este workspace
-              {isAdmin && inviteList.length > 0 && (
-                <> · <span className="font-mono-zoe">{inviteList.length}</span> {inviteList.length === 1 ? "convite pendente" : "convites pendentes"}</>
-              )}.
-            </div>
+            {/* As contagens saíram daqui: as abas logo abaixo já dizem
+                "Pessoas (5)" e "Convites (2)" — era o mesmo número duas vezes,
+                a 60px de distância. */}
+            <p className="text-[14.5px] leading-relaxed text-ink-muted mt-2.5 mb-0 max-w-150">
+              Quem entra no workspace, com qual papel e sobre quais marcas.
+            </p>
           </div>
           {isAdmin && (
             <button
               onClick={() => setInviteOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-medium text-white transition-colors"
+              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-md text-[13px] font-medium text-white transition-colors shrink-0 cursor-pointer"
               style={{ background: "var(--color-teal-500)" }}
             >
               <Plus className="w-3.5 h-3.5" /> Convidar usuário
@@ -214,31 +213,22 @@ export default function UsersPage() {
         </div>
       </section>
 
-      {/* Tabs */}
-      <section className="px-6 py-3.5 border-b border-border-soft" style={{ background: "var(--surface)" }}>
-        <div className="flex items-center gap-1">
-          {tabs.map((t) => {
-            const active = tab === t.key
-            return (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                aria-pressed={active}
-                className={`px-3.5 py-2 rounded-lg text-[13px] font-semibold transition-colors ${
-                  active ? "text-white" : "text-ink-muted hover:text-ink"
-                }`}
-                style={active ? { background: "var(--color-teal-500)" } : undefined}
-              >
-                {t.label}
-                {t.count !== undefined && (
-                  <span className="ml-1.5 font-medium" style={{ opacity: active ? 0.85 : 0.6 }}>
-                    ({t.count})
-                  </span>
-                )}
-              </button>
-            )
-          })}
-        </div>
+      {/* Barra de trabalho: `TabPill` porque o conteúdo de cada aba é OUTRO —
+          pessoas, papéis e convites são entidades diferentes, não recortes da
+          mesma lista (aí seria `Segmented`). Gruda no topo porque a tabela rola. */}
+      <section
+        className="px-8 py-3 border-b border-border-soft flex items-center gap-1.5 flex-wrap sticky top-0 z-10"
+        style={{ background: "var(--surface)" }}
+      >
+        {tabs.map((t) => (
+          <TabPill
+            key={t.key}
+            active={tab === t.key}
+            onClick={() => setTab(t.key)}
+            label={t.label}
+            count={t.count}
+          />
+        ))}
       </section>
 
       {/* Conteúdo */}
@@ -256,9 +246,9 @@ export default function UsersPage() {
                 <thead>
                   <tr className="border-b border-border-soft">
                     <th className="text-left px-8 py-3 eyebrow font-semibold">Nome</th>
-                    <th className="text-left py-3 eyebrow font-semibold">Papel</th>
-                    <th className="text-left py-3 eyebrow font-semibold">Marcas</th>
-                    <th className="text-left py-3 eyebrow font-semibold">Entrou em</th>
+                    <th className="text-left px-3 py-3 eyebrow font-semibold">Papel</th>
+                    <th className="text-left px-3 py-3 eyebrow font-semibold">Marcas</th>
+                    <th className="text-left px-3 py-3 eyebrow font-semibold">Entrou em</th>
                     <th className="px-8 py-3" />
                   </tr>
                 </thead>
@@ -266,7 +256,11 @@ export default function UsersPage() {
                   {memberList.map((m, i) => {
                     const isSelf = m.userId === user?.id
                     return (
-                      <tr key={m.membershipId} className="border-b border-border-soft hover:bg-hover transition-colors">
+                      <tr
+                        key={m.membershipId}
+                        className="border-b border-border-soft hover:bg-hover transition-colors z-rise"
+                        style={stagger(Math.min(i, 12))}
+                      >
                         <td className="px-8 py-3.5">
                           <div className="flex items-center gap-3">
                             <div
@@ -284,7 +278,7 @@ export default function UsersPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="py-3.5">
+                        <td className="px-3 py-3.5">
                           <RoleCell
                             member={m}
                             canEdit={isAdmin}
@@ -294,10 +288,10 @@ export default function UsersPage() {
                             onChange={(next) => handleRoleChange(m, next)}
                           />
                         </td>
-                        <td className="py-3.5">
+                        <td className="px-3 py-3.5">
                           <BrandsCell member={m} canEdit={isAdmin} onEdit={() => setEditingBrands(m)} />
                         </td>
-                        <td className="py-3.5 font-mono-zoe text-ink-2">{fmtDate(m.joinedAt)}</td>
+                        <td className="px-3 py-3.5 font-mono-zoe text-ink-2">{fmtDate(m.joinedAt)}</td>
                         <td className="px-8 py-3.5 text-right">
                           {isAdmin && !isSelf && (
                             <button
@@ -507,8 +501,8 @@ function AssignBrandsModal({ member, onClose }: { member: TenantMember; onClose:
 
         <div className="px-6 py-2 overflow-y-auto flex-1">
           {brandsQuery.isLoading ? (
-            <div className="space-y-2 animate-pulse">
-              {[0, 1, 2].map((i) => <div key={i} className="h-11 rounded-lg bg-tint" />)}
+            <div className="space-y-2">
+              {[0, 1, 2].map((i) => <div key={i} className="h-11 rounded-lg z-skeleton" />)}
             </div>
           ) : brands.length === 0 ? (
             <EmptyBlock className="py-8" message="Nenhuma marca assinada no workspace" />
@@ -762,8 +756,8 @@ function InviteModal({ isOwner, onClose }: { isOwner: boolean; onClose: () => vo
               {/* Acesso a marcas */}
               <label className="block text-[13px] font-semibold text-ink-2 mt-5 mb-2">Acesso a marcas</label>
               {brandsQuery.isLoading ? (
-                <div className="space-y-2 animate-pulse">
-                  {[0, 1].map((i) => <div key={i} className="h-10 rounded-lg bg-tint" />)}
+                <div className="space-y-2">
+                  {[0, 1].map((i) => <div key={i} className="h-10 rounded-lg z-skeleton" />)}
                 </div>
               ) : brands.length === 0 ? (
                 <p className="text-[12.5px] text-ink-muted">Nenhuma marca assinada no workspace.</p>
@@ -919,9 +913,9 @@ function ResentLinkModal({ link, onClose }: { link: string; onClose: () => void 
 
 function TableSkeleton() {
   return (
-    <div className="px-8 py-6 space-y-3 animate-pulse">
+    <div className="px-8 py-6 space-y-3">
       {[0, 1, 2, 3].map((i) => (
-        <div key={i} className="h-11 rounded bg-tint" />
+        <div key={i} className="h-11 rounded z-skeleton" />
       ))}
     </div>
   )
