@@ -97,9 +97,12 @@ export type BillingPlans = {
   operationsPlans: OperationsPlanOption[]
   currentOperationsPlanSlug: string | null
   bundle: BundleOffer
+  /** Workspace sem assinatura e usuário que nunca usou o teste (um por pessoa). */
+  trialAvailable: boolean
 }
 
-export type ChangeKind = "Upgrade" | "Downgrade" | "TrialChange" | "ReleaseScheduled"
+/** `TrialConversion` = assinar durante o teste: o teste acaba e a primeira mensalidade é cobrada. */
+export type ChangeKind = "Upgrade" | "Downgrade" | "TrialConversion" | "ReleaseScheduled"
 
 export type ChangeWarning = {
   code: "brands_over_limit" | "features_lost" | "intelligence_removed" | "operations_removed" | "replaces_scheduled_change"
@@ -108,12 +111,26 @@ export type ChangeWarning = {
   features: string[] | null
 }
 
+/**
+ * Uma fatura estimada, aberta em parcelas. O total a pagar não é o preço de tabela: o
+ * provedor abate desconto e o crédito que sobrou de uma troca anterior no meio do ciclo.
+ */
+export type InvoiceEstimate = {
+  subtotalCents: number
+  /** Positivo = abatimento por cupom. */
+  discountCents: number
+  /** Positivo = abatimento pelo saldo do cliente. */
+  creditCents: number
+  amountDueCents: number
+}
+
 export type ChangePreview = {
   kind: ChangeKind
   effectiveAt: string
-  /** Cobrado no ato. Null = o provedor não calculou. */
-  amountDueNowCents: number | null
-  nextInvoiceCents: number | null
+  /** Fatura emitida no ato (upgrade). Null quando nada é cobrado agora. */
+  dueNow: InvoiceEstimate | null
+  /** Próxima fatura recorrente. Null quando o provedor não calculou. */
+  next: InvoiceEstimate | null
   nextInvoiceAt: string | null
   currency: string | null
   bundleDiscountApplies: boolean
@@ -139,6 +156,8 @@ export type ChangeSubscriptionInput = {
   planSlug?: string | null
   operationsPlanSlug?: string | null
   extraBrandSlots?: number
+  /** Marcas que continuam quando o plano novo tem menos slots. As demais são arquivadas na data da troca. */
+  keepBrandIds?: string[]
   /** Só na assinatura inicial. Omitido = com teste; a API recusa o segundo trial do mesmo usuário. */
   withTrial?: boolean
   /**
@@ -157,6 +176,9 @@ export const TRIAL_ALREADY_USED = "trial_already_used"
 
 /** Assinatura paga recusada por falta de cartão. */
 export const PAYMENT_METHOD_REQUIRED = "payment_method_required"
+
+/** Downgrade com mais marcas do que o plano novo comporta: falta escolher quais ficam. */
+export const BRAND_SELECTION_REQUIRED = "brand_selection_required"
 
 /** `hasPaymentMethod` null = não deu para saber (sem provedor ou provedor fora do ar). */
 export type PaymentMethodStatus = {
@@ -177,6 +199,9 @@ export const billingApi = {
     apiClient.post("/api/billing/subscription/preview", input),
   cancelScheduledChange: (): Promise<void> =>
     apiClient.delete("/api/billing/subscription/scheduled-change"),
+  /** Tela do provedor só para cadastrar cartão (sem cobrança). Volta com `?checkout=card`. */
+  setupPaymentMethod: (): Promise<{ url: string }> =>
+    apiClient.post("/api/billing/payment-method/setup"),
   portal: (returnUrl: string): Promise<{ url: string }> =>
     apiClient.post("/api/billing/portal", { returnUrl }),
   paymentMethod: (opts?: { signal?: AbortSignal }): Promise<PaymentMethodStatus> =>
@@ -207,9 +232,10 @@ export const billingApi = {
 export type PendingProjection = PlanSelection & {
   /**
    * `immediate` espera o plano mudar; `scheduled` espera a troca agendada aparecer;
-   * `release` espera ela sumir. O plano vigente não muda nos dois últimos.
+   * `release` espera ela sumir (o plano vigente não muda nesses dois); `conversion`
+   * espera o teste acabar — o plano pode ser o mesmo do teste.
    */
-  mode: "immediate" | "scheduled" | "release"
+  mode: "immediate" | "scheduled" | "release" | "conversion"
   since: number
 }
 
@@ -234,7 +260,38 @@ export function projectionArrived(
       )
     case "release":
       return sub.scheduledChange == null
+    case "conversion":
+      return (
+        sub.status !== "Trialing" &&
+        sub.planSlug === pending.planSlug &&
+        sub.operationsPlanSlug === pending.operationsPlanSlug
+      )
   }
+}
+
+/**
+ * Assinatura escolhida no teste que esperou o cadastro do cartão. A ida ao provedor
+ * recarrega a página; sem guardar, o cliente voltaria e teria de escolher tudo de novo.
+ */
+const PENDING_CONVERSION_KEY = "zoe:pending-conversion"
+
+export const pendingConversion = {
+  save(selection: PlanSelection) {
+    try {
+      sessionStorage.setItem(PENDING_CONVERSION_KEY, JSON.stringify(selection))
+    } catch {
+      /* navegador sem storage: o cliente escolhe de novo na volta */
+    }
+  },
+  take(): PlanSelection | null {
+    try {
+      const raw = sessionStorage.getItem(PENDING_CONVERSION_KEY)
+      sessionStorage.removeItem(PENDING_CONVERSION_KEY)
+      return raw ? (JSON.parse(raw) as PlanSelection) : null
+    } catch {
+      return null
+    }
+  },
 }
 
 /** Janela de espera antes de desistir do repique. */
@@ -306,6 +363,7 @@ export function useSubscriptionMutations() {
     change: useMutation({ mutationFn: billingApi.change, onSuccess: invalidate }),
     cancelScheduled: useMutation({ mutationFn: billingApi.cancelScheduledChange, onSuccess: invalidate }),
     portal: useMutation({ mutationFn: billingApi.portal }),
+    setupPaymentMethod: useMutation({ mutationFn: billingApi.setupPaymentMethod }),
   }
 }
 

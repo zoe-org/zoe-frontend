@@ -45,6 +45,7 @@ const data: BillingPlans = {
   currentOperationsPlanSlug: null,
   currentExtraBrandSlots: 0,
   bundle: { percentOff: 5, eligiblePlanSlugs: ["starter", "pro", "max"], operationsPlanSlug: "operations_pro", isCurrent: false },
+  trialAvailable: false,
 }
 
 const sel = (planSlug: string | null, operationsPlanSlug: string | null = null, extraBrandSlots = 0) => ({
