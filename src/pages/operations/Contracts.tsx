@@ -159,13 +159,13 @@ export default function OperationsContractsPage() {
   return (
     <div className="-m-6" style={{ color: "var(--ink)" }}>
       <section className="px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
-        <div className="flex items-start justify-between gap-6 flex-wrap">
-          <div className="flex-1 max-w-190 min-w-70">
-            <div className="eyebrow mb-3">Operations · Contratos</div>
+        <div className="flex items-end justify-between gap-6 flex-wrap">
+          <div className="flex-1 max-w-200 min-w-70">
+            <div className="eyebrow mb-3">Operations · Documentos</div>
             <h1 className="font-display m-0" style={{ fontSize: 34, lineHeight: 1.1, color: "var(--ink)" }}>
               Contratos
             </h1>
-            <p className="text-[14.5px] leading-relaxed text-ink-muted mt-2.5 mb-0 max-w-150">
+            <p className="text-[14.5px] leading-relaxed text-ink-muted mt-2.5 mb-0 max-w-200">
               O documento é montado a partir do template da modalidade — você preenche os
               valores, as cláusulas vêm prontas.
             </p>

@@ -6,9 +6,12 @@ const routeLabels: Record<string, string> = {
   "/intelligence/sentiment": "Sentimento",
   "/intelligence/influencers": "Influenciadores",
   "/intelligence/sov": "Share of Voice",
+  "/operations": "Painel",
   "/operations/campaigns": "Campanhas",
   "/operations/contracts": "Contratos",
-  "/operations/influencers": "Influenciadores",
+  // "Elenco", como na sidebar e no eyebrow da própria tela. Dizia
+  // "Influenciadores" — o mesmo nome da tela de Intelligence, em outro módulo.
+  "/operations/influencers": "Elenco",
   "/operations/deliveries": "Entregas",
   "/operations/escrow": "Custódia",
   "/alerts": "Alertas",
@@ -23,6 +26,7 @@ const parentGroups: Record<string, string> = {
   "/intelligence/sentiment": "Intelligence",
   "/intelligence/influencers": "Intelligence",
   "/intelligence/sov": "Intelligence",
+  "/operations": "Operations",
   "/operations/campaigns": "Operations",
   "/operations/contracts": "Operations",
   "/operations/influencers": "Operations",

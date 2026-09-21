@@ -1,14 +1,13 @@
 import { useMemo, useState } from "react"
 import { Link, useSearchParams } from "react-router-dom"
-import { Users, UserPlus, X, ExternalLink, Loader2, Mail } from "lucide-react"
+import { Users, X, ExternalLink, Loader2, Mail, FileText, Plus } from "lucide-react"
 import { notifyError, notifySuccess } from "@/lib/feedback"
 import { EmptyBlock } from "@/components/ui/empty-block"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { StatusChip } from "@/components/ui/status-chip"
 import { DELIVERY_STATUS_COLOR } from "@/lib/status-colors"
 import { RoleGate } from "@/features/auth/RoleGate"
 import { tEnum } from "@/i18n/enums"
-import { useEscapeKey } from "@/lib/useEscapeKey"
-import { useFocusTrap } from "@/lib/useFocusTrap"
 import { fmtDate, initials, matches, campaignLabel } from "@/lib/operations-format"
 import {
   TableSkeleton, ErrorState, SearchBox, NoResults,
@@ -61,7 +60,14 @@ const NETWORKS: Record<string, { abbreviation: string; url: (handle: string) => 
   TikTok: { abbreviation: "TT", url: (h) => `https://www.tiktok.com/@${h}` },
 }
 
-const stripAt = (h: string) => h.trim().replace(/^@/, "")
+/**
+ * Limpa o que vem antes do @ digitado pelo criador.
+ *
+ * Era só `^@`, e um valor salvo como "~@fulano" virava "@~@fulano" na tela,
+ * porque o template prefixa o @ de novo. Tira tudo que não pode começar um
+ * handle — @, ~, espaço — em vez de um caractere específico.
+ */
+const stripAt = (h: string) => h.trim().replace(/^[^A-Za-z0-9_.-]+/, "")
 
 export default function OperationsRosterPage() {
   const roster = useRoster()
@@ -71,11 +77,20 @@ export default function OperationsRosterPage() {
   // direto para cá, e o voltar do navegador fecha a gaveta.
   const [params, setParams] = useSearchParams()
   const selectedId = params.get("creator")
-  const openCreator = (influencerId: string | null) => setParams((p) => {
-    if (influencerId) p.set("creator", influencerId)
-    else p.delete("creator")
-    return p
-  })
+  /**
+   * O id continua mandando (link direto e botão voltar), mas o item fica em
+   * estado: ao fechar, o parâmetro some e o `Sheet` ainda precisa do conteúdo
+   * para animar a saída. Sem isto a gaveta esvaziava antes de terminar de sair.
+   */
+  const [lastOpened, setLastOpened] = useState<RosterItem | null>(null)
+  const openCreator = (item: RosterItem | null) => {
+    if (item) setLastOpened(item)
+    setParams((p) => {
+      if (item) p.set("creator", item.influencerId)
+      else p.delete("creator")
+      return p
+    })
+  }
 
   const all = useMemo(() => roster.data?.items ?? [], [roster.data])
   const [rel, setRel] = useState<string>("")
@@ -101,11 +116,17 @@ export default function OperationsRosterPage() {
       // E-mail também entra na busca.
       .filter((i) => !area || i.primaryArea === area)
       .filter((i) => !audience || i.audienceSize === audience)
-      .filter((i) => matches(search, i.displayName, i.fullName, i.email, i.primaryArea)),
+      // Tópicos entram na busca: procurar criador para uma campanha é procurar
+      // por assunto ("skincare", "review"), não pelo nome de quem você ainda
+      // não sabe que existe.
+      .filter((i) => matches(
+        search, i.displayName, i.fullName, i.email, i.primaryArea, ...(i.topics ?? []))),
     [all, rel, search, area, audience],
   )
 
   const selectedCreator = selectedId ? all.find((i) => i.influencerId === selectedId) ?? null : null
+  // Link direto resolve pelo id; o fechamento cai no último aberto.
+  const drawerItem = selectedCreator ?? lastOpened
 
   const temRecorte = Boolean(search || area || audience || rel)
   const limparRecorte = () => { setSearch(""); setArea(""); setAudience(""); setRel("") }
@@ -115,13 +136,13 @@ export default function OperationsRosterPage() {
       {/* Abertura: só o enquadramento. A contagem foi pra barra, ao lado do
           recorte que a muda — repetida aqui ela envelhecia a cada filtro. */}
       <section className="px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
-        <div className="flex items-start justify-between gap-6 flex-wrap">
-          <div className="flex-1 max-w-190 min-w-70">
+        <div className="flex items-end justify-between gap-6 flex-wrap">
+          <div className="flex-1 max-w-200 min-w-70">
             <div className="eyebrow mb-3">Operations · Elenco</div>
             <h1 className="font-display m-0" style={{ fontSize: 34, lineHeight: 1.1, color: "var(--ink)" }}>
               Criadores
             </h1>
-            <p className="text-[14.5px] leading-relaxed text-ink-muted mt-2.5 mb-0 max-w-150">
+            <p className="text-[14.5px] leading-relaxed text-ink-muted mt-2.5 mb-0 max-w-200">
               A pessoa é única na plataforma — se ela já trabalha com outra marca, o cadastro
               só cria o vínculo com você.
             </p>
@@ -133,7 +154,7 @@ export default function OperationsRosterPage() {
               className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-md text-[13px] font-medium text-white transition-colors shrink-0 cursor-pointer"
               style={{ background: "var(--color-teal-500)" }}
             >
-              <UserPlus className="w-3.5 h-3.5" /> Convidar criador
+              <Plus className="w-3.5 h-3.5" /> Convidar criador
             </button>
           </RoleGate>
         </div>
@@ -220,17 +241,19 @@ export default function OperationsRosterPage() {
             <table className="w-full text-[13px]">
               <thead>
                 <tr className="border-b border-border-soft">
+                  {/* `px-3` nas colunas do meio: sem padding lateral os rótulos
+                      encostavam um no outro — "RECEBIMENTOCONTRATOS". */}
                   <th className="text-left px-8 py-3 eyebrow font-semibold">Criador</th>
-                  <th className="text-left py-3 eyebrow font-semibold">Redes</th>
-                  <th className="text-left py-3 eyebrow font-semibold">Área</th>
-                  <th className="text-left py-3 eyebrow font-semibold">Recebimento</th>
-                  <th className="text-left py-3 eyebrow font-semibold">Contratos</th>
+                  <th className="text-left px-3 py-3 eyebrow font-semibold">Redes e audiência</th>
+                  <th className="text-left px-3 py-3 eyebrow font-semibold">Atuação</th>
+                  <th className="text-left px-3 py-3 eyebrow font-semibold">Recebimento</th>
+                  <th className="text-right px-3 py-3 eyebrow font-semibold">Contratos</th>
                   <th className="text-left px-8 py-3 eyebrow font-semibold">Última campanha</th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((it, i) => (
-                  <RosterRow key={it.tenantInfluencerId} item={it} index={i} onOpen={() => openCreator(it.influencerId)} />
+                  <RosterRow key={it.tenantInfluencerId} item={it} index={i} onOpen={() => openCreator(it)} />
                 ))}
               </tbody>
             </table>
@@ -238,7 +261,11 @@ export default function OperationsRosterPage() {
         )}
       </section>
 
-      {selectedCreator && <CreatorDrawer item={selectedCreator} onClose={() => openCreator(null)} />}
+      <CreatorDrawer
+        item={drawerItem}
+        open={selectedCreator !== null}
+        onClose={() => openCreator(null)}
+      />
       {inviteOpen && <InviteCreatorModal onClose={() => setInviteOpen(false)} />}
     </div>
   )
@@ -248,6 +275,8 @@ function RosterRow({ item, index, onOpen }: { item: RosterItem; index: number; o
   const name = item.displayName || item.fullName
   const rec = payoutState(item)
   const networks = Object.entries(item.handles ?? {})
+  const audiencia = AUDIENCE_SIZES.find((a) => a.value === item.audienceSize)?.label ?? null
+  const topicos = item.topics ?? []
 
   return (
     // A linha inteira abre a gaveta; o nome é o botão, para teclado e leitor de tela.
@@ -256,7 +285,7 @@ function RosterRow({ item, index, onOpen }: { item: RosterItem; index: number; o
       className="border-b border-border-soft hover:bg-hover transition-colors cursor-pointer z-rise"
       style={stagger(Math.min(index, 12))}
     >
-      <td className="px-8 py-3.5">
+      <td className="px-8 py-3.5 align-top">
         <div className="flex items-center gap-3">
           <div
             className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center font-display text-white text-[12px]"
@@ -279,7 +308,7 @@ function RosterRow({ item, index, onOpen }: { item: RosterItem; index: number; o
           </div>
         </div>
       </td>
-      <td className="py-3.5 text-[12px] text-ink-2">
+      <td className="px-3 py-3.5 text-[12px] text-ink-2 align-top">
         {networks.length === 0
           ? <span className="text-ink-muted">—</span>
           : networks.map(([network, handle]) => (
@@ -287,11 +316,30 @@ function RosterRow({ item, index, onOpen }: { item: RosterItem; index: number; o
               <span className="text-ink-muted">{NETWORKS[network]?.abbreviation ?? network}</span> @{stripAt(handle)}
             </span>
           ))}
+        {/* A audiência era filtrável e invisível: dava para recortar por "50 mil
+            a 200 mil" e nenhuma coluna dizia em qual faixa cada um estava. */}
+        {audiencia && (
+          <div className="text-[11.5px] text-ink-muted mt-0.5">{audiencia}</div>
+        )}
       </td>
-      <td className="py-3.5 text-[12.5px] text-ink-2">
+      <td className="px-3 py-3.5 text-[12.5px] text-ink-2 align-top">
         {item.primaryArea ?? <span className="text-ink-muted">—</span>}
+        {/* Tópicos são o que se procura ao montar uma campanha. Três, porque a
+            coluna é estreita e o resto vive na gaveta. */}
+        {topicos.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1.5">
+            {topicos.slice(0, 3).map((t) => (
+              <span key={t} className="chip text-[10px]">{t}</span>
+            ))}
+            {topicos.length > 3 && (
+              <span className="text-[10.5px] text-ink-muted-2 self-center">
+                +{topicos.length - 3}
+              </span>
+            )}
+          </div>
+        )}
       </td>
-      <td className="py-3.5 text-[12.5px]">
+      <td className="px-3 py-3.5 text-[12.5px] align-top">
         <span style={{ color: rec.color }}>{rec.label}</span>
         {isPaymentStuck(item) && (
           <div className="text-[11px] font-medium" style={{ color: "var(--color-neg)" }}>
@@ -299,8 +347,8 @@ function RosterRow({ item, index, onOpen }: { item: RosterItem; index: number; o
           </div>
         )}
       </td>
-      <td className="py-3.5 font-mono-zoe text-ink-2">{item.contractCount}</td>
-      <td className="px-8 py-3.5 text-[12.5px] text-ink-2">
+      <td className="px-3 py-3.5 font-mono-zoe text-ink-2 text-right align-top">{item.contractCount}</td>
+      <td className="px-8 py-3.5 text-[12.5px] text-ink-2 align-top">
         {item.lastContractAt
           ? <>{campaignLabel(item.lastCampaignName)} <span className="text-ink-muted">· {fmtDate(item.lastContractAt)}</span></>
           : <span className="text-ink-muted">—</span>}
@@ -310,64 +358,121 @@ function RosterRow({ item, index, onOpen }: { item: RosterItem; index: number; o
 }
 
 /** O criador por inteiro: conta, cadastro declarado e contratos com este workspace. */
-function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => void }) {
-  useEscapeKey(onClose)
-  const dialogRef = useFocusTrap<HTMLDivElement>()
+function CreatorDrawer({ item, open, onClose }: {
+  item: RosterItem | null
+  open: boolean
+  onClose: () => void
+}) {
+  // Hooks antes do guard: a gaveta fica montada enquanto anima a saída, e um
+  // retorno adiantado aqui mudaria a ordem deles entre renders.
   const contracts = useContracts()
+  const deliveries = useDeliveries()
+  const escrows = useEscrowAccounts()
+
+  if (!item) return null
+
   const creatorContracts = (contracts.data?.items ?? []).filter((c) => c.influencerId === item.influencerId)
 
   // Histórico do trabalho com este criador. As entregas vêm pela lista de contratos dele (a fila
   // não traz o id do criador); os pagamentos, pelas custódias já liberadas.
-  const deliveries = useDeliveries()
-  const escrows = useEscrowAccounts()
   const contractIds = new Set(creatorContracts.map((c) => c.contractId))
   const creatorDeliveries = (deliveries.data?.items ?? [])
     .filter((d) => contractIds.has(d.contractId))
     .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt))
   const creatorPayments = (escrows.data?.items ?? [])
     .filter((e) => e.influencerId === item.influencerId && e.state === "Released")
+
   const rec = payoutState(item)
   const audience = AUDIENCE_SIZES.find((a) => a.value === item.audienceSize)?.label
   const networks = Object.entries(item.handles ?? {})
   const topics = item.topics ?? []
 
   return (
-    <>
-      <div className="fixed inset-0 z-40" style={{ background: "rgba(11,15,26,.5)" }} onClick={onClose} />
-      <div
-        className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-[460px] overflow-y-auto border-l border-border-soft"
-        style={{ background: "var(--surface)" }}
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label={`Criador ${item.fullName}`}
+    // `Sheet`, como o drawer de menções: mesmo overlay, mesma animação e o foco
+    // resolvido pelo Radix. Era uma casca à mão, com `useFocusTrap` e
+    // `useEscapeKey` próprios — dois drawers com comportamentos parecidos, mas
+    // não idênticos.
+    <Sheet open={open} onOpenChange={(v) => { if (!v) onClose() }}>
+      <SheetContent
+        side="right"
+        // X embutido desligado: ele é absoluto e some sob o cabeçalho fixo.
+        showCloseButton={false}
+        // Inline porque o `SheetContent` embute `sm:max-w-sm`, que vence
+        // utilitário por especificidade.
+        style={{ width: 520, maxWidth: "94vw" }}
+        className="p-0 overflow-y-auto gap-0"
       >
+        <SheetHeader className="sr-only">
+          <SheetTitle>Criador {item.fullName}</SheetTitle>
+        </SheetHeader>
+
         <div
           className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b border-border-soft"
           style={{ background: "var(--surface)" }}
         >
           <div className="eyebrow">Criador</div>
-          <button onClick={onClose} className="text-ink-muted hover:opacity-70" aria-label="Fechar">
+          <button
+            onClick={onClose}
+            aria-label="Fechar"
+            className="w-8 h-8 flex items-center justify-center rounded-full border border-border-soft text-ink-muted hover:text-ink hover:bg-tint transition-colors cursor-pointer"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="p-6">
-          <h2 className="font-display m-0" style={{ fontSize: 21, color: "var(--ink)" }}>
-            {item.displayName || item.fullName}
-          </h2>
-          <div className="font-mono-zoe text-[12px] text-ink-muted mt-0.5">{item.email}</div>
-          <div className="flex gap-1.5 flex-wrap mt-2">
-            <span className="chip text-[10.5px]">{tEnum("relationshipStatus", item.relationshipStatus)}</span>
-            {item.countryCode && <span className="chip text-[10.5px]">{item.countryCode}</span>}
+        <div className="px-6 py-5 flex flex-col gap-6">
+          {/* Identidade com a mesma inicial colorida da lista: abrir a gaveta
+              não deveria fazer duvidar se é a mesma pessoa da linha clicada. */}
+          <div className="flex items-start gap-3.5">
+            <div
+              className="w-11 h-11 rounded-full shrink-0 flex items-center justify-center font-display text-white text-[14px]"
+              style={{ background: `hsl(${(item.fullName.length * 47 + 200) % 360}, 45%, 60%)` }}
+              aria-hidden
+            >
+              {initials(item.fullName, item.email)}
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="font-display m-0" style={{ fontSize: 21, lineHeight: 1.15, color: "var(--ink)" }}>
+                {item.displayName || item.fullName}
+              </h2>
+              <div className="font-mono-zoe text-[12px] text-ink-muted mt-1 truncate">{item.email}</div>
+              <div className="flex gap-1.5 flex-wrap mt-2">
+                <span className="chip text-[10.5px]">{tEnum("relationshipStatus", item.relationshipStatus)}</span>
+                {item.countryCode && <span className="chip text-[10.5px]">{item.countryCode}</span>}
+                {item.primaryArea && <span className="chip text-[10.5px]">{item.primaryArea}</span>}
+              </div>
+            </div>
           </div>
 
-          <div className="rounded-lg border border-border-soft p-4 mt-5">
-            <div className="eyebrow mb-1.5">Recebimento</div>
+          {/* O dinheiro da relação num relance, sempre em líquido — o que chega
+              nele. Estava dentro de "Contratos com você", três seções abaixo:
+              é a manchete da relação, não um detalhe da lista. */}
+          {((item.paidCents ?? 0) > 0 || (item.inEscrowCents ?? 0) > 0 || (item.releasableCents ?? 0) > 0) && (
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                ["Pago", item.paidCents ?? 0],
+                ["Em custódia", item.inEscrowCents ?? 0],
+                ["Liberável", item.releasableCents ?? 0],
+              ] as const).map(([label, value]) => (
+                <div key={label} className="rounded-lg border border-border-soft px-3 py-2.5">
+                  <div className="text-[10.5px] text-ink-muted">{label}</div>
+                  <div className="font-mono-zoe text-[13px] font-semibold mt-0.5" style={{ color: "var(--ink)" }}>
+                    {fmtCents(value)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Seção, não cartão. A gaveta tinha cinco caixas com borda e nenhuma
+              hierarquia entre elas — no drawer de menções só o veredito é
+              cartão, e o resto se separa por rótulo e respiro. */}
+          <div>
+            <div className="eyebrow mb-2">Recebimento</div>
             <div className="text-[13px] font-medium" style={{ color: rec.color }}>{rec.label}</div>
             <p className="text-[12px] text-ink-muted m-0 mt-1">{rec.explanation}</p>
             {isPaymentStuck(item) && (
-              <div className="rounded-md p-2.5 mt-2.5 text-[12px]" style={{ background: "#DC262612", color: "#B91C1C" }}>
+              <div className="rounded-md p-2.5 mt-2.5 text-[12px]" style={{ background: "var(--neg-bg)", color: "var(--color-neg)" }}>
                 {fmtCents(item.releasableCents ?? 0)} já aprovados para este criador esperam esta conta.{" "}
                 <Link to="/operations/escrow" className="underline">Ver na custódia</Link>
               </div>
@@ -379,21 +484,25 @@ function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => voi
             )}
           </div>
 
-          <div className="mt-5">
-            <div className="eyebrow mb-2">Cadastro</div>
+          <div>
+            <div className="eyebrow mb-2.5">Cadastro</div>
             {!item.profileComplete && (
-              <p className="text-[12px] text-ink-muted m-0 mb-2">
+              <p className="text-[12px] text-ink-muted m-0 mb-3">
                 Ainda não completou o cadastro — o que estiver abaixo pode estar incompleto.
               </p>
             )}
-            <div className="text-[12.5px] flex flex-col gap-1.5" style={{ color: "var(--ink-2)" }}>
-              <div>
-                <span className="text-ink-muted">Área: </span>
-                {item.primaryArea ?? "—"}
-                {audience && <span className="text-ink-muted"> · audiência {audience.toLowerCase()}</span>}
+            {/* Pares rótulo/valor em vez de uma pilha de frases: eram área,
+                audiência, redes, tópicos, bio e portfólio num fluxo só, e nada
+                dizia onde um assunto terminava e o outro começava. */}
+            <div className="text-[12.5px] flex flex-col gap-3" style={{ color: "var(--ink-2)" }}>
+              <div className="flex gap-3">
+                <span className="text-ink-muted w-20 shrink-0">Audiência</span>
+                <span>{audience ?? "—"}</span>
               </div>
               {networks.length > 0 && (
-                <div className="flex flex-wrap gap-x-3 gap-y-1">
+                <div className="flex gap-3">
+                  <span className="text-ink-muted w-20 shrink-0">Redes</span>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 min-w-0">
                   {networks.map(([network, handle]) => (
                     <a
                       key={network}
@@ -406,57 +515,51 @@ function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => voi
                       {network} @{stripAt(handle)} <ExternalLink className="w-3 h-3" />
                     </a>
                   ))}
+                  </div>
                 </div>
               )}
               {topics.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-0.5">
-                  {topics.map((t) => <span key={t} className="chip text-[10.5px]">{t}</span>)}
+                <div className="flex gap-3">
+                  <span className="text-ink-muted w-20 shrink-0 pt-0.5">Tópicos</span>
+                  <div className="flex flex-wrap gap-1.5 min-w-0">
+                    {topics.map((t) => <span key={t} className="chip text-[10.5px]">{t}</span>)}
+                  </div>
                 </div>
               )}
-              {item.bio && <p className="m-0 mt-1">{item.bio}</p>}
+              {item.bio && (
+                <div className="flex gap-3">
+                  <span className="text-ink-muted w-20 shrink-0">Bio</span>
+                  <p className="m-0 min-w-0">{item.bio}</p>
+                </div>
+              )}
               {item.portfolioUrl && (
-                <a
-                  href={item.portfolioUrl}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className="inline-flex items-center gap-1 break-all"
-                  style={{ color: "var(--color-teal-500)" }}
-                >
-                  Portfólio <ExternalLink className="w-3 h-3 shrink-0" />
-                </a>
+                <div className="flex gap-3">
+                  <span className="text-ink-muted w-20 shrink-0">Portfólio</span>
+                  <a
+                    href={item.portfolioUrl}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="inline-flex items-center gap-1 break-all min-w-0"
+                    style={{ color: "var(--color-teal-500)" }}
+                  >
+                    Abrir <ExternalLink className="w-3 h-3 shrink-0" />
+                  </a>
+                </div>
               )}
             </div>
           </div>
 
-          <div className="mt-5">
+          <div>
             <div className="eyebrow mb-2">Contratos com você ({creatorContracts.length})</div>
-            {/* O dinheiro da relação num relance, sempre em líquido — o que chega nele. */}
-            {((item.paidCents ?? 0) > 0 || (item.inEscrowCents ?? 0) > 0 || (item.releasableCents ?? 0) > 0) && (
-              <div className="grid grid-cols-3 gap-2 mb-2.5">
-                {([
-                  ["Pago", item.paidCents ?? 0],
-                  ["Em custódia", item.inEscrowCents ?? 0],
-                  ["Liberável", item.releasableCents ?? 0],
-                ] as const).map(([label, value]) => (
-                  <div key={label} className="rounded-lg border border-border-soft px-2.5 py-2">
-                    <div className="text-[10.5px] text-ink-muted">{label}</div>
-                    <div className="font-mono-zoe text-[12.5px] font-semibold" style={{ color: "var(--ink)" }}>
-                      {fmtCents(value)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
             {creatorContracts.length === 0 ? (
               <p className="text-[12.5px] text-ink-muted m-0">Nenhum contrato com este criador ainda.</p>
             ) : (
-              <div className="rounded-lg border border-border-soft">
-                {creatorContracts.map((c, i) => (
+              <div className="flex flex-col">
+                {creatorContracts.map((c) => (
                   <Link
                     key={c.contractId}
                     to={`/operations/contracts/${c.contractId}`}
-                    className="flex items-center gap-2 px-3.5 py-2.5 text-[12.5px] hover:bg-hover"
-                    style={{ borderTop: i === 0 ? undefined : "1px solid var(--border-soft)" }}
+                    className="flex items-center gap-2 py-2.5 border-b border-border-soft last:border-b-0 text-[12.5px] hover:bg-hover transition-colors"
                   >
                     <span className="flex-1 truncate" style={{ color: "var(--ink)" }}>{campaignLabel(c.campaignName)}</span>
                     {c.escrowState && (
@@ -470,15 +573,14 @@ function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => voi
           </div>
 
           {creatorDeliveries.length > 0 && (
-            <div className="mt-5">
+            <div>
               <div className="eyebrow mb-2">Entregas ({creatorDeliveries.length})</div>
-              <div className="rounded-lg border border-border-soft">
-                {creatorDeliveries.slice(0, 5).map((d, i) => (
+              <div className="flex flex-col">
+                {creatorDeliveries.slice(0, 5).map((d) => (
                   <Link
                     key={d.deliveryId}
                     to={`/operations/deliveries?contract=${d.contractId}`}
-                    className="flex items-center gap-2 px-3.5 py-2.5 text-[12.5px] hover:bg-hover"
-                    style={{ borderTop: i === 0 ? undefined : "1px solid var(--border-soft)" }}
+                    className="flex items-center gap-2 py-2.5 border-b border-border-soft last:border-b-0 text-[12.5px] hover:bg-hover transition-colors"
                   >
                     <span className="flex-1 min-w-0">
                       <span className="block truncate" style={{ color: "var(--ink)" }}>{campaignLabel(d.campaignName)}</span>
@@ -500,15 +602,14 @@ function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => voi
           )}
 
           {creatorPayments.length > 0 && (
-            <div className="mt-5">
+            <div>
               <div className="eyebrow mb-2">Pagamentos feitos ({creatorPayments.length})</div>
-              <div className="rounded-lg border border-border-soft">
-                {creatorPayments.map((e, i) => (
+              <div className="flex flex-col">
+                {creatorPayments.map((e) => (
                   <Link
                     key={e.escrowAccountId}
                     to="/operations/escrow"
-                    className="flex items-center gap-2 px-3.5 py-2.5 text-[12.5px] hover:bg-hover"
-                    style={{ borderTop: i === 0 ? undefined : "1px solid var(--border-soft)" }}
+                    className="flex items-center gap-2 py-2.5 border-b border-border-soft last:border-b-0 text-[12.5px] hover:bg-hover transition-colors"
                   >
                     <span className="flex-1 truncate" style={{ color: "var(--ink)" }}>{campaignLabel(e.campaignName)}</span>
                     {/* Líquido: o que chegou nele, como no resumo acima. */}
@@ -521,8 +622,26 @@ function CreatorDrawer({ item, onClose }: { item: RosterItem; onClose: () => voi
             </div>
           )}
         </div>
-      </div>
-    </>
+
+        {/* Rodapé fixo com a ação seguinte do fluxo — elenco existe para virar
+            contrato. A rota já aceita `creator`, então o formulário abre com
+            ele escolhido. */}
+        <RoleGate minRole="Admin">
+          <div
+            className="sticky bottom-0 mt-auto px-6 py-4 border-t border-border-soft"
+            style={{ background: "var(--surface)" }}
+          >
+            <Link
+              to={`/operations/contracts?new=1&creator=${item.influencerId}`}
+              className="flex items-center justify-center gap-2 h-10 rounded-lg text-[13.5px] font-semibold text-white transition-colors"
+              style={{ background: "var(--color-teal-500)" }}
+            >
+              <FileText className="w-4 h-4" /> Criar contrato com {item.displayName || item.fullName.split(" ")[0]}
+            </Link>
+          </div>
+        </RoleGate>
+      </SheetContent>
+    </Sheet>
   )
 }
 

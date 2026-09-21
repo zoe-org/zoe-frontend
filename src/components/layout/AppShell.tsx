@@ -282,8 +282,14 @@ export function AppShell() {
           {hasOperations && (
             <NavSection label="Operations" collapsed={collapsed}>
               {/* A ordem do menu é a ordem do fluxo: campanha → elenco →
-                  contrato → entrega → custódia. */}
-              <NavItem to="/operations" end icon={Gauge} collapsed={collapsed}>Painel</NavItem>
+                  contrato → entrega → custódia.
+
+                  O Painel só entra com Intelligence junto: sem ele, `/dashboard`
+                  JÁ renderiza esta mesma tela, e dois itens de menu levando ao
+                  mesmo lugar fazem a pessoa procurar a diferença que não existe. */}
+              {hasIntelligence && (
+                <NavItem to="/operations" end icon={Gauge} collapsed={collapsed}>Painel</NavItem>
+              )}
               <NavItem to="/operations/campaigns" icon={Megaphone} collapsed={collapsed}>Campanhas</NavItem>
               <NavItem to="/operations/influencers" icon={UsersRound} collapsed={collapsed}>Elenco</NavItem>
               <NavItem to="/operations/contracts" icon={FileText} collapsed={collapsed}>Contratos</NavItem>

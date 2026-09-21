@@ -1,9 +1,13 @@
 import { useMemo } from "react"
 import { Link, useNavigate } from "react-router-dom"
-import { AlertCircle, ArrowUp, ArrowDown, ArrowUpRight, BellRing } from "lucide-react"
+import {
+  AlertCircle, ArrowUp, ArrowDown, ArrowUpRight, Banknote, BellRing, FileText, Package,
+  PenLine, ShieldAlert, Wallet,
+} from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { useAuth } from "@/features/auth/context"
+import { useFeature } from "@/features/auth/useFeature"
 import { CoverageNotice } from "@/components/coverage/CoverageNotice"
 import { CompetitorChannelCard } from "@/components/owned/CompetitorChannelCard"
 import { Heatmap, Sparkline, StackedArea } from "@/components/ui/charts"
@@ -26,6 +30,10 @@ import { tEnum } from "@/i18n/enums"
 import { classificationChip } from "@/lib/chip"
 import { formatScore, scoreColor } from "@/lib/score"
 import { stagger } from "@/lib/motion"
+import { StatBand } from "@/components/ui/stat-band"
+import { useOperationsDashboard, fmtCents, type OperationsDashboard } from "@/lib/api/operations"
+import { ESCROW_STATE_COLOR } from "@/lib/status-colors"
+import OperationsDashboardPage from "@/pages/operations/Dashboard"
 
 function getGreeting(): string {
   const h = new Date().getHours()
@@ -51,6 +59,240 @@ const nf = new Intl.NumberFormat("pt-BR")
 const nf1 = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 })
 
 export default function DashboardPage() {
+  const hasIntelligence = useFeature("intelligence")
+  const hasOperations = useFeature("operations")
+
+  if (hasIntelligence && hasOperations) return <FullPlatformDashboard />
+  if (hasOperations) return <OperationsDashboardPage />
+  if (hasIntelligence) return <IntelligenceDashboard />
+
+  return (
+    <EmptyState
+      title="Nenhum módulo ativo"
+      description="Este workspace ainda não tem acesso ao Intelligence ou ao Operations."
+    />
+  )
+}
+
+/**
+ * Dashboard de quem tem os dois módulos.
+ *
+ * Não é um módulo embaixo do outro: era isso antes, cada um dentro de uma
+ * moldura, e o resultado era o Dashboard e o Painel na mesma rolagem — duas
+ * páginas coabitando, sem nenhuma informação nova nascendo do encontro.
+ *
+ * O que muda: a abertura volta a ser o resumo com números reais; as pendências
+ * dos dois módulos se somam numa faixa só (é a única coisa que de fato soma —
+ * alerta não lido e contrato parado são a mesma categoria: trabalho esperando);
+ * e Operations entra como RESUMO com atalho, não como o Painel inteiro.
+ */
+function FullPlatformDashboard() {
+  return (
+    <div className="-m-6">
+      <IntelligenceDashboard embedded afterHero={<NeedsYouBand />} />
+      <OperationsSummary />
+    </div>
+  )
+}
+
+/**
+ * Um item de trabalho parado, numa pastilha que flui com as outras.
+ *
+ * Duas tentativas até aqui, cada uma errando de um lado. Texto corrido separado
+ * por "·" era compacto mas ilegível — e os rótulos perdiam o substantivo ("2 em
+ * rascunho", rascunho de quê?). Cartões em grade resolveram a leitura e
+ * quebraram a proporção: com um item só, um cartão sozinho numa grade de quatro
+ * colunas gastava 150px de altura para dizer um fato.
+ *
+ * A pastilha tem a borda que agrupa o que é um item só, o rótulo por extenso, e
+ * flui: um item ocupa uma linha curta, sete ocupam duas.
+ */
+function NeedsYouChip({ n, singular, plural, to, icon }: {
+  n: number
+  singular: string
+  plural: string
+  to: string
+  icon: React.ReactNode
+}) {
+  return (
+    <Link
+      to={to}
+      className="inline-flex items-center gap-2 h-8 pl-2.5 pr-3 rounded-lg border border-border-soft bg-inset hover:bg-hover transition-colors"
+    >
+      <span className="shrink-0 text-ink-muted-2" aria-hidden>{icon}</span>
+      <span className="font-mono-zoe font-semibold text-[13px]" style={{ color: "var(--color-teal-500)" }}>
+        {n}
+      </span>
+      <span className="text-[12.5px] text-ink-muted whitespace-nowrap">
+        {n === 1 ? singular : plural}
+      </span>
+    </Link>
+  )
+}
+
+/**
+ * O que espera por você, dos dois módulos.
+ *
+ * Some inteira quando não há nada: uma faixa de pendências vazia treina a
+ * pessoa a ignorá-la, e aí ela não vê quando enche.
+ *
+ * Fundo neutro, e não âmbar: nem tudo aqui é problema — contrato em rascunho é
+ * trabalho normal. O âmbar fica para o bloco de Atenção, onde algo travou.
+ */
+function NeedsYouBand() {
+  const brand = useActiveBrand()
+  const alerts = useAlertEvents({ brandId: brand.brandId, unreadOnly: true })
+  const ops = useOperationsDashboard()
+
+  const unread = alerts.data?.pages[0]?.unreadCount ?? 0
+  const p = ops.data?.pending
+  const itens = [
+    {
+      n: unread,
+      singular: "alerta não lido",
+      plural: "alertas não lidos",
+      to: "/alerts",
+      icon: <BellRing className="w-3.5 h-3.5" />,
+    },
+    {
+      n: p?.contractDrafts ?? 0,
+      singular: "contrato em rascunho",
+      plural: "contratos em rascunho",
+      to: "/operations/contracts",
+      icon: <FileText className="w-3.5 h-3.5" />,
+    },
+    {
+      n: p?.contractsAwaitingSignature ?? 0,
+      singular: "contrato aguardando assinatura",
+      plural: "contratos aguardando assinatura",
+      to: "/operations/contracts",
+      icon: <PenLine className="w-3.5 h-3.5" />,
+    },
+    {
+      n: p?.draftsAwaitingReview ?? 0,
+      singular: "corte para aprovar",
+      plural: "cortes para aprovar",
+      to: "/operations/deliveries",
+      icon: <Package className="w-3.5 h-3.5" />,
+    },
+    {
+      n: p?.deliveriesAwaitingReview ?? 0,
+      singular: "entrega para revisar",
+      plural: "entregas para revisar",
+      to: "/operations/deliveries",
+      icon: <Package className="w-3.5 h-3.5" />,
+    },
+    {
+      n: p?.escrowsAwaitingDeposit ?? 0,
+      singular: "custódia sem depósito",
+      plural: "custódias sem depósito",
+      to: "/operations/escrow",
+      icon: <Wallet className="w-3.5 h-3.5" />,
+    },
+    {
+      n: p?.escrowsReleasable ?? 0,
+      singular: "custódia pronta para liberar",
+      plural: "custódias prontas para liberar",
+      to: "/operations/escrow",
+      icon: <Banknote className="w-3.5 h-3.5" />,
+    },
+  ].filter((i) => i.n > 0)
+
+  if (itens.length === 0) return null
+
+  return (
+    // Rótulo na mesma linha das pastilhas: a faixa inteira mede 56px com um
+    // item, contra os ~150px que a grade gastava.
+    <section className="px-8 py-3 border-b border-border-soft flex items-center gap-x-3 gap-y-2 flex-wrap">
+      <span className="eyebrow shrink-0">Precisa de você</span>
+      {itens.map((i) => <NeedsYouChip key={i.plural} {...i} />)}
+    </section>
+  )
+}
+
+/**
+ * Operations em resumo, não o Painel inteiro.
+ *
+ * O escopo vai escrito: campanha, contrato e custódia são do workspace, e não
+ * mudam quando se troca a marca ativa lá em cima. Sem dizer isso, quem troca de
+ * marca espera estes números mudarem.
+ */
+function OperationsSummary() {
+  const q = useOperationsDashboard()
+  const d = q.data
+
+  return (
+    <>
+      <section className="px-8 py-3 border-y border-border-soft flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="eyebrow">Operations</span>
+          <span className="chip text-[10.5px]">workspace inteiro</span>
+        </div>
+        <Link
+          to="/operations"
+          className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-teal-700 dark:text-teal-300 hover:text-teal-500"
+        >
+          Abrir painel <ArrowUpRight className="w-3.5 h-3.5" />
+        </Link>
+      </section>
+
+      {q.isLoading ? (
+        <div className="grid grid-cols-2 xl:grid-cols-4 border-b border-border-soft">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="px-6 py-5 border-r border-border-soft">
+              <div className="h-3 w-24 rounded z-skeleton mb-3" />
+              <div className="h-9 w-28 rounded z-skeleton" />
+            </div>
+          ))}
+        </div>
+      ) : d ? (
+        <>
+          <StatBand
+            items={[
+              {
+                label: "Em custódia",
+                value: fmtCents(d.money.inCustodyCents),
+                hint: "reservado e ainda não resolvido",
+              },
+              {
+                label: "Liberado",
+                value: fmtCents(d.money.releasedCents),
+                hint: "já pago aos criadores",
+                tone: "pos",
+              },
+              {
+                label: "Campanhas ativas",
+                value: d.volume.activeCampaigns,
+                hint: `de ${d.volume.totalCampaigns} no total`,
+              },
+              {
+                label: "Criadores",
+                value: d.volume.creators,
+                hint: `${d.volume.signedContracts} ${d.volume.signedContracts === 1 ? "contrato assinado" : "contratos assinados"}`,
+              },
+            ]}
+          />
+
+          <section className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] border-b border-border-soft">
+            <div className="p-7 lg:border-r border-b lg:border-b-0 border-border-soft">
+              <EscrowByState rows={d.escrowByState} />
+            </div>
+            <div className="p-7">
+              <OpsRisks risks={d.risks} />
+            </div>
+          </section>
+        </>
+      ) : null}
+    </>
+  )
+}
+
+function IntelligenceDashboard({ embedded = false, afterHero }: {
+  /** Dentro do dashboard full platform: sem o `-m-6`, que já veio de fora. */
+  embedded?: boolean
+  /** Entra logo abaixo da abertura — é onde mora a faixa de pendências. */
+  afterHero?: React.ReactNode
+}) {
   const { user } = useAuth()
   const navigate = useNavigate()
   const displayName = user?.name?.split(" ")[0] ?? user?.email?.split("@")[0] ?? ""
@@ -108,8 +350,10 @@ export default function DashboardPage() {
   const brandName = brand.active?.displayName ?? brand.active?.brandName ?? ""
 
   return (
-    <div className="-m-6">
-      {/* Abertura: o resumo do período escrito em frase, com os números reais. */}
+    <div className={embedded ? "" : "-m-6"}>
+      {/* Abertura: o resumo do período escrito em frase, com os números reais.
+          Ela vale nos dois modos — no full platform ela era trocada por um
+          slogan, e slogan não diz o que mudou desde ontem. */}
       <section className="px-8 pt-7 pb-7 border-b border-border-soft">
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div className="flex-1 min-w-70">
@@ -146,6 +390,8 @@ export default function DashboardPage() {
           </Link>
         </div>
       </section>
+
+      {afterHero}
 
       <CoverageNotice tenantBrandIds={[brand.active?.tenantBrandId]} className="mx-8 mt-4" />
 
@@ -764,5 +1010,141 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
       <p className="text-sm text-ink-muted mb-4">Tente novamente em instantes.</p>
       <button onClick={onRetry} className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-hover transition-colors">Tentar de novo</button>
     </div>
+  )
+}
+
+/**
+ * Onde o dinheiro está parado, por estado da custódia.
+ *
+ * O total sozinho ("R$ 1,2 mi em custódia") não diz se o valor está esperando
+ * depósito, esperando entrega ou pronto para sair — e são situações com donos
+ * diferentes. A barra dá a proporção antes da leitura; a lista dá o número.
+ */
+function EscrowByState({ rows }: { rows: OperationsDashboard["escrowByState"] }) {
+  const comValor = rows.filter((r) => r.amountCents > 0)
+  const total = comValor.reduce((acc, r) => acc + r.amountCents, 0)
+
+  if (total === 0) {
+    return (
+      <>
+        <div className="eyebrow mb-3">Onde está o dinheiro</div>
+        <p className="text-[13px] text-ink-muted m-0">
+          Nenhum valor em custódia agora. A conta nasce do contrato assinado que prevê reserva.
+        </p>
+      </>
+    )
+  }
+
+  return (
+    <>
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div className="eyebrow">Onde está o dinheiro</div>
+        <Link
+          to="/operations/escrow"
+          className="text-[12px] font-medium text-teal-700 dark:text-teal-300 hover:underline"
+        >
+          Ver custódia →
+        </Link>
+      </div>
+
+      {/* `z-wipe`: escalar cada pedaço distorceria as proporções na entrada. */}
+      <div className="flex h-2 rounded-full overflow-hidden bg-tint-2 z-wipe">
+        {comValor.map((r) => (
+          <span
+            key={r.state}
+            style={{ width: `${(r.amountCents / total) * 100}%`, background: ESCROW_STATE_COLOR[r.state] }}
+          />
+        ))}
+      </div>
+
+      <div className="flex flex-col gap-2 mt-4">
+        {comValor.map((r) => (
+          <div key={r.state} className="flex items-center gap-2.5 text-[12.5px]">
+            <span
+              className="w-2 h-2 rounded-full shrink-0"
+              style={{ background: ESCROW_STATE_COLOR[r.state] }}
+            />
+            <span className="flex-1 min-w-0 truncate" style={{ color: "var(--ink-2)" }}>
+              {tEnum("escrowState", r.state)}
+            </span>
+            <span className="font-mono-zoe text-[11.5px] text-ink-muted-2">
+              {r.count}
+            </span>
+            <span className="font-mono-zoe w-28 text-right" style={{ color: "var(--ink)" }}>
+              {fmtCents(r.amountCents)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
+/**
+ * O que travou — diferente das filas da faixa de cima.
+ *
+ * Fila é trabalho esperando a sua vez; isto aqui é coisa que não anda sozinha.
+ * Cada linha diz a consequência, porque o número sem ela não move ninguém: "2
+ * criadores sem conta" só vira urgente quando se lê que o pagamento não sai.
+ */
+function OpsRisks({ risks: r }: { risks: OperationsDashboard["risks"] }) {
+  const itens = [
+    r.stuckFinancialCommands > 0 && {
+      n: r.stuckFinancialCommands,
+      texto: r.stuckFinancialCommands === 1
+        ? "operação financeira parada"
+        : "operações financeiras paradas",
+      consequencia: "O valor não se move sozinho a partir daqui.",
+      href: "/operations/escrow",
+    },
+    r.contractsBlockedByLegalReview > 0 && {
+      n: r.contractsBlockedByLegalReview,
+      texto: r.contractsBlockedByLegalReview === 1
+        ? "rascunho preso na revisão jurídica"
+        : "rascunhos presos na revisão jurídica",
+      consequencia: "O envio para assinatura é recusado até a Zoe liberar o template.",
+      href: "/operations/contracts",
+    },
+    r.creatorsWithoutPayoutAccount > 0 && {
+      n: r.creatorsWithoutPayoutAccount,
+      texto: r.creatorsWithoutPayoutAccount === 1
+        ? "criador sem conta de recebimento"
+        : "criadores sem conta de recebimento",
+      consequencia: "Podem assinar e produzir, mas o pagamento não sai.",
+      href: "/operations/influencers",
+    },
+  ].filter(Boolean) as { n: number; texto: string; consequencia: string; href: string }[]
+
+  if (itens.length === 0) {
+    return (
+      <>
+        <div className="eyebrow mb-3">Atenção</div>
+        <p className="text-[13px] text-ink-muted m-0">Nada travado na operação agora.</p>
+      </>
+    )
+  }
+
+  return (
+    <>
+      <div className="eyebrow mb-3">Atenção</div>
+      <div className="flex flex-col gap-2">
+        {itens.map((it) => (
+          <Link
+            key={it.href + it.texto}
+            to={it.href}
+            className="flex items-start gap-3 p-3 rounded-xl border transition-colors hover:brightness-[0.98]"
+            style={{ borderColor: "var(--color-warn)", background: "var(--warn-bg)" }}
+          >
+            <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" style={{ color: "var(--color-warn)" }} />
+            <span className="min-w-0">
+              <span className="block text-[13px]" style={{ color: "var(--ink)" }}>
+                <span className="font-mono-zoe font-semibold">{it.n}</span> {it.texto}
+              </span>
+              <span className="block text-[11.5px] text-ink-muted mt-0.5">{it.consequencia}</span>
+            </span>
+          </Link>
+        ))}
+      </div>
+    </>
   )
 }

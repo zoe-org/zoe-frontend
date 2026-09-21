@@ -83,25 +83,17 @@ export default function OperationsDeliveriesPage() {
     // dentro do padding padrão, e cada uma das duas filas trazia o PRÓPRIO
     // `<h1>` — o título da página trocava ao alternar de fila.
     <div className="-m-6" style={{ color: "var(--ink)" }}>
-      <section className="px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
-        <div className="flex-1 max-w-190 min-w-70">
+      <section className="px-8 pt-7 pb-6 border-b border-border-soft flex items-end justify-between" style={{ background: "var(--surface)" }}>
+        <div className="flex-1 max-w-200 min-w-70">
           <div className="eyebrow mb-3">Operations · Qualidade</div>
           <h1 className="font-display m-0" style={{ fontSize: 34, lineHeight: 1.1, color: "var(--ink)" }}>
             Entregas
           </h1>
-          <p className="text-[14.5px] leading-relaxed text-ink-muted mt-2.5 mb-0 max-w-150">
+          <p className="text-[14.5px] leading-relaxed text-ink-muted mt-2.5 mb-0 max-w-200">
             Duas portas de qualidade: aprovar o corte libera a publicação, aprovar a entrega
             publicada libera o pagamento.
           </p>
         </div>
-      </section>
-
-      {/* Barra de trabalho: qual fila. É recorte do mesmo trabalho, não
-          navegação entre telas — daí `Segmented` e não `TabPill`. */}
-      <section
-        className="px-8 py-3 border-b border-border-soft flex items-center gap-4 flex-wrap sticky top-0 z-10"
-        style={{ background: "var(--surface)" }}
-      >
         <Segmented
           items={[
             { key: "drafts", label: "Cortes por aprovar", count: counts.drafts },
