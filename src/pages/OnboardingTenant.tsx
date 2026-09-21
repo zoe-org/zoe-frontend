@@ -158,10 +158,10 @@ export default function OnboardingTenantPage() {
               <span className="text-[10px] uppercase tracking-[0.18em] font-semibold text-teal-700">
                 Último passo
               </span>
-              <h1 className="text-2xl sm:text-3xl font-bold text-midnight dark:text-[#E6E8EF] mt-2">
+              <h1 className="text-2xl sm:text-3xl font-bold text-midnight dark:text-ink mt-2">
                 {firstName ? `Bem-vindo(a), ${firstName}` : "Crie seu workspace"}
               </h1>
-              <p className="text-sm text-[#6B7280] mt-2">
+              <p className="text-sm text-ink-muted mt-2">
                 Dá um nome pro workspace da sua empresa. Esse é o espaço onde tudo da Zoe vai acontecer.
               </p>
             </div>
@@ -184,7 +184,7 @@ export default function OnboardingTenantPage() {
               <div className="space-y-1.5">
                 <Label htmlFor="slug">Identificador</Label>
                 <div className="flex rounded-md border border-input bg-transparent focus-within:ring-1 focus-within:ring-ring focus-within:border-ring overflow-hidden">
-                  <span className="inline-flex items-center px-3 bg-[#F3F4F6] text-[#6B7280] text-sm select-none border-r border-input">
+                  <span className="inline-flex items-center px-3 bg-tint text-ink-muted text-sm select-none border-r border-input">
                     {SLUG_PREFIX}
                   </span>
                   <input
@@ -196,7 +196,7 @@ export default function OnboardingTenantPage() {
                     className="flex-1 px-3 py-1 text-sm bg-transparent outline-none placeholder:text-muted-foreground"
                   />
                 </div>
-                <p className="text-[11px] text-[#6B7280]">Letras minúsculas, números e hífens.</p>
+                <p className="text-[11px] text-ink-muted">Letras minúsculas, números e hífens.</p>
                 {form.formState.errors.slug && (
                   <p className="text-xs text-neg">{form.formState.errors.slug.message}</p>
                 )}
@@ -220,11 +220,11 @@ export default function OnboardingTenantPage() {
                         }
                         aria-pressed={on}
                         className={`text-left rounded-md border px-3 py-2.5 transition-colors ${
-                          on ? "border-ring bg-[#F0FDFB]" : "border-input hover:bg-[#FBFCFD]"
+                          on ? "border-ring bg-[#F0FDFB]" : "border-input hover:bg-hover"
                         }`}
                       >
                         <span className="block text-sm font-medium">{m.name}</span>
-                        <span className="block text-[11px] text-[#6B7280] mt-0.5">{m.hint}</span>
+                        <span className="block text-[11px] text-ink-muted mt-0.5">{m.hint}</span>
                       </button>
                     )
                   })}

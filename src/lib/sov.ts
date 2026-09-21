@@ -1,3 +1,4 @@
+import { formatScore } from "@/lib/score"
 import type { SovBrand, SovTopic, SovTopicShare } from "@/lib/api/dashboard"
 
 // Regras de leitura do Share of Voice. Ficam fora da tela porque quase todas são
@@ -27,9 +28,8 @@ export type SentimentReading = {
   text: string
 }
 
-export function formatScore(score: number | null): string {
-  return score == null ? "—" : score.toFixed(2).replace(".", ",")
-}
+// Reexportado para não quebrar quem já importa daqui; a fonte é `lib/score`.
+export { formatScore }
 
 export function readSentiment(score: number | null): SentimentReading {
   if (score == null) {

@@ -114,8 +114,8 @@ function StepIntentionLarge({ onNext, initialValue }: { onNext: (intent: string)
   return (
     <div className="w-full">
       <div className="mb-10">
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-midnight dark:text-[#E6E8EF]">O que você quer fazer com a Zoe?</h1>
-        <p className="text-sm text-[#6B7280] mt-1">
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-midnight dark:text-ink">O que você quer fazer com a Zoe?</h1>
+        <p className="text-sm text-ink-muted mt-1">
           Personalizamos sua experiência com base no seu objetivo. Você poderá alterar depois.
         </p>
       </div>
@@ -127,7 +127,7 @@ function StepIntentionLarge({ onNext, initialValue }: { onNext: (intent: string)
             onClick={() => setSelected(opt.value)}
             className={`group text-left p-5 rounded-xl flex flex-col h-full border-2 transition-all duration-200 cursor-pointer ${selected === opt.value
                 ? "border-teal-500 bg-teal-50/50 shadow-lg shadow-teal-500/5 ring-4 ring-teal-500/10"
-                : "border-[#E5E7EB] bg-white hover:border-teal-300 hover:shadow-md"
+                : "border-border bg-white hover:border-teal-300 hover:shadow-md"
               }`}
           >
             <div className="flex justify-between items-center mb-5">
@@ -145,14 +145,14 @@ function StepIntentionLarge({ onNext, initialValue }: { onNext: (intent: string)
                 </span>
               )}
             </div>
-            <h3 className="text-xl mb-4 font-bold text-midnight dark:text-[#E6E8EF]">{opt.title}</h3>
-            <p className="text-sm text-[#6B7280] flex-1 leading-relaxed">{opt.desc}</p>
+            <h3 className="text-xl mb-4 font-bold text-midnight dark:text-ink">{opt.title}</h3>
+            <p className="text-sm text-ink-muted flex-1 leading-relaxed">{opt.desc}</p>
 
             <hr className="my-6" />
 
             <ul className="space-y-1.5 mb-4">
               {opt.features.map((feat, i) => (
-                <li key={i} className="flex items-center gap-2 text-sm text-midnight dark:text-[#E6E8EF] font-medium">
+                <li key={i} className="flex items-center gap-2 text-sm text-midnight dark:text-ink font-medium">
                   <div className="w-1 h-1 rounded-full bg-teal-500 shrink-0" />
                   {feat}
                 </li>
@@ -218,7 +218,7 @@ function StepAccount({ onNext, defaultEmail = "", emailLocked = false }: { onNex
   }
 
   const strength = password.length >= 12 ? 3 : password.length >= 8 ? 2 : password.length >= 4 ? 1 : 0
-  const strengthColors = ["bg-[#E5E7EB]", "bg-red-500", "bg-amber-500", "bg-green-500"]
+  const strengthColors = ["bg-tint-2", "bg-red-500", "bg-amber-500", "bg-green-500"]
   const strengthLabels = ["", "Fraca", "Média", "Forte"]
 
   return (
@@ -226,8 +226,8 @@ function StepAccount({ onNext, defaultEmail = "", emailLocked = false }: { onNex
       {/* Left: Form */}
       <div className="flex-1 space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-midnight dark:text-[#E6E8EF] mb-1">Crie sua conta</h1>
-          <p className="text-sm text-[#6B7280]">Leva menos de um minuto para entrar.</p>
+          <h1 className="text-3xl font-bold text-midnight dark:text-ink mb-1">Crie sua conta</h1>
+          <p className="text-sm text-ink-muted">Leva menos de um minuto para entrar.</p>
         </div>
 
         <form
@@ -282,10 +282,10 @@ function StepAccount({ onNext, defaultEmail = "", emailLocked = false }: { onNex
               placeholder="joao@empresa.com"
               aria-invalid={!!form.formState.errors.email}
               readOnly={emailLocked}
-              className={emailLocked ? "bg-[#F3F4F6] text-[#6B7280] cursor-not-allowed" : undefined}
+              className={emailLocked ? "bg-tint text-ink-muted cursor-not-allowed" : undefined}
             />
             {emailLocked
-              ? <p className="text-xs text-[#6B7280]">E-mail do convite — não pode ser alterado.</p>
+              ? <p className="text-xs text-ink-muted">E-mail do convite — não pode ser alterado.</p>
               : form.formState.errors.email && <p className="text-xs text-destructive">{form.formState.errors.email.message}</p>}
           </div>
 
@@ -312,7 +312,7 @@ function StepAccount({ onNext, defaultEmail = "", emailLocked = false }: { onNex
                 <div className="flex items-center gap-2">
                   <div className="flex gap-1 flex-1">
                     {[1, 2, 3].map((i) => (
-                      <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${i <= strength ? strengthColors[strength] : "bg-[#E5E7EB]"}`} />
+                      <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${i <= strength ? strengthColors[strength] : "bg-tint-2"}`} />
                     ))}
                   </div>
                   <span className="text-xs text-muted-foreground">{strengthLabels[strength]}</span>
@@ -333,8 +333,8 @@ function StepAccount({ onNext, defaultEmail = "", emailLocked = false }: { onNex
             </div>
           </div>
 
-          <label className="flex items-start gap-2 text-sm text-[#6B7280] pt-2">
-            <input type="checkbox" {...form.register("terms")} className="mt-0.5 rounded border-[#E5E7EB] accent-teal-500" />
+          <label className="flex items-start gap-2 text-sm text-ink-muted pt-2">
+            <input type="checkbox" {...form.register("terms")} className="mt-0.5 rounded border-border accent-teal-500" />
             <span>
               Ao criar conta, você aceita os{" "}
               {/* Nova aba: o formulário preenchido não pode se perder para ler o documento. */}
@@ -354,12 +354,12 @@ function StepAccount({ onNext, defaultEmail = "", emailLocked = false }: { onNex
 
       {/* Divider */}
       <div className="hidden lg:flex flex-col items-center pt-14 shrink-0">
-        <div className="w-px h-100 bg-[#E5E7EB]" />
+        <div className="w-px h-100 bg-tint-2" />
       </div>
 
       {/* Right: Social login */}
       <div className="hidden lg:flex flex-col items-center gap-5 w-80 shrink-0">
-        <span className="text-xs text-[#6B7280] font-medium">ou cadastre-se com</span>
+        <span className="text-xs text-ink-muted font-medium">ou cadastre-se com</span>
 
         <Button variant="outline" disabled={!socialLoginEnabled || redirecting !== null} onClick={() => onSocial("Google")} className="w-full justify-center bg-transparent gap-2">
           <Google className="w-4 h-4" /> {redirecting === "Google" ? "Redirecionando..." : "Google"}
@@ -367,7 +367,7 @@ function StepAccount({ onNext, defaultEmail = "", emailLocked = false }: { onNex
         <Button variant="outline" disabled={!socialLoginEnabled || redirecting !== null} onClick={() => onSocial("Microsoft")} className="w-full justify-center bg-transparent gap-2">
           <Microsoft className="w-4 h-4" /> {redirecting === "Microsoft" ? "Redirecionando..." : "Microsoft"}
         </Button>
-        <p className="text-xs text-[#6B7280] text-center">
+        <p className="text-xs text-ink-muted text-center">
           Ao continuar, você aceita os termos de uso e a política de privacidade.
         </p>
       </div>
@@ -568,10 +568,10 @@ function StepVerification({
             <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
           </svg>
         </div>
-        <h1 className="text-3xl font-bold text-midnight dark:text-[#E6E8EF]">Confirme seu e-mail</h1>
-        <p className="text-sm text-[#6B7280] mt-2">
+        <h1 className="text-3xl font-bold text-midnight dark:text-ink">Confirme seu e-mail</h1>
+        <p className="text-sm text-ink-muted mt-2">
           Mandamos um código de 6 dígitos para<br />
-          <strong className="text-midnight dark:text-[#E6E8EF]">{email}</strong>
+          <strong className="text-midnight dark:text-ink">{email}</strong>
         </p>
       </div>
 
@@ -588,7 +588,7 @@ function StepVerification({
             onChange={(e) => handleDigit(i, e.target.value)}
             onKeyDown={(e) => handleKeyDown(i, e)}
             disabled={submitting || confirmedOnly}
-            className="w-12 h-14 text-center text-2xl font-bold border-2 border-[#E5E7EB] rounded-xl focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 outline-none transition-all disabled:opacity-50"
+            className="w-12 h-14 text-center text-2xl font-bold border-2 border-border rounded-xl focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 outline-none transition-all disabled:opacity-50"
           />
         ))}
       </div>
@@ -616,7 +616,7 @@ function StepVerification({
 
       {!confirmedOnly && (
         <div className="space-y-3">
-          <p className="text-sm text-[#6B7280]">
+          <p className="text-sm text-ink-muted">
             {resendTimer > 0 ? (
               `Reenviar código em ${resendTimer}s`
             ) : (
@@ -626,7 +626,7 @@ function StepVerification({
             )}
           </p>
           <div className="pt-3 border-t border-gray-100">
-            <button onClick={onBack} className="text-sm text-[#6B7280] hover:text-midnight dark:hover:text-[#E6E8EF] hover:underline transition-colors">
+            <button onClick={onBack} className="text-sm text-ink-muted hover:text-midnight dark:hover:text-ink hover:underline transition-colors">
               Digitou o e-mail errado? Voltar
             </button>
           </div>
@@ -658,7 +658,7 @@ export default function RegisterPage() {
   const activeIndex = inviteMode ? step - 2 : step - 1
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] flex flex-col lg:flex-row">
+    <div className="min-h-screen bg-inset flex flex-col lg:flex-row">
       {/* Left Sidebar with gradient */}
       <div className="lg:w-[320px] sticky top-0 relative bg-black border-b lg:border-r border-white/10 flex flex-col shrink-0 lg:h-dvh z-10 w-full overflow-hidden">
         <div className="absolute inset-0 pointer-events-none">
@@ -745,7 +745,7 @@ export default function RegisterPage() {
             {step > minStep ? (
               <button
                 onClick={() => setStep(step - 1)}
-                className="flex items-center gap-2 text-sm font-bold text-[#6B7280] hover:text-teal-500 transition-colors"
+                className="flex items-center gap-2 text-sm font-bold text-ink-muted hover:text-teal-500 transition-colors"
                 aria-label="Voltar para etapa anterior"
               >
                 <ArrowLeft className="w-4 h-4" /> Voltar
@@ -753,7 +753,7 @@ export default function RegisterPage() {
             ) : (
               <div />
             )}
-            <div className="lg:hidden text-sm text-[#6B7280]">
+            <div className="lg:hidden text-sm text-ink-muted">
               Já tem conta?{" "}
               <Link to="/login" className="text-teal-500 font-bold hover:underline">Entrar</Link>
             </div>

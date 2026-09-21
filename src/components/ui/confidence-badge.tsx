@@ -7,6 +7,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { formatScore } from "@/lib/score"
 
 // Badge de confiança do pipeline (Etapa 4, requisito — não polish). Mostrar um
 // score de componente único (comments_only) igual a um `full` engana o cliente e
@@ -45,7 +46,7 @@ export function ConfidenceBadge({
   if (!cfg.tip) return badge
 
   const tip =
-    confidence != null ? `${cfg.tip} (confiança ${confidence.toFixed(2)})` : cfg.tip
+    confidence != null ? `${cfg.tip} (confiança ${formatScore(confidence)})` : cfg.tip
 
   return (
     <TooltipProvider>

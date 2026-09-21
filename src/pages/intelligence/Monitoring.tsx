@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { Search, AlertCircle, List, LayoutGrid, Download } from "lucide-react"
+import { Search, AlertCircle, List, LayoutGrid, Download, X } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { MentionDrawer } from "@/components/features/MentionDrawer"
@@ -10,6 +10,7 @@ import { ConfidenceBadge } from "@/components/ui/confidence-badge"
 import { coverageSaysOwnedContent } from "@/components/ui/coverage-labels"
 import { VideoThumb } from "@/components/ui/video-thumb"
 import { SelectFilterChip } from "@/components/ui/select-filter-chip"
+import { Segmented } from "@/components/ui/segmented"
 import { useActiveBrand } from "@/features/brands/context"
 import { toCsv, downloadCsv } from "@/lib/csv"
 import { startOfToday, windowFrom } from "@/lib/date-window"
@@ -24,6 +25,8 @@ import {
 } from "@/lib/api/videos"
 import { tEnum } from "@/i18n/enums"
 import { classificationChip } from "@/lib/chip"
+import { formatScore, scoreColor } from "@/lib/score"
+import { stagger } from "@/lib/motion"
 
 /** 1234 → "1,2 mil"; 1_234_567 → "1,2 mi". Compacto pt-BR para views. */
 function compactNumber(n: number): string {
@@ -39,7 +42,6 @@ const SENT_TABS = [
   { key: "Positive", label: "Positivo", color: "var(--color-pos)" },
   { key: "Neutral", label: "Neutro", color: "#6B7280" },
   { key: "Negative", label: "Negativo", color: "var(--color-neg)" },
-  { key: "Inconclusive", label: "Indeterminado", color: "#6B7280" },
 ] as const
 
 const PERIODS = [
@@ -81,7 +83,7 @@ const SORT_OPTIONS = [
  */
 function scoreLabel(m: VideoListItem): string {
   if (hasSelfMeasuredScore(m)) return "—"
-  return m.score != null ? m.score.toFixed(2) : "—"
+  return formatScore(m.score)
 }
 
 /** Marca visual do conteúdo próprio na listagem (doc 05 §2). */
@@ -176,9 +178,29 @@ export default function MonitoringPage() {
     }
   }
 
+  // Só os filtros de CONTEÚDO: ordem e formato de exibição não são recorte, e
+  // limpá-los junto tiraria do usuário uma preferência que ele não pediu pra mudar.
+  const temFiltro = Boolean(sent || period || min || rel || q)
+  const limparFiltros = () => {
+    setParams((prev) => {
+      const next = new URLSearchParams(prev)
+      for (const k of ["sent", "period", "min", "rel", "q"]) next.delete(k)
+      return next
+    }, { replace: true })
+  }
+
   const [selected, setSelected] = useState<VideoListItem | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const openDrawer = (item: VideoListItem) => { setSelected(item); setDrawerOpen(true) }
+
+  // Vizinhos da menção aberta: o drawer navega sem fechar. O índice é
+  // recalculado da lista atual porque ela cresce com "carregar mais" e muda de
+  // ordem com os filtros — guardar a posição daria o vizinho errado.
+  const selectedIndex = selected ? items.findIndex((i) => i.analysisId === selected.analysisId) : -1
+  const goTo = (offset: number) => {
+    const alvo = items[selectedIndex + offset]
+    if (alvo) setSelected(alvo)
+  }
 
   /**
    * Export CSV das menções carregadas (respeita os filtros ativos). Título e
@@ -226,43 +248,50 @@ export default function MonitoringPage() {
   }
 
   return (
-    <div className="-m-6 border-t border-border-soft" style={{ background: "var(--surface)", color: "var(--ink)" }}>
-      {/* Hero */}
-      <section className="px-8 pt-7  " style={{ background: "var(--surface)" }}>
+    <div className="-m-6" style={{ color: "var(--ink)" }}>
+      {/* Abertura */}
+      <section className="px-8 pt-7 pb-6 border-b border-border-soft">
         <div className="flex flex-wrap items-end justify-between gap-6">
-          <div className="flex-1 max-w-[640px] min-w-[280px]">
+          <div className="flex-1 max-w-200 min-w-70">
             <div className="eyebrow mb-3">Intelligence · Feed</div>
-            <h1 className="font-display m-0" style={{ fontSize: 34, lineHeight: 1.1, color: "var(--ink)" }}>
+            <h1 className="font-display m-0 text-ink" style={{ fontSize: 34, lineHeight: 1.1 }}>
               Monitoramento
             </h1>
-            {summary.data && (
-              <div className="text-[14px] text-ink-muted mt-1.5 max-w-140">
-                Feed completo de menções detectadas em vídeo.{" "}
-                <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>
-                  {summary.data.total} {summary.data.total === 1 ? "item" : "itens"}
-                </span>
-                {period ? ` nos últimos ${period} dias` : " no período"}.
-              </div>
-            )}
+            <div className="flex items-center mt-2 gap-1 text-[14px]">
+              <p className=" text-ink-muted">
+                Tudo o que foi dito sobre {brand.active?.displayName ?? brand.active?.brandName ?? "a marca"} em
+                vídeo, áudio e comentários.
+              </p>
+              
+              {summary.data && (
+                <p className="text-[14px] text-ink-muted">
+                  <span className="font-mono-zoe text-ink">{summary.data.total}
+                    {summary.data.total === 1 ? " menção" : " menções"}
+                  </span>
+                  {period ? ` nos últimos ${period} dias` : " no período"}.
+                </p>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {/* Seletor de marca vive no header agora (BrandSwitcher). */}
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-ink-muted" />
+            <label className="relative">
+              <span className="sr-only">Buscar por título</span>
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-ink-muted-2" />
               <input
-                type="text"
+                type="search"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 placeholder="Buscar título..."
-                className="w-56 h-8 pl-8 pr-3 text-[12.5px] rounded-md border border-border-soft bg-transparent outline-none focus:border-teal-500"
+                className="w-60 h-9 pl-9 pr-3 text-[13px] rounded-md border border-border-soft bg-transparent outline-none transition-colors focus:border-teal-500"
               />
-            </div>
+            </label>
             <button
               type="button"
               onClick={exportCsv}
               disabled={items.length === 0}
               title="Exporta as menções já carregadas, com os filtros atuais"
-              className="inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 h-9 px-3.5 text-[13px] rounded-md border border-border-soft hover:bg-hover transition-colors disabled:opacity-50"
             >
               <Download className="w-3.5 h-3.5" /> Exportar
             </button>
@@ -270,63 +299,47 @@ export default function MonitoringPage() {
         </div>
       </section>
 
-      {/* Filtros em pill (design) */}
-      <section className="px-8 py-3 border-b border-border-soft flex flex-wrap items-center gap-2">
-        <SelectFilterChip
-          value={period} onChange={(v) => setParam("period", v)}
-          options={PERIODS} placeholder="Todo o período"
-        />
-        <SelectFilterChip
-          value={min} onChange={(v) => setParam("min", v)}
-          options={MIN_SCORES} placeholder="Qualquer score"
-        />
-        <SelectFilterChip
-          value={rel} onChange={(v) => setParam("rel", v)}
-          options={CHANNEL_RELATIONS} placeholder="Terceiros"
-        />
-      </section>
-
-      {/* Tabs de classificação (filtro server-side) + toggle de visualização */}
+      {/* Barra de trabalho: o que estou vendo (abas) e como (ordem e formato).
+          Gruda no topo porque o feed é longo e a régua precisa acompanhar. */}
       <section
-        className="px-8 py-3 border-b border-border-soft flex items-center justify-between gap-4 sticky top-13 z-10"
+        className="px-8 py-3 border-b border-border-soft flex items-center justify-between gap-4 flex-wrap sticky top-0 z-10"
         style={{ background: "var(--surface)" }}
       >
-        <div className="flex items-center gap-1 flex-wrap">
-          {SENT_TABS.map((tab) => {
-            const active = sent === tab.key
-            const count = tabCount(tab.key)
-            return (
-              <button
-                key={tab.key || "all"}
-                onClick={() => setParam("sent", tab.key)}
-                aria-pressed={active}
-                className={`px-4 py-2 text-[13.5px] font-semibold rounded-lg transition-colors ${
-                  active ? "text-white" : "text-ink-muted hover:text-ink"
-                }`}
-                style={active ? { background: tab.color } : undefined}
-              >
-                {tab.label}
-                {count !== undefined && (
-                  <span className="ml-1.5 font-medium" style={{ opacity: active ? 0.85 : 0.6 }}>
-                    ({count})
-                  </span>
-                )}
-              </button>
-            )
-          })}
-        </div>
+        <Segmented
+          items={SENT_TABS.map((tab) => ({ ...tab, count: tabCount(tab.key) }))}
+          value={sent}
+          onChange={(key) => setParam("sent", key)}
+          ariaLabel="Recorte por sentimento"
+        />
 
-        <div className="flex items-center gap-3 shrink-0">
-          {/* Ordenar (design: "Ordenar: Mais recentes ▾") */}
-          <div className="flex items-center gap-2">
-            <span className="text-[12px] text-ink-muted">Ordenar:</span>
-            <SelectFilterChip
-              value={sort}
-              onChange={(v) => setParam("sort", v)}
-              options={SORT_OPTIONS}
-              placeholder="Mais recentes"
-            />
-          </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {temFiltro && (
+            <button
+              onClick={limparFiltros}
+              className="inline-flex items-center gap-1.5 h-8 px-2.5 text-[12px] rounded-lg text-ink-muted hover:text-ink hover:bg-hover transition-colors"
+            >
+              <X className="w-3 h-3" /> Limpar filtros
+            </button>
+          )}
+          <SelectFilterChip
+            value={period} onChange={(v) => setParam("period", v)}
+            options={PERIODS} placeholder="Todo o período"
+          />
+          <SelectFilterChip
+            value={min} onChange={(v) => setParam("min", v)}
+            options={MIN_SCORES} placeholder="Qualquer score"
+          />
+          <SelectFilterChip
+            value={rel} onChange={(v) => setParam("rel", v)}
+            options={CHANNEL_RELATIONS} placeholder="Terceiros"
+          />
+        
+          <SelectFilterChip
+            value={sort}
+            onChange={(v) => setParam("sort", v)}
+            options={SORT_OPTIONS}
+            placeholder="Mais recentes"
+          />
 
           {/* Lista ↔ grade: com thumbnail, a grade vira uma leitura visual rápida. */}
           <div className="flex items-center gap-0.5 p-0.5 rounded-lg border border-border-soft">
@@ -340,10 +353,8 @@ export default function MonitoringPage() {
                 aria-pressed={view === key}
                 title={label}
                 aria-label={label}
-                className={`p-1.5 rounded-md transition-colors ${
-                  view === key
-                    ? "bg-[#F3F4F6] dark:bg-[#1A1D2D] text-ink"
-                    : "text-ink-muted hover:text-ink"
+                className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors ${
+                  view === key ? "bg-tint text-ink" : "text-ink-muted hover:text-ink"
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />
@@ -352,6 +363,30 @@ export default function MonitoringPage() {
           </div>
         </div>
       </section>
+
+      {/* Recorte: período, score e origem do canal, com o resultado ao lado. */}
+      {view !== "grid" ? (
+      <section 
+        className="px-8 py-2.5 border-b border-border-soft grid items-center gap-4 text-ink-muted eyebrow font-semibold"
+        style={{ gridTemplateColumns: "1fr 150px 100px 60px 80px" }}
+      >
+        <p>
+          VÍDEO
+        </p>
+        <p>
+          COBERTURA
+        </p>
+        <p>
+          AUDIÊNCIA
+        </p>
+        <p>
+          SCORE
+        </p>
+        <p>
+          TOM
+        </p>
+      </section>
+      ) : null}
 
       {blockedCount > 0 && brand.active && (
         <BlockedFeedNotice blockedCount={blockedCount} tenantBrandId={brand.active.tenantBrandId} />
@@ -376,71 +411,76 @@ export default function MonitoringPage() {
         <section>
           {view === "grid" ? (
             <div className="grid gap-4 px-8 py-6" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
-              {items.map((m) => (
+              {items.map((m, i) => (
                 <button
                   key={m.analysisId}
                   onClick={() => openDrawer(m)}
-                  className="rounded-lg border border-border-soft overflow-hidden text-left cursor-pointer hover:border-teal-500 transition-colors"
+                  className="z-rise rounded-lg border border-border-soft overflow-hidden text-left cursor-pointer bg-surface hover:border-teal-500 transition-colors"
+                  style={stagger(Math.min(i, 12))}
                 >
-                  <div className="relative">
-                    <VideoThumb
-                      youtubeVideoId={m.youtubeVideoId}
-                      durationSeconds={m.durationSeconds}
-                      className="w-full aspect-video rounded-none"
-                      playSize={34}
-                    />
-                    {m.classificacao && (
-                      <span className={`absolute top-2 left-2 ${classificationChip(m.classificacao)}`}>
-                        {tEnum("classification", m.classificacao)}
-                      </span>
-                    )}
-                  </div>
+                  {/* Miniatura sem selo por cima: chip translúcido sobre foto fica
+                      ilegível, e o tom já aparece ao lado do score, abaixo. */}
+                  <VideoThumb
+                    youtubeVideoId={m.youtubeVideoId}
+                    durationSeconds={m.durationSeconds}
+                    className="w-full aspect-video rounded-none"
+                    playSize={34}
+                  />
                   <div className="p-3.5">
-                    <div className="text-[13.5px] font-medium leading-snug line-clamp-2 mb-1.5" style={{ color: "var(--ink)" }}>
+                    <div className="text-[13.5px] font-medium leading-snug line-clamp-2 mb-1.5 text-ink">
                       {m.title}
                     </div>
-                    <div className="flex items-center gap-1.5 text-[11.5px] text-ink-muted mb-2">
+                    <div className="flex items-center gap-1.5 text-[11.5px] text-ink-muted">
                       <span className="truncate">{m.channelName}</span>
-                      {m.views != null && (
-                        <>
-                          <span>·</span>
-                          <span className="font-mono-zoe shrink-0">{compactNumber(m.views)} views</span>
-                        </>
-                      )}
-                      {/* Comentários ANALISADOS. Sem agregado (ou zero) não mostra
-                          nada: "0 comentários" é ruído, não informação. */}
-                      {m.commentsCount != null && m.commentsCount > 0 && (
-                        <>
-                          <span>·</span>
-                          <span className="font-mono-zoe shrink-0">{compactNumber(m.commentsCount)} coment.</span>
-                        </>
-                      )}
                       <span>·</span>
                       <span className="shrink-0">
                         {formatDistanceToNow(new Date(m.publishedAt), { addSuffix: true, locale: ptBR })}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <ConfidenceBadge
-                        pipelinePath={m.pipelinePath}
-                        confidence={m.confidence}
-                        selfMeasured={hasSelfMeasuredScore(m)}
-                      />
-                      <span className="font-mono-zoe text-[12px] shrink-0" style={{ color: "var(--ink)" }}>
+                    <div className="flex items-baseline gap-2 mt-2.5">
+                      <span
+                        className="font-display text-[19px] leading-none"
+                        style={{ color: hasSelfMeasuredScore(m) || m.score == null ? "var(--ink-muted-2)" : scoreColor(m.score) }}
+                      >
                         {scoreLabel(m)}
                       </span>
+                      {m.classificacao && (
+                        <span className={`${classificationChip(m.classificacao)} h-4.5 text-[10.5px]`}>
+                          {tEnum("classification", m.classificacao)}
+                        </span>
+                      )}
+                      <span className="flex-1" />
+                      {m.channelRelation === "Owned"
+                        && !coverageSaysOwnedContent(m.pipelinePath, hasSelfMeasuredScore(m))
+                        && <OwnedTag />}
                     </div>
+                  </div>
+                  {/* Mesmo rodapé dos cartões do Dashboard: o que a análise alcançou
+                      e o tamanho da audiência, separados por linha. Só views aqui —
+                      no cartão estreito, views + comentários estouravam a largura. */}
+                  <div className="flex items-center gap-2 px-3.5 py-2 border-t border-border-soft bg-inset">
+                    <ConfidenceBadge
+                      pipelinePath={m.pipelinePath}
+                      confidence={m.confidence}
+                      selfMeasured={hasSelfMeasuredScore(m)}
+                    />
+                    <span className="flex-1" />
+                    <span className="font-mono-zoe text-[10.5px] text-ink-muted-2 shrink-0">
+                      {m.views != null ? `${compactNumber(m.views)} views` : "sem views"}
+                    </span>
                   </div>
                 </button>
               ))}
             </div>
           ) : (
-            items.map((m) => (
+            items.map((m, i) => (
               <button
                 key={m.analysisId}
                 onClick={() => openDrawer(m)}
-                className="grid items-center gap-4 px-8 py-3.5 border-b border-border-soft w-full text-left cursor-pointer hover:bg-[#FAFBFC] dark:hover:bg-[#181B28] transition-colors"
-                style={{ gridTemplateColumns: "110px 1fr 200px 150px 90px" }}
+                className="z-row z-rise grid items-center gap-4 px-8 py-3.5 border-b border-border-soft w-full text-left cursor-pointer"
+                // O escalonamento para na 12ª linha: mais do que isso e a última
+                // demoraria quase um segundo para aparecer.
+                style={{ gridTemplateColumns: "110px 1fr 150px 100px 60px 80px", ...stagger(Math.min(i, 12)) }}
               >
                 <VideoThumb
                   youtubeVideoId={m.youtubeVideoId}
@@ -453,20 +493,6 @@ export default function MonitoringPage() {
                   </div>
                   <div className="flex items-center gap-2 text-[11.5px] text-ink-muted flex-wrap">
                     <span className="truncate font-medium text-ink-2">{m.channelName}</span>
-                    {m.views != null && (
-                      <>
-                        <span>·</span>
-                        <span className="font-mono-zoe">{compactNumber(m.views)} views</span>
-                      </>
-                    )}
-                    {m.commentsCount != null && m.commentsCount > 0 && (
-                      <>
-                        <span>·</span>
-                        <span className="font-mono-zoe">
-                          {compactNumber(m.commentsCount)} {m.commentsCount === 1 ? "comentário" : "comentários"}
-                        </span>
-                      </>
-                    )}
                     <span>·</span>
                     <span>{formatDistanceToNow(new Date(m.publishedAt), { addSuffix: true, locale: ptBR })}</span>
                   </div>
@@ -485,18 +511,35 @@ export default function MonitoringPage() {
                     && !coverageSaysOwnedContent(m.pipelinePath, hasSelfMeasuredScore(m))
                     && <OwnedTag />}
                 </div>
+                
+                <p className="text-[12px] text-ink-muted flex flex-col">
+                {m.views != null && (
+                      <>
+                        <span className="font-mono-zoe">{compactNumber(m.views)} views</span>
+                      </>
+                    )}
+                    {m.commentsCount != null && m.commentsCount > 0 && (
+                      <>
+                        <span className="font-mono-zoe">
+                          {compactNumber(m.commentsCount)} {m.commentsCount === 1 ? "coment." : "coment."}
+                        </span>
+                      </>
+                    )}
+                </p>
+
+                <span
+                  className="font-mono-zoe text-[13px] shrink-0"
+                  style={{ color: hasSelfMeasuredScore(m) || m.score == null ? "var(--ink-muted-2)" : scoreColor(m.score) }}
+                >
+                  {scoreLabel(m)}
+                </span>
+
                 <div>
                   {m.classificacao && (
                     <span className={classificationChip(m.classificacao)}>
                       {tEnum("classification", m.classificacao)}
                     </span>
                   )}
-                </div>
-                <div className="text-right">
-                  <div className="font-mono-zoe text-[13px]" style={{ color: "var(--ink)" }}>
-                    {scoreLabel(m)}
-                  </div>
-                  <div className="text-[10px] text-ink-muted-2">score</div>
                 </div>
               </button>
             ))
@@ -507,7 +550,7 @@ export default function MonitoringPage() {
               <button
                 onClick={() => feed.fetchNextPage()}
                 disabled={feed.isFetchingNextPage}
-                className="inline-flex items-center h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors disabled:opacity-50"
+                className="inline-flex items-center h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-hover transition-colors disabled:opacity-50"
               >
                 {feed.isFetchingNextPage ? "Carregando..." : "Carregar mais menções"}
               </button>
@@ -516,7 +559,15 @@ export default function MonitoringPage() {
         </section>
       )}
 
-      <MentionDrawer item={selected} brandId={brandId} open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      <MentionDrawer
+        item={selected}
+        brandId={brandId}
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        position={selectedIndex >= 0 ? { index: selectedIndex, total: items.length } : undefined}
+        onPrev={selectedIndex > 0 ? () => goTo(-1) : undefined}
+        onNext={selectedIndex >= 0 && selectedIndex < items.length - 1 ? () => goTo(1) : undefined}
+      />
     </div>
   )
 }
@@ -525,9 +576,10 @@ export default function MonitoringPage() {
 
 function PageSkeleton() {
   return (
-    <div className="-m-6 animate-pulse">
+    <div className="-m-6">
       <div className="px-8 pt-7 pb-6 border-b border-border-soft">
-        <div className="h-9 w-96 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+        <div className="h-3 w-40 rounded z-skeleton mb-4" />
+        <div className="h-9 w-96 max-w-full rounded z-skeleton" />
       </div>
       <FeedSkeleton />
     </div>
@@ -536,17 +588,17 @@ function PageSkeleton() {
 
 function FeedSkeleton() {
   return (
-    <section className="animate-pulse">
+    <section>
       {Array.from({ length: 6 }).map((_, i) => (
         <div key={i} className="flex items-center gap-4 px-8 py-3.5 border-b border-border-soft">
           {/* Mesma caixa 110×62 da thumbnail real — sem isso a linha "pula" ao carregar. */}
-          <div className="w-27.5 h-15.5 shrink-0 rounded-md bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+          <div className="w-27.5 h-15.5 shrink-0 rounded-md z-skeleton" />
           <div className="flex-1 space-y-2">
-            <div className="h-3.5 w-2/3 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
-            <div className="h-3 w-1/3 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+            <div className="h-3.5 w-2/3 rounded z-skeleton" />
+            <div className="h-3 w-1/3 rounded z-skeleton" />
           </div>
-          <div className="h-5 w-28 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
-          <div className="h-5 w-16 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+          <div className="h-5 w-28 rounded z-skeleton" />
+          <div className="h-5 w-16 rounded z-skeleton" />
         </div>
       ))}
     </section>
@@ -557,9 +609,9 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <AlertCircle className="w-10 h-10 text-neg mb-3" />
-      <h3 className="text-lg font-semibold text-midnight dark:text-[#E6E8EF] mb-1">Não foi possível carregar</h3>
-      <p className="text-sm text-[#6B7280] mb-4">Tente novamente em instantes.</p>
-      <button onClick={onRetry} className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors">
+      <h3 className="text-lg font-semibold text-ink mb-1">Não foi possível carregar</h3>
+      <p className="text-sm text-ink-muted mb-4">Tente novamente em instantes.</p>
+      <button onClick={onRetry} className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-hover transition-colors">
         Tentar de novo
       </button>
     </div>

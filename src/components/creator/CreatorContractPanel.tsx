@@ -165,7 +165,7 @@ function ContractView({ contractId }: { contractId: string }) {
   if (contract.isError || !contract.data) {
     return (
       <div className="rounded-xl border border-border-soft p-5" style={{ background: "var(--surface)" }}>
-        <AlertCircle className="w-6 h-6 mb-2" style={{ color: "#D97706" }} />
+        <AlertCircle className="w-6 h-6 mb-2" style={{ color: "var(--color-warn)" }} />
         <p className="text-[13px] text-ink-muted m-0">Não foi possível carregar o contrato.</p>
       </div>
     )
@@ -232,7 +232,7 @@ function HeaderCard({
       {/* Assinar destrava depósito e produção. Sem link de assinatura na API da Clicksign, a tela reenvia o aviso. */}
       {c.canResendSignature && (
         <div className="mt-5 rounded-lg p-3.5" style={{ background: "#D9770610" }}>
-          <div className="text-[13px] font-medium mb-1" style={{ color: "#D97706" }}>
+          <div className="text-[13px] font-medium mb-1" style={{ color: "var(--color-warn)" }}>
             Aguardando sua assinatura
           </div>
           <p className="text-[12.5px] text-ink-2 m-0">
@@ -337,7 +337,7 @@ function FieldsCard({ fields }: { fields: CreatorContractField[] }) {
           className="mt-4 rounded-lg p-3.5"
           style={{ background: "#D9770610" }}
         >
-          <div className="text-[12.5px] font-medium mb-1" style={{ color: "#D97706" }}>
+          <div className="text-[12.5px] font-medium mb-1" style={{ color: "var(--color-warn)" }}>
             {pending.length === 1
               ? "1 campo ainda não foi preenchido"
               : `${pending.length} campos ainda não foram preenchidos`}

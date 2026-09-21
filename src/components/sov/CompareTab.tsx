@@ -5,6 +5,7 @@ import { ArrowRight } from "lucide-react"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { InfoHint } from "@/components/ui/info-hint"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { stagger } from "@/lib/motion"
 import type { SovTopic } from "@/lib/api/dashboard"
 import { brandColor,
   CONTESTED_MARGIN, formatScore, GLOSSARY, matchup, nearestRival, readSentiment,
@@ -53,7 +54,7 @@ export function CompareTab({ ranked, topics, topicsLoading, hasPreviousPeriod }:
           <Select value={rival.brandId} onValueChange={setChoice}>
             <SelectTrigger
               aria-label="Concorrente da comparação"
-              className="h-8 rounded-full px-3.5 text-[13px] font-medium border border-teal-500 text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-900/25"
+              className="h-8 rounded-lg px-3.5 text-[13px] font-medium border border-teal-500 text-teal-700 dark:text-teal-300 bg-teal-50 dark:bg-teal-900/25"
             >
               <SelectValue />
             </SelectTrigger>
@@ -114,7 +115,7 @@ function HeadToHead({ you, rival, youColor, rivalColor, hasPreviousPeriod }: {
   const winner = (a: number, b: number) => (a > b ? "you" : a < b ? "rival" : null)
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto overflow-y-clip">
       <table className="w-full text-[13px] min-w-130">
         <thead>
           <tr className="text-[12px] text-ink-muted">
@@ -211,13 +212,13 @@ function TopicDuels({ topics, you, rival, youColor, rivalColor }: {
           conta como disputa — o share já vem arredondado.</>}
       />
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-8 gap-y-7">
-        <DuelColumn title={`Onde ${you.brandName} está à frente`} tone="var(--color-pos)" duels={m.youLead}
+        <DuelColumn index={0} title={`Onde ${you.brandName} está à frente`} tone="var(--color-pos)" duels={m.youLead}
           youName={you.brandName} rivalName={rival.brandName} youColor={youColor} rivalColor={rivalColor}
           empty="Em nenhum tópico você está mais de 3pp à frente." />
-        <DuelColumn title={`Onde ${rival.brandName} está à frente`} tone="var(--color-neg)" duels={m.theyLead}
+        <DuelColumn index={1} title={`Onde ${rival.brandName} está à frente`} tone="var(--color-neg)" duels={m.theyLead}
           youName={you.brandName} rivalName={rival.brandName} youColor={youColor} rivalColor={rivalColor}
           empty={`Em nenhum tópico ${rival.brandName} está mais de 3pp à frente.`} />
-        <DuelColumn title="Disputa acirrada" tone="var(--color-warn)" duels={m.contested}
+        <DuelColumn index={2} title="Disputa acirrada" tone="var(--color-warn)" duels={m.contested}
           youName={you.brandName} rivalName={rival.brandName} youColor={youColor} rivalColor={rivalColor}
           empty="Nenhum tópico empatado." />
       </div>
@@ -225,7 +226,8 @@ function TopicDuels({ topics, you, rival, youColor, rivalColor }: {
   )
 }
 
-function DuelColumn({ title, tone, duels, youName, rivalName, youColor, rivalColor, empty }: {
+function DuelColumn({ index, title, tone, duels, youName, rivalName, youColor, rivalColor, empty }: {
+  index: number
   title: string
   tone: string
   duels: TopicDuel[]
@@ -236,7 +238,7 @@ function DuelColumn({ title, tone, duels, youName, rivalName, youColor, rivalCol
   empty: string
 }) {
   return (
-    <div className="min-w-0">
+    <div className="min-w-0 z-rise" style={stagger(index)}>
       <div className="flex items-center gap-2 mb-3">
         <span className="w-1.5 h-4 rounded-full" style={{ background: tone }} />
         <span className="text-[13px] font-semibold truncate" style={{ color: "var(--ink)" }}>{title}</span>
@@ -268,8 +270,8 @@ function DuelBar({ label, value, color, strong }: { label: string; value: number
   return (
     <div className="flex items-center gap-2 mt-1">
       <span className="w-20 truncate text-[11.5px] text-ink-muted" style={{ fontWeight: strong ? 600 : 400 }}>{label}</span>
-      <div className="flex-1 h-1.5 rounded-full overflow-hidden bg-[#F3F4F6] dark:bg-[#1C1F2E]">
-        <div style={{ width: `${value}%`, height: "100%", background: color }} />
+      <div className="flex-1 h-1.5 rounded-full overflow-hidden bg-tint">
+        <div className="h-full z-grow-x" style={{ width: `${value}%`, background: color }} />
       </div>
       <span className="w-9 text-right font-mono-zoe text-[11.5px]" style={{ color: "var(--ink)" }}>{value}%</span>
     </div>

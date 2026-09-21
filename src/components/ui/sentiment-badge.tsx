@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils"
+import { formatScore } from "@/lib/score"
 
 type Sentiment = "positive" | "negative" | "neutral"
 
@@ -20,7 +21,7 @@ export function SentimentBadge({ sentiment, score }: { sentiment: Sentiment; sco
   return (
     <span className={cn(styles[sentiment])}>
       {labels[sentiment]}
-      {score !== undefined && <span>({score > 0 ? "+" : ""}{score.toFixed(2)})</span>}
+      {score !== undefined && <span>({score > 0 ? "+" : ""}{formatScore(score)})</span>}
     </span>
   )
 }

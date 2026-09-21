@@ -72,7 +72,7 @@ const SECTIONS: Section[] = [
     icon: CreditCard,
     title: "Plano e faturamento",
     description:
-      "Cada plano dá uma cota de vídeo-minutos por mês. Trocas entram com proração na próxima fatura.",
+      "Intelligence, Operations ou os dois. Upgrade vale na hora; downgrade, no fim do período já pago.",
   },
   {
     key: "consumo",
@@ -181,7 +181,7 @@ export function SettingsDialog() {
               </div>
               <Dialog.Close
                 aria-label="Fechar configurações"
-                className="shrink-0 -mt-1 -mr-2 p-2 rounded-lg text-ink-muted hover:text-ink hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D] transition-colors"
+                className="shrink-0 -mt-1 -mr-2 p-2 rounded-lg text-ink-muted hover:text-ink hover:bg-tint transition-colors"
               >
                 <X className="w-[18px] h-[18px]" />
               </Dialog.Close>
@@ -229,7 +229,7 @@ function Rail({
                   onClick={() => onSelect(key)}
                   aria-current={active ? "page" : undefined}
                   className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13.5px] font-medium text-left transition-colors ${
-                    active ? "" : "text-ink-muted hover:text-ink hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D]"
+                    active ? "" : "text-ink-muted hover:text-ink hover:bg-tint"
                   }`}
                   style={active ? { background: "var(--teal-bg)", color: "var(--teal-fg)" } : undefined}
                 >

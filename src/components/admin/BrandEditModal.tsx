@@ -86,7 +86,7 @@ export function BrandEditModal({ brand, onClose }: { brand: AdminBrand; onClose:
             </div>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D] cursor-pointer shrink-0"
+              className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-tint cursor-pointer shrink-0"
               aria-label="Fechar"
             >
               <X className="w-4.5 h-4.5" />
@@ -143,7 +143,7 @@ export function BrandEditModal({ brand, onClose }: { brand: AdminBrand; onClose:
           {step > 0 ? (
             <button
               onClick={() => setStep(step - 1)}
-              className="h-9 px-3.5 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors cursor-pointer"
+              className="h-9 px-3.5 text-[13px] rounded-md border border-border-soft hover:bg-hover transition-colors cursor-pointer"
             >
               Voltar
             </button>
@@ -263,7 +263,7 @@ function ChannelField({ draft }: { draft: CurationDraft }) {
           type="button"
           onClick={draft.addChannel}
           disabled={!draft.channelDraft.trim() || draft.resolvingChannel}
-          className="h-9 px-3 rounded-lg border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors disabled:opacity-50 cursor-pointer"
+          className="h-9 px-3 rounded-lg border border-border-soft hover:bg-hover transition-colors disabled:opacity-50 cursor-pointer"
           aria-label="Adicionar canal"
         >
           {draft.resolvingChannel ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
@@ -276,7 +276,7 @@ function ChannelField({ draft }: { draft: CurationDraft }) {
             <span
               key={ch}
               title={ch}
-              className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-md text-[12px] font-mono-zoe bg-[#F3F4F6] dark:bg-[#1A1D2D]"
+              className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-md text-[12px] font-mono-zoe bg-tint"
               style={{ color: "var(--ink-2)" }}
             >
               {draft.channelTitles[ch] ? <span className="font-sans">{draft.channelTitles[ch]}</span> : ch}
@@ -343,7 +343,7 @@ function AliasStep({
             className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-md text-[12.5px] font-mono-zoe border"
             style={isNew(a)
               ? { background: "var(--pos-bg)", borderColor: "rgba(22,163,74,.3)", color: "var(--color-pos)" }
-              : { background: "#F3F4F6", borderColor: "transparent", color: "var(--ink-2)" }}
+              : { background: "var(--tint)", borderColor: "transparent", color: "var(--ink-2)" }}
           >
             {`"${a}"`}
             <button
@@ -516,8 +516,9 @@ function ImpactStep({
 
       {looksMisconfigured(brand) && (
         <p className="text-[11.5px] text-ink-muted-2 mt-3 leading-snug">
-          Lembrete: esta marca declara canal oficial mas não tem nenhuma análise classificada como mídia própria — se o
-          objetivo é corrigir isso, confira o channel id no primeiro passo.
+          Lembrete: esta marca declara canal oficial mas não tem nenhuma análise classificada como mídia própria.
+          Confira o channel id no primeiro passo; se estiver certo, é porque nenhum vídeo do canal foi coletado e
+          analisado ainda.
         </p>
       )}
     </>

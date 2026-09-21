@@ -12,7 +12,7 @@ type EmptyStateProps = {
 export function EmptyState({ icon, title, description, actionLabel, onAction }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="mb-4 text-[#6B7280]">
+      <div className="mb-4 text-ink-muted">
         {icon ?? <InboxIcon className="w-12 h-12" />}
       </div>
       {/* Tailwind v4: usar os utilitários gerados pelo @theme. A sintaxe v3
@@ -20,8 +20,8 @@ export function EmptyState({ icon, title, description, actionLabel, onAction }: 
           sobre fundo inexistente (invisível).
           Cor: `.btn.primary` do design = var(--primary) #00A799 (teal-500),
           hover var(--t-600) — NÃO o --cta laranja. */}
-      <h3 className="text-lg font-semibold text-midnight dark:text-[#E6E8EF] mb-1">{title}</h3>
-      {description && <p className="text-sm text-[#6B7280] mb-4 max-w-sm">{description}</p>}
+      <h3 className="text-lg font-semibold text-midnight dark:text-ink mb-1">{title}</h3>
+      {description && <p className="text-sm text-ink-muted mb-4 max-w-sm">{description}</p>}
       {actionLabel && onAction && (
         <Button onClick={onAction} className="bg-teal-500 hover:bg-teal-600 text-white">
           {actionLabel}

@@ -1,6 +1,7 @@
 import { Check, Plus } from "lucide-react"
 import { Link } from "react-router-dom"
 import { useAuth } from "@/features/auth/context"
+import { useSwitchWorkspace } from "@/features/auth/useSwitchWorkspace"
 import { Section, ReadOnlyValue } from "./AccountPanel"
 
 // Workspace ativo e a lista de todos. A troca vive aqui além do menu do rodapé:
@@ -19,7 +20,9 @@ function tenantColor(id: string) {
 }
 
 export function WorkspacePanel({ onNavigate }: { onNavigate: () => void }) {
-  const { role, memberships, activeTenantId, switchTenant } = useAuth()
+  const { role, memberships, activeTenantId } = useAuth()
+  // Leva pro Dashboard, e o diálogo fecha junto: ele vive no `?settings=` da rota.
+  const switchWorkspace = useSwitchWorkspace()
   const active = memberships.find((m) => m.tenantId === activeTenantId)
 
   return (
@@ -51,11 +54,11 @@ export function WorkspacePanel({ onNavigate }: { onNavigate: () => void }) {
             return (
               <button
                 key={m.tenantId}
-                onClick={() => { if (!isActive) void switchTenant(m.tenantId) }}
+                onClick={() => { if (!isActive) switchWorkspace(m.tenantId) }}
                 disabled={isActive}
                 className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
                   i > 0 ? "border-t border-border-soft" : ""
-                } ${isActive ? "cursor-default" : "hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D]"}`}
+                } ${isActive ? "cursor-default" : "hover:bg-hover"}`}
               >
                 <span
                   className="w-2 h-2 rounded-full shrink-0"
@@ -82,7 +85,7 @@ export function WorkspacePanel({ onNavigate }: { onNavigate: () => void }) {
         <Link
           to="/onboarding/tenant"
           onClick={onNavigate}
-          className="mt-3 h-9 px-3.5 inline-flex items-center gap-1.5 rounded-lg text-[13px] font-medium border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors"
+          className="mt-3 h-9 px-3.5 inline-flex items-center gap-1.5 rounded-lg text-[13px] font-medium border border-border-soft hover:bg-hover transition-colors"
           style={{ color: "var(--ink)" }}
         >
           <Plus className="w-3.5 h-3.5" />

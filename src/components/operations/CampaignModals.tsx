@@ -1,9 +1,9 @@
+import { Modal, ModalFooter } from "@/components/ui/modal"
 import { useMemo, useState } from "react"
-import { Link } from "react-router-dom"
-import { X, Loader2, Sparkles } from "lucide-react"
+import { Sparkles } from "lucide-react"
+import { useOpenSettings } from "@/components/settings/useSettings"
+import { PLAN_TAB_PARAM } from "@/lib/plans"
 import { notifyError, notifySuccess } from "@/lib/feedback"
-import { useEscapeKey } from "@/lib/useEscapeKey"
-import { useFocusTrap } from "@/lib/useFocusTrap"
 import { MoneyInput } from "@/components/ui/money-input"
 import { parseBRLToCents, centsToBRLInput } from "@/lib/money"
 import { ApiError } from "@/lib/api"
@@ -12,7 +12,8 @@ import { useFeature } from "@/features/auth/useFeature"
 import { useTenantBrands } from "@/lib/api/brands"
 import { tEnum } from "@/i18n/enums"
 import { fmtDate } from "@/lib/operations-format"
-import { Field, Select } from "@/components/operations/shared"
+import { Field } from "@/components/operations/shared"
+import { SelectField } from "@/components/ui/select-field"
 import {
   useCampaignMutations, CAMPAIGN_MODALITIES, escrowRejectionReason, supportsEscrow,
   type CreateCampaignBody, type CampaignDetail,
@@ -33,8 +34,6 @@ export function EditCampaignModal({
   const [budget, setBudget] = useState(
     campaign.budgetCents > 0 ? centsToBRLInput(campaign.budgetCents) : "")
   const [notes, setNotes] = useState(campaign.notes ?? "")
-  useEscapeKey(onClose)
-  const dialogRef = useFocusTrap<HTMLDivElement>()
 
   // Briefing: texto separado por vírgula na tela, lista na API. É o formato que as pessoas
   // já usam para listar palavras, e evita um editor de tags só para isto.
@@ -88,35 +87,22 @@ export function EditCampaignModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-[90] flex items-center justify-center p-4"
-      style={{ background: "rgba(7,9,26,0.32)", backdropFilter: "blur(2px)" }}
-      onClick={onClose}
+    <Modal
+      eyebrow="Campanhas"
+      title="Editar campanha"
+      description="A modalidade não muda: os contratos desta campanha já a herdaram."
+      onClose={onClose}
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onSubmit={submit}
+          submitLabel="Salvar"
+          pending={update.isPending}
+          disabled={name.trim().length < 3}
+        />
+      }
     >
-      <div
-        /* Rolagem interna: com o briefing o formulário passa da altura da tela, e o
-           botão de salvar não pode ficar fora de alcance. */
-        className="w-full max-w-md rounded-xl border border-border-soft shadow-2xl p-6 max-h-[85vh] overflow-y-auto"
-        style={{ background: "var(--surface)" }}
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Editar campanha"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between mb-5">
-          <div>
-            <div className="eyebrow mb-1">Campanhas</div>
-            <h2 className="font-display m-0" style={{ fontSize: 20, color: "var(--ink)" }}>
-              Editar campanha
-            </h2>
-          </div>
-          <button onClick={onClose} className="text-ink-muted hover:opacity-70" aria-label="Fechar">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="space-y-4">
+      <div className="space-y-4">
           <Field label="Nome">
             <Input value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
@@ -162,13 +148,15 @@ export function EditCampaignModal({
 
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Logo obrigatório">
-                  <Select
+                  <SelectField
                     value={requiresLogo ? "sim" : "nao"}
                     onChange={(v) => setRequiresLogo(v === "sim")}
-                  >
-                    <option value="nao">Não exigir</option>
-                    <option value="sim">Exigir</option>
-                  </Select>
+                    ariaLabel="Logo obrigatório"
+                    options={[
+                      { key: "nao", label: "Não exigir" },
+                      { key: "sim", label: "Exigir" },
+                    ]}
+                  />
                 </Field>
                 <Field label="Segundos mínimos" hint={requiresLogo ? undefined : "só com logo exigido"}>
                   <Input
@@ -182,24 +170,30 @@ export function EditCampaignModal({
               </div>
 
               <Field label="Tom esperado">
-                <Select
+                <SelectField
                   value={minSentiment}
                   onChange={(v) => setMinSentiment(v as BriefingSentiment)}
-                >
-                  {BRIEFING_SENTIMENTS.map((sv) => (
-                    <option key={sv} value={sv}>{tEnum("briefingSentiment", sv)}</option>
-                  ))}
-                </Select>
+                  ariaLabel="Tom esperado"
+                  options={BRIEFING_SENTIMENTS.map((sv) => ({
+                    key: sv,
+                    label: tEnum("briefingSentiment", sv),
+                  }))}
+                />
               </Field>
 
               <Field
                 label="Disclosure de publicidade"
                 hint="Conteúdo pago sem identificação é irregular no Brasil."
               >
-                <Select value={conar ? "sim" : "nao"} onChange={(v) => setConar(v === "sim")}>
-                  <option value="sim">Exigir #publi</option>
-                  <option value="nao">Não exigir</option>
-                </Select>
+                <SelectField
+                  value={conar ? "sim" : "nao"}
+                  onChange={(v) => setConar(v === "sim")}
+                  ariaLabel="Disclosure de publicidade"
+                  options={[
+                    { key: "sim", label: "Exigir #publi" },
+                    { key: "nao", label: "Não exigir" },
+                  ]}
+                />
               </Field>
 
               <div className="grid grid-cols-2 gap-3">
@@ -227,32 +221,13 @@ export function EditCampaignModal({
           </div>
         </div>
 
-        <p className="text-[11.5px] text-ink-muted mt-4 mb-0">
-          A modalidade não muda: os contratos desta campanha já a herdaram.
-        </p>
-
-        <div className="flex gap-2 mt-5">
-          <button onClick={onClose} className="flex-1 px-4 py-2.5 rounded-lg text-[13.5px] border border-border-soft">
-            Cancelar
-          </button>
-          <button
-            onClick={submit}
-            disabled={update.isPending || name.trim().length < 3}
-            className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[13.5px] font-medium text-white disabled:opacity-50"
-            style={{ background: "var(--color-teal-500)" }}
-          >
-            {update.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            Salvar
-          </button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
 
 /** Cota vinda no `details` do Problem Details. Tudo opcional: a tela não pode quebrar
  *  se o formato mudar — o essencial é a mensagem, não o número. */
-type Allowance = { limit?: number; used?: number; resetsAt?: string }
+type Allowance = { limit?: number; used?: number; resetsAt?: string; noPlan?: boolean }
 
 function readAllowance(e: ApiError): Allowance {
   const d = e.problem?.details
@@ -269,81 +244,55 @@ function readAllowance(e: ApiError): Allowance {
 
 /** Convite de upgrade (RN-O-021): a campanha não foi descartada e o limite zera numa data conhecida. */
 function AllowanceModal({
-  allowance, campaignName, onBack, onClose,
+  allowance, campaignName, noPlan = false, onBack, onClose,
 }: {
   allowance: Allowance
   campaignName: string
+  /** Workspace sem plano de Operations: o convite é para assinar, não para subir. */
+  noPlan?: boolean
   onBack: () => void
   onClose: () => void
 }) {
-  useEscapeKey(onClose)
-  const dialogRef = useFocusTrap<HTMLDivElement>()
+  const openSettings = useOpenSettings()
   return (
-    <div
-      className="fixed inset-0 z-[90] flex items-center justify-center p-4"
-      style={{ background: "rgba(7,9,26,0.32)", backdropFilter: "blur(2px)" }}
-      onClick={onClose}
+    <Modal
+      eyebrow={<><Sparkles className="w-3 h-3" style={{ color: "var(--color-teal-500)" }} /> Seu plano</>}
+      title={noPlan
+        ? "Escolha um plano de Operations"
+        : `Você usou as ${allowance.limit ?? 5} campanhas deste mês`}
+      size="sm"
+      onClose={onClose}
+      footer={
+        <ModalFooter
+          onCancel={onBack}
+          cancelLabel="Voltar ao rascunho"
+          onSubmit={() => {
+            onClose()
+            openSettings("plano", { [PLAN_TAB_PARAM]: "operations" })
+          }}
+          submitLabel="Ver planos"
+        />
+      }
     >
-      <div
-        className="w-full max-w-md rounded-xl border border-border-soft shadow-2xl p-6"
-        style={{ background: "var(--surface)" }}
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Limite de campanhas do plano"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4" style={{ color: "var(--color-teal-500)" }} />
-            <div className="eyebrow">Seu plano</div>
-          </div>
-          <button onClick={onClose} className="text-ink-muted hover:opacity-70" aria-label="Fechar">
-            <X className="w-4 h-4" />
-          </button>
+      <p className="text-[13.5px] text-ink-muted m-0">
+        {campaignName
+          ? <>A campanha <span style={{ color: "var(--ink)" }}>“{campaignName}”</span> não
+             foi descartada — ela só não foi criada ainda.</>
+          : "Nada do que você preencheu foi descartado."}
+        {noPlan
+          ? " Campanhas fazem parte dos planos de Operations, que incluem contrato digital e custódia."
+          : " Com o Operations Pro as campanhas passam a ser ilimitadas."}
+      </p>
+
+      {!noPlan && allowance.resetsAt && (
+        // `bg-inset` e não `var(--bg, #F9FAFB)`: o fallback claro fixo não ia
+        // para o modo escuro.
+        <div className="rounded-lg p-3 text-[12.5px] bg-inset text-ink-muted">
+          Sem fazer upgrade, sua cota volta a {allowance.limit ?? 5} em{" "}
+          <span style={{ color: "var(--ink)" }}>{fmtDate(allowance.resetsAt)}</span>.
         </div>
-
-        <h2 className="font-display m-0 mb-2" style={{ fontSize: 22, color: "var(--ink)" }}>
-          Você usou as {allowance.limit ?? 5} campanhas deste mês
-        </h2>
-
-        <p className="text-[13.5px] text-ink-muted mb-4">
-          {campaignName
-            ? <>A campanha <span style={{ color: "var(--ink)" }}>“{campaignName}”</span> não
-               foi descartada — ela só não foi criada ainda.</>
-            : "Nada do que você preencheu foi descartado."}
-          {" "}Com o plano Pro as campanhas passam a ser ilimitadas.
-        </p>
-
-        {allowance.resetsAt && (
-          <div
-            className="rounded-lg p-3 text-[12.5px] mb-5"
-            style={{ background: "var(--bg, #F9FAFB)", color: "var(--ink-muted)" }}
-          >
-            Sem fazer upgrade, sua cota volta a {allowance.limit ?? 5} em{" "}
-            <span style={{ color: "var(--ink)" }}>{fmtDate(allowance.resetsAt)}</span>.
-          </div>
-        )}
-
-        <div className="flex gap-2">
-          <button
-            onClick={onBack}
-            className="flex-1 px-4 py-2.5 rounded-lg text-[13.5px] border border-border-soft"
-          >
-            Voltar ao rascunho
-          </button>
-          {/* Não existe fluxo de upgrade self-service: mandar para as configurações é o
-              caminho honesto, em vez de um botão que não faz nada. */}
-          <Link
-            to="/plan"
-            className="flex-1 inline-flex items-center justify-center px-4 py-2.5 rounded-lg text-[13.5px] font-medium text-white"
-            style={{ background: "var(--color-teal-500)" }}
-          >
-            Ver planos
-          </Link>
-        </div>
-      </div>
-    </div>
+      )}
+    </Modal>
   )
 }
 
@@ -360,8 +309,6 @@ export function CreateCampaignModal({ onClose }: { onClose: () => void }) {
   const [endsAt, setEndsAt] = useState("")
   const [budget, setBudget] = useState("")
   const [limit, setLimit] = useState<Allowance | null>(null)
-  useEscapeKey(onClose)
-  const dialogRef = useFocusTrap<HTMLDivElement>()
 
   const brandList = useMemo(() => brands.data?.items ?? [], [brands.data])
   const useBrandPicker = hasIntelligence && brandList.length > 0
@@ -395,6 +342,10 @@ export function CreateCampaignModal({ onClose }: { onClose: () => void }) {
           setLimit(readAllowance(e))
           return
         }
+        if (e instanceof ApiError && e.code === "operations_plan_required") {
+          setLimit({ noPlan: true })
+          return
+        }
         notifyError(e, "Não foi possível criar a campanha.")
       },
     })
@@ -406,6 +357,7 @@ export function CreateCampaignModal({ onClose }: { onClose: () => void }) {
     return (
       <AllowanceModal
         allowance={limit}
+        noPlan={limit.noPlan}
         campaignName={name.trim()}
         onBack={() => setLimit(null)}
         onClose={onClose}
@@ -414,37 +366,22 @@ export function CreateCampaignModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div
-      className="fixed inset-0 z-[90] flex items-center justify-center p-4"
-      style={{ background: "rgba(7,9,26,0.32)", backdropFilter: "blur(2px)" }}
-      onClick={onClose}
+    <Modal
+      eyebrow="Campanhas"
+      title="Nova campanha"
+      description="Os contratos nascem dentro dela e herdam a modalidade escolhida aqui."
+      onClose={onClose}
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onSubmit={submit}
+          submitLabel="Criar campanha"
+          pending={create.isPending}
+          disabled={!canSubmit}
+        />
+      }
     >
-      <div
-        className="w-full max-w-md rounded-xl border border-border-soft shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
-        style={{ background: "var(--surface)" }}
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Nova campanha"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between px-6 pt-5 pb-3 shrink-0">
-          <div>
-            <div className="eyebrow mb-1.5">Campanhas</div>
-            <h2 className="font-display m-0" style={{ fontSize: 22, color: "var(--ink)" }}>
-              Nova campanha
-            </h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D]"
-            aria-label="Fechar"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="px-6 py-2 overflow-y-auto flex-1 flex flex-col gap-3.5">
+      <div className="flex flex-col gap-3.5">
           <Field label="Nome">
             <Input
               value={name}
@@ -456,31 +393,37 @@ export function CreateCampaignModal({ onClose }: { onClose: () => void }) {
 
           <Field label="Marca" hint={useBrandPicker ? "Marcas assinadas no workspace." : "Sem Intelligence, o nome vai como texto."}>
             {useBrandPicker ? (
-              <Select value={tenantBrandId} onChange={setTenantBrandId}>
-                <option value="">Selecione…</option>
-                {brandList.map((b) => (
-                  <option key={b.tenantBrandId} value={b.tenantBrandId}>
-                    {b.displayName ?? b.brandName}
-                  </option>
-                ))}
-              </Select>
+              <SelectField
+                value={tenantBrandId}
+                onChange={setTenantBrandId}
+                ariaLabel="Marca"
+                placeholder="Selecione…"
+                options={brandList.map((b) => ({
+                  key: b.tenantBrandId,
+                  label: b.displayName ?? b.brandName,
+                }))}
+              />
             ) : (
               <Input value={brandLabel} onChange={(e) => setBrandLabel(e.target.value)} placeholder="Nome da marca" />
             )}
           </Field>
 
           <Field label="Modalidade" hint="Todos os contratos da campanha herdam esta escolha.">
-            <Select value={modality} onChange={setModality}>
-              {CAMPAIGN_MODALITIES.map((m) => (
-                <option key={m} value={m}>{tEnum("contractModality", m)}</option>
-              ))}
-            </Select>
+            <SelectField
+              value={modality}
+              onChange={setModality}
+              ariaLabel="Modalidade"
+              options={CAMPAIGN_MODALITIES.map((m) => ({
+                key: m,
+                label: tEnum("contractModality", m),
+              }))}
+            />
           </Field>
 
           {!supportsEscrow(modality) && (
             <div
               className="rounded-lg p-3 text-[11.5px]"
-              style={{ background: "#D9770615", color: "#D97706" }}
+              style={{ background: "var(--warn-bg)", color: "var(--color-warn)" }}
             >
               <span className="font-semibold">Sem custódia nesta modalidade.</span>{" "}
               {escrowRejectionReason(modality)}
@@ -501,24 +444,6 @@ export function CreateCampaignModal({ onClose }: { onClose: () => void }) {
           </Field>
         </div>
 
-        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-border-soft shrink-0">
-          <button
-            onClick={onClose}
-            className="px-3.5 py-2 rounded-lg text-[13px] font-medium border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D]"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={submit}
-            disabled={!canSubmit}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-medium text-white disabled:opacity-50"
-            style={{ background: "var(--color-teal-500)" }}
-          >
-            {create.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            Criar campanha
-          </button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   )
 }

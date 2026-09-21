@@ -16,13 +16,22 @@ export type Stat = {
   suffix?: string
   /** Linha de contexto abaixo — o que o número significa. */
   hint?: string
-  tone?: "accent" | "warn" | "neg"
+  tone?: "accent" | "pos" | "warn" | "neg"
 }
 
 const TONE_COLOR: Record<NonNullable<Stat["tone"]>, string> = {
   accent: "var(--color-teal-500)",
+  pos: "var(--color-pos)",
   warn: "var(--color-warn)",
   neg: "var(--color-neg)",
+}
+
+/**
+ * Valor longo encolhe. "R$ 1.746.205,00" em 40px passava da coluna e encostava
+ * no vizinho — visto na Custódia com a barra lateral aberta, em 15/09.
+ */
+function valueSize(value: string | number): number {
+  return String(value).length > 13 ? 24 : 40
 }
 
 export function StatBand({ items }: { items: Stat[] }) {
@@ -32,12 +41,17 @@ export function StatBand({ items }: { items: Stat[] }) {
       style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
     >
       {items.map((k, i) => (
-        <div key={k.label} className={`px-6 py-5 ${i < items.length - 1 ? "border-r border-border-soft" : ""}`}>
+        <div key={k.label} className={`px-6 py-5 min-w-0 ${i < items.length - 1 ? "border-r border-border-soft" : ""}`}>
           <div className="eyebrow">{k.label}</div>
           <div className="flex items-baseline gap-1.5 mt-2">
             <span
               className="font-display"
-              style={{ fontSize: 40, lineHeight: 1, color: k.tone ? TONE_COLOR[k.tone] : "var(--ink)" }}
+              style={{
+                fontSize: valueSize(k.value),
+                lineHeight: 1.1,
+                color: k.tone ? TONE_COLOR[k.tone] : "var(--ink)",
+                overflowWrap: "anywhere",
+              }}
             >
               {k.value}
             </span>

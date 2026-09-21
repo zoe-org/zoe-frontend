@@ -277,7 +277,7 @@ function Done({ campaignName, onGo }: { campaignName: string; onGo: () => void }
 function Invalid() {
   return (
     <div className="text-center">
-      <AlertCircle className="w-10 h-10 mx-auto mb-3 text-[#DC2626]" />
+      <AlertCircle className="w-10 h-10 mx-auto mb-3 text-neg" />
       <h1 className="font-display m-0 mb-2" style={{ fontSize: 24, color: "var(--ink)" }}>
         Convite não encontrado
       </h1>

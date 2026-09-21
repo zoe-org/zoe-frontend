@@ -53,7 +53,7 @@ function TaxIdCard({ current }: { current: string | null }) {
       style={{ background: "var(--surface)" }}
     >
       <div className="flex items-start gap-2.5 mb-1">
-        <FileText className="w-4 h-4 mt-0.5 shrink-0" style={{ color: "#D97706" }} />
+        <FileText className="w-4 h-4 mt-0.5 shrink-0" style={{ color: "var(--color-warn)" }} />
         <div>
           <div className="text-[13.5px] font-semibold" style={{ color: "var(--ink)" }}>
             Informe seu CPF ou CNPJ
@@ -286,7 +286,7 @@ function NextStepsCard({
           <li key={p.key}>
             <button
               onClick={() => onGoTo(p)}
-              className="w-full text-left flex items-start gap-2.5 rounded-lg px-2 py-2 hover:bg-[#FAFBFC] dark:hover:bg-[#181B28] transition-colors"
+              className="w-full text-left flex items-start gap-2.5 rounded-lg px-2 py-2 hover:bg-hover transition-colors"
             >
               <span
                 className="w-5 h-5 rounded-full grid place-items-center text-[11px] font-semibold text-white shrink-0 mt-0.5"
@@ -382,7 +382,7 @@ function EngagementCard({ e }: { e: CreatorEngagement }) {
       </div>
 
       {reworkRequested && (
-        <div className="rounded-lg p-3 text-[12.5px] mb-4" style={{ background: "#D9770612", color: "#B45309" }}>
+        <div className="rounded-lg p-3 text-[12.5px] mb-4" style={{ background: "var(--warn-bg)", color: "var(--color-warn)" }}>
           <div className="font-medium mb-0.5">A marca pediu uma correção</div>
           {e.draft?.status === "ChangesRequested"
             ? "É para refazer o vídeo: envie um novo corte para aprovação antes de publicar de novo."
@@ -498,7 +498,7 @@ function NotACreator({ error }: { error: unknown }) {
   const notLinked = error instanceof ApiError && error.status === 404
   return (
     <div className="rounded-xl border border-border-soft p-6" style={{ background: "var(--surface)" }}>
-      <AlertCircle className="w-8 h-8 mb-3" style={{ color: "#D97706" }} />
+      <AlertCircle className="w-8 h-8 mb-3" style={{ color: "var(--color-warn)" }} />
       <h1 className="font-display m-0 mb-2" style={{ fontSize: 22, color: "var(--ink)" }}>
         {notLinked ? "Esta conta ainda não é de criador" : "Não foi possível carregar"}
       </h1>

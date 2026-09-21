@@ -40,8 +40,14 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTenantId, idsKey])
 
+  // Não persiste: o recorte agregado vale para a sessão, e voltar dias depois
+  // numa tela sem marca definida é pior que voltar na última marca usada.
+  const [allBrands, setAllBrands] = useState(false)
+
   const setBrand = useCallback((id: string) => {
     setBrandId(id)
+    // Escolher uma marca é sair do recorte agregado — são a mesma decisão.
+    setAllBrands(false)
     if (activeTenantId) writeStored(activeTenantId, id)
   }, [activeTenantId])
 
@@ -50,10 +56,12 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
     brandId,
     active: list.find((b) => b.brandId === brandId) ?? null,
     setBrand,
+    allBrands,
+    setAllBrands,
     isLoading: query.isLoading,
     isError: query.isError,
     refetch: query.refetch,
-  }), [list, brandId, setBrand, query.isLoading, query.isError, query.refetch])
+  }), [list, brandId, setBrand, allBrands, query.isLoading, query.isError, query.refetch])
 
   return <BrandContext.Provider value={value}>{children}</BrandContext.Provider>
 }

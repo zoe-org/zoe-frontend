@@ -21,6 +21,7 @@ import { looksMisconfigured } from "@/lib/admin-curation"
 import { useCurationDraft } from "@/components/admin/curation-draft"
 import { CurationCard, CurationEditor } from "@/components/admin/CurationEditor"
 import { BrandEditModal } from "@/components/admin/BrandEditModal"
+import { formatScore } from "@/lib/score"
 
 /**
  * Curadoria admin de brands (ADR-021). É o **mecanismo de cura** do modelo de
@@ -308,7 +309,7 @@ function VerificationPanel({ brandId, queueItem }: { brandId: string; queueItem:
                 <button
                   onClick={() => m.merge.mutate({ targetId: s.brandId, policy: "PreferTarget" as MergeAnalysesPolicy })}
                   disabled={busy}
-                  className="inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors disabled:opacity-50 shrink-0 cursor-pointer"
+                  className="inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] rounded-md border border-border-soft hover:bg-hover transition-colors disabled:opacity-50 shrink-0 cursor-pointer"
                 >
                   <GitMerge className="w-3.5 h-3.5" /> Mesclar nesta
                 </button>
@@ -329,7 +330,7 @@ function VerificationPanel({ brandId, queueItem }: { brandId: string; queueItem:
                 <span className="text-[13px] truncate flex-1" style={{ color: "var(--ink-2)" }}>{a.videoTitle}</span>
                 <span className="font-mono-zoe text-[11px] text-ink-muted shrink-0">{a.nerMode}</span>
                 <span className="font-mono-zoe text-[12px] shrink-0" style={{ color: "var(--ink)" }}>
-                  {a.score != null ? a.score.toFixed(2) : "—"}
+                  {formatScore(a.score)}
                 </span>
               </div>
             ))}
@@ -395,7 +396,7 @@ function VerificationPanel({ brandId, queueItem }: { brandId: string; queueItem:
               onClick={() => m.reprocess.mutate()}
               disabled={busy}
               title="Reprocessa as análises conservadoras sem verificar a marca."
-              className="inline-flex items-center gap-1.5 h-9 px-3.5 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors disabled:opacity-50 cursor-pointer"
+              className="inline-flex items-center gap-1.5 h-9 px-3.5 text-[13px] rounded-md border border-border-soft hover:bg-hover transition-colors disabled:opacity-50 cursor-pointer"
             >
               <RefreshCw className="w-3.5 h-3.5" /> Só reprocessar
             </button>
@@ -570,7 +571,7 @@ function GlobalBrandRow({ brand, onEdit }: { brand: AdminBrand; onEdit: () => vo
         <div className="flex flex-wrap gap-1" style={{ maxWidth: 260 }}>
           {brand.canonicalAliases.length === 0 && <span className="text-[11.5px] text-ink-muted-2 italic">só o nome</span>}
           {brand.canonicalAliases.slice(0, 3).map((a) => (
-            <span key={a} className="font-mono-zoe text-[11px] px-1.5 py-0.5 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" style={{ color: "var(--ink-2)" }}>
+            <span key={a} className="font-mono-zoe text-[11px] px-1.5 py-0.5 rounded bg-tint" style={{ color: "var(--ink-2)" }}>
               {a}
             </span>
           ))}
@@ -587,12 +588,12 @@ function GlobalBrandRow({ brand, onEdit }: { brand: AdminBrand; onEdit: () => vo
         {brand.analysesCount.toLocaleString("pt-BR")}
       </td>
       <td className="px-4 py-3 text-right">
-        {/* A coluna que denuncia channel id errado: declara canal, tem análise,
-            e nada ficou owned. Era sinal que só existia no audit log. */}
+        {/* Declara canal, tem análise, e nada ficou owned. O aviso descreve o
+            fato: a causa pode ser channel id errado OU nenhuma coleta do canal. */}
         <span
           className="font-mono-zoe text-[12.5px]"
           style={{ color: suspeita ? "var(--color-warn)" : "var(--ink-2)" }}
-          title={suspeita ? "Declara canal oficial e tem análises, mas nenhuma classificada como mídia própria — provável channel id errado." : undefined}
+          title={suspeita ? "Declara canal oficial e tem análises, mas nenhuma classificada como mídia própria. Confira o channel id; se estiver certo, o canal ainda não teve vídeo coletado e analisado." : undefined}
         >
           {suspeita && <AlertTriangle className="inline w-3 h-3 mr-1 -mt-0.5" />}
           {brand.ownedAnalysesCount.toLocaleString("pt-BR")}
@@ -608,7 +609,7 @@ function GlobalBrandRow({ brand, onEdit }: { brand: AdminBrand; onEdit: () => vo
       <td className="px-4 py-3 text-right">
         <button
           onClick={onEdit}
-          className="h-8 px-3 text-[12.5px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors cursor-pointer"
+          className="h-8 px-3 text-[12.5px] rounded-md border border-border-soft hover:bg-hover transition-colors cursor-pointer"
         >
           Editar
         </button>
@@ -623,7 +624,7 @@ function PageSkeleton() {
   return (
     <div className="animate-pulse">
       <div className="px-8 pt-7 pb-6 border-b border-border-soft">
-        <div className="h-9 w-96 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+        <div className="h-9 w-96 rounded bg-tint" />
       </div>
       <div className="p-8"><PanelSkeleton /></div>
     </div>
@@ -634,7 +635,7 @@ function PanelSkeleton() {
   return (
     <div className="space-y-3 animate-pulse">
       {[0, 1, 2, 3].map((i) => (
-        <div key={i} className="h-4 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" style={{ width: `${85 - i * 12}%` }} />
+        <div key={i} className="h-4 rounded bg-tint" style={{ width: `${85 - i * 12}%` }} />
       ))}
     </div>
   )
@@ -648,7 +649,7 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
       <p className="text-sm text-ink-muted mb-4 max-w-100">{message}</p>
       <button
         onClick={onRetry}
-        className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors cursor-pointer"
+        className="h-9 px-4 text-[13px] rounded-md border border-border-soft hover:bg-hover transition-colors cursor-pointer"
       >
         Tentar de novo
       </button>

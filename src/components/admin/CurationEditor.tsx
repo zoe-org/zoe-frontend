@@ -78,7 +78,7 @@ export function CurationEditor({
                     className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12.5px] border transition-colors cursor-pointer ${
                       on
                         ? "border-teal-500 bg-teal-50 dark:bg-teal-900/25 text-teal-700 dark:text-teal-300"
-                        : "border-border-soft text-ink-2 hover:bg-[#FAFBFC] dark:hover:bg-[#181B28]"
+                        : "border-border-soft text-ink-2 hover:bg-hover"
                     }`}
                   >
                     {on ? <Check className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
@@ -103,7 +103,7 @@ export function CurationEditor({
             type="button"
             onClick={draft.commitAliasDraft}
             disabled={!draft.aliasDraft.trim()}
-            className="inline-flex items-center gap-1.5 h-9 px-3 text-[13px] rounded-lg border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors disabled:opacity-50 cursor-pointer"
+            className="inline-flex items-center gap-1.5 h-9 px-3 text-[13px] rounded-lg border border-border-soft hover:bg-hover transition-colors disabled:opacity-50 cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" /> Adicionar
           </button>
@@ -148,7 +148,7 @@ export function CurationEditor({
             type="button"
             onClick={draft.addChannel}
             disabled={!draft.channelDraft.trim() || draft.resolvingChannel}
-            className="h-9 px-3 rounded-lg border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors disabled:opacity-50 cursor-pointer"
+            className="h-9 px-3 rounded-lg border border-border-soft hover:bg-hover transition-colors disabled:opacity-50 cursor-pointer"
             aria-label="Adicionar canal"
           >
             {draft.resolvingChannel ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
@@ -166,7 +166,7 @@ export function CurationEditor({
               <span
                 key={ch}
                 title={ch}
-                className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-md text-[12px] font-mono-zoe bg-[#F3F4F6] dark:bg-[#1A1D2D]"
+                className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-md text-[12px] font-mono-zoe bg-tint"
                 style={{ color: "var(--ink-2)" }}
               >
                 {draft.channelTitles[ch] ? <span className="font-sans">{draft.channelTitles[ch]}</span> : ch}

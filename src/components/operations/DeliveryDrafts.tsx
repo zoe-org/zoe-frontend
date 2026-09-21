@@ -8,6 +8,7 @@ import { fmtDate, matches, campaignLabel } from "@/lib/operations-format"
 import {
   ErrorState, TableSkeleton, SearchBox, NoResults,
 } from "@/components/operations/shared"
+import { SelectField } from "@/components/ui/select-field"
 import { QueueLayout, QueueRow, QueueSection } from "@/components/operations/ReviewQueue"
 import { sectionsByCampaign, visibleItems } from "@/lib/queue-sections"
 import { useIsWide, useQueueKeys, waitingLabel } from "@/lib/queue-navigation"
@@ -126,19 +127,8 @@ export function DeliveryDrafts() {
 
   return (
     <>
-      <div>
-        <div className="eyebrow mb-2">Operations · Qualidade</div>
-        <h1 className="font-display m-0" style={{ fontSize: 32, lineHeight: 1.1, color: "var(--ink)" }}>
-          Cortes por aprovar
-        </h1>
-        <p className="text-[14px] text-ink-muted mt-1.5 max-w-[620px]">
-          O vídeo antes de ir ao ar. Aprovar libera a publicação — o pagamento só sai depois,
-          sobre o vídeo publicado.
-        </p>
-      </div>
-
-      <div className="flex gap-2 flex-wrap items-center justify-between">
-        <div className="flex gap-1">
+      <section className="px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap">
+        <div className="flex gap-1.5 flex-wrap">
           {([["AwaitingReview", "Aguardando"], ["", "Todos"]] as const).map(([id, label]) => (
             <button
               key={id || "todos"}
@@ -165,23 +155,34 @@ export function DeliveryDrafts() {
           ))}
         </div>
         {all.length > 0 && (
-          <div className="flex gap-2 flex-wrap items-center">
+          <div className="flex gap-2 flex-wrap items-center ml-auto">
             {campaignOptions.length > 1 && (
-              <select
+              <SelectField
                 value={campaignFilter}
-                onChange={(e) => setCampaignFilter(e.target.value)}
-                aria-label="Filtrar por campanha"
-                className="h-9 px-2.5 rounded-lg border border-border-soft text-[12.5px] bg-transparent max-w-[220px]"
-                style={{ color: "var(--ink)" }}
-              >
-                <option value="">Todas as campanhas</option>
-                {campaignOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-              </select>
+                onChange={setCampaignFilter}
+                ariaLabel="Filtrar por campanha"
+                className="data-[size=default]:h-8 px-3 text-[12.5px] rounded-lg border-border-soft max-w-[220px]"
+                options={[
+                  { key: "", label: "Todas as campanhas" },
+                  ...campaignOptions.map(([id, name]) => ({ key: id, label: name })),
+                ]}
+              />
             )}
-            <SearchBox value={search} onChange={setSearch} placeholder="Buscar por criador, campanha…" />
+            <SearchBox
+              value={search}
+              onChange={setSearch}
+              placeholder="Buscar por criador, campanha…"
+              className="w-48 sm:w-60"
+            />
           </div>
         )}
-      </div>
+      </section>
+
+      {/* O que esta fila decide — a frase saiu do `<h1>` que trocava. */}
+      <p className="px-8 pt-4 pb-0 m-0 text-[12.5px] text-ink-muted max-w-160">
+        O vídeo antes de ir ao ar. Aprovar libera a publicação — o pagamento só sai depois,
+        sobre o vídeo publicado.
+      </p>
 
       {isLoading ? (
         <TableSkeleton />
@@ -344,7 +345,7 @@ function DraftPanel({ draft, onDecided }: { draft: DeliveryDraftItem; onDecided:
               onClick={() => run("RequestChanges")}
               disabled={decide.isPending}
               className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-[13px] border border-border-soft disabled:opacity-50"
-              style={{ color: "#D97706" }}
+              style={{ color: "var(--color-warn)" }}
             >
               <RotateCcw className="w-3.5 h-3.5" /> Pedir correção
             </button>

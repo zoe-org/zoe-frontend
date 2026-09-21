@@ -9,6 +9,7 @@ import { useAnalysisComments, type CommentAggregate } from "@/lib/api/analyses"
 import { useVideoTranscript, type TranscriptPreview } from "@/lib/api/videos"
 import { tEnum } from "@/i18n/enums"
 import { classificationChip } from "@/lib/chip"
+import { formatScore } from "@/lib/score"
 
 /**
  * Modais de leitura longa do detalhe da menção (`src/mention-modals.jsx`):
@@ -161,7 +162,7 @@ export function TranscriptModal({
           onClick={download}
           title="Baixar como .txt"
           aria-label="Baixar transcrição"
-          className="h-9 px-3 inline-flex items-center gap-1.5 rounded-lg border border-border-soft text-[12.5px] text-ink-muted hover:text-ink hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D] transition-colors cursor-pointer"
+          className="h-9 px-3 inline-flex items-center gap-1.5 rounded-lg border border-border-soft text-[12.5px] text-ink-muted hover:text-ink hover:bg-hover transition-colors cursor-pointer"
         >
           <Download className="w-3.5 h-3.5" />
         </button>
@@ -189,7 +190,7 @@ export function TranscriptModal({
                 href={`https://www.youtube.com/watch?v=${encodeURIComponent(youtubeVideoId)}&t=${Math.floor(seg.startSeconds)}s`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-start gap-3.5 px-2.5 py-2 -mx-2.5 rounded-lg hover:bg-[#FAFBFC] dark:hover:bg-[#181B28] transition-colors"
+                className="flex items-start gap-3.5 px-2.5 py-2 -mx-2.5 rounded-lg hover:bg-hover transition-colors"
               >
                 <span
                   className="font-mono-zoe text-[11px] shrink-0 mt-0.5 px-1.5 py-0.5 rounded"
@@ -332,7 +333,7 @@ export function CommentsModal({
                   <span className="inline-flex items-center gap-1">
                     <ThumbsUp className="w-3 h-3" /> {compactNumber(c.likesCount)}
                   </span>
-                  <span className="font-mono-zoe">score {c.score.toFixed(2)}</span>
+                  <span className="font-mono-zoe">score {formatScore(c.score)}</span>
                 </div>
               </div>
             </div>
@@ -354,11 +355,11 @@ function CommentsSkeleton() {
     <div className="flex flex-col gap-4 animate-pulse">
       {[0, 1, 2, 3].map((i) => (
         <div key={i} className="flex gap-3">
-          <div className="w-8 h-8 rounded-full bg-[#F3F4F6] dark:bg-[#1A1D2D] shrink-0" />
+          <div className="w-8 h-8 rounded-full bg-tint shrink-0" />
           <div className="flex-1 space-y-2">
-            <div className="h-2.5 w-32 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
-            <div className="h-2.5 w-full rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
-            <div className="h-2.5 w-4/5 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+            <div className="h-2.5 w-32 rounded bg-tint" />
+            <div className="h-2.5 w-full rounded bg-tint" />
+            <div className="h-2.5 w-4/5 rounded bg-tint" />
           </div>
         </div>
       ))}
@@ -410,7 +411,7 @@ function ModalShell({
             </div>
             <Dialog.Close
               aria-label="Fechar"
-              className="p-1.5 -mr-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D] transition-colors cursor-pointer shrink-0"
+              className="p-1.5 -mr-1.5 rounded-lg text-ink-muted hover:text-ink hover:bg-tint transition-colors cursor-pointer shrink-0"
             >
               <X className="w-4 h-4" />
             </Dialog.Close>

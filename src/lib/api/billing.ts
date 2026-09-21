@@ -8,8 +8,19 @@ import { useAuth } from "@/features/auth/context"
 
 export type SubscriptionStatus = "Trialing" | "Active" | "PastDue" | "Canceled"
 
+/** Downgrade agendado para o fim do período. Null nos slugs = sai daquele módulo. */
+export type ScheduledChange = {
+  effectiveAt: string
+  planSlug: string | null
+  operationsPlanSlug: string | null
+  extraBrandSlots: number
+}
+
 export type Subscription = {
-  planSlug: string
+  /** Tier do Intelligence. Null = workspace só de Operations. */
+  planSlug: string | null
+  operationsPlanSlug: string | null
+  scheduledChange: ScheduledChange | null
   status: SubscriptionStatus
   currentPeriodStart: string
   currentPeriodEnd: string
@@ -46,6 +57,33 @@ export type PlanOption = {
   priceCents: number | null
   sellsExtraBrandSlots: boolean
   isCurrent: boolean
+  historyWindowDays: number
+  /** Prazo da Zoe para verificar marca nova. */
+  brandVerificationSlaHours: number
+  /** Primeira resposta do suporte, em horas úteis. */
+  supportResponseBusinessHours: number
+  assistedOnboarding: boolean
+}
+
+export type OperationsPlanOption = {
+  slug: string
+  /** Null = ilimitado. */
+  monthlyCampaignLimit: number | null
+  /** Taxa sobre o valor em custódia: 500 = 5%. */
+  takeRateBps: number
+  /** `custom_contracts`, `auto_invoice`, `reports`, `unlimited_campaigns`. */
+  features: string[]
+  supportResponseBusinessHours: number
+  priceCents: number | null
+  isCurrent: boolean
+}
+
+export type BundleOffer = {
+  /** Null = cupom não configurado neste ambiente. */
+  percentOff: number | null
+  eligiblePlanSlugs: string[]
+  operationsPlanSlug: string
+  isCurrent: boolean
 }
 
 export type BillingPlans = {
@@ -56,11 +94,70 @@ export type BillingPlans = {
   billingEnabled: boolean
   currentPlanSlug: string | null
   currentExtraBrandSlots: number
+  operationsPlans: OperationsPlanOption[]
+  currentOperationsPlanSlug: string | null
+  bundle: BundleOffer
+  /** Workspace sem assinatura e usuário que nunca usou o teste (um por pessoa). */
+  trialAvailable: boolean
+}
+
+/** `TrialConversion` = assinar durante o teste: o teste acaba e a primeira mensalidade é cobrada. */
+export type ChangeKind = "Upgrade" | "Downgrade" | "TrialConversion" | "ReleaseScheduled"
+
+export type ChangeWarning = {
+  code: "brands_over_limit" | "features_lost" | "intelligence_removed" | "operations_removed" | "replaces_scheduled_change"
+  used: number | null
+  allowed: number | null
+  features: string[] | null
+}
+
+/**
+ * Uma fatura estimada, aberta em parcelas. O total a pagar não é o preço de tabela: o
+ * provedor abate desconto e o crédito que sobrou de uma troca anterior no meio do ciclo.
+ */
+export type InvoiceEstimate = {
+  subtotalCents: number
+  /** Positivo = abatimento por cupom. */
+  discountCents: number
+  /** Positivo = abatimento pelo saldo do cliente. */
+  creditCents: number
+  amountDueCents: number
+}
+
+export type ChangePreview = {
+  kind: ChangeKind
+  effectiveAt: string
+  /** Fatura emitida no ato (upgrade). Null quando nada é cobrado agora. */
+  dueNow: InvoiceEstimate | null
+  /** Próxima fatura recorrente. Null quando o provedor não calculou. */
+  next: InvoiceEstimate | null
+  nextInvoiceAt: string | null
+  currency: string | null
+  bundleDiscountApplies: boolean
+  warnings: ChangeWarning[]
+}
+
+export type ChangeResult = {
+  subscriptionId: string
+  status: string
+  kind: ChangeKind
+  effectiveAt: string
+}
+
+/** Uma combinação de planos: o que se quer assinado depois da troca. */
+export type PlanSelection = {
+  planSlug: string | null
+  operationsPlanSlug: string | null
+  extraBrandSlots: number
 }
 
 export type ChangeSubscriptionInput = {
-  planSlug: string
+  /** Tier do Intelligence. Null/omitido = sem Intelligence. */
+  planSlug?: string | null
+  operationsPlanSlug?: string | null
   extraBrandSlots?: number
+  /** Marcas que continuam quando o plano novo tem menos slots. As demais são arquivadas na data da troca. */
+  keepBrandIds?: string[]
   /** Só na assinatura inicial. Omitido = com teste; a API recusa o segundo trial do mesmo usuário. */
   withTrial?: boolean
   /**
@@ -80,6 +177,9 @@ export const TRIAL_ALREADY_USED = "trial_already_used"
 /** Assinatura paga recusada por falta de cartão. */
 export const PAYMENT_METHOD_REQUIRED = "payment_method_required"
 
+/** Downgrade com mais marcas do que o plano novo comporta: falta escolher quais ficam. */
+export const BRAND_SELECTION_REQUIRED = "brand_selection_required"
+
 /** `hasPaymentMethod` null = não deu para saber (sem provedor ou provedor fora do ar). */
 export type PaymentMethodStatus = {
   hasCustomer: boolean
@@ -92,8 +192,16 @@ export const billingApi = {
     apiClient.get("/api/billing/plans", { signal: opts?.signal }),
   start: (input: ChangeSubscriptionInput): Promise<{ subscriptionId: string; status: string }> =>
     apiClient.post("/api/billing/subscription", input),
-  change: (input: ChangeSubscriptionInput): Promise<{ subscriptionId: string; status: string }> =>
+  change: (input: ChangeSubscriptionInput): Promise<ChangeResult> =>
     apiClient.put("/api/billing/subscription", input),
+  /** Quando vale, quanto cobra e o que se perde. Nada muda. */
+  preview: (input: PlanSelection): Promise<ChangePreview> =>
+    apiClient.post("/api/billing/subscription/preview", input),
+  cancelScheduledChange: (): Promise<void> =>
+    apiClient.delete("/api/billing/subscription/scheduled-change"),
+  /** Tela do provedor só para cadastrar cartão (sem cobrança). Volta com `?checkout=card`. */
+  setupPaymentMethod: (): Promise<{ url: string }> =>
+    apiClient.post("/api/billing/payment-method/setup"),
   portal: (returnUrl: string): Promise<{ url: string }> =>
     apiClient.post("/api/billing/portal", { returnUrl }),
   paymentMethod: (opts?: { signal?: AbortSignal }): Promise<PaymentMethodStatus> =>
@@ -121,7 +229,70 @@ export const billingApi = {
  * o slug dava a espera por encerrada no primeiro refetch, e o número de marcas na
  * tela continuava o antigo.
  */
-export type PendingProjection = { planSlug: string; extraBrandSlots: number; since: number }
+export type PendingProjection = PlanSelection & {
+  /**
+   * `immediate` espera o plano mudar; `scheduled` espera a troca agendada aparecer;
+   * `release` espera ela sumir (o plano vigente não muda nesses dois); `conversion`
+   * espera o teste acabar — o plano pode ser o mesmo do teste.
+   */
+  mode: "immediate" | "scheduled" | "release" | "conversion"
+  since: number
+}
+
+/** A projeção já reflete o que foi pedido. Uma regra só, para a tela e para o repique. */
+export function projectionArrived(
+  pending: PendingProjection | null | undefined,
+  sub: Subscription | null | undefined,
+): boolean {
+  if (!pending || !sub || sub.readOnly) return false
+  switch (pending.mode) {
+    case "immediate":
+      return (
+        sub.planSlug === pending.planSlug &&
+        sub.operationsPlanSlug === pending.operationsPlanSlug &&
+        sub.extraBrandSlots === pending.extraBrandSlots
+      )
+    case "scheduled":
+      return (
+        sub.scheduledChange != null &&
+        sub.scheduledChange.planSlug === pending.planSlug &&
+        sub.scheduledChange.operationsPlanSlug === pending.operationsPlanSlug
+      )
+    case "release":
+      return sub.scheduledChange == null
+    case "conversion":
+      return (
+        sub.status !== "Trialing" &&
+        sub.planSlug === pending.planSlug &&
+        sub.operationsPlanSlug === pending.operationsPlanSlug
+      )
+  }
+}
+
+/**
+ * Assinatura escolhida no teste que esperou o cadastro do cartão. A ida ao provedor
+ * recarrega a página; sem guardar, o cliente voltaria e teria de escolher tudo de novo.
+ */
+const PENDING_CONVERSION_KEY = "zoe:pending-conversion"
+
+export const pendingConversion = {
+  save(selection: PlanSelection) {
+    try {
+      sessionStorage.setItem(PENDING_CONVERSION_KEY, JSON.stringify(selection))
+    } catch {
+      /* navegador sem storage: o cliente escolhe de novo na volta */
+    }
+  },
+  take(): PlanSelection | null {
+    try {
+      const raw = sessionStorage.getItem(PENDING_CONVERSION_KEY)
+      sessionStorage.removeItem(PENDING_CONVERSION_KEY)
+      return raw ? (JSON.parse(raw) as PlanSelection) : null
+    } catch {
+      return null
+    }
+  },
+}
 
 /** Janela de espera antes de desistir do repique. */
 export const PROJECTION_TIMEOUT_MS = 45_000
@@ -160,11 +331,14 @@ export function useBillingPlans(pending?: PendingProjection | null) {
     queryFn: ({ signal }) => billingApi.plans({ signal }),
     enabled: Boolean(activeTenantId),
     staleTime: pending ? 0 : 5 * 60_000,
+    // Os planos só mudam na troca imediata; nas agendadas a assinatura é quem avisa.
     refetchInterval: pollWhilePending<BillingPlans>(
       pending,
       (d) =>
-        d?.currentPlanSlug === pending?.planSlug &&
-        d?.currentExtraBrandSlots === pending?.extraBrandSlots,
+        pending?.mode !== "immediate" ||
+        (d?.currentPlanSlug === pending?.planSlug &&
+          d?.currentOperationsPlanSlug === pending?.operationsPlanSlug &&
+          d?.currentExtraBrandSlots === pending?.extraBrandSlots),
     ),
   })
 }
@@ -187,7 +361,9 @@ export function useSubscriptionMutations() {
     checkout: useMutation({ mutationFn: billingApi.checkout }),
     sync: useMutation({ mutationFn: billingApi.sync, onSuccess: invalidate }),
     change: useMutation({ mutationFn: billingApi.change, onSuccess: invalidate }),
+    cancelScheduled: useMutation({ mutationFn: billingApi.cancelScheduledChange, onSuccess: invalidate }),
     portal: useMutation({ mutationFn: billingApi.portal }),
+    setupPaymentMethod: useMutation({ mutationFn: billingApi.setupPaymentMethod }),
   }
 }
 
@@ -198,13 +374,20 @@ export function useSubscription(pending?: PendingProjection | null) {
     queryFn: ({ signal }) => billingApi.subscription({ signal }),
     enabled: Boolean(activeTenantId),
     staleTime: pending ? 0 : 5 * 60_000,
-    refetchInterval: pollWhilePending<Subscription | null>(
-      pending,
-      (d) =>
-        d?.planSlug === pending?.planSlug &&
-        d?.extraBrandSlots === pending?.extraBrandSlots &&
-        !d?.readOnly,
-    ),
+    refetchInterval: pollWhilePending<Subscription | null>(pending, (d) => projectionArrived(pending, d)),
+  })
+}
+
+/** Prévia da troca para o modal. Só busca com o modal aberto; sem cache entre aberturas. */
+export function useChangePreview(selection: PlanSelection | null) {
+  const { activeTenantId } = useAuth()
+  return useQuery({
+    queryKey: ["billing-change-preview", activeTenantId, selection],
+    queryFn: () => billingApi.preview(selection!),
+    enabled: Boolean(activeTenantId && selection),
+    staleTime: 0,
+    gcTime: 0,
+    retry: false,
   })
 }
 
@@ -238,6 +421,7 @@ export function useProjectionWatch(awaiting: PendingProjection | null, arrived: 
 
   const since = awaiting?.since ?? null
   const esperado = awaiting?.planSlug ?? null
+  const imediata = awaiting?.mode === "immediate"
   const phase: ProjectionPhase = rescue != null && rescue.since === since ? rescue.phase : "waiting"
 
   // A identidade da mutação muda a cada render; o timer abaixo depende só do relógio
@@ -253,12 +437,13 @@ export function useProjectionWatch(awaiting: PendingProjection | null, arrived: 
     syncRef.current.mutate(undefined, {
       // O provedor devolve o plano que ELE tem. Bateu com o pedido: a projeção acabou
       // de ser escrita e o refetch já vem com ela — acusar falha aqui seria mentira.
+      // Na troca agendada o plano do provedor não muda: quem decide é o prazo de graça.
       onSuccess: (res) => {
-        if (!res.synced || res.planSlug !== esperado) setRescue({ since, phase: "stale" })
+        if (!res.synced || (imediata && res.planSlug !== esperado)) setRescue({ since, phase: "stale" })
       },
       onError: () => setRescue({ since, phase: "stale" }),
     })
-  }, [since, esperado])
+  }, [since, esperado, imediata])
 
   useEffect(() => {
     if (since == null || arrived) return

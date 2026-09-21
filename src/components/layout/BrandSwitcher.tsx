@@ -1,4 +1,4 @@
-import { ChevronDown, Check, Plus } from "lucide-react"
+import { ChevronDown, Check, Layers, Plus } from "lucide-react"
 import { Link } from "react-router-dom"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
@@ -20,8 +20,16 @@ function brandColor(color: string | null, slug: string): string {
  * global (BrandContext) — trocar aqui reflete em Dashboard/Monitoramento/
  * Sentimento. Sem marca assinada, não renderiza (as páginas mostram o empty).
  */
-export function BrandSwitcher() {
-  const { brands, brandId, active, setBrand } = useActiveBrand()
+export function BrandSwitcher({ allowAll = false }: {
+  /**
+   * A rota atual sabe ler várias marcas de uma vez. Só Alertas, por enquanto:
+   * as outras telas pedem um `brandId` à API e não têm modo agregado, então
+   * oferecer "todas" nelas prometeria um recorte que não existe.
+   */
+  allowAll?: boolean
+}) {
+  const { brands, brandId, active, setBrand, allBrands, setAllBrands } = useActiveBrand()
+  const todas = allowAll && allBrands
 
   // Concorrente ENTRA na lista. O dado dele já foi pago em minutos e ele consome
   // slot de marca — esconder a análise tirava valor sem ganhar nada. O que o WS-F4
@@ -37,29 +45,69 @@ export function BrandSwitcher() {
 
   if (selecionaveis.length === 0) return null
 
-  const label = active ? (active.displayName ?? active.brandName) : "Selecione uma marca"
-  const dot = active ? brandColor(active.color, active.brandSlug) : "#9AA1AE"
+  const label = todas
+    ? "Todas as marcas"
+    : active ? (active.displayName ?? active.brandName) : "Selecione uma marca"
+  const cor = active ? brandColor(active.color, active.brandSlug) : "var(--ink-muted-2)"
+  const concorrente = !todas && active?.relationship === "Competitor"
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className="border border-[#E5E7EB] dark:border-[#262A3A] flex items-center gap-1.5 text-xs text-midnight dark:text-[#E6E8EF] hover:bg-[#F9FAFB] dark:hover:bg-[#1A1D2D] px-3 py-2 rounded-md transition-colors cursor-pointer"
+          className="h-8 pl-1 pr-2.5 border border-border rounded-full flex items-center gap-2 text-[12.5px] text-ink hover:bg-hover transition-colors cursor-pointer"
           aria-label="Trocar marca ativa"
         >
-          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: dot }} />
-          <span className="max-w-[160px] truncate">{label}</span>
-          <ChevronDown className="w-3 h-3 text-[#6B7280]" />
+          {todas ? (
+            <span className="w-6 h-6 rounded-full shrink-0 flex items-center justify-center bg-tint text-ink-muted">
+              <Layers className="w-3 h-3" />
+            </span>
+          ) : (
+            <span
+              className="w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-[11px] font-bold text-white"
+              style={{ backgroundColor: cor }}
+            >
+              {label.charAt(0).toUpperCase()}
+            </span>
+          )}
+          <span className="max-w-40 truncate font-medium">{label}</span>
+          {/* O selo diz de quem é o dado ANTES de alguém ler os números da tela.
+              No recorte agregado não há "de quem": o selo sai em vez de mentir. */}
+          {!todas && (
+            <span className={`chip h-4.5 text-[10px] ${concorrente ? "chip-warn" : "chip-primary"}`}>
+              {concorrente ? "Concorrente" : "Própria"}
+            </span>
+          )}
+          <ChevronDown className="w-3.5 h-3.5 text-ink-muted" />
         </button>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="w-64">
-        <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-[#6B7280] font-semibold">
+        {allowAll && (
+          <>
+            <DropdownMenuItem
+              onSelect={() => setAllBrands(true)}
+              className="flex items-center gap-2 cursor-pointer"
+            >
+              <Layers className="w-3.5 h-3.5 text-ink-muted shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium">Todas as marcas</div>
+                <div className="text-[11px] text-ink-muted">
+                  {brands.length} {brands.length === 1 ? "marca" : "marcas"} de uma vez
+                </div>
+              </div>
+              {todas && <Check className="w-4 h-4 text-teal-500 shrink-0" />}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
+
+        <DropdownMenuLabel className="text-[10px] uppercase tracking-wide text-ink-muted font-semibold">
           Marcas monitoradas
         </DropdownMenuLabel>
 
         {selecionaveis.map((b) => {
-          const isActive = b.brandId === brandId
+          const isActive = !todas && b.brandId === brandId
           return (
             <DropdownMenuItem
               key={b.brandId}
@@ -73,12 +121,12 @@ export function BrandSwitcher() {
                   {/* Marcado, não escondido: quem troca precisa saber que está olhando
                       um concorrente antes de ler os números. */}
                   {b.relationship === "Competitor" && (
-                    <span className="text-[9.5px] uppercase tracking-wide font-semibold text-[#6B7280] shrink-0">
+                    <span className="text-[9.5px] uppercase tracking-wide font-semibold text-ink-muted shrink-0">
                       concorrente
                     </span>
                   )}
                 </div>
-                <div className="text-[11px] text-[#6B7280] truncate">
+                <div className="text-[11px] text-ink-muted truncate">
                   {b.videoCount30d} {b.videoCount30d === 1 ? "vídeo" : "vídeos"} · 30d
                 </div>
               </div>

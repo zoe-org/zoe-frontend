@@ -1,18 +1,23 @@
 import { useMemo, useState } from "react"
 import { CONTRACT_STATUS_COLOR } from "@/lib/status-colors"
-import { Plus, X, Loader2, FileText, ShieldAlert, Trash2 } from "lucide-react"
+import { Plus, X, FileText, ShieldAlert, Trash2 } from "lucide-react"
 import { notifyError, notifySuccess } from "@/lib/feedback"
-import { useEscapeKey } from "@/lib/useEscapeKey"
-import { useFocusTrap } from "@/lib/useFocusTrap"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { Input } from "@/components/ui/input"
+import { Modal, ModalFooter } from "@/components/ui/modal"
+import { Segmented } from "@/components/ui/segmented"
+import { escrowMissing, isEscrowMissing } from "@/lib/contracts"
+import { SelectField } from "@/components/ui/select-field"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { StatusChip } from "@/components/ui/status-chip"
 import { RoleGate } from "@/features/auth/RoleGate"
 import { tEnum } from "@/i18n/enums"
 import { fmtDate, matches } from "@/lib/operations-format"
+import { formatDistanceToNow } from "date-fns"
+import { ptBR } from "date-fns/locale"
+import { stagger } from "@/lib/motion"
 import {
-  Field, Select, TableSkeleton, ErrorState, SearchBox, NoResults,
+  Field, TableSkeleton, ErrorState, SearchBox, NoResults,
 } from "@/components/operations/shared"
 import {
   useContractDefaults,
@@ -22,6 +27,40 @@ import {
 } from "@/lib/api/operations"
 
 const STATUS_COLOR = CONTRACT_STATUS_COLOR
+
+/**
+ * Ordem do fluxo, não alfabética: é a vida do contrato.
+ */
+const STATUS_ORDER = ["Draft", "SentForSignature", "Signed", "Cancelled"]
+
+/**
+ * Quando, no sentido que importa em cada estado.
+ *
+ * Era uma data absoluta de criação para todo mundo — que não responde nem "há
+ * quanto tempo este rascunho está parado" nem "quando isto foi assinado".
+ *
+ * Assinado usa `signedAt`, que a tela não usava. Enviado mostra a criação e não
+ * "esperando assinatura há X": a API não traz o carimbo do envio, e contar do
+ * `createdAt` seria inventar uma espera maior do que a real.
+ */
+function WhenCell({ item }: { item: ContractSummary }) {
+  const relativo = (iso: string) =>
+    formatDistanceToNow(new Date(iso), { addSuffix: true, locale: ptBR })
+
+  if (item.status === "Signed" && item.signedAt) {
+    return (
+      <span className="font-mono-zoe text-ink-2" title={`Assinado em ${fmtDate(item.signedAt)}`}>
+        assinado {fmtDate(item.signedAt)}
+      </span>
+    )
+  }
+  return (
+    <span className="text-ink-muted" title={`Criado em ${fmtDate(item.createdAt)}`}>
+      {item.status === "Draft" ? "rascunho " : "criado "}
+      {relativo(item.createdAt)}
+    </span>
+  )
+}
 
 /** Custódia aberta (estado), prevista e ainda não aberta, ou inexistente por desenho. */
 function EscrowCell({ item }: { item: ContractSummary }) {
@@ -33,6 +72,19 @@ function EscrowCell({ item }: { item: ContractSummary }) {
     )
   }
   if (item.usesEscrow) {
+    // Depois de assinado, "prevista e não aberta" deixa de ser uma etapa e vira
+    // dinheiro parado — é a única pendência do fluxo que ninguém avisa.
+    if (isEscrowMissing(item)) {
+      return (
+        <span
+          className="inline-flex items-center gap-1.5 font-medium"
+          style={{ color: "var(--color-warn)" }}
+          title="Contrato assinado que previa custódia e ainda não tem conta aberta."
+        >
+          <ShieldAlert className="w-3.5 h-3.5 shrink-0" /> não aberta
+        </span>
+      )
+    }
     return <span className="text-ink-muted">prevista, não aberta</span>
   }
   return <span className="text-ink-muted">sem custódia</span>
@@ -62,65 +114,150 @@ export default function OperationsContractsPage() {
     return p
   })
 
+  const [status, setStatus] = useState("")
+  const [soPendentes, setSoPendentes] = useState(false)
+
   // Criador e campanha sao o que se procura; status e modalidade entram porque "assinado"
   // e "publipost" sao termos que a pessoa digita sem pensar que sao filtros.
   const items = useMemo(
-    () => allContracts.filter((c) => (!campaignFilter || c.campaignId === campaignFilter) && matches(
-      search, c.influencerName, c.campaignName, tEnum("contractStatus", c.status),
-      c.modality ? tEnum("contractModality", c.modality) : c.hybridCode)),
-    [allContracts, search, campaignFilter],
+    () => allContracts.filter((c) => (!campaignFilter || c.campaignId === campaignFilter)
+      && (!status || c.status === status)
+      && (!soPendentes || isEscrowMissing(c))
+      && matches(
+        search, c.influencerName, c.campaignName, tEnum("contractStatus", c.status),
+        c.modality ? tEnum("contractModality", c.modality) : c.hybridCode)),
+    [allContracts, search, campaignFilter, status, soPendentes],
   )
 
+  // Escopo da faixa: o mesmo da lista, menos a busca e o próprio recorte de
+  // pendência — senão o aviso sumiria no clique que ele mesmo provocou.
+  const pendentes = useMemo(
+    () => escrowMissing(allContracts.filter((c) => !campaignFilter || c.campaignId === campaignFilter)),
+    [allContracts, campaignFilter],
+  )
+
+  /**
+   * Abas do status. O recorte por campanha entra na contagem (ela é o escopo da
+   * lista), a busca não — um número que muda a cada tecla digitada deixa de ser
+   * panorama. Só aparecem os estados que existem: aba com zero fixo é botão
+   * morto.
+   */
+  const statusTabs = useMemo(() => {
+    const base = allContracts.filter((c) => !campaignFilter || c.campaignId === campaignFilter)
+    const counts = new Map<string, number>()
+    for (const c of base) counts.set(c.status, (counts.get(c.status) ?? 0) + 1)
+    return [
+      { key: "", label: "Todos", count: base.length },
+      ...STATUS_ORDER.filter((k) => counts.has(k)).map((k) => ({
+        key: k,
+        label: tEnum("contractStatus", k),
+        count: counts.get(k) ?? 0,
+      })),
+    ]
+  }, [allContracts, campaignFilter])
+
   return (
-    <div className="-m-6 border-t border-border-soft" style={{ color: "var(--ink)" }}>
-      <section className="px-8 pt-7 pb-5 border-b border-border-soft" style={{ background: "var(--surface)" }}>
-        <div className="flex items-start justify-between gap-6 flex-wrap">
-          <div>
-            <div className="eyebrow mb-2.5">Operations · Contratos</div>
+    <div className="-m-6" style={{ color: "var(--ink)" }}>
+      <section className="px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
+        <div className="flex items-end justify-between gap-6 flex-wrap">
+          <div className="flex-1 max-w-200 min-w-70">
+            <div className="eyebrow mb-3">Operations · Documentos</div>
             <h1 className="font-display m-0" style={{ fontSize: 34, lineHeight: 1.1, color: "var(--ink)" }}>
               Contratos
             </h1>
-            <div className="text-[14px] text-ink-muted mt-1.5 max-w-140">
-              <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>
-                {allContracts.length} {allContracts.length === 1 ? "contrato" : "contratos"}
-              </span>{" "}
-              neste workspace. O documento é montado a partir do template da modalidade —
-              você preenche os valores, as cláusulas vêm prontas.
-            </div>
+            <p className="text-[14.5px] leading-relaxed text-ink-muted mt-2.5 mb-0 max-w-200">
+              O documento é montado a partir do template da modalidade — você preenche os
+              valores, as cláusulas vêm prontas.
+            </p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {campaignFilterName && (
-              <button
-                onClick={clearCampaignFilter}
-                title="Mostrar os contratos de todas as campanhas"
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[12px] font-medium"
-                style={{ background: "var(--color-teal-50, #F0FDFB)", color: "var(--color-teal-500)" }}
-              >
-                Campanha: {campaignFilterName} <X className="w-3 h-3" />
-              </button>
-            )}
-            {allContracts.length > 0 && (
-              <SearchBox
-                value={search}
-                onChange={setSearch}
-                placeholder="Buscar por criador, campanha…"
-              />
-            )}
           <RoleGate minRole="Admin">
             <button
               onClick={() => setCreateOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-medium text-white transition-colors"
+              className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-md text-[13px] font-medium text-white transition-colors shrink-0 cursor-pointer"
               style={{ background: "var(--color-teal-500)" }}
             >
               <Plus className="w-3.5 h-3.5" /> Novo contrato
             </button>
           </RoleGate>
-          </div>
         </div>
       </section>
 
+      {/* Barra de trabalho: o recorte vigente e a busca, coladas na tabela. */}
+      <section
+        className="px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap sticky top-0 z-10"
+        style={{ background: "var(--surface)" }}
+      >
+        <div className="flex items-center gap-2 flex-wrap">
+          {statusTabs.length > 2 && (
+            <Segmented
+              items={statusTabs}
+              value={status}
+              onChange={setStatus}
+              ariaLabel="Recorte por status do contrato"
+            />
+          )}
+          <span className="text-[12px] text-ink-muted whitespace-nowrap">
+            {items.length === allContracts.length
+              ? `${allContracts.length} ${allContracts.length === 1 ? "contrato" : "contratos"}`
+              : `${items.length} de ${allContracts.length} contratos`}
+          </span>
+          {campaignFilterName && (
+            <button
+              onClick={clearCampaignFilter}
+              title="Mostrar os contratos de todas as campanhas"
+              className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[12px] font-medium cursor-pointer"
+              // `--teal-bg` e não o hex fixo: `#F0FDFB` ficava branco no escuro.
+              style={{ background: "var(--teal-bg)", color: "var(--color-teal-500)" }}
+            >
+              Campanha: {campaignFilterName} <X className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+
+        {allContracts.length > 0 && (
+          <SearchBox
+            value={search}
+            onChange={setSearch}
+            placeholder="Buscar por criador, campanha…"
+            className="w-48 sm:w-64 ml-auto"
+          />
+        )}
+      </section>
+
       <section style={{ background: "var(--surface)" }}>
-        {contracts.isLoading ? (
+        {/* A pendência que ninguém mais mostra: a tela de Custódia não lista o que
+          não existe, e o Painel conta o que está lá. Aqui é onde ela aparece. */}
+      {pendentes.length > 0 && (
+        <section
+          className="px-8 py-3 border-b border-border-soft flex items-center gap-3 flex-wrap"
+          style={{ background: "var(--warn-bg)" }}
+        >
+          <ShieldAlert className="w-4 h-4 shrink-0" style={{ color: "var(--color-warn)" }} />
+          <span className="text-[13px] flex-1 min-w-0" style={{ color: "var(--ink)" }}>
+            <span className="font-semibold">
+              {pendentes.length === 1
+                ? "1 contrato assinado"
+                : `${pendentes.length} contratos assinados`}
+            </span>
+            {pendentes.length === 1 ? " previa custódia e não tem conta aberta." : " previam custódia e não têm conta aberta."}
+            {" "}O valor não está reservado.
+          </span>
+          <button
+            onClick={() => { setSoPendentes((v) => !v); setStatus("") }}
+            aria-pressed={soPendentes}
+            className="inline-flex items-center h-8 px-3 text-[12.5px] font-medium rounded-lg border transition-colors cursor-pointer shrink-0"
+            style={{
+              borderColor: "var(--color-warn)",
+              color: soPendentes ? "#fff" : "var(--color-warn)",
+              background: soPendentes ? "var(--color-warn)" : "transparent",
+            }}
+          >
+            {soPendentes ? "Ver todos" : "Ver só esses"}
+          </button>
+        </section>
+      )}
+
+      {contracts.isLoading ? (
           <TableSkeleton />
         ) : contracts.isError ? (
           <ErrorState onRetry={() => contracts.refetch()} />
@@ -137,7 +274,7 @@ export default function OperationsContractsPage() {
             hint="Um contrato começa como rascunho a partir de uma modalidade. Só depois de assinado é que a custódia pode ser aberta."
           />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto overflow-y-clip">
             <table className="w-full text-[13px]">
               <thead>
                 <tr className="border-b border-border-soft">
@@ -146,15 +283,16 @@ export default function OperationsContractsPage() {
                   <th className="text-left py-3 eyebrow font-semibold">Modalidade</th>
                   <th className="text-left py-3 eyebrow font-semibold">Status</th>
                   <th className="text-left py-3 eyebrow font-semibold">Custódia</th>
-                  <th className="text-left py-3 eyebrow font-semibold">Criado em</th>
+                  <th className="text-left py-3 eyebrow font-semibold">Quando</th>
                   <th className="px-8 py-3"><span className="sr-only">Ações</span></th>
                 </tr>
               </thead>
               <tbody>
-                {items.map((it) => (
+                {items.map((it, i) => (
                   <tr
                     key={it.contractId}
-                    className="border-b border-border-soft hover:bg-[#FAFBFC] dark:hover:bg-[#181B28] transition-colors"
+                    className="border-b border-border-soft hover:bg-hover transition-colors z-rise"
+                    style={stagger(Math.min(i, 12))}
                   >
                     <td className="px-8 py-3.5">
                       <Link to={`/operations/contracts/${it.contractId}`} className="block">
@@ -189,7 +327,7 @@ export default function OperationsContractsPage() {
                         {it.status === "Draft" && !it.templateLegalReviewed && (
                           <span
                             title="O template desta modalidade ainda não passou por revisão jurídica — o contrato não sai para assinatura assim."
-                            className="text-[#D97706]"
+                            className="text-warn"
                           >
                             <ShieldAlert className="w-3.5 h-3.5" />
                           </span>
@@ -197,7 +335,7 @@ export default function OperationsContractsPage() {
                       </div>
                     </td>
                     <td className="py-3.5"><EscrowCell item={it} /></td>
-                    <td className="py-3.5 font-mono-zoe text-ink-2">{fmtDate(it.createdAt)}</td>
+                    <td className="py-3.5 text-[12.5px]"><WhenCell item={it} /></td>
                     <td className="px-8 py-3.5 text-right">
                       <RoleGate allow={["Owner", "Admin"]}>
                         {/* Só rascunho: a partir do envio existe envelope no provedor e
@@ -253,7 +391,7 @@ function DeleteDraftButton({ item }: { item: ContractSummary }) {
         onClick={() => setConfirming(true)}
         title="Excluir rascunho"
         aria-label={`Excluir rascunho de ${item.influencerName}`}
-        className="p-1.5 rounded-md text-ink-muted hover:text-[#DC2626] transition-colors"
+        className="p-1.5 rounded-md text-ink-muted hover:text-neg transition-colors"
       >
         <Trash2 className="w-3.5 h-3.5" />
       </button>
@@ -266,7 +404,7 @@ function DeleteDraftButton({ item }: { item: ContractSummary }) {
         onClick={deleteDraft}
         disabled={remove.isPending}
         className="text-[12px] font-medium px-2 py-1 rounded-md disabled:opacity-50"
-        style={{ background: "#DC262615", color: "#DC2626" }}
+        style={{ background: "#DC262615", color: "var(--color-neg)" }}
       >
         {remove.isPending ? "Excluindo…" : "Confirmar"}
       </button>
@@ -306,8 +444,6 @@ function CreateContractModal({
   const [autoRelease, setAutoRelease] = useState<boolean | null>(null)
   const tenantDefaults = useContractDefaults()
   const autoReleaseValue = autoRelease ?? tenantDefaults.data?.autoReleaseOnTimeout ?? true
-  useEscapeKey(onClose)
-  const dialogRef = useFocusTrap<HTMLDivElement>()
 
   const people = useMemo(() => roster.data?.items ?? [], [roster.data])
 
@@ -343,11 +479,10 @@ function CreateContractModal({
   const hasProposal = (i: CampaignInvite) =>
     i.feeCents != null || Boolean(i.expectedDeliverables?.trim()) || i.deliveryDeadline != null
 
-  const renderOption = (p: RosterItem, suffix: string) => (
-    <option key={p.influencerId} value={p.influencerId}>
-      {p.displayName || p.fullName} — {suffix}
-    </option>
-  )
+  const creatorOption = (p: RosterItem, suffix: string) => ({
+    key: p.influencerId,
+    label: `${p.displayName || p.fullName} — ${suffix}`,
+  })
 
   const duplicates = useMemo(
     () => campaignId && influencerId
@@ -422,37 +557,24 @@ function CreateContractModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-[90] flex items-center justify-center p-4"
-      style={{ background: "rgba(7,9,26,0.32)", backdropFilter: "blur(2px)" }}
-      onClick={onClose}
+    <Modal
+      eyebrow="Contratos"
+      title="Novo contrato"
+      description="Nasce como rascunho: nada é enviado ao criador até você revisar."
+      onClose={onClose}
+      footer={
+        <ModalFooter
+          onCancel={onClose}
+          onSubmit={submit}
+          submitLabel="Criar rascunho"
+          pending={create.isPending}
+          // Campanha deixou de ser pré-requisito: o que trava agora é elenco
+          // vazio, porque sem criador não há com quem contratar.
+          disabled={!canSubmit || people.length === 0}
+        />
+      }
     >
-      <div
-        className="w-full max-w-md rounded-xl border border-border-soft shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
-        style={{ background: "var(--surface)" }}
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Novo contrato"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between px-6 pt-5 pb-3 shrink-0">
-          <div>
-            <div className="eyebrow mb-1.5">Contratos</div>
-            <h2 className="font-display m-0" style={{ fontSize: 22, color: "var(--ink)" }}>
-              Novo contrato
-            </h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-[#F3F4F6] dark:hover:bg-[#1A1D2D]"
-            aria-label="Fechar"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="px-6 py-2 overflow-y-auto flex-1 flex flex-col gap-3.5">
+      <div className="flex flex-col gap-3.5">
           {people.length === 0 ? (
             <div className="py-6 text-center text-[13px] text-ink-muted">
               Nenhum criador no elenco ainda.{" "}
@@ -469,16 +591,20 @@ function CreateContractModal({
                   ? "A modalidade e as cláusulas vêm dela."
                   : "Trabalho pontual não precisa de campanha — escolha a modalidade abaixo."}
               >
-                <Select value={campaignId} onChange={changeCampaign}>
-                  {/* "Sem campanha" é opção, não estado vazio: um "Selecione…" que também
-                      significa "nenhuma" faria a pessoa achar que esqueceu de escolher. */}
-                  <option value="">Sem campanha (avulso)</option>
-                  {openCampaigns.map((c) => (
-                    <option key={c.campaignId} value={c.campaignId}>
-                      {c.name} — {tEnum("contractModality", c.modality)}
-                    </option>
-                  ))}
-                </Select>
+                {/* "Sem campanha" é opção, não estado vazio: um "Selecione…" que também
+                    significa "nenhuma" faria a pessoa achar que esqueceu de escolher. */}
+                <SelectField
+                  value={campaignId}
+                  onChange={changeCampaign}
+                  ariaLabel="Campanha"
+                  options={[
+                    { key: "", label: "Sem campanha (avulso)" },
+                    ...openCampaigns.map((c) => ({
+                      key: c.campaignId,
+                      label: `${c.name} — ${tEnum("contractModality", c.modality)}`,
+                    })),
+                  ]}
+                />
               </Field>
 
               {!campaignId && (
@@ -486,15 +612,16 @@ function CreateContractModal({
                   label="Modalidade"
                   hint="Resolve o template do documento. No contrato com campanha, ela vem da campanha."
                 >
-                  <Select value={avulsaModality} onChange={changeModality}>
-                    <option value="">Selecione…</option>
-                    {CONTRACT_MODALITIES.map((m) => (
-                      <option key={m} value={m}>
-                        {tEnum("contractModality", m)}
-                        {!supportsEscrow(m) ? " — sem custódia" : ""}
-                      </option>
-                    ))}
-                  </Select>
+                  <SelectField
+                    value={avulsaModality}
+                    onChange={changeModality}
+                    ariaLabel="Modalidade"
+                    placeholder="Selecione…"
+                    options={CONTRACT_MODALITIES.map((m) => ({
+                      key: m,
+                      label: `${tEnum("contractModality", m)}${!supportsEscrow(m) ? " — sem custódia" : ""}`,
+                    }))}
+                  />
                 </Field>
               )}
 
@@ -509,23 +636,23 @@ function CreateContractModal({
               )}
 
               <Field label="Criador">
-                <Select value={influencerId} onChange={setInfluencerId}>
-                  <option value="">Selecione…</option>
-                  {invitedCreators.length > 0 ? (
-                    <>
-                      <optgroup label="Convidados para esta campanha">
-                        {invitedCreators.map((p) => renderOption(p, inviteStatus(inviteByCreator.get(p.influencerId)!)))}
-                      </optgroup>
-                      {otherCreators.length > 0 && (
-                        <optgroup label="Resto do elenco">
-                          {otherCreators.map((p) => renderOption(p, p.email))}
-                        </optgroup>
-                      )}
-                    </>
-                  ) : (
-                    otherCreators.map((p) => renderOption(p, p.email))
-                  )}
-                </Select>
+                <SelectField
+                  value={influencerId}
+                  onChange={setInfluencerId}
+                  ariaLabel="Criador"
+                  placeholder="Selecione…"
+                  options={invitedCreators.length > 0
+                    ? [
+                      {
+                        group: "Convidados para esta campanha",
+                        options: invitedCreators.map((p) => creatorOption(p, inviteStatus(inviteByCreator.get(p.influencerId)!))),
+                      },
+                      ...(otherCreators.length > 0
+                        ? [{ group: "Resto do elenco", options: otherCreators.map((p) => creatorOption(p, p.email)) }]
+                        : []),
+                    ]
+                    : otherCreators.map((p) => creatorOption(p, p.email))}
+                />
               </Field>
 
               {selectedInvite && hasProposal(selectedInvite) && (
@@ -557,7 +684,7 @@ function CreateContractModal({
               {/* Com o rascunho nascendo no aceite do convite, criar pela tela duplicava sem
                   ninguém perceber. Não bloqueia: dois trabalhos na mesma campanha existem. */}
               {duplicates.length > 0 && (
-                <div className="rounded-lg p-3 text-[12px]" style={{ background: "#D9770615", color: "#B45309" }}>
+                <div className="rounded-lg p-3 text-[12px]" style={{ background: "var(--warn-bg)", color: "var(--color-warn)" }}>
                   Este criador já tem {duplicates.length === 1 ? "um contrato" : `${duplicates.length} contratos`} nesta
                   campanha ({duplicates.map((c) => tEnum("contractStatus", c.status).toLowerCase()).join(", ")}).{" "}
                   <button
@@ -594,7 +721,7 @@ function CreateContractModal({
                 </label>
 
                 {escrowBlocked && (
-                  <p className="text-[11.5px] text-[#D97706] pl-6.5">{escrowBlocked}</p>
+                  <p className="text-[11.5px] text-warn pl-6.5">{escrowBlocked}</p>
                 )}
 
                 {usesEscrow && !escrowBlocked && (
@@ -667,27 +794,7 @@ function CreateContractModal({
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-border-soft shrink-0">
-          <button
-            onClick={onClose}
-            className="px-3.5 py-2 rounded-lg text-[13px] font-medium border border-border-soft hover:bg-[#FBFCFD] dark:hover:bg-[#1A1D2D]"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={submit}
-            // Campanha deixou de ser pré-requisito: o que trava agora é elenco vazio,
-            // porque sem criador não há com quem contratar.
-            disabled={!canSubmit || people.length === 0}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-[13px] font-medium text-white disabled:opacity-50"
-            style={{ background: "var(--color-teal-500)" }}
-          >
-            {create.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            Criar rascunho
-          </button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
 

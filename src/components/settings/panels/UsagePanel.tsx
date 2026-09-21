@@ -30,8 +30,8 @@ const WARNING_THRESHOLD = 0.8
 // Cores por tom, não por estado: dois estados param a coleta e ambos são `neg`.
 const TONE = {
   normal: { color: "var(--color-teal-500)", bg: "var(--teal-bg)", border: "rgba(0,167,153,.28)" },
-  warn: { color: "var(--color-warn)", bg: "#FFFBEB", border: "rgba(217,119,6,.32)" },
-  neg: { color: "var(--color-neg)", bg: "#FEF2F2", border: "rgba(220,38,38,.32)" },
+  warn: { color: "var(--color-warn)", bg: "var(--warn-bg)", border: "rgba(217,119,6,.32)" },
+  neg: { color: "var(--color-neg)", bg: "var(--neg-bg)", border: "rgba(220,38,38,.32)" },
 } as const
 
 type Tone = keyof typeof TONE
@@ -510,7 +510,7 @@ function BlockedBrandsBanner({ rows }: { rows: BrandUsage[] }) {
   return (
     <div
       className="flex items-start gap-3 rounded-[14px] border px-4 py-3.5"
-      style={{ background: "#FEF2F2", borderColor: "rgba(220,38,38,.32)" }}
+      style={{ background: "var(--neg-bg)", borderColor: "rgba(220,38,38,.32)" }}
     >
       <AlertCircle className="w-[17px] h-[17px] shrink-0 mt-0.5" style={{ color: "var(--color-neg)" }} />
       <div>
@@ -845,8 +845,8 @@ function SpendCapCard({
 function SkeletonScreen() {
   return (
     <div className="space-y-4 animate-pulse">
-      <div className="h-40 rounded-[14px] bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
-      <div className="h-56 rounded-[14px] bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+      <div className="h-40 rounded-[14px] bg-tint" />
+      <div className="h-56 rounded-[14px] bg-tint" />
     </div>
   )
 }

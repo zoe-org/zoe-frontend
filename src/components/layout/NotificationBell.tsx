@@ -57,7 +57,7 @@ export function NotificationBell() {
       <PopoverTrigger asChild>
         <button
           aria-label={unread > 0 ? `Alertas — ${unread} não lidos` : "Alertas"}
-          className="relative text-[#6B7280] p-2 rounded-md hover:text-ink hover:bg-muted dark:hover:text-[#E6E8EF] transition-colors cursor-pointer"
+          className="relative text-ink-muted p-2 rounded-full hover:text-ink hover:bg-muted dark:hover:text-ink transition-colors cursor-pointer"
         >
           <Bell className="w-4 h-4" />
           {/* O ponto só existe quando há algo não lido. Antes era fixo no markup:
@@ -106,7 +106,7 @@ export function NotificationBell() {
           {events.isLoading ? (
             <div className="p-4 space-y-3 animate-pulse">
               {[0, 1, 2].map((i) => (
-                <div key={i} className="h-11 rounded bg-[#F3F4F6] dark:bg-[#1A1D2D]" />
+                <div key={i} className="h-11 rounded bg-tint" />
               ))}
             </div>
           ) : recent.length === 0 ? (
@@ -120,7 +120,7 @@ export function NotificationBell() {
 
         <button
           onClick={() => { setOpen(false); navigate("/alerts") }}
-          className="w-full py-3 text-[12.5px] font-semibold text-teal-700 dark:text-teal-300 border-t border-border-soft bg-[#FAFBFC] dark:bg-[#151824] hover:text-teal-500 transition-colors"
+          className="w-full py-3 text-[12.5px] font-semibold text-teal-700 dark:text-teal-300 border-t border-border-soft bg-inset hover:text-teal-500 transition-colors"
         >
           Ver todos os alertas →
         </button>
@@ -143,7 +143,7 @@ function NotificationRow({ event, onOpen }: { event: AlertEvent; onOpen: () => v
   return (
     <button
       onClick={onOpen}
-      className="w-full text-left flex items-start gap-3 px-4 py-3 border-b border-border-soft transition-colors hover:bg-[#FAFBFC] dark:hover:bg-[#181B28]"
+      className="w-full text-left flex items-start gap-3 px-4 py-3 border-b border-border-soft transition-colors hover:bg-hover"
       // Não lida recebe fundo: é o que faz a lista ser varrível sem ler tudo.
       style={event.isRead ? undefined : { background: "var(--teal-bg)" }}
     >

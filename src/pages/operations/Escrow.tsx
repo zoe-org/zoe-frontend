@@ -3,12 +3,13 @@ import { ESCROW_STATE_COLOR } from "@/lib/status-colors"
 import { Link } from "react-router-dom"
 import { Loader2, Wallet, AlertTriangle, Clock, X } from "lucide-react"
 import { notifyError, notifySuccess } from "@/lib/feedback"
-import { useEscapeKey } from "@/lib/useEscapeKey"
-import { useFocusTrap } from "@/lib/useFocusTrap"
 import { EmptyBlock } from "@/components/ui/empty-block"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { RoleGate } from "@/features/auth/RoleGate"
 import { tEnum } from "@/i18n/enums"
 import { fmtDate, matches, campaignLabel } from "@/lib/operations-format"
+import { stagger } from "@/lib/motion"
+import { StatBand, type Stat } from "@/components/ui/stat-band"
 import {
   TableSkeleton, ErrorState, SearchBox, NoResults,
 } from "@/components/operations/shared"
@@ -62,123 +63,123 @@ export default function OperationsEscrowPage() {
   }, [items, stateFilter, search])
 
   const current = items.find((e) => e.escrowAccountId === selected) ?? null
+  const [lastOpened, setLastOpened] = useState<EscrowSummary | null>(null)
 
-  const kpis = [
+  const kpis: Stat[] = [
     {
       label: "Em custódia",
       value: totals ? fmtCents(totals.heldCents) : "—",
       hint: "autorizado e ainda não resolvido",
     },
     {
+      // `tone` e não `#059669`: o hex fixo não acompanhava o modo escuro.
       label: "Liberado",
       value: totals ? fmtCents(totals.releasedCents) : "—",
       hint: "histórico pago aos criadores",
-      color: "#059669",
+      tone: "pos",
     },
     {
       label: "Contratos ativos",
       value: totals ? String(totals.activeCount) : "—",
       hint: "custódias em andamento",
     },
+    // Só aparece quando houve devolução: uma coluna fixa em zero seria ruído,
+    // e essa linha andava solta embaixo da faixa sem rótulo de destaque.
+    ...(totals && totals.refundedCents > 0
+      ? [{
+        label: "Devolvido às marcas",
+        value: fmtCents(totals.refundedCents),
+        hint: "custódias canceladas ou expiradas",
+      } as Stat]
+      : []),
   ]
 
   return (
-    <div className="flex flex-col gap-5">
-      <div>
-        <div className="eyebrow mb-2">Operations · Custódia</div>
-        <h1 className="font-display m-0" style={{ fontSize: 32, lineHeight: 1.1, color: "var(--ink)" }}>
-          Custódia
-        </h1>
-        <p className="text-[14px] text-ink-muted mt-1.5 max-w-[640px]">
-          O dinheiro fica reservado no provedor de pagamento até a entrega ser aprovada.
-          A Zoe orquestra e nunca custodia — nenhum valor passa por conta nossa.
-        </p>
-      </div>
-
-      <div className="rounded-xl border border-border-soft overflow-hidden" style={{ background: "var(--surface)" }}>
-        {/* Três colunas só quando cabe o valor inteiro. Com a barra lateral aberta, "R$ 1.746.205,00"
-            em 26 px passava do card e encostava no do lado (visto em 15/09). */}
-        <div className="grid grid-cols-1 lg:grid-cols-3">
-          {kpis.map((k, i) => (
-            <div
-              key={k.label}
-              className={`px-5 py-4 min-w-0 ${i < 2 ? "border-b lg:border-b-0 lg:border-r border-border-soft" : ""}`}
-            >
-              <div className="eyebrow">{k.label}</div>
-              <div
-                className="font-display mt-1.5"
-                style={{
-                  fontSize: k.value.length > 13 ? 21 : 26,
-                  lineHeight: 1.1,
-                  color: k.color ?? "var(--ink)",
-                  overflowWrap: "anywhere",
-                }}
-              >
-                {k.value}
-              </div>
-              <div className="text-[11px] text-ink-muted mt-1">{k.hint}</div>
-            </div>
-          ))}
+    // Full-bleed com divisórias, como o resto da plataforma. Era uma pilha de
+    // cartões dentro do padding padrão — na mesma sidebar que Contratos e
+    // Elenco, as duas linguagens liam como dois produtos.
+    <div className="-m-6" style={{ color: "var(--ink)" }}>
+      <section className="px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
+        <div className="flex-1 max-w-190 min-w-70">
+          <div className="eyebrow mb-3">Operations · Financeiro</div>
+          <h1 className="font-display m-0" style={{ fontSize: 34, lineHeight: 1.1, color: "var(--ink)" }}>
+            Custódia
+          </h1>
+          <p className="text-[14.5px] leading-relaxed text-ink-muted mt-2.5 mb-0 max-w-150">
+            O dinheiro fica reservado no provedor de pagamento até a entrega ser aprovada.
+            A Zoe orquestra e nunca custodia — nenhum valor passa por conta nossa.
+          </p>
         </div>
-      </div>
+      </section>
 
-      {totals && totals.refundedCents > 0 && (
-        <div className="text-[12px] text-ink-muted">
-          Devolvido às marcas: <span className="font-mono-zoe">{fmtCents(totals.refundedCents)}</span>
-        </div>
-      )}
+      <StatBand items={kpis} />
 
       {escrow.isLoading ? (
         <TableSkeleton rows={3} />
       ) : escrow.isError ? (
         <ErrorState onRetry={() => escrow.refetch()} />
       ) : items.length === 0 ? (
-        <EmptyBlock message="Nenhuma custódia ainda. Ela nasce quando um contrato assinado tem valor a reservar." />
+        <EmptyBlock
+          className="py-16"
+          message="Nenhuma custódia ainda. Ela nasce quando um contrato assinado tem valor a reservar."
+        />
       ) : (
         <>
-          <div className="flex justify-end">
-            <SearchBox value={search} onChange={setSearch} placeholder="Buscar por criador, campanha…" />
-          </div>
-
-          {/* Trilha de estados: o panorama do kanban sem a largura dele. Quebra em varias
-              linhas em vez de rolar, e serve de filtro. */}
-          <div className="flex flex-wrap gap-1.5">
-            <StateChip
-              label="Todas"
-              n={items.length}
-              color="var(--ink-muted)"
-              active={stateFilter === null}
-              onClick={() => setStateFilter(null)}
-            />
-            {ESCROW_STATES.map((st) => (
+          {/* Barra de trabalho: a trilha de estados (que é panorama e filtro ao
+              mesmo tempo) à esquerda, o resultado e a busca à direita. */}
+          <section
+            className="px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap sticky top-0 z-10"
+            style={{ background: "var(--surface)" }}
+          >
+            <div className="flex flex-wrap gap-1.5">
               <StateChip
-                key={st}
-                label={tEnum("escrowState", st)}
-                n={counts[st]}
-                color={COLUMN_COLOR[st]}
-                active={stateFilter === st}
-                // Estado vazio nao vira botao morto: continua visivel para o panorama,
-                // mas nao convida a um clique que leva a lugar nenhum.
-                onClick={counts[st] ? () => setStateFilter(st) : undefined}
+                label="Todas"
+                n={items.length}
+                color="var(--ink-muted)"
+                active={stateFilter === null}
+                onClick={() => setStateFilter(null)}
               />
-            ))}
-          </div>
+              {ESCROW_STATES.map((st) => (
+                <StateChip
+                  key={st}
+                  label={tEnum("escrowState", st)}
+                  n={counts[st]}
+                  color={COLUMN_COLOR[st]}
+                  active={stateFilter === st}
+                  // Estado vazio nao vira botao morto: continua visivel para o panorama,
+                  // mas nao convida a um clique que leva a lugar nenhum.
+                  onClick={counts[st] ? () => setStateFilter(st) : undefined}
+                />
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2 ml-auto">
+              <span className="text-[12px] text-ink-muted whitespace-nowrap">
+                {visible.length === items.length
+                  ? `${items.length} ${items.length === 1 ? "custódia" : "custódias"}`
+                  : `${visible.length} de ${items.length} custódias`}
+              </span>
+              <SearchBox
+                value={search}
+                onChange={setSearch}
+                placeholder="Buscar por criador, campanha…"
+                className="w-48 sm:w-64"
+              />
+            </div>
+          </section>
 
           {visible.length === 0 && search ? (
             <NoResults query={search} onClear={() => setSearch("")} />
           ) : visible.length === 0 ? (
-            <EmptyBlock message="Nenhuma custódia neste estado." />
+            <EmptyBlock className="py-16" message="Nenhuma custódia neste estado." />
           ) : (
-            <div
-              className="rounded-xl border border-border-soft overflow-hidden"
-              style={{ background: "var(--surface)" }}
-            >
+            <div>
               {visible.map((e, i) => (
                 <EscrowRow
                   key={e.escrowAccountId}
                   e={e}
-                  first={i === 0}
-                  onOpen={() => setSelected(e.escrowAccountId)}
+                  index={i}
+                  onOpen={() => { setLastOpened(e); setSelected(e.escrowAccountId) }}
                 />
               ))}
             </div>
@@ -186,7 +187,8 @@ export default function OperationsEscrowPage() {
         </>
       )}
 
-      {current && <EscrowDrawer e={current} onClose={() => setSelected(null)} />}
+      {/* O item segue montado enquanto a gaveta anima a saída. */}
+      <EscrowDrawer e={current ?? lastOpened} open={current !== null} onClose={() => setSelected(null)} />
     </div>
   )
 }
@@ -223,22 +225,22 @@ function StateChip({
 
 /** Uma custódia por linha, ordenada por urgência e com o alerta visível. */
 function EscrowRow({
-  e, first, onOpen,
+  e, index, onOpen,
 }: {
   e: EscrowSummary
-  first: boolean
+  index: number
   onOpen: () => void
 }) {
   // Reserva caída pesa mais que vencida; custódia encerrada não recebe alerta.
   const warning =
     e.authorizationLapsedAt && !e.isTerminal
-      ? { icon: AlertTriangle, text: "reserva caiu — refinanciar", color: "#DC2626", strong: true }
+      ? { icon: AlertTriangle, text: "reserva caiu — refinanciar", color: "var(--color-neg)", strong: true }
       : e.isAuthorizationExpired && !e.isTerminal
-        ? { icon: Clock, text: "autorização vencida", color: "#D97706", strong: false }
+        ? { icon: Clock, text: "autorização vencida", color: "var(--color-warn)", strong: false }
         : e.payoutAccountMissing && !e.isTerminal
-          ? { icon: Wallet, text: "criador sem conta de recebimento", color: "#D97706", strong: false }
+          ? { icon: Wallet, text: "criador sem conta de recebimento", color: "var(--color-warn)", strong: false }
           : e.payoutAccountUnverified && !e.isTerminal
-            ? { icon: Wallet, text: "aguardando verificação da conta do criador", color: "#D97706", strong: false }
+            ? { icon: Wallet, text: "aguardando verificação da conta do criador", color: "var(--color-warn)", strong: false }
             : null
 
   const WarningIcon = warning?.icon
@@ -246,8 +248,10 @@ function EscrowRow({
   return (
     <button
       onClick={onOpen}
-      className="w-full text-left px-4 py-3.5 flex items-center gap-4 hover:bg-[var(--surface-2,#FAFBFC)] transition-colors"
-      style={{ borderTop: first ? undefined : "1px solid var(--border-soft)" }}
+      // `hover:bg-hover` e não `--surface-2` com fallback claro fixo: o
+      // `#FAFBFC` clareava a linha no modo escuro.
+      className="w-full text-left px-8 py-3.5 flex items-center gap-4 border-b border-border-soft hover:bg-hover transition-colors cursor-pointer z-rise"
+      style={stagger(Math.min(index, 12))}
     >
       <span
         className="w-1 self-stretch rounded-full shrink-0"
@@ -297,10 +301,15 @@ function EscrowRow({
   )
 }
 
-function EscrowDrawer({ e, onClose }: { e: EscrowSummary; onClose: () => void }) {
+function EscrowDrawer({ e, open, onClose }: {
+  e: EscrowSummary | null
+  open: boolean
+  onClose: () => void
+}) {
+  // Hook antes do guard: a gaveta segue montada enquanto anima a saída.
   const { apply } = useEscrowMutations()
-  useEscapeKey(onClose)
-  const dialogRef = useFocusTrap<HTMLDivElement>()
+
+  if (!e) return null
 
   const can = (action: EscrowAction) => e.allowedTriggers.includes(ESCROW_ACTION_TRIGGER[action])
 
@@ -329,22 +338,32 @@ function EscrowDrawer({ e, onClose }: { e: EscrowSummary; onClose: () => void })
   ]
 
   return (
-    <>
-      <div className="fixed inset-0 z-40" style={{ background: "rgba(11,15,26,.5)" }} onClick={onClose} />
-      <div
-        ref={dialogRef}
-        className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-[440px] overflow-y-auto border-l border-border-soft"
-        style={{ background: "var(--surface)" }}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Custódia"
+    // `Sheet`, como as outras gavetas da plataforma: mesmo overlay, mesma
+    // animação e foco resolvido pelo Radix, no lugar da casca à mão.
+    <Sheet open={open} onOpenChange={(v) => { if (!v) onClose() }}>
+      <SheetContent
+        side="right"
+        // X embutido desligado: ele é absoluto e some sob o cabeçalho fixo.
+        showCloseButton={false}
+        // Inline porque o `SheetContent` embute `sm:max-w-sm`, que vence
+        // utilitário por especificidade.
+        style={{ width: 480, maxWidth: "94vw" }}
+        className="p-0 overflow-y-auto gap-0"
       >
+        <SheetHeader className="sr-only">
+          <SheetTitle>Custódia de {e.influencerName}</SheetTitle>
+        </SheetHeader>
+
         <div
           className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b border-border-soft"
           style={{ background: "var(--surface)" }}
         >
           <div className="eyebrow">Custódia</div>
-          <button onClick={onClose} className="text-ink-muted hover:opacity-70" aria-label="Fechar">
+          <button
+            onClick={onClose}
+            aria-label="Fechar"
+            className="w-8 h-8 flex items-center justify-center rounded-full border border-border-soft text-ink-muted hover:text-ink hover:bg-tint transition-colors cursor-pointer"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -379,7 +398,7 @@ function EscrowDrawer({ e, onClose }: { e: EscrowSummary; onClose: () => void })
           </div>
 
           {e.disputeReason && (
-            <div className="rounded-lg p-3 text-[12.5px] mt-4" style={{ background: "#DC262615", color: "#DC2626" }}>
+            <div className="rounded-lg p-3 text-[12.5px] mt-4" style={{ background: "#DC262615", color: "var(--color-neg)" }}>
               <div className="font-semibold mb-0.5">Em disputa</div>
               {e.disputeReason} A resolução é manual — fale com o suporte.
             </div>
@@ -388,7 +407,7 @@ function EscrowDrawer({ e, onClose }: { e: EscrowSummary; onClose: () => void })
           {e.payoutAccountMissing && !e.isTerminal && (
             <div
               className="rounded-lg p-3 text-[12px] mt-4 flex items-start gap-2"
-              style={{ background: "#D9770615", color: "#D97706" }}
+              style={{ background: "var(--warn-bg)", color: "var(--color-warn)" }}
             >
               <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
               <span>
@@ -404,7 +423,7 @@ function EscrowDrawer({ e, onClose }: { e: EscrowSummary; onClose: () => void })
           {e.payoutAccountUnverified && !e.isTerminal && (
             <div
               className="rounded-lg p-3 text-[12px] mt-4 flex items-start gap-2"
-              style={{ background: "#D9770615", color: "#D97706" }}
+              style={{ background: "var(--warn-bg)", color: "var(--color-warn)" }}
             >
               <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
               <span>
@@ -423,9 +442,9 @@ function EscrowDrawer({ e, onClose }: { e: EscrowSummary; onClose: () => void })
               className="rounded-lg p-3 mt-4 flex items-start gap-2.5"
               style={{ background: "#DC262612", border: "1px solid #DC2626" }}
             >
-              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" style={{ color: "#DC2626" }} />
+              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" style={{ color: "var(--color-neg)" }} />
               <div className="text-[12.5px]" style={{ color: "var(--ink-2)" }}>
-                <div className="font-semibold mb-0.5" style={{ color: "#DC2626" }}>
+                <div className="font-semibold mb-0.5" style={{ color: "var(--color-neg)" }}>
                   O dinheiro não está mais reservado
                 </div>
                 A renovação da autorização falhou em {fmtDate(e.authorizationLapsedAt)} e o
@@ -528,8 +547,8 @@ function EscrowDrawer({ e, onClose }: { e: EscrowSummary; onClose: () => void })
             )}
           </RoleGate>
         </div>
-      </div>
-    </>
+      </SheetContent>
+    </Sheet>
   )
 }
 
