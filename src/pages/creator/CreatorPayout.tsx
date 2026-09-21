@@ -1,9 +1,9 @@
 import { useEffect, useRef } from "react"
 import { Link, useSearchParams } from "react-router-dom"
 import {
-  Loader2, LogOut, Wallet, ArrowLeft, ExternalLink, Check, AlertCircle, ShieldCheck,
+  Loader2, LogOut, Wallet, ArrowLeft, ExternalLink, Check, AlertCircle, ShieldCheck, RefreshCw,
 } from "lucide-react"
-import { notifyError } from "@/lib/feedback"
+import { notifyError, notifyInfo, notifySuccess } from "@/lib/feedback"
 import { ApiError } from "@/lib/api"
 import { useAuth } from "@/features/auth/context"
 import { initials } from "@/lib/operations-format"
@@ -44,6 +44,29 @@ export default function CreatorPayoutPage() {
     })
   }, [returned, sync, setParams])
 
+  /**
+   * Reconsulta sob demanda. A automática é muda por desenho (roda ao abrir a tela); esta
+   * responde, porque é gesto de quem acabou de terminar o cadastro e quer saber se valeu.
+   */
+  const recheck = () => {
+    sync.mutate(undefined, {
+      onSuccess: (res) => {
+        if (res.canReceivePayout) {
+          notifySuccess("Conta verificada — seu recebimento está liberado.")
+        } else if (res.awaitingUser > 0) {
+          notifyInfo(
+            `Ainda faltam ${res.awaitingUser} informação(ões) sua(s).`,
+            "Continue o cadastro de onde parou para liberar o recebimento.")
+        } else {
+          notifyInfo(
+            "Ainda em análise no provedor.",
+            "Nada depende de você agora — confira de novo daqui a pouco.")
+        }
+      },
+      onError: (e) => notifyError(e, "Não foi possível checar sua conta de recebimento agora."),
+    })
+  }
+
   const connect = async () => {
     try {
       const res = await start.mutateAsync()
@@ -69,14 +92,26 @@ export default function CreatorPayoutPage() {
   const inVerification = kyc === "Pending"
   const rejected = kyc === "Rejected"
 
+  // DE QUEM É A VEZ. Sem isto a tela dizia "estamos verificando" para quem tinha o
+  // cadastro parado esperando ele mesmo — e a pessoa esperava dias por algo que não ia
+  // acontecer. Quem responde isso é o provedor; nós só paramos de esconder.
+  const awaitingUser = sync.data?.awaitingUser ?? 0
+  const awaitingProvider = sync.data?.awaitingProvider ?? 0
+  const needsYou = inVerification && awaitingUser > 0
+
   const heading = verified
     ? "Recebimento liberado"
+    : needsYou ? "Cadastro incompleto — falta você"
     : inVerification ? "Conta criada — em verificação"
     : rejected ? "O provedor pediu mais dados"
     : "Conta de recebimento não conectada"
 
   const explanation = verified
     ? "Sua conta está verificada. Entregas aprovadas caem aqui com o desconto da taxa."
+    : needsYou
+      ? `O provedor está esperando ${awaitingUser === 1 ? "uma informação sua" : `${awaitingUser} informações suas`}`
+        + " para liberar seu recebimento. Continue o cadastro de onde parou — enquanto isso"
+        + " não for enviado, a verificação não anda."
     : inVerification
       ? "Sua conta foi criada e está sendo verificada pelo provedor. Isso leva de alguns "
         + "minutos a alguns dias. Você pode assinar contrato e gravar normalmente — só o "
@@ -89,6 +124,7 @@ export default function CreatorPayoutPage() {
 
   const buttonLabel = noAccount ? "Conectar conta" : "Continuar cadastro"
   const busy = start.isPending || sync.isPending
+  const progressTone = verified || (inVerification && !needsYou)
 
   return (
     <div className="min-h-dvh" style={{ background: "var(--bg, #FAFBFC)" }}>
@@ -150,18 +186,19 @@ export default function CreatorPayoutPage() {
               className="rounded-xl border p-5 mb-5"
               style={{
                 background: "var(--surface)",
-                borderColor: verified || inVerification
+                borderColor: progressTone
                   ? "var(--color-teal-500)" : "var(--border-soft)",
               }}
             >
               <div className="flex items-start gap-3">
                 <div
                   className="w-9 h-9 rounded-lg grid place-items-center shrink-0"
-                  style={{ background: verified || inVerification ? "#00A79915" : "var(--warn-bg)" }}
+                  style={{ background: progressTone ? "#00A79915" : "var(--warn-bg)" }}
                 >
-                  {/* Em verificação usa o tom de progresso, não o de alerta: a pessoa fez
-                      a parte dela, quem está devendo resposta é o provedor. */}
-                  {verified || inVerification
+                  {/* Em verificação usa o tom de progresso, não o de alerta — mas só
+                      quando a bola está mesmo com o provedor. Com pendência do criador o
+                      tom vira alerta: é ele que precisa voltar ao cadastro. */}
+                  {progressTone
                     ? <ShieldCheck className="w-4.5 h-4.5" style={{ color: "var(--color-teal-500)" }} />
                     : <Wallet className="w-4.5 h-4.5" style={{ color: "var(--color-warn)" }} />}
                 </div>
@@ -169,7 +206,7 @@ export default function CreatorPayoutPage() {
                 <div className="min-w-0 flex-1">
                   <div
                     className="text-[14px] font-medium mb-1"
-                    style={{ color: verified || inVerification ? "var(--color-teal-500)" : "#D97706" }}
+                    style={{ color: progressTone ? "var(--color-teal-500)" : "#D97706" }}
                   >
                     {heading}
                   </div>
@@ -186,17 +223,45 @@ export default function CreatorPayoutPage() {
                         enviar entregas — só o pagamento fica retido até a verificação sair.
                       </p>
 
-                      <button
-                        onClick={connect}
-                        disabled={busy}
-                        className="mt-4 inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-[13.5px] font-medium text-white disabled:opacity-50"
-                        style={{ background: "var(--color-teal-500)" }}
-                      >
-                        {start.isPending
-                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          : <ExternalLink className="w-3.5 h-3.5" />}
-                        {buttonLabel}
-                      </button>
+                      {/* O número existia na resposta da API e a tela jogava fora: sem ele
+                          a pessoa não tinha como saber se o cadastro andou. */}
+                      {(awaitingUser > 0 || awaitingProvider > 0) && (
+                        <p className="text-[12px] text-ink-muted mt-2 mb-0 font-mono-zoe">
+                          {awaitingUser > 0 && <>{awaitingUser} com você</>}
+                          {awaitingUser > 0 && awaitingProvider > 0 && " · "}
+                          {awaitingProvider > 0 && <>{awaitingProvider} em análise do provedor</>}
+                        </p>
+                      )}
+
+                      <div className="mt-4 flex items-center gap-2 flex-wrap">
+                        <button
+                          onClick={connect}
+                          disabled={busy}
+                          className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-[13.5px] font-medium text-white disabled:opacity-50"
+                          style={{ background: "var(--color-teal-500)" }}
+                        >
+                          {start.isPending
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : <ExternalLink className="w-3.5 h-3.5" />}
+                          {buttonLabel}
+                        </button>
+
+                        {/* A sincronização acontecia só ao abrir a tela, calada. Quem
+                            terminou o cadastro e voltou não tinha como pedir de novo
+                            senão recarregando a página e torcendo. */}
+                        {!noAccount && (
+                          <button
+                            onClick={() => recheck()}
+                            disabled={busy}
+                            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-[13.5px] font-medium border border-border-soft disabled:opacity-50"
+                          >
+                            {sync.isPending
+                              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              : <RefreshCw className="w-3.5 h-3.5" />}
+                            Conferir agora
+                          </button>
+                        )}
+                      </div>
                     </>
                   )}
                 </div>

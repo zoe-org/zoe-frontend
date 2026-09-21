@@ -12,8 +12,10 @@ import { TabPill } from "@/components/ui/tab-pill"
 import { apiMessage } from "@/lib/api-error"
 import {
   usePendingBrands, usePendingSummary, useAdminBrands, useBrandVerification, useCurationMutations,
+  useContractTemplates,
   type MergeAnalysesPolicy, type BrandVerificationDetail, type PendingBrand, type AdminBrand,
 } from "@/lib/api/admin"
+import { ContractTemplatesTab } from "@/components/admin/ContractTemplatesTab"
 import { SLA_LABEL, describeSlaCountdown, describeSubscribers } from "@/lib/admin-sla"
 import { looksMisconfigured } from "@/lib/admin-curation"
 import { useCurationDraft } from "@/components/admin/curation-draft"
@@ -32,12 +34,16 @@ import { formatScore } from "@/lib/score"
  * (muitas marcas, varredura por coluna). Por isso uma é master-detail e a outra
  * é tabela com modal.
  */
-type Tab = "queue" | "global"
+type Tab = "queue" | "global" | "templates"
 
 export default function AdminBrandsPage() {
   const { isZoeAdmin } = useAuth()
   const [tab, setTab] = useState<Tab>("queue")
   const summary = usePendingSummary(isZoeAdmin)
+  // Fora da aba de propósito, como o summary: o número de modalidades sem parecer
+  // é urgência que precisa aparecer na pastilha, não só depois de clicar nela.
+  // Mesma query key da aba — o cache serve as duas, sem request repetido.
+  const templates = useContractTemplates(isZoeAdmin)
 
   if (!isZoeAdmin) {
     return (
@@ -50,14 +56,20 @@ export default function AdminBrandsPage() {
 
   return (
     <div className="-m-6 border-t border-border-soft" style={{ background: "var(--surface)", color: "var(--ink)" }}>
+      {/* O cabeçalho acompanha a aba: as duas primeiras curam marcas, a terceira
+          cura o texto dos contratos. Manter "Marcas" fixo faria a aba de templates
+          parecer uma sub-seção de marca, que ela não é. */}
       <section className="px-8 pt-7 pb-5 border-b border-border-soft">
-        <div className="eyebrow mb-2.5">Curadoria · núcleo global</div>
+        <div className="eyebrow mb-2.5">
+          {tab === "templates" ? "Curadoria · contratos" : "Curadoria · núcleo global"}
+        </div>
         <h1 className="font-display m-0" style={{ fontSize: 34, lineHeight: 1.1, color: "var(--ink)" }}>
-          Marcas
+          {tab === "templates" ? "Templates de contrato" : "Marcas"}
         </h1>
         <div className="text-[14px] text-ink-muted mt-1.5 max-w-160">
-          O núcleo verificado que parametriza a análise base compartilhada. Marca criada por tenant nasce pendente e
-          roda em NER conservador — só o nome, sem aliases — até alguém verificar.
+          {tab === "templates"
+            ? "O catálogo de contratos da plataforma, um por modalidade. Quem libera texto jurídico é a Zoe — o workspace nunca vê esta tela nem consegue destravar o gate por conta própria."
+            : "O núcleo verificado que parametriza a análise base compartilhada. Marca criada por tenant nasce pendente e roda em NER conservador — só o nome, sem aliases — até alguém verificar."}
         </div>
       </section>
 
@@ -70,9 +82,17 @@ export default function AdminBrandsPage() {
           badge={summary.data?.breached}
         />
         <TabPill active={tab === "global"} onClick={() => setTab("global")} label="Marcas globais" />
+        <TabPill
+          active={tab === "templates"}
+          onClick={() => setTab("templates")}
+          label="Templates de contrato"
+          badge={templates.data?.pendingLegalReview}
+        />
       </section>
 
-      {tab === "queue" ? <VerificationQueueTab /> : <GlobalBrandsTab />}
+      {tab === "queue" ? <VerificationQueueTab />
+        : tab === "global" ? <GlobalBrandsTab />
+        : <ContractTemplatesTab />}
     </div>
   )
 }
