@@ -375,16 +375,6 @@ function PlanShell({
         borderColor: highlight ? "var(--color-teal-500)" : "var(--border-soft)",
       }}
     >
-      {isCurrent && (
-        <span
-          className="self-start text-[10px] font-semibold rounded-full px-2 py-0.5 mb-2"
-          style={
-            reativando
-              ? { background: "var(--tint)", color: "var(--ink-muted)" }
-              : { background: "var(--teal-bg)", color: "var(--color-teal-500)" }
-          }
-        >
-          {reativando ? "Plano anterior" : "Plano atual"}
       {badge && (
         <span className="self-start mb-2">
           <BadgeChip badge={badge} />
