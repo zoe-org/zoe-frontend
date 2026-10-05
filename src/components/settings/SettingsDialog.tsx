@@ -161,7 +161,7 @@ export function SettingsDialog() {
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/45 supports-backdrop-filter:backdrop-blur-[2px] data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
         <Dialog.Content
-          className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 flex w-[min(1120px,calc(100vw-2rem))] h-[min(760px,calc(100dvh-3rem))] overflow-hidden rounded-[18px] border border-border-soft shadow-2xl outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0"
+          className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 flex w-[min(1120px,calc(100vw-2rem))] h-[min(760px,calc(100dvh-3rem))] max-sm:inset-0 max-sm:translate-x-0 max-sm:translate-y-0 max-sm:w-full max-sm:h-dvh max-sm:rounded-none max-sm:border-0 overflow-hidden rounded-[18px] border border-border-soft shadow-2xl outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0"
           style={{ background: "var(--surface)", color: "var(--ink)" }}
         >
           <Dialog.Title className="sr-only">Configurações</Dialog.Title>
@@ -170,18 +170,18 @@ export function SettingsDialog() {
           <Rail groups={groups} activeKey={activeKey} onSelect={goTo} />
 
           <div className="flex-1 min-w-0 flex flex-col">
-            <header className="shrink-0 flex items-start gap-4 px-5 pt-6 pb-4 sm:px-8 sm:pt-7 sm:pb-5 border-b border-border-soft">
+            <header className="shrink-0 flex items-start gap-4 px-4 pt-4 pb-3.5 sm:px-8 sm:pt-7 sm:pb-5 border-b border-border-soft">
               <div className="min-w-0 flex-1">
-                <h2 className="font-display m-0" style={{ fontSize: 22, lineHeight: 1.2, color: "var(--ink)" }}>
+                <h2 className="font-display m-0 text-[20px] sm:text-[22px]" style={{ lineHeight: 1.2, color: "var(--ink)" }}>
                   {active.title}
                 </h2>
-                <p className="text-[13px] text-ink-muted mt-1.5 max-w-165 leading-relaxed">
+                <p className="text-[12.5px] sm:text-[13px] text-ink-muted mt-1 sm:mt-1.5 max-w-165 leading-relaxed">
                   {active.description}
                 </p>
               </div>
               <Dialog.Close
                 aria-label="Fechar configurações"
-                className="shrink-0 -mt-1 -mr-2 p-2 rounded-lg text-ink-muted hover:text-ink hover:bg-tint transition-colors"
+                className="shrink-0 -mt-1 -mr-1.5 sm:-mr-2 p-2 rounded-lg text-ink-muted hover:text-ink hover:bg-tint transition-colors"
               >
                 <X className="w-[18px] h-[18px]" />
               </Dialog.Close>
@@ -193,7 +193,7 @@ export function SettingsDialog() {
 
             {/* A `key` remonta o painel ao trocar de seção: sem ela o scroll da seção
                 anterior fica herdado e a próxima abre no meio. */}
-            <div key={activeKey} className="flex-1 min-h-0 overflow-y-auto px-5 py-6 sm:px-8 sm:py-7">
+            <div key={activeKey} className="flex-1 min-h-0 overflow-y-auto px-4 py-5 sm:px-8 sm:py-7">
               <Panel section={activeKey} onClose={close} onGoTo={goTo} />
             </div>
           </div>
@@ -275,8 +275,8 @@ function TabStrip({
   onSelect: (key: SectionKey) => void
 }) {
   return (
-    <div className="sm:hidden shrink-0 border-b border-border-soft overflow-x-auto">
-      <div className="flex items-center gap-1 px-5 py-2.5 w-max">
+    <div className="sm:hidden shrink-0 border-b border-border-soft overflow-x-auto no-scrollbar">
+      <div className="flex items-center gap-1 px-3 py-2 w-max">
         {sections.map(({ key, label, icon: Icon }) => {
           const active = key === activeKey
           return (

@@ -498,7 +498,9 @@ export function Heatmap({ data, counts, width = 560 }: HeatmapProps) {
           style={{
             position: "absolute",
             left: `${((labelW + hover.ci * (cellW + cellGap) + cellW / 2) / width) * 100}%`,
-            top: hover.ri * (cellH + cellGap) - 12,
+            // Em %, como o `left`: o SVG escala com a largura, e em px do desenho
+            // (560) o balão descolava da célula quando o mapa encolhia no celular.
+            top: `${((hover.ri * (cellH + cellGap) - 4) / (rows * (cellH + cellGap) + 24)) * 100}%`,
             transform: "translate(-50%, -100%)",
             pointerEvents: "none",
             background: "var(--ink)",

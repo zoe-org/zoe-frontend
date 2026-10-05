@@ -242,7 +242,59 @@ export default function UsersPage() {
             <EmptyBlock className="py-16" message="Nenhum membro neste workspace" />
           ) : (
             <div className="@container overflow-x-auto">
-              <table className="w-full text-[13px] table-cards">
+              {/* Estreita: uma linha por pessoa, com papel e marcas logo abaixo do
+                  e-mail — os dois controles que se mexem aqui — e a remoção
+                  num ícone à direita. */}
+              <ul className="@2xl:hidden m-0 p-0 list-none">
+                {memberList.map((m, i) => {
+                  const isSelf = m.userId === user?.id
+                  return (
+                    <li
+                      key={m.membershipId}
+                      className="flex items-start gap-3 px-4 md:px-8 py-3.5 border-b border-border-soft z-rise"
+                      style={stagger(Math.min(i, 12))}
+                    >
+                      <div
+                        className="w-9 h-9 rounded-lg shrink-0 flex items-center justify-center font-display text-white text-[12px]"
+                        style={{ background: `hsl(${i * 47 + 200}, 45%, 60%)` }}
+                      >
+                        {initials(m.name, m.email)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-[14px] flex items-center gap-2" style={{ color: "var(--ink)" }}>
+                          <span className="truncate">{m.name || "—"}</span>
+                          {isSelf && <span className="chip text-[10px] shrink-0">você</span>}
+                        </div>
+                        <div className="font-mono-zoe text-[11.5px] text-ink-muted truncate">{m.email}</div>
+                        <div className="flex items-center gap-2 mt-2.5 flex-wrap">
+                          <RoleCell
+                            member={m}
+                            canEdit={isAdmin}
+                            isOwner={isOwner}
+                            isSelf={isSelf}
+                            pending={changeMemberRole.isPending}
+                            onChange={(next) => handleRoleChange(m, next)}
+                          />
+                          <BrandsCell member={m} canEdit={isAdmin} onEdit={() => setEditingBrands(m)} />
+                          <span className="text-[11px] text-ink-muted-2">desde {fmtDate(m.joinedAt)}</span>
+                        </div>
+                      </div>
+                      {isAdmin && !isSelf && (
+                        <button
+                          onClick={() => handleRemove(m)}
+                          disabled={removeMember.isPending}
+                          aria-label={`Remover ${m.name || m.email} do workspace`}
+                          title="Remover do workspace"
+                          className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg text-ink-muted hover:text-neg hover:bg-hover transition-colors disabled:opacity-50"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+              <table className="hidden @2xl:table w-full text-[13px]">
                 <thead>
                   <tr className="border-b border-border-soft">
                     <th className="text-left px-4 md:px-8 py-3 eyebrow font-semibold">Nome</th>
@@ -278,7 +330,7 @@ export default function UsersPage() {
                             </div>
                           </div>
                         </td>
-                        <td data-label="Papel" className="px-3 py-3.5">
+                        <td className="px-3 py-3.5">
                           <RoleCell
                             member={m}
                             canEdit={isAdmin}
@@ -288,11 +340,11 @@ export default function UsersPage() {
                             onChange={(next) => handleRoleChange(m, next)}
                           />
                         </td>
-                        <td data-label="Marcas" className="px-3 py-3.5">
+                        <td className="px-3 py-3.5">
                           <BrandsCell member={m} canEdit={isAdmin} onEdit={() => setEditingBrands(m)} />
                         </td>
-                        <td data-label="Entrou em" className="px-3 py-3.5 font-mono-zoe text-ink-2">{fmtDate(m.joinedAt)}</td>
-                        <td data-wide className="px-4 md:px-8 py-3.5 text-right">
+                        <td className="px-3 py-3.5 font-mono-zoe text-ink-2">{fmtDate(m.joinedAt)}</td>
+                        <td className="px-4 md:px-8 py-3.5 text-right">
                           {isAdmin && !isSelf && (
                             <button
                               onClick={() => handleRemove(m)}
@@ -351,11 +403,13 @@ export default function UsersPage() {
           ) : (
             <div>
               {inviteList.map((inv) => (
-                <div key={inv.id} className="flex items-center gap-4 px-4 md:px-8 py-4 border-b border-border-soft">
+                // Estreita, quebra em duas linhas: quem foi convidado em cima, papel e
+                // ações embaixo — numa linha só o e-mail virava "no…".
+                <div key={inv.id} className="flex flex-wrap sm:flex-nowrap items-center gap-x-4 gap-y-2.5 px-4 md:px-8 py-4 border-b border-border-soft">
                   <div className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center bg-tint text-ink-muted">
                     <Mail className="w-4 h-4" />
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 basis-[calc(100%-3.25rem)] sm:basis-auto">
                     <div className="font-mono-zoe text-[13px] font-medium truncate" style={{ color: "var(--ink)" }}>{inv.email}</div>
                     <div className="text-[11.5px] text-ink-muted mt-0.5">
                       Convidado por {inv.invitedByName || "—"} · {fmtDate(inv.createdAt)} ·{" "}
@@ -364,11 +418,11 @@ export default function UsersPage() {
                       </span>
                     </div>
                   </div>
-                  <RoleChip role={inv.role} />
+                  <span className="ml-13 sm:ml-0"><RoleChip role={inv.role} /></span>
                   <button
                     onClick={() => handleResend(inv)}
                     disabled={resendInvite.isPending}
-                    className="inline-flex items-center gap-1 text-[12px] px-2.5 py-1.5 rounded-lg text-ink-muted hover:text-ink transition-colors disabled:opacity-50"
+                    className="ml-auto sm:ml-0 inline-flex items-center gap-1 text-[12px] px-2.5 py-1.5 rounded-lg text-ink-muted hover:text-ink transition-colors disabled:opacity-50"
                   >
                     <Send className="w-3.5 h-3.5" /> Reenviar
                   </button>

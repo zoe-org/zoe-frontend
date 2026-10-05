@@ -10,6 +10,7 @@ import { ConfidenceBadge } from "@/components/ui/confidence-badge"
 import { coverageSaysOwnedContent } from "@/components/ui/coverage-labels"
 import { VideoThumb } from "@/components/ui/video-thumb"
 import { SelectFilterChip } from "@/components/ui/select-filter-chip"
+import { FilterSheetButton } from "@/components/ui/filter-sheet"
 import { Segmented } from "@/components/ui/segmented"
 import { useActiveBrand } from "@/features/brands/context"
 import { toCsv, downloadCsv } from "@/lib/csv"
@@ -189,6 +190,12 @@ export default function MonitoringPage() {
     }, { replace: true })
   }
 
+  const [filtrosOpen, setFiltrosOpen] = useState(false)
+  // No botão do celular só conta o que recorta a lista e mora na folha: o
+  // sentimento tem a própria barra e a busca, o próprio campo.
+  const filtrosNaFolha = [period, min, rel].filter(Boolean).length
+  const totalAtual = tabCount(sent)
+
   const [selected, setSelected] = useState<VideoListItem | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const openDrawer = (item: VideoListItem) => { setSelected(item); setDrawerOpen(true) }
@@ -291,9 +298,10 @@ export default function MonitoringPage() {
               onClick={exportCsv}
               disabled={items.length === 0}
               title="Exporta as menções já carregadas, com os filtros atuais"
-              className="inline-flex items-center gap-1.5 h-9 px-3.5 text-[13px] rounded-md border border-border-soft hover:bg-hover transition-colors disabled:opacity-50"
+              aria-label="Exportar CSV"
+              className="inline-flex items-center justify-center gap-1.5 h-9 w-9 sm:w-auto sm:px-3.5 text-[13px] rounded-md border border-border-soft hover:bg-hover transition-colors disabled:opacity-50 shrink-0"
             >
-              <Download className="w-3.5 h-3.5" /> Exportar
+              <Download className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Exportar</span>
             </button>
           </div>
         </div>
@@ -307,14 +315,39 @@ export default function MonitoringPage() {
         className="px-4 md:px-8 py-3 border-b border-border-soft flex items-center justify-between gap-4 flex-wrap md:sticky top-0 z-10"
         style={{ background: "var(--surface)" }}
       >
-        <Segmented
-          items={SENT_TABS.map((tab) => ({ ...tab, count: tabCount(tab.key) }))}
-          value={sent}
-          onChange={(key) => setParam("sent", key)}
-          ariaLabel="Recorte por sentimento"
+        <div className="min-w-0 flex-1 md:flex-none">
+          <Segmented
+            items={SENT_TABS.map((tab) => ({ ...tab, count: tabCount(tab.key) }))}
+            value={sent}
+            onChange={(key) => setParam("sent", key)}
+            ariaLabel="Recorte por sentimento"
+          />
+        </div>
+
+        <FilterSheetButton
+          className="md:hidden"
+          open={filtrosOpen}
+          onOpenChange={setFiltrosOpen}
+          activeCount={filtrosNaFolha}
+          onClear={limparFiltros}
+          resultLabel={totalAtual === undefined
+            ? "Ver menções"
+            : `Ver ${totalAtual} ${totalAtual === 1 ? "menção" : "menções"}`}
+          groups={[
+            { label: "Período", value: period, options: PERIODS, onChange: (v) => setParam("period", v) },
+            { label: "Score mínimo", value: min, options: MIN_SCORES, onChange: (v) => setParam("min", v) },
+            { label: "Origem do canal", value: rel, options: CHANNEL_RELATIONS, onChange: (v) => setParam("rel", v) },
+            { label: "Ordem", value: sort, options: SORT_OPTIONS, onChange: (v) => setParam("sort", v) },
+            {
+              label: "Exibição",
+              value: view === "grid" ? "grid" : "",
+              options: [{ key: "", label: "Lista" }, { key: "grid", label: "Grade" }],
+              onChange: (v) => setParam("view", v),
+            },
+          ]}
         />
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="hidden md:flex items-center gap-2 flex-wrap">
           {temFiltro && (
             <button
               onClick={limparFiltros}
@@ -491,7 +524,8 @@ export default function MonitoringPage() {
                   className="w-24 h-13.5 lg:w-27.5 lg:h-15.5"
                 />
                 <div className="min-w-0">
-                  <div className="text-[14px] font-medium truncate mb-0.5" style={{ color: "var(--ink)" }}>
+                  {/* Duas linhas no celular: numa só, o título virava "Compre Só o Br…" */}
+                  <div className="text-[14px] font-medium leading-snug line-clamp-2 lg:line-clamp-1 mb-0.5" style={{ color: "var(--ink)" }}>
                     {m.title}
                   </div>
                   <div className="flex items-center gap-2 text-[11.5px] text-ink-muted flex-wrap">

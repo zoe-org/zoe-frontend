@@ -88,10 +88,20 @@ function ReactionBody({ data }: { data: OwnedReactionResponse }) {
     <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr] gap-x-10 gap-y-8">
       <div className="min-w-0">
         {s.audienceSentiment == null ? (
-          <EmptyBlock
-            message="Sem reação de audiência no período"
-            hint="Nenhum vídeo teve comentários de terceiros para medir."
-          />
+          // Há dois "sem nota": ninguém comentou, ou comentaram pouco sobre a marca em
+          // cada vídeo para fechar uma leitura. Dizer "nenhum comentário" ao lado de
+          // "27 comentários" foi o que denunciou a confusão.
+          s.totalComments > 0 ? (
+            <EmptyBlock
+              message="Comentários sem nota de audiência"
+              hint={`Houve ${s.totalComments.toLocaleString("pt-BR")} ${s.totalComments === 1 ? "comentário" : "comentários"}, mas nenhum vídeo juntou o bastante sobre a marca para uma nota. A divisão abaixo conta comentário por comentário.`}
+            />
+          ) : (
+            <EmptyBlock
+              message="Sem reação de audiência no período"
+              hint="Nenhum vídeo teve comentários de terceiros para medir."
+            />
+          )
         ) : (
           <>
             <div className="flex items-end gap-6 flex-wrap">
@@ -126,10 +136,10 @@ function ReactionBody({ data }: { data: OwnedReactionResponse }) {
           </>
         )}
 
-        <dl className="grid grid-cols-3 gap-4 my-6">
+        <dl className="grid grid-cols-3 gap-3 sm:gap-4 my-6">
           <Stat label="Vídeos publicados" value={s.videoCount.toLocaleString("pt-BR")} />
           <Stat label="Comentários" value={s.totalComments.toLocaleString("pt-BR")} />
-          <Stat label="Vídeos com reação" value={s.videosWithAudienceSignal.toLocaleString("pt-BR")} />
+          <Stat label="Vídeos com nota" value={s.videosWithAudienceSignal.toLocaleString("pt-BR")} />
         </dl>
 
         {total > 0 && <CommentSentimentBar positives={s.positives} neutrals={s.neutrals} negatives={s.negatives} />}
@@ -166,7 +176,9 @@ function ReactionBody({ data }: { data: OwnedReactionResponse }) {
 function VideoRow({ v }: { v: OwnedVideoItem }) {
   const r = readSentiment(v.audienceSentiment)
   return (
-    <li className="flex items-start justify-between gap-4 py-2.5 border-t border-border-soft first:border-t-0 first:pt-0">
+    // Celular: o estado do vídeo desce para baixo da data. Ao lado, o selo
+    // "comentários desativados" espremia o título em três palavras por linha.
+    <li className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1.5 sm:gap-4 py-2.5 border-t border-border-soft first:border-t-0 first:pt-0">
       <div className="min-w-0">
         <a
           href={v.url || `https://www.youtube.com/watch?v=${v.youtubeVideoId}`}
@@ -183,18 +195,22 @@ function VideoRow({ v }: { v: OwnedVideoItem }) {
           {v.views != null && <> · {v.views.toLocaleString("pt-BR")} visualizações</>}
         </div>
       </div>
-      <div className="text-right shrink-0 text-[12px]">
+      <div className="sm:text-right shrink-0 text-[12px]">
         {v.commentsDisabled ? (
           <span className="chip chip-warn text-[10.5px]">comentários desativados</span>
         ) : !v.hasAudienceSignal ? (
-          <span className="text-ink-muted-2">sem comentários</span>
+          <span className="text-ink-muted-2">
+            {v.commentCount > 0
+              ? `${v.commentCount.toLocaleString("pt-BR")} ${v.commentCount === 1 ? "comentário" : "comentários"} · sem nota`
+              : "sem comentários"}
+          </span>
         ) : (
-          <>
+          <div className="flex sm:block items-baseline gap-2">
             <div className="font-mono-zoe" style={{ color: r.color }}>{formatScore(v.audienceSentiment)}</div>
             <div className="text-[11px] text-ink-muted-2">
               {v.commentCount.toLocaleString("pt-BR")} {v.commentCount === 1 ? "comentário" : "comentários"}
             </div>
-          </>
+          </div>
         )}
       </div>
     </li>
@@ -254,7 +270,10 @@ function SignalGaps({ commentsDisabled, withoutSignal }: { commentsDisabled: num
       )}
       {withoutSignal > 0 && (
         <p className="text-[11.5px] text-ink-muted-2 m-0">
-          {withoutSignal} {withoutSignal === 1 ? "vídeo" : "vídeos"} sem comentários de audiência no período.
+          {/* "Sem nota", não "sem comentários": o vídeo pode ter comentários que não
+              bastaram para uma leitura sobre a marca. */}
+          {withoutSignal} {withoutSignal === 1 ? "vídeo" : "vídeos"} sem nota de audiência no período —
+          nenhum comentário, ou poucos sobre a marca.
         </p>
       )}
     </div>

@@ -125,7 +125,8 @@ export function PlanPanel() {
           />
         )}
 
-        <div className="flex items-center gap-1 flex-wrap">
+        {/* Uma linha só: quebrada, "Full Platform" descia sozinho e parecia outro grupo. */}
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar -mx-1 px-1">
           <TabPill active={tab === "intelligence"} onClick={() => setTab("intelligence")} label="Intelligence" />
           <TabPill active={tab === "operations"} onClick={() => setTab("operations")} label="Operations" />
           <TabPill active={tab === "pacote"} onClick={() => setTab("pacote")} label="Full Platform" />
@@ -469,7 +470,7 @@ function CurrentSubscription({
     : { color: "var(--color-teal-500)", bg: "var(--teal-bg)" }
 
   return (
-    <div className="rounded-[14px] border border-border-soft px-6 py-5" style={{ background: "var(--surface)" }}>
+    <div className="rounded-[14px] border border-border-soft px-4 sm:px-6 py-5" style={{ background: "var(--surface)" }}>
       <div className="flex items-start justify-between gap-6 flex-wrap">
         <div>
           <div className="eyebrow">Assinatura atual</div>
@@ -613,7 +614,7 @@ function TrialStatus({ sub }: { sub: Subscription }) {
     : null
 
   return (
-    <div className="rounded-[14px] border border-border-soft px-6 py-5" style={{ background: "var(--surface)" }}>
+    <div className="rounded-[14px] border border-border-soft px-4 sm:px-6 py-5" style={{ background: "var(--surface)" }}>
       <div className="eyebrow">Período de teste</div>
       <div className="flex items-baseline gap-2.5 mt-2 flex-wrap">
         <span className="font-display" style={{ fontSize: 26, color: "var(--ink)" }}>
@@ -658,7 +659,7 @@ function TrialFact({ label, value }: { label: string; value: string }) {
 function TrialOffer({ disabled, busy, onStart }: { disabled: boolean; busy: boolean; onStart: () => void }) {
   return (
     <div
-      className="rounded-[14px] border px-6 py-5 flex items-center gap-5 flex-wrap"
+      className="rounded-[14px] border px-4 sm:px-6 py-5 flex items-center gap-5 flex-wrap"
       style={{ background: "var(--teal-bg)", borderColor: "rgba(0,167,153,.28)" }}
     >
       <Sparkles className="w-5 h-5 shrink-0" style={{ color: "var(--color-teal-500)" }} />
@@ -710,7 +711,7 @@ function TrialUsedDialog({
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div
-        className="relative w-full max-w-[480px] rounded-[14px] border border-border-soft px-6 py-6 shadow-xl max-sm:rounded-b-none max-sm:border-b-0 max-sm:max-h-[92dvh] z-sheet max-sm:overflow-y-auto"
+        className="relative w-full max-w-[480px] rounded-[14px] border border-border-soft px-4 sm:px-6 py-6 shadow-xl max-sm:rounded-b-none max-sm:border-b-0 max-sm:max-h-[92dvh] z-sheet max-sm:overflow-y-auto"
         style={{ background: "var(--surface)" }}
       >
         <div className="eyebrow">Período de teste</div>
@@ -796,7 +797,7 @@ function BrandSlotsCard({
 
   return (
     <>
-      <div className="rounded-[14px] border border-border-soft px-6 py-5" style={{ background: "var(--surface)" }}>
+      <div className="rounded-[14px] border border-border-soft px-4 sm:px-6 py-5" style={{ background: "var(--surface)" }}>
         <div className="flex items-start gap-5 flex-wrap">
           <div className="flex-1 min-w-[260px]">
             <div className="eyebrow">Marcas do plano</div>
@@ -913,7 +914,7 @@ function ExtraBrandDialog({
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div
-        className="relative w-full max-w-[520px] rounded-[14px] border border-border-soft px-6 py-6 shadow-xl max-sm:rounded-b-none max-sm:border-b-0 max-sm:max-h-[92dvh] z-sheet max-sm:overflow-y-auto"
+        className="relative w-full max-w-[520px] rounded-[14px] border border-border-soft px-4 sm:px-6 py-6 shadow-xl max-sm:rounded-b-none max-sm:border-b-0 max-sm:max-h-[92dvh] z-sheet max-sm:overflow-y-auto"
         style={{ background: "var(--surface)" }}
       >
         <div className="eyebrow">Adicionar marca extra</div>
@@ -1039,7 +1040,7 @@ function BillingSection({
 
   return (
     <div className="rounded-[14px] border border-border-soft overflow-hidden" style={{ background: "var(--surface)" }}>
-      <div className="px-6 pt-5 pb-3">
+      <div className="px-4 sm:px-6 pt-5 pb-3">
         <div className="eyebrow">Faturamento</div>
         <div className="text-[13px] text-ink-muted mt-2 max-w-165 leading-relaxed">
           Pagamento e notas ficam no portal da Stripe. Os itens abaixo abrem lá.
@@ -1051,7 +1052,7 @@ function BillingSection({
           key={r.label}
           onClick={open}
           disabled={disabled}
-          className="w-full flex items-center gap-4 px-6 py-4 text-left transition-colors hover:bg-hover disabled:opacity-50 disabled:hover:bg-transparent border-t border-border-soft"
+          className="w-full flex items-center gap-4 px-4 sm:px-6 py-4 text-left transition-colors hover:bg-hover disabled:opacity-50 disabled:hover:bg-transparent border-t border-border-soft"
         >
           <div className="flex-1">
             <div className="text-[14px] font-semibold" style={{ color: "var(--ink)" }}>
@@ -1071,7 +1072,7 @@ function BillingSection({
       ))}
 
       {!hasSubscription && (
-        <div className="px-6 py-3 text-[12px] text-ink-muted border-t border-border-soft">
+        <div className="px-4 sm:px-6 py-3 text-[12px] text-ink-muted border-t border-border-soft">
           O portal fica disponível depois da primeira assinatura.
         </div>
       )}

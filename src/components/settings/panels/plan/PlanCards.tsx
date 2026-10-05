@@ -264,7 +264,7 @@ export function BundleGrid({ ctx }: { ctx: CardContext }) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-[14px] border border-border-soft px-6 py-5" style={{ background: "var(--surface)" }}>
+      <div className="rounded-[14px] border border-border-soft px-4 sm:px-6 py-5" style={{ background: "var(--surface)" }}>
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4" style={{ color: "var(--color-teal-500)" }} />
           <div className="eyebrow">Full Platform</div>
@@ -297,7 +297,7 @@ export function BundleGrid({ ctx }: { ctx: CardContext }) {
           return (
             <div
               key={planSlug}
-              className={`flex items-center gap-4 px-6 py-4 flex-wrap ${i > 0 ? "border-t border-border-soft" : ""}`}
+              className={`flex items-center gap-4 px-4 sm:px-6 py-4 flex-wrap ${i > 0 ? "border-t border-border-soft" : ""}`}
             >
               <div className="flex-1 min-w-[200px]">
                 <div className="text-[14px] font-semibold flex items-center gap-2 flex-wrap" style={{ color: "var(--ink)" }}>

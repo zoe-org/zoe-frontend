@@ -460,9 +460,11 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
     // conjunto competitivo —, todos com o mesmo peso e moldura.
     <div className="overflow-y-auto">
       {/* Cabeçalho */}
-      <div className="flex flex-wrap items-center gap-4 px-4 md:px-8 pt-7 pb-6 border-b border-border-soft">
+      {/* Celular: avatar e nome na primeira linha, o botão inteiro na segunda. Na
+          mesma linha, o botão espremia os selos e ficava por cima deles. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-4 px-4 md:px-8 pt-7 pb-6 border-b border-border-soft">
         <Avatar name={brand.brandName} slug={brand.brandSlug} color={brand.color} size={64} radius={14} font={26} />
-        <div className="min-w-0 flex-1 sm:flex-none">
+        <div className="min-w-0 flex-1 basis-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <h2 className="font-display m-0" style={{ fontSize: 28, lineHeight: 1, color: "var(--ink)" }}>
               {brand.displayName ?? brand.brandName}
@@ -481,10 +483,9 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
             Assinada em {new Date(brand.subscribedAt).toLocaleDateString("pt-BR")} · {brand.brandSlug}
           </div>
         </div>
-        <div className="hidden sm:block flex-1" />
         <button
           onClick={onOpenDashboard}
-          className="inline-flex items-center gap-1.5 h-9 px-3.5 text-[13px] rounded-md border border-border-soft hover:bg-hover transition-colors shrink-0 cursor-pointer"
+          className="basis-full sm:basis-auto justify-center inline-flex items-center gap-1.5 h-9 px-3.5 text-[13px] rounded-md border border-border-soft hover:bg-hover transition-colors shrink-0 cursor-pointer"
         >
           Ver no dashboard
           <ExternalLink className="w-3.5 h-3.5" />
@@ -545,12 +546,12 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
                 value={newKeyword}
                 onChange={(e) => setNewKeyword(e.target.value)}
                 placeholder="adicionar palavra-chave…"
-                className="flex-1 h-8 px-3 text-[12.5px] rounded-md border border-border-soft bg-transparent outline-none focus:border-teal-500"
+                className="flex-1 min-w-0 h-8 px-3 text-[12.5px] rounded-md border border-border-soft bg-transparent outline-none focus:border-teal-500"
               />
               <button
                 type="submit"
                 disabled={!newKeyword.trim() || m.addKeyword.isPending}
-                className="inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] rounded-md border border-border-soft hover:bg-hover transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 h-8 px-3 text-[12.5px] rounded-md border border-border-soft hover:bg-hover transition-colors disabled:opacity-50 shrink-0"
               >
                 <Plus className="w-3 h-3" /> {m.addKeyword.isPending ? "..." : "adicionar"}
               </button>

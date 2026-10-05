@@ -347,7 +347,7 @@ function EscrowDrawer({ e, open, onClose }: {
         showCloseButton={false}
         // Inline porque o `SheetContent` embute `sm:max-w-sm`, que vence
         // utilitário por especificidade.
-        style={{ width: 480, maxWidth: "94vw" }}
+        style={{ width: "min(480px, 100vw)" }}
         className="p-0 overflow-y-auto gap-0"
       >
         <SheetHeader className="sr-only">
@@ -355,7 +355,7 @@ function EscrowDrawer({ e, open, onClose }: {
         </SheetHeader>
 
         <div
-          className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b border-border-soft"
+          className="sticky top-0 z-10 flex items-center justify-between px-4 sm:px-6 py-4 border-b border-border-soft"
           style={{ background: "var(--surface)" }}
         >
           <div className="eyebrow">Custódia</div>

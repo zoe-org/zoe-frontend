@@ -179,7 +179,50 @@ function RankingSection({ ranked, hasPreviousPeriod, ppHint }: {
         sub="Share e sentimento lado a lado: share alto com sentimento baixo é exposição, não vantagem. Clique num concorrente para abrir o Dashboard dele."
       />
       <div className="@container overflow-x-auto overflow-y-clip">
-        <table className="w-full text-[13px] @2xl:min-w-160 table-cards">
+        {/* Estreita: uma linha por marca — nome e share em cima, a barra, e
+            sentimento, menções e variação numa linha só. */}
+        <ul className="@2xl:hidden m-0 p-0 list-none">
+          {ranked.map((b, i) => {
+            const c = brandColor(b.brandId, b.color)
+            return (
+              <li
+                key={b.brandId}
+                className="py-3 px-2.5 border-t border-border-soft z-rise"
+                style={{ ...stagger(Math.min(i, 12)), ...(b.isYou ? { background: "var(--teal-bg)" } : {}) }}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="font-mono-zoe text-[11px] text-ink-muted-2 w-4 shrink-0">{b.rank}</span>
+                  <BrandSwatch color={c} />
+                  {b.isYou || !assinadas.has(b.brandId) ? (
+                    <span className="truncate text-[13.5px]" style={{ color: "var(--ink)", fontWeight: b.isYou ? 700 : 500 }}>{b.brandName}</span>
+                  ) : (
+                    <Link
+                      to="/dashboard"
+                      onClick={() => setBrand(b.brandId)}
+                      className="truncate text-[13.5px] font-medium hover:underline inline-flex items-center gap-1"
+                      style={{ color: "var(--ink)" }}
+                    >
+                      {b.brandName}
+                      <ChevronRight className="w-3 h-3 opacity-60 shrink-0" aria-hidden />
+                    </Link>
+                  )}
+                  {b.isYou && <span className="chip chip-primary text-[9.5px] px-1.5 py-px shrink-0">VOCÊ</span>}
+                  <span className="ml-auto font-mono-zoe text-[13px] shrink-0" style={{ color: "var(--ink)" }}>{b.sharePct}%</span>
+                </div>
+                <div className="h-1.5 rounded-full overflow-hidden bg-tint mt-2 ml-6">
+                  <div className="h-full rounded-full z-grow-x" style={{ width: `${b.sharePct}%`, background: c, ...stagger(Math.min(i, 12)) }} />
+                </div>
+                <div className="flex items-center gap-2.5 mt-2 ml-6 text-[11.5px] text-ink-muted flex-wrap">
+                  <SentimentChip score={b.avgScore} />
+                  <span><span className="font-mono-zoe">{b.mentions.toLocaleString("pt-BR")}</span> menções</span>
+                  {hasPreviousPeriod && <DeltaPp value={b.deltaPp} />}
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+
+        <table className="hidden @2xl:table w-full text-[13px] min-w-160">
           <thead>
             <tr className="text-ink-muted text-[12px]">
               <th className="text-left font-medium pb-2 w-8">#</th>
@@ -207,8 +250,8 @@ function RankingSection({ ranked, hasPreviousPeriod, ppHint }: {
                   className="border-t border-border-soft z-rise"
                   style={{ ...stagger(Math.min(i, 12)), ...(b.isYou ? { background: "var(--teal-bg)" } : {}) }}
                 >
-                  <td className="@max-2xl:hidden! py-3 pl-1 font-mono-zoe text-[11.5px] text-ink-muted-2">{b.rank}</td>
-                  <td data-wide className="py-3 pr-3">
+                  <td className="py-3 pl-1 font-mono-zoe text-[11.5px] text-ink-muted-2">{b.rank}</td>
+                  <td className="py-3 pr-3">
                     <span className="flex items-center gap-2 min-w-0">
                       <BrandSwatch color={c} />
                       {/* ADR-063: o concorrente se lê no Dashboard, com ele como marca
@@ -230,7 +273,7 @@ function RankingSection({ ranked, hasPreviousPeriod, ppHint }: {
                       {b.isYou && <span className="chip chip-primary text-[9.5px] px-1.5 py-px">VOCÊ</span>}
                     </span>
                   </td>
-                  <td data-wide data-label="Share" className="py-3 pr-4">
+                  <td className="py-3 pr-4">
                     {/* Barra na escala absoluta: 34% ocupa 34% do trilho. Relativa ao
                         líder, o primeiro sempre pareceria dono de tudo. */}
                     <div className="flex items-center gap-2.5">
@@ -245,11 +288,11 @@ function RankingSection({ ranked, hasPreviousPeriod, ppHint }: {
                       <span className="font-mono-zoe w-10 text-right" style={{ color: "var(--ink)" }}>{b.sharePct}%</span>
                     </div>
                   </td>
-                  <td data-label="Variação" className="py-3 text-right">
+                  <td className="py-3 text-right">
                     {hasPreviousPeriod ? <DeltaPp value={b.deltaPp} /> : <span className="text-ink-muted-2">—</span>}
                   </td>
-                  <td data-label="Sentimento" className="py-3 text-right"><SentimentChip score={b.avgScore} /></td>
-                  <td data-label="Menções" className="py-3 pr-1 text-right font-mono-zoe text-ink-muted">{b.mentions.toLocaleString("pt-BR")}</td>
+                  <td className="py-3 text-right"><SentimentChip score={b.avgScore} /></td>
+                  <td className="py-3 pr-1 text-right font-mono-zoe text-ink-muted">{b.mentions.toLocaleString("pt-BR")}</td>
                 </tr>
               )
             })}

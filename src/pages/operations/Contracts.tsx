@@ -219,7 +219,7 @@ export default function OperationsContractsPage() {
             value={search}
             onChange={setSearch}
             placeholder="Buscar por criador, campanha…"
-            className="w-48 sm:w-64 ml-auto"
+            className="w-full sm:w-64 sm:ml-auto"
           />
         )}
       </section>
@@ -275,7 +275,43 @@ export default function OperationsContractsPage() {
           />
         ) : (
           <div className="@container overflow-x-auto overflow-y-clip">
-            <table className="w-full text-[13px] table-cards">
+            {/* Estreita: uma linha por contrato — quem e de qual campanha, quando, e
+                à direita o status e a custódia, que é o que se procura aqui. */}
+            <ul className="@2xl:hidden m-0 p-0 list-none">
+              {items.map((it, i) => (
+                <li
+                  key={it.contractId}
+                  className="flex items-start border-b border-border-soft z-rise"
+                  style={stagger(Math.min(i, 12))}
+                >
+                  <Link
+                    to={`/operations/contracts/${it.contractId}`}
+                    className="flex-1 min-w-0 flex items-start gap-3 pl-4 md:pl-8 pr-2 py-3.5 hover:bg-hover transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-[14px] font-medium truncate" style={{ color: "var(--ink)" }}>{it.influencerName}</span>
+                        {it.status === "Draft" && !it.templateLegalReviewed && (
+                          <ShieldAlert className="w-3.5 h-3.5 shrink-0 text-warn" aria-label="Template sem revisão jurídica" />
+                        )}
+                      </div>
+                      <div className="text-[12px] text-ink-2 mt-0.5 truncate">
+                        {it.campaignName ?? "Sem campanha"} · {tEnum("contractModality", it.modality)}
+                      </div>
+                      <div className="text-[11.5px] text-ink-muted mt-0.5"><WhenCell item={it} /></div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 shrink-0 text-right text-[11.5px]">
+                      <StatusChip status={it.status} kind="contractStatus" colors={STATUS_COLOR} />
+                      <EscrowCell item={it} />
+                    </div>
+                  </Link>
+                  <RoleGate allow={["Owner", "Admin"]}>
+                    {it.status === "Draft" && <div className="pr-2 md:pr-6 pt-3"><DeleteDraftButton item={it} /></div>}
+                  </RoleGate>
+                </li>
+              ))}
+            </ul>
+            <table className="hidden @2xl:table w-full text-[13px]">
               <thead>
                 <tr className="border-b border-border-soft">
                   <th className="text-left px-4 md:px-8 py-3 eyebrow font-semibold">Criador</th>
@@ -305,7 +341,7 @@ export default function OperationsContractsPage() {
                         </div>
                       </Link>
                     </td>
-                    <td data-label="Campanha" className="py-3.5">
+                    <td className="py-3.5">
                       {it.campaignId ? (
                         <Link
                           to={`/operations/campaigns?c=${it.campaignId}`}
@@ -320,8 +356,8 @@ export default function OperationsContractsPage() {
                         <span className="text-ink-muted">Sem campanha</span>
                       )}
                     </td>
-                    <td data-label="Modalidade" className="py-3.5">{tEnum("contractModality", it.modality)}</td>
-                    <td data-label="Status" className="py-3.5">
+                    <td className="py-3.5">{tEnum("contractModality", it.modality)}</td>
+                    <td className="py-3.5">
                       <div className="flex items-center gap-2">
                         <StatusChip status={it.status} kind="contractStatus" colors={STATUS_COLOR} />
                         {it.status === "Draft" && !it.templateLegalReviewed && (
@@ -334,9 +370,9 @@ export default function OperationsContractsPage() {
                         )}
                       </div>
                     </td>
-                    <td data-label="Custódia" className="py-3.5"><EscrowCell item={it} /></td>
-                    <td data-label="Quando" className="py-3.5 text-[12.5px]"><WhenCell item={it} /></td>
-                    <td data-wide className="px-4 md:px-8 py-3.5 text-right">
+                    <td className="py-3.5"><EscrowCell item={it} /></td>
+                    <td className="py-3.5 text-[12.5px]"><WhenCell item={it} /></td>
+                    <td className="px-4 md:px-8 py-3.5 text-right">
                       <RoleGate allow={["Owner", "Admin"]}>
                         {/* Só rascunho: a partir do envio existe envelope no provedor e
                             talvez quem ja' assinou, e apagar aqui nao desfaz nada disso. */}

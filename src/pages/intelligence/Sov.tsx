@@ -160,7 +160,9 @@ export default function SovPage() {
       >
         <Segmented items={TABS} value={tab} onChange={setTab} ariaLabel="Leitura do share of voice" />
 
-        <div className="flex items-center gap-2 ml-auto">
+        {/* Celular: a contagem à esquerda e o período à direita, na linha de baixo —
+            alinhados à direita, os dois pareciam soltos sob as abas. */}
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end sm:ml-auto">
           {!precisaEscolher && competitors > 0 && (
             <span className="text-[12px] text-ink-muted whitespace-nowrap">
               {competitors} {competitors === 1 ? "concorrente" : "concorrentes"}
