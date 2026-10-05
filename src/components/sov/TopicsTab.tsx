@@ -2,7 +2,7 @@ import { EmptyBlock } from "@/components/ui/empty-block"
 import { stagger } from "@/lib/motion"
 import type { SovTopic, SovTopicShare } from "@/lib/api/dashboard"
 import {
-  brandColor, findTopicGaps, GLOSSARY, isLowVolume, leaderOf, MIN_TOPIC_VOLUME, type RankedBrand,
+  brandColor, findTopicGaps, GLOSSARY, isLowVolume, leaderOf, MIN_TOPIC_VOLUME, ppGap, type RankedBrand,
 } from "@/lib/sov"
 import { BlockSkeleton, BrandSwatch, SectionHead } from "./shared"
 
@@ -110,7 +110,7 @@ function GapsPanel({ topics, you }: { topics: SovTopic[]; you: RankedBrand }) {
                   <span>você <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>{mine}%</span></span>
                   <span className="truncate">
                     {leader.brandName} <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>{leader.sharePct}%</span>
-                    {" · "}<span className="font-mono-zoe">{leader.sharePct - mine}pp</span> à frente
+                    {" · "}<span className="font-mono-zoe">{ppGap(leader.sharePct, mine)}pp</span> à frente
                   </span>
                 </div>
               </div>

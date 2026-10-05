@@ -300,9 +300,11 @@ export default function MonitoringPage() {
       </section>
 
       {/* Barra de trabalho: o que estou vendo (abas) e como (ordem e formato).
-          Gruda no topo porque o feed é longo e a régua precisa acompanhar. */}
+          Gruda no topo porque o feed é longo e a régua precisa acompanhar — a
+          partir de md. No celular ela quebra em três linhas e, presa, comia um
+          quinto da tela. */}
       <section
-        className="px-4 md:px-8 py-3 border-b border-border-soft flex items-center justify-between gap-4 flex-wrap sticky top-0 z-10"
+        className="px-4 md:px-8 py-3 border-b border-border-soft flex items-center justify-between gap-4 flex-wrap md:sticky top-0 z-10"
         style={{ background: "var(--surface)" }}
       >
         <Segmented

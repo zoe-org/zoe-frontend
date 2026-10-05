@@ -946,12 +946,12 @@ function BrandModal({ open, onClose }: { open: boolean; onClose: () => void }) {
         onClick={close}
         aria-hidden
       />
-      <div className="fixed inset-0 z-90 flex items-center justify-center pointer-events-none p-4">
+      <div className="fixed inset-0 z-90 flex items-end sm:items-center justify-center pointer-events-none sm:p-4">
         <div
           role="dialog"
           aria-modal="true"
           aria-label="Nova marca"
-          className="pointer-events-auto w-160 max-w-full max-h-[88vh] flex flex-col overflow-hidden rounded-xl border border-border-soft shadow-2xl"
+          className="pointer-events-auto w-160 max-w-full max-h-[88vh] flex flex-col overflow-hidden rounded-xl border border-border-soft shadow-2xl max-sm:rounded-b-none max-sm:border-b-0 max-sm:max-h-[92dvh] z-sheet"
           style={{ background: "var(--surface)" }}
         >
           {/* Header */}

@@ -631,7 +631,7 @@ function Briefing({ brandName, loading, total, delta, avgScore, pctPos, unread }
   if (total === 0) {
     return (
       <>
-        <h1 className="font-display m-0 text-ink" style={{ fontSize: 38, lineHeight: 1.1 }}>
+        <h1 className="font-display m-0 text-ink text-[30px] md:text-[38px]" style={{ lineHeight: 1.1 }}>
           Nenhuma menção a <span className="text-teal-500">{brandName}</span> nos últimos 30 dias
         </h1>
         <p className="text-[15px] leading-relaxed text-ink-muted mt-3 max-w-[62ch]">
@@ -656,7 +656,7 @@ function Briefing({ brandName, loading, total, delta, avgScore, pctPos, unread }
 
   return (
     <>
-      <h1 className="font-display m-0 text-ink" style={{ fontSize: 38, lineHeight: 1.1 }}>
+      <h1 className="font-display m-0 text-ink text-[30px] md:text-[38px]" style={{ lineHeight: 1.1 }}>
         <span className="text-teal-500">
           <CountUp value={total} format={(n) => nf.format(Math.round(n))} /> {total === 1 ? "menção" : "menções"}
         </span>{" "}

@@ -128,7 +128,7 @@ export default function OperationsEscrowPage() {
           {/* Barra de trabalho: a trilha de estados (que é panorama e filtro ao
               mesmo tempo) à esquerda, o resultado e a busca à direita. */}
           <section
-            className="px-4 md:px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap sticky top-0 z-10"
+            className="px-4 md:px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap md:sticky top-0 z-10"
             style={{ background: "var(--surface)" }}
           >
             <div className="flex flex-wrap gap-1.5">

@@ -8,7 +8,7 @@ import { InfoHint } from "@/components/ui/info-hint"
 import type { SovTrend } from "@/lib/api/dashboard"
 import { Stat } from "@/components/ui/stat"
 import {
-  brandColor, formatScore, GLOSSARY, nearestRival, positionSummary, readSentiment,
+  brandColor, formatScore, GLOSSARY, nearestRival, positionSummary, ppGap, readSentiment,
   type RankedBrand,
 } from "@/lib/sov"
 import { stagger } from "@/lib/motion"
@@ -121,7 +121,7 @@ function RivalTarget({ ranked, onCompare }: { ranked: RankedBrand[]; onCompare?:
   if (!you || !alvo) return null
 
   const lidera = you.rank === 1
-  const gap = Math.abs(you.sharePct - alvo.sharePct)
+  const gap = Math.abs(ppGap(you.sharePct, alvo.sharePct))
 
   return (
     <div className="flex items-center gap-4 flex-wrap mt-5 rounded-[14px] border border-border-soft bg-inset px-4 py-3">

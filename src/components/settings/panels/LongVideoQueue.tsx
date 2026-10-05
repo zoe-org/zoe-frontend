@@ -397,6 +397,13 @@ function QueueBody({
 
   return (
     <div className="@container overflow-x-auto">
+      {/* Modo cartão: o "todos" do cabeçalho some junto com o <thead>. */}
+      {selectable && (
+        <label className="@2xl:hidden flex items-center gap-2 px-4 py-2.5 border-y border-border-soft text-[12.5px] text-ink-muted cursor-pointer">
+          <input type="checkbox" checked={allSelected} onChange={onToggleAll} className="accent-teal-500" />
+          Selecionar todos
+        </label>
+      )}
       <table className="w-full text-[13px] table-cards">
         <thead>
           <tr className="border-y border-border-soft">

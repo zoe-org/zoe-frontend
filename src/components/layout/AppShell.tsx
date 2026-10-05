@@ -262,7 +262,8 @@ function SidebarBody({ collapsed, onToggle, onNavigate }: {
         {/* Navegação: seções planas, sempre abertas. O clique em qualquer link
             fecha a gaveta — delegado aqui em vez de repetido em cada item. */}
         <nav
-          className={`flex-1 pb-3 overflow-y-auto ${sidebarOpen ? "px-3" : "px-2"}`}
+          // Na gaveta os itens crescem para alvo de dedo (40px); 32px é alvo de mouse.
+          className={`flex-1 pb-3 overflow-y-auto ${sidebarOpen ? "px-3" : "px-2"} ${onNavigate ? "[&_a]:h-10 [&_a]:text-[14.5px]" : ""}`}
           onClick={(e) => { if ((e.target as HTMLElement).closest("a")) onNavigate?.() }}
         >
           <NavItem to="/dashboard" icon={LayoutDashboard} collapsed={collapsed}>Dashboard</NavItem>

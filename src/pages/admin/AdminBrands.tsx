@@ -512,8 +512,8 @@ function GlobalBrandsTab() {
                 : "Marcas aparecem aqui depois de passarem pela fila de verificação."}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse" style={{ minWidth: 860 }}>
+            <div className="@container overflow-x-auto">
+              <table className="w-full border-collapse @2xl:min-w-[860px] table-cards">
                 <thead>
                   <tr className="border-b border-border-soft">
                     <Th>Marca</Th>
@@ -570,7 +570,7 @@ function GlobalBrandRow({ brand, onEdit }: { brand: AdminBrand; onEdit: () => vo
         </div>
       </td>
 
-      <td className="px-4 py-3">
+      <td data-wide data-label="Aliases canônicos" className="px-4 py-3">
         <div className="flex flex-wrap gap-1" style={{ maxWidth: 260 }}>
           {brand.canonicalAliases.length === 0 && <span className="text-[11.5px] text-ink-muted-2 italic">só o nome</span>}
           {brand.canonicalAliases.slice(0, 3).map((a) => (
@@ -584,13 +584,13 @@ function GlobalBrandRow({ brand, onEdit }: { brand: AdminBrand; onEdit: () => vo
         </div>
       </td>
 
-      <td className="px-4 py-3 font-mono-zoe text-[12.5px] text-right" style={{ color: "var(--ink-2)" }}>
+      <td data-label="Tenants" className="px-4 py-3 font-mono-zoe text-[12.5px] text-right" style={{ color: "var(--ink-2)" }}>
         {brand.subscriberTenantsCount}
       </td>
-      <td className="px-4 py-3 font-mono-zoe text-[12.5px] text-right" style={{ color: "var(--ink-2)" }}>
+      <td data-label="Análises" className="px-4 py-3 font-mono-zoe text-[12.5px] text-right" style={{ color: "var(--ink-2)" }}>
         {brand.analysesCount.toLocaleString("pt-BR")}
       </td>
-      <td className="px-4 py-3 text-right">
+      <td data-label="Owned" className="px-4 py-3 text-right">
         {/* Declara canal, tem análise, e nada ficou owned. O aviso descreve o
             fato: a causa pode ser channel id errado OU nenhuma coleta do canal. */}
         <span
@@ -603,13 +603,13 @@ function GlobalBrandRow({ brand, onEdit }: { brand: AdminBrand; onEdit: () => vo
         </span>
       </td>
 
-      <td className="px-4 py-3 text-[12.5px] text-ink-muted" style={{ whiteSpace: "nowrap" }}>
+      <td data-label="Verificada" className="px-4 py-3 text-[12.5px] text-ink-muted" style={{ whiteSpace: "nowrap" }}>
         {brand.verifiedAt
           ? formatDistanceToNow(new Date(brand.verifiedAt), { addSuffix: true, locale: ptBR })
           : "—"}
       </td>
 
-      <td className="px-4 py-3 text-right">
+      <td data-wide className="px-4 py-3 text-right">
         <button
           onClick={onEdit}
           className="h-8 px-3 text-[12.5px] rounded-md border border-border-soft hover:bg-hover transition-colors cursor-pointer"

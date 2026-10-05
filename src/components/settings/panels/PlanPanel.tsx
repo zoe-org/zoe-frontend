@@ -707,10 +707,10 @@ function TrialUsedDialog({
   const price = recurringCents(selection, data)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div
-        className="relative w-full max-w-[480px] rounded-[14px] border border-border-soft px-6 py-6 shadow-xl"
+        className="relative w-full max-w-[480px] rounded-[14px] border border-border-soft px-6 py-6 shadow-xl max-sm:rounded-b-none max-sm:border-b-0 max-sm:max-h-[92dvh] z-sheet max-sm:overflow-y-auto"
         style={{ background: "var(--surface)" }}
       >
         <div className="eyebrow">Período de teste</div>
@@ -910,10 +910,10 @@ function ExtraBrandDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div
-        className="relative w-full max-w-[520px] rounded-[14px] border border-border-soft px-6 py-6 shadow-xl"
+        className="relative w-full max-w-[520px] rounded-[14px] border border-border-soft px-6 py-6 shadow-xl max-sm:rounded-b-none max-sm:border-b-0 max-sm:max-h-[92dvh] z-sheet max-sm:overflow-y-auto"
         style={{ background: "var(--surface)" }}
       >
         <div className="eyebrow">Adicionar marca extra</div>

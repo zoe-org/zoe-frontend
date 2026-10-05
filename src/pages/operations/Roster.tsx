@@ -163,7 +163,7 @@ export default function OperationsRosterPage() {
       {/* Barra de trabalho: o recorte à esquerda, o resultado e os filtros à
           direita. Gruda no topo porque o elenco cresce e rola. */}
       <section
-        className="px-4 md:px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap sticky top-0 z-10"
+        className="px-4 md:px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap md:sticky top-0 z-10"
         style={{ background: "var(--surface)" }}
       >
         <RelationshipTabs items={all} value={rel} onChange={setRel} />

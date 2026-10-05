@@ -32,6 +32,10 @@ const FALA_BEM = 0.6
 const ATENCAO = 0.4
 
 type SortKey = "mentions" | "reach" | "subscribers" | "sentiment"
+
+const SORT_LABELS: [SortKey, string][] = [
+  ["mentions", "Menções"], ["reach", "Views somadas"], ["subscribers", "Inscritos"], ["sentiment", "Sentimento"],
+]
 type Tier = "all" | "mega" | "macro" | "micro"
 
 // Tier por audiência (subscribers). null = canal sem captura de audiência ainda
@@ -322,7 +326,7 @@ export default function InfluencersPage() {
               contador do resultado. Gruda no topo porque a lista é longa e o
               controle precisa seguir ao alcance enquanto se rola. */}
           <section
-            className="px-4 md:px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap sticky top-0 z-10"
+            className="@container px-4 md:px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap md:sticky top-0 z-10"
             style={{ background: "var(--surface)" }}
           >
             {hasSubs ? (
@@ -364,6 +368,28 @@ export default function InfluencersPage() {
                 ariaLabel="Buscar canal na lista"
                 className="w-44 sm:w-56"
               />
+            </div>
+
+            {/* Modo cartão: o cabeçalho que ordenava some com a tabela, então a
+                ordenação vem para cá. Select nativo abre o seletor do sistema. */}
+            <div className="@2xl:hidden flex items-center gap-1.5 w-full">
+              <label className="text-[12px] text-ink-muted" htmlFor="ordem-influenciadores">Ordenar por</label>
+              <select
+                id="ordem-influenciadores"
+                value={sortKey}
+                onChange={(e) => toggleSort(e.target.value as SortKey)}
+                className="h-8 rounded-lg border border-border-soft bg-transparent px-2 text-[13px] text-ink"
+              >
+                {SORT_LABELS.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+              </select>
+              <button
+                type="button"
+                onClick={() => toggleSort(sortKey)}
+                aria-label={sortAsc ? "Ordem crescente — inverter" : "Ordem decrescente — inverter"}
+                className="w-8 h-8 flex items-center justify-center rounded-lg border border-border-soft text-ink-muted hover:text-ink"
+              >
+                <ArrowUp className={`w-3.5 h-3.5 transition-transform ${sortAsc ? "" : "rotate-180"}`} />
+              </button>
             </div>
           </section>
 
@@ -526,7 +552,7 @@ function HighlightRow({
       </div>
       <div className="flex-1 min-w-0">
         <div className="text-[13px] font-medium truncate text-ink">{inf.name || "Canal sem nome"}</div>
-        <div className="flex items-center gap-1.5 text-[11px] text-ink-muted truncate">
+        <div className="flex flex-wrap items-center gap-x-1.5 text-[11px] text-ink-muted">
           <span className="font-mono-zoe">{inf.mentions}</span>
           <span>{inf.mentions === 1 ? "menção" : "menções"}</span>
           <span>·</span>

@@ -491,3 +491,34 @@
     }
   }
 }
+
+/* iOS amplia a página ao focar um campo com fonte abaixo de 16px, e não desfaz
+   o zoom ao sair — a tela ficava cortada até a pessoa pinçar de volta. Quase todo
+   campo aqui é 13px. Fora de @layer de propósito: precisa vencer os utilitários
+   `text-[13px]`. Só em tela de toque pequena; no desktop nada muda. */
+@media (pointer: coarse) and (width < 48rem) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* Diálogo no celular: folha que sobe do rodapé, ao alcance do polegar. A casca
+   encosta embaixo (`items-end`) e perde o raio inferior; aqui só o movimento. */
+@media (width < 40rem) {
+  .z-sheet {
+    animation: z-sheet 0.32s var(--ease-out) backwards;
+  }
+}
+@keyframes z-sheet {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .z-sheet {
+    animation: none !important;
+  }
+}

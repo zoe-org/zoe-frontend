@@ -198,7 +198,7 @@ export default function SentimentPage() {
                 <div className="h-10 w-28 rounded z-skeleton" />
               ) : (
                 <>
-                  <span className="font-display leading-none" style={{ fontSize: 40, color: netColor(stats.net) }}>
+                  <span className="font-display leading-none text-[32px] md:text-[40px]" style={{ color: netColor(stats.net) }}>
                     <CountUp value={stats.net} format={(n) => formatScoreDelta(n)} />
                   </span>
                   <NetRuler value={stats.net} />
@@ -211,7 +211,7 @@ export default function SentimentPage() {
                 <div className="h-10 w-24 rounded z-skeleton" />
               ) : anterior == null ? (
                 <>
-                  <span className="font-display leading-none text-ink-muted-2" style={{ fontSize: 40 }}>—</span>
+                  <span className="font-display leading-none text-ink-muted-2 text-[32px] md:text-[40px]">—</span>
                   <p className="text-[11.5px] text-ink-muted mt-3 leading-snug">
                     {days === 0
                       ? "Escolha um período para comparar com o anterior."
@@ -221,7 +221,7 @@ export default function SentimentPage() {
               ) : (
                 <>
                   <div className="flex items-center gap-2.5">
-                    <span className="font-display leading-none" style={{ fontSize: 40, color: netColor(anterior.delta) }}>
+                    <span className="font-display leading-none text-[32px] md:text-[40px]" style={{ color: netColor(anterior.delta) }}>
                       {formatScoreDelta(anterior.delta)}
                     </span>
                     {/* Sem seta quando a variação arredonda para zero: a seta afirmaria
@@ -253,7 +253,7 @@ export default function SentimentPage() {
               {carregando ? (
                 <div className="h-10 w-20 rounded z-skeleton" />
               ) : (
-                <span className="font-display leading-none text-ink" style={{ fontSize: 40 }}>
+                <span className="font-display leading-none text-ink text-[32px] md:text-[40px]">
                   <CountUp value={stats.total} format={(n) => nf.format(Math.round(n))} />
                 </span>
               )}
@@ -268,7 +268,7 @@ export default function SentimentPage() {
               ) : (
                 <>
                   <div className="flex items-baseline gap-2">
-                    <span className="font-display leading-none" style={{ fontSize: 40, color: "var(--color-neg)" }}>
+                    <span className="font-display leading-none text-[32px] md:text-[40px]" style={{ color: "var(--color-neg)" }}>
                       <CountUp value={stats.totalNeg} format={(n) => nf.format(Math.round(n))} />
                     </span>
                     <span className="text-[12.5px] text-ink-muted">negativas</span>

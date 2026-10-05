@@ -101,8 +101,8 @@ export function ContractTemplatesTab() {
               neste ambiente, o seed não rodou aqui, e não há o que liberar.
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse" style={{ minWidth: 860 }}>
+            <div className="@container overflow-x-auto">
+              <table className="w-full border-collapse @2xl:min-w-[860px] table-cards">
                 <thead>
                   <tr className="border-b border-border-soft">
                     <Th>Modalidade</Th>
@@ -157,26 +157,26 @@ function TemplateRow({ template }: { template: AdminContractTemplate }) {
           </div>
         </td>
 
-        <td className="px-4 py-3 font-mono-zoe text-[12.5px] text-right" style={{ color: "var(--ink-2)" }}>
+        <td data-label="Versão" className="px-4 py-3 font-mono-zoe text-[12.5px] text-right" style={{ color: "var(--ink-2)" }}>
           v{template.version}
         </td>
-        <td className="px-4 py-3 font-mono-zoe text-[12.5px] text-right" style={{ color: "var(--ink-2)" }}>
+        <td data-label="Campos" className="px-4 py-3 font-mono-zoe text-[12.5px] text-right" style={{ color: "var(--ink-2)" }}>
           {template.fieldsCount}
         </td>
 
-        <td className="px-4 py-3 text-[12.5px]" style={{ color: "var(--ink-2)" }}>
+        <td data-label="Custódia" className="px-4 py-3 text-[12.5px]" style={{ color: "var(--ink-2)" }}>
           {/* Sem custódia o pagamento corre fora da plataforma — quem revisa precisa
               saber disso antes de ler as cláusulas, porque muda o que o texto promete. */}
           {template.supportsEscrow ? "com escrow" : <span className="text-ink-muted">fora do escrow</span>}
         </td>
 
-        <td className="px-4 py-3 font-mono-zoe text-[12.5px] text-right">
+        <td data-label="Rascunhos parados" className="px-4 py-3 font-mono-zoe text-[12.5px] text-right">
           <span style={{ color: template.draftContractsWaiting > 0 && !template.isLegalReviewed ? "var(--color-warn)" : "var(--ink-2)" }}>
             {template.draftContractsWaiting}
           </span>
         </td>
 
-        <td className="px-4 py-3">
+        <td data-label="Parecer jurídico" className="px-4 py-3">
           {template.isLegalReviewed ? (
             <span className="chip chip-pos text-[10.5px] inline-flex items-center gap-1">
               <ShieldCheck className="w-3 h-3" /> registrado
@@ -186,7 +186,7 @@ function TemplateRow({ template }: { template: AdminContractTemplate }) {
           )}
         </td>
 
-        <td className="px-4 py-3 text-right">
+        <td data-wide className="px-4 py-3 text-right">
           {template.isLegalReviewed ? (
             <span className="text-[12px] text-ink-muted">—</span>
           ) : (

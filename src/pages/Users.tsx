@@ -467,12 +467,12 @@ function AssignBrandsModal({ member, onClose }: { member: TenantMember; onClose:
 
   return (
     <div
-      className="fixed inset-0 z-90 flex items-center justify-center p-4"
+      className="fixed inset-0 z-90 flex items-end sm:items-center justify-center sm:p-4"
       style={{ background: "rgba(7,9,26,0.32)", backdropFilter: "blur(2px)" }}
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-xl border border-border-soft shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
+        className="w-full max-w-md rounded-xl border border-border-soft shadow-2xl overflow-hidden flex flex-col max-h-[85vh] max-sm:rounded-b-none max-sm:border-b-0 max-sm:max-h-[92dvh] z-sheet"
         style={{ background: "var(--surface)" }}
         role="dialog"
         aria-modal="true"
@@ -637,12 +637,12 @@ function InviteModal({ isOwner, onClose }: { isOwner: boolean; onClose: () => vo
 
   return (
     <div
-      className="fixed inset-0 z-90 flex items-center justify-center p-4"
+      className="fixed inset-0 z-90 flex items-end sm:items-center justify-center sm:p-4"
       style={{ background: "rgba(7,9,26,0.32)", backdropFilter: "blur(2px)" }}
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-xl border border-border-soft shadow-2xl overflow-hidden flex flex-col max-h-[88vh]"
+        className="w-full max-w-lg rounded-xl border border-border-soft shadow-2xl overflow-hidden flex flex-col max-h-[88vh] max-sm:rounded-b-none max-sm:border-b-0 max-sm:max-h-[92dvh] z-sheet"
         style={{ background: "var(--surface)" }}
         role="dialog"
         aria-modal="true"
@@ -850,12 +850,12 @@ function ResentLinkModal({ link, onClose }: { link: string; onClose: () => void 
 
   return (
     <div
-      className="fixed inset-0 z-90 flex items-center justify-center p-4"
+      className="fixed inset-0 z-90 flex items-end sm:items-center justify-center sm:p-4"
       style={{ background: "rgba(7,9,26,0.32)", backdropFilter: "blur(2px)" }}
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-xl border border-border-soft shadow-2xl overflow-hidden"
+        className="w-full max-w-lg rounded-xl border border-border-soft shadow-2xl overflow-hidden max-sm:rounded-b-none max-sm:border-b-0 max-sm:max-h-[92dvh] z-sheet max-sm:overflow-y-auto"
         style={{ background: "var(--surface)" }}
         role="dialog"
         aria-modal="true"

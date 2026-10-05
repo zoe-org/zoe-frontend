@@ -184,7 +184,7 @@ export default function OperationsContractsPage() {
 
       {/* Barra de trabalho: o recorte vigente e a busca, coladas na tabela. */}
       <section
-        className="px-4 md:px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap sticky top-0 z-10"
+        className="px-4 md:px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap md:sticky top-0 z-10"
         style={{ background: "var(--surface)" }}
       >
         <div className="flex items-center gap-2 flex-wrap">
