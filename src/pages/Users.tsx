@@ -185,9 +185,9 @@ export default function UsersPage() {
   ]
 
   return (
-    <div className="-m-6 min-h-[calc(100dvh-3.75rem)] flex flex-col" style={{ color: "var(--ink)" }}>
+    <div className="-m-4 md:-m-6 min-h-[calc(100dvh-3.75rem)] flex flex-col" style={{ color: "var(--ink)" }}>
       {/* Hero */}
-      <section className="px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
+      <section className="px-4 md:px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
         <div className="flex items-end justify-between gap-6 flex-wrap">
           <div className="flex-1 max-w-190 min-w-70">
             <div className="eyebrow mb-3">Gestão · Equipe</div>
@@ -217,7 +217,7 @@ export default function UsersPage() {
           pessoas, papéis e convites são entidades diferentes, não recortes da
           mesma lista (aí seria `Segmented`). Gruda no topo porque a tabela rola. */}
       <section
-        className="px-8 py-3 border-b border-border-soft flex items-center gap-1.5 flex-wrap sticky top-0 z-10"
+        className="px-4 md:px-8 py-3 border-b border-border-soft flex items-center gap-1.5 flex-wrap sticky top-0 z-10"
         style={{ background: "var(--surface)" }}
       >
         {tabs.map((t) => (
@@ -241,15 +241,15 @@ export default function UsersPage() {
           ) : memberList.length === 0 ? (
             <EmptyBlock className="py-16" message="Nenhum membro neste workspace" />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-[13px]">
+            <div className="@container overflow-x-auto">
+              <table className="w-full text-[13px] table-cards">
                 <thead>
                   <tr className="border-b border-border-soft">
-                    <th className="text-left px-8 py-3 eyebrow font-semibold">Nome</th>
+                    <th className="text-left px-4 md:px-8 py-3 eyebrow font-semibold">Nome</th>
                     <th className="text-left px-3 py-3 eyebrow font-semibold">Papel</th>
                     <th className="text-left px-3 py-3 eyebrow font-semibold">Marcas</th>
                     <th className="text-left px-3 py-3 eyebrow font-semibold">Entrou em</th>
-                    <th className="px-8 py-3" />
+                    <th className="px-4 md:px-8 py-3" />
                   </tr>
                 </thead>
                 <tbody>
@@ -261,7 +261,7 @@ export default function UsersPage() {
                         className="border-b border-border-soft hover:bg-hover transition-colors z-rise"
                         style={stagger(Math.min(i, 12))}
                       >
-                        <td className="px-8 py-3.5">
+                        <td className="px-4 md:px-8 py-3.5">
                           <div className="flex items-center gap-3">
                             <div
                               className="w-9 h-9 rounded-lg shrink-0 flex items-center justify-center font-display text-white text-[12px]"
@@ -278,7 +278,7 @@ export default function UsersPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-3 py-3.5">
+                        <td data-label="Papel" className="px-3 py-3.5">
                           <RoleCell
                             member={m}
                             canEdit={isAdmin}
@@ -288,11 +288,11 @@ export default function UsersPage() {
                             onChange={(next) => handleRoleChange(m, next)}
                           />
                         </td>
-                        <td className="px-3 py-3.5">
+                        <td data-label="Marcas" className="px-3 py-3.5">
                           <BrandsCell member={m} canEdit={isAdmin} onEdit={() => setEditingBrands(m)} />
                         </td>
-                        <td className="px-3 py-3.5 font-mono-zoe text-ink-2">{fmtDate(m.joinedAt)}</td>
-                        <td className="px-8 py-3.5 text-right">
+                        <td data-label="Entrou em" className="px-3 py-3.5 font-mono-zoe text-ink-2">{fmtDate(m.joinedAt)}</td>
+                        <td data-wide className="px-4 md:px-8 py-3.5 text-right">
                           {isAdmin && !isSelf && (
                             <button
                               onClick={() => handleRemove(m)}
@@ -315,7 +315,7 @@ export default function UsersPage() {
       )}
 
       {tab === "papeis" && (
-        <section className="flex-1 p-7 bg-inset">
+        <section className="flex-1 p-4 md:p-7 bg-inset">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {ROLE_ORDER.map((r) => {
               const meta = ROLE_META[r]
@@ -351,7 +351,7 @@ export default function UsersPage() {
           ) : (
             <div>
               {inviteList.map((inv) => (
-                <div key={inv.id} className="flex items-center gap-4 px-8 py-4 border-b border-border-soft">
+                <div key={inv.id} className="flex items-center gap-4 px-4 md:px-8 py-4 border-b border-border-soft">
                   <div className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center bg-tint text-ink-muted">
                     <Mail className="w-4 h-4" />
                   </div>
@@ -650,7 +650,7 @@ function InviteModal({ isOwner, onClose }: { isOwner: boolean; onClose: () => vo
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header (design: eyebrow "Gestão · Equipe" + título + subtítulo) */}
-        <div className="px-7 pt-6 pb-4 shrink-0">
+        <div className="px-4 md:px-7 pt-6 pb-4 shrink-0">
           <div className="flex items-start justify-between">
             <div>
               <div className="eyebrow mb-1.5">Gestão · Equipe</div>
@@ -670,7 +670,7 @@ function InviteModal({ isOwner, onClose }: { isOwner: boolean; onClose: () => vo
         </div>
 
         {link ? (
-          <div className="px-7 pb-7">
+          <div className="px-4 md:px-7 pb-7">
             <div className="flex flex-col items-center text-center py-4">
               <div
                 className="w-14 h-14 rounded-full flex items-center justify-center mb-4"
@@ -713,7 +713,7 @@ function InviteModal({ isOwner, onClose }: { isOwner: boolean; onClose: () => vo
           </div>
         ) : (
           <>
-            <div className="px-7 pb-5 overflow-y-auto flex-1">
+            <div className="px-4 md:px-7 pb-5 overflow-y-auto flex-1">
               {/* E-mail */}
               <label className="block text-[13px] font-semibold text-ink-2 mb-1.5">E-mail</label>
               <input
@@ -810,7 +810,7 @@ function InviteModal({ isOwner, onClose }: { isOwner: boolean; onClose: () => vo
               />
             </div>
 
-            <div className="flex justify-between items-center gap-2 px-7 py-4 border-t border-border-soft shrink-0">
+            <div className="flex justify-between items-center gap-2 px-4 md:px-7 py-4 border-t border-border-soft shrink-0">
               <button onClick={onClose} className="px-3.5 py-2 rounded-lg text-[13px] font-medium border border-border-soft hover:bg-hover">
                 Cancelar
               </button>
@@ -862,7 +862,7 @@ function ResentLinkModal({ link, onClose }: { link: string; onClose: () => void 
         aria-label="Link do convite"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-7 pt-6 pb-4 flex items-start justify-between">
+        <div className="px-4 md:px-7 pt-6 pb-4 flex items-start justify-between">
           <div>
             <div className="eyebrow mb-1.5">Gestão · Equipe</div>
             <h2 className="font-display m-0" style={{ fontSize: 22, color: "var(--ink)" }}>
@@ -877,7 +877,7 @@ function ResentLinkModal({ link, onClose }: { link: string; onClose: () => void 
           </button>
         </div>
 
-        <div className="px-7 pb-7">
+        <div className="px-4 md:px-7 pb-7">
           <p className="text-[13px] text-ink-muted mb-4">
             O e-mail não pôde ser enviado agora, mas o convite foi renovado. Compartilhe o
             link abaixo — ele expira em 7 dias.
@@ -913,7 +913,7 @@ function ResentLinkModal({ link, onClose }: { link: string; onClose: () => void 
 
 function TableSkeleton() {
   return (
-    <div className="px-8 py-6 space-y-3">
+    <div className="px-4 md:px-8 py-6 space-y-3">
       {[0, 1, 2, 3].map((i) => (
         <div key={i} className="h-11 rounded z-skeleton" />
       ))}

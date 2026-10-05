@@ -106,7 +106,7 @@ export function EditCampaignModal({
           <Field label="Nome">
             <Input value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Início">
               <Input type="date" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
             </Field>
@@ -146,7 +146,7 @@ export function EditCampaignModal({
                 />
               </Field>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Field label="Logo obrigatório">
                   <SelectField
                     value={requiresLogo ? "sim" : "nao"}
@@ -196,7 +196,7 @@ export function EditCampaignModal({
                 />
               </Field>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Field label="SLA de entrega (dias)">
                   <Input
                     type="number"
@@ -430,7 +430,7 @@ export function CreateCampaignModal({ onClose }: { onClose: () => void }) {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Início">
               <Input type="date" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} />
             </Field>

@@ -219,7 +219,7 @@ export default function AlertsPage() {
   }
 
   if (brand.isLoading) {
-    return <div className="px-8 py-20 text-center text-ink-muted text-[13px]">Carregando…</div>
+    return <div className="px-4 md:px-8 py-20 text-center text-ink-muted text-[13px]">Carregando…</div>
   }
 
   // Regra exige marca: sem nenhuma assinada não há o que configurar nem o que disparar.
@@ -235,9 +235,9 @@ export default function AlertsPage() {
   }
 
   return (
-    <div className="-m-6" style={{ background: "var(--surface)", color: "var(--ink)" }}>
+    <div className="-m-4 md:-m-6" style={{ background: "var(--surface)", color: "var(--ink)" }}>
       {/* Abertura */}
-      <section className="px-8 pt-7 pb-6 border-b border-border-soft">
+      <section className="px-4 md:px-8 pt-7 pb-6 border-b border-border-soft">
         <div className="flex items-end justify-between gap-6 flex-wrap">
           <div className="flex-1 max-w-190 min-w-70">
             <div className="eyebrow mb-3">Intelligence · Vigilância</div>
@@ -248,7 +248,7 @@ export default function AlertsPage() {
               O que suas regras viram enquanto você não estava olhando.
             </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={exportCsv}
               disabled={eventItems.length === 0}
@@ -302,7 +302,7 @@ export default function AlertsPage() {
       {/* Duas colunas, como no design: o que disparou à esquerda, as regras que
           disparam à direita. Em abas, ver um disparo e conferir a regra que o
           gerou custava duas trocas de contexto — e a pergunta é sempre a mesma. */}
-      <section className="px-8 py-6 grid grid-cols-1 xl:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] gap-x-7 gap-y-9 items-start">
+      <section className="px-4 md:px-8 py-6 grid grid-cols-1 xl:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)] gap-x-7 gap-y-9 items-start">
         <div className="min-w-0">
           <div className="flex items-center gap-3 flex-wrap mb-4">
             {/* Sem contagem na aba: `unreadCount` é do workspace inteiro

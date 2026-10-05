@@ -283,6 +283,8 @@ function TabStrip({
             <button
               key={key}
               onClick={() => onSelect(key)}
+              // Aberto direto em Consumo ou Plano, a aba ativa nascia fora da faixa.
+              ref={active ? (el) => el?.scrollIntoView({ block: "nearest", inline: "nearest" }) : undefined}
               aria-current={active ? "page" : undefined}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium whitespace-nowrap transition-colors ${
                 active ? "" : "text-ink-muted"

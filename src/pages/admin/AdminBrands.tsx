@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react"
+import { MasterDetail } from "@/components/ui/master-detail"
+import { scrollContentToTopOnMobile } from "@/lib/useScrollToTop"
 import {
   AlertCircle, AlertTriangle, Clock, Loader2, GitMerge, RefreshCw, Search, ShieldCheck, X,
 } from "lucide-react"
@@ -55,11 +57,11 @@ export default function AdminBrandsPage() {
   }
 
   return (
-    <div className="-m-6 border-t border-border-soft" style={{ background: "var(--surface)", color: "var(--ink)" }}>
+    <div className="-m-4 md:-m-6 border-t border-border-soft" style={{ background: "var(--surface)", color: "var(--ink)" }}>
       {/* O cabeçalho acompanha a aba: as duas primeiras curam marcas, a terceira
           cura o texto dos contratos. Manter "Marcas" fixo faria a aba de templates
           parecer uma sub-seção de marca, que ela não é. */}
-      <section className="px-8 pt-7 pb-5 border-b border-border-soft">
+      <section className="px-4 md:px-8 pt-7 pb-5 border-b border-border-soft">
         <div className="eyebrow mb-2.5">
           {tab === "templates" ? "Curadoria · contratos" : "Curadoria · núcleo global"}
         </div>
@@ -73,7 +75,7 @@ export default function AdminBrandsPage() {
         </div>
       </section>
 
-      <section className="px-8 py-4 border-b border-border-soft flex items-center gap-1.5">
+      <section className="px-4 md:px-8 py-4 border-b border-border-soft flex items-center gap-1.5">
         <TabPill
           active={tab === "queue"}
           onClick={() => setTab("queue")}
@@ -139,20 +141,21 @@ function VerificationQueueTab() {
           />
         </div>
       ) : (
-        <div className="grid" style={{ gridTemplateColumns: "340px 1fr", minHeight: "calc(100vh - 340px)" }}>
-          <div className="border-r border-border-soft">
-            {items.map((b) => (
-              <QueueRow
-                key={b.brandId}
-                brand={b}
-                active={selected?.brandId === b.brandId}
-                onClick={() => setSelectedId(b.brandId)}
-              />
-            ))}
-          </div>
-
-          {selected && <VerificationPanel key={selected.brandId} brandId={selected.brandId} queueItem={selected} />}
-        </div>
+        <MasterDetail
+          style={{ minHeight: "calc(100vh - 340px)" }}
+          showDetail={selectedId != null}
+          onBack={() => setSelectedId(null)}
+          backLabel="Fila de verificação"
+          list={items.map((b) => (
+            <QueueRow
+              key={b.brandId}
+              brand={b}
+              active={selected?.brandId === b.brandId}
+              onClick={() => { setSelectedId(b.brandId); scrollContentToTopOnMobile() }}
+            />
+          ))}
+          detail={selected && <VerificationPanel key={selected.brandId} brandId={selected.brandId} queueItem={selected} />}
+        />
       )}
     </>
   )
@@ -240,10 +243,10 @@ function VerificationPanel({ brandId, queueItem }: { brandId: string; queueItem:
     draft.reset(d.canonicalAliases, d.officialChannelIds)
   }
 
-  if (detail.isLoading) return <div className="p-7"><PanelSkeleton /></div>
+  if (detail.isLoading) return <div className="p-4 md:p-7"><PanelSkeleton /></div>
   if (detail.isError || !d) {
     return (
-      <div className="p-7">
+      <div className="p-4 md:p-7">
         <ErrorState message={apiMessage(detail.error, "Não foi possível carregar o detalhe.")} onRetry={() => detail.refetch()} />
       </div>
     )
@@ -253,7 +256,7 @@ function VerificationPanel({ brandId, queueItem }: { brandId: string; queueItem:
   const actionError = m.verify.error ?? m.reject.error ?? m.merge.error ?? m.reprocess.error
 
   return (
-    <div className="p-7 overflow-y-auto">
+    <div className="p-4 md:p-7 overflow-y-auto">
       <div className="flex items-start gap-4 mb-4 flex-wrap">
         <BrandAvatar name={d.name} seed={d.slug} size={56} radius={12} />
         <div className="min-w-0 flex-1">
@@ -439,7 +442,7 @@ function GlobalBrandsTab() {
 
   return (
     <>
-      <div className="px-8 pt-5 pb-2">
+      <div className="px-4 md:px-8 pt-5 pb-2">
         <p className="text-[13.5px] text-ink-muted max-w-160 m-0 leading-relaxed">
           Editar aqui muda a análise base de todos os tenants inscritos — e, quando muda a detecção, exige decisão
           sobre reprocessar o histórico.
@@ -447,7 +450,7 @@ function GlobalBrandsTab() {
       </div>
 
       {items.length > 0 && (
-        <div className="px-8 pb-5 pt-3">
+        <div className="px-4 md:px-8 pb-5 pt-3">
           <div className="rounded-lg border border-border-soft grid grid-cols-3">
             {[
               { l: "Marcas verificadas", v: items.length, h: "parametrizando a análise base" },
@@ -478,7 +481,7 @@ function GlobalBrandsTab() {
         </div>
       )}
 
-      <div className="px-8 pb-8">
+      <div className="px-4 md:px-8 pb-8">
         <div className="rounded-lg border border-border-soft overflow-hidden">
           <div className="flex items-center justify-between gap-4 px-4 py-3 border-b border-border-soft">
             <div className="relative w-70">
@@ -499,7 +502,7 @@ function GlobalBrandsTab() {
           </div>
 
           {list.isLoading ? (
-            <div className="p-8"><PanelSkeleton /></div>
+            <div className="p-4 md:p-8"><PanelSkeleton /></div>
           ) : list.isError ? (
             <ErrorState message={apiMessage(list.error, "Não foi possível carregar as marcas.")} onRetry={() => list.refetch()} />
           ) : items.length === 0 ? (
@@ -623,10 +626,10 @@ function GlobalBrandRow({ brand, onEdit }: { brand: AdminBrand; onEdit: () => vo
 function PageSkeleton() {
   return (
     <div className="animate-pulse">
-      <div className="px-8 pt-7 pb-6 border-b border-border-soft">
+      <div className="px-4 md:px-8 pt-7 pb-6 border-b border-border-soft">
         <div className="h-9 w-96 rounded bg-tint" />
       </div>
-      <div className="p-8"><PanelSkeleton /></div>
+      <div className="p-4 md:p-8"><PanelSkeleton /></div>
     </div>
   )
 }

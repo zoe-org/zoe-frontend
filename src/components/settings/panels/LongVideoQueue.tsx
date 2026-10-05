@@ -396,8 +396,8 @@ function QueueBody({
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-[13px]">
+    <div className="@container overflow-x-auto">
+      <table className="w-full text-[13px] table-cards">
         <thead>
           <tr className="border-y border-border-soft">
             {selectable && (
@@ -428,7 +428,7 @@ function QueueBody({
               style={selected.has(v.id) ? { background: "var(--teal-bg)" } : undefined}
             >
               {selectable && (
-                <td className="pl-6 pr-1 py-3 align-top">
+                <td className="@max-2xl:hidden! pl-6 pr-1 py-3 align-top">
                   <input
                     type="checkbox"
                     checked={selected.has(v.id)}
@@ -438,7 +438,17 @@ function QueueBody({
                   />
                 </td>
               )}
-              <td className={`py-3 align-top ${selectable ? "px-3" : "px-6"}`}>
+              <td data-wide className={`py-3 align-top ${selectable ? "px-3" : "px-6"}`}>
+                {/* No cartão a coluna de seleção some; o checkbox vem para cá. */}
+                {selectable && (
+                  <input
+                    type="checkbox"
+                    checked={selected.has(v.id)}
+                    onChange={() => onToggle(v.id)}
+                    aria-label={`Selecionar ${v.title}`}
+                    className="@2xl:hidden accent-teal-500 mr-2 align-top mt-1"
+                  />
+                )}
                 <a
                   href={`https://www.youtube.com/watch?v=${v.youtubeVideoId}`}
                   target="_blank"
@@ -461,14 +471,17 @@ function QueueBody({
                   )}
                 </div>
               </td>
-              <td className="px-3 py-3 align-top">{v.brandName}</td>
-              <td className="text-right px-3 py-3 align-top">
+              <td data-label="Marca" className="px-3 py-3 align-top">{v.brandName}</td>
+              <td data-label="Duração" className="text-right px-3 py-3 align-top">
                 <div className="font-mono-zoe">{formatDuration(v.durationSeconds)}</div>
                 {/* O teto que ele passou é o "por quê" de estar aqui. */}
                 <div className="text-[11px] text-ink-muted-2 mt-0.5">teto {int(v.maxVideoMinutes)} min</div>
               </td>
-              <td className="text-right px-3 py-3 align-top font-mono-zoe">{int(v.estimatedMinutes)}</td>
-              <td className="text-right px-6 py-3 align-top text-[12.5px] text-ink-muted whitespace-nowrap">
+              <td data-label="Minutos" className="text-right px-3 py-3 align-top font-mono-zoe">{int(v.estimatedMinutes)}</td>
+              <td
+                data-label={tab === "Pending" ? "Chegou" : tab === "Approved" ? "Situação" : "Descartado"}
+                className="text-right px-6 py-3 align-top text-[12.5px] text-ink-muted whitespace-nowrap"
+              >
                 {tab === "Pending" && shortDate(v.createdAt)}
                 {tab === "Approved" && (v.collected
                   ? <span className="chip chip-pos text-[10.5px]">cobrado</span>

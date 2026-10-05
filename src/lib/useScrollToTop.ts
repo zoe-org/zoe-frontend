@@ -17,3 +17,13 @@ export function useScrollToTop(container?: RefObject<HTMLElement | null>) {
     container?.current?.scrollTo({ top: 0, left: 0, behavior: "instant" })
   }, [pathname, container])
 }
+
+/**
+ * Lista → detalhe no celular (`MasterDetail`): o detalhe toma o lugar da lista,
+ * e sem isso abriria rolado até a altura do item tocado. No desktop as duas
+ * colunas convivem e pular para o topo tiraria a pessoa do lugar.
+ */
+export function scrollContentToTopOnMobile() {
+  if (window.matchMedia("(min-width: 1024px)").matches) return
+  document.querySelector("main")?.scrollTo({ top: 0, left: 0, behavior: "instant" })
+}

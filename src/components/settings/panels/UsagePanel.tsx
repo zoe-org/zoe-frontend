@@ -546,8 +546,8 @@ function BrandTable({ rows, billedMinutes }: { rows: BrandUsage[]; billedMinutes
           <EmptyBlock message="Nenhum minuto cobrado neste período." />
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-[13px]">
+        <div className="@container overflow-x-auto">
+          <table className="w-full text-[13px] table-cards">
             <thead>
               <tr className="border-y border-border-soft">
                 <th className="text-left font-medium text-ink-muted px-6 py-2.5">Marca</th>
@@ -571,14 +571,14 @@ function BrandTable({ rows, billedMinutes }: { rows: BrandUsage[]; billedMinutes
                         <span className="font-semibold">{b.brandName}</span>
                       </div>
                     </td>
-                    <td className="text-right px-3 py-3 font-mono-zoe">{int(b.billedMinutes)}</td>
-                    <td className="text-right px-3 py-3 font-mono-zoe">{int(b.videoCount)}</td>
-                    <td className="text-right px-3 py-3 font-mono-zoe">{dec(b.averageMinutes)} min</td>
-                    <td className="text-right px-3 py-3 font-mono-zoe">{duration(b.longestVideoMinutes)}</td>
-                    <td className="text-right px-3 py-3">
+                    <td data-label="Minutos" className="text-right px-3 py-3 font-mono-zoe">{int(b.billedMinutes)}</td>
+                    <td data-label="Vídeos" className="text-right px-3 py-3 font-mono-zoe">{int(b.videoCount)}</td>
+                    <td data-label="Duração média" className="text-right px-3 py-3 font-mono-zoe">{dec(b.averageMinutes)} min</td>
+                    <td data-label="Vídeo mais longo" className="text-right px-3 py-3 font-mono-zoe">{duration(b.longestVideoMinutes)}</td>
+                    <td data-label="Teto mensal" className="text-right px-3 py-3">
                       <BrandBudgetCell row={b} />
                     </td>
-                    <td className="px-6 py-3">
+                    <td data-wide data-label="Participação" className="px-6 py-3">
                       <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--border-soft)" }}>
                         <div className="h-full rounded-full" style={{ width: `${share}%`, background: color }} />
                       </div>

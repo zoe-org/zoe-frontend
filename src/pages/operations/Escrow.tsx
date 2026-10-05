@@ -98,8 +98,8 @@ export default function OperationsEscrowPage() {
     // Full-bleed com divisórias, como o resto da plataforma. Era uma pilha de
     // cartões dentro do padding padrão — na mesma sidebar que Contratos e
     // Elenco, as duas linguagens liam como dois produtos.
-    <div className="-m-6" style={{ color: "var(--ink)" }}>
-      <section className="px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
+    <div className="-m-4 md:-m-6" style={{ color: "var(--ink)" }}>
+      <section className="px-4 md:px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
         <div className="flex-1 max-w-190 min-w-70">
           <div className="eyebrow mb-3">Operations · Financeiro</div>
           <h1 className="font-display m-0" style={{ fontSize: 34, lineHeight: 1.1, color: "var(--ink)" }}>
@@ -128,7 +128,7 @@ export default function OperationsEscrowPage() {
           {/* Barra de trabalho: a trilha de estados (que é panorama e filtro ao
               mesmo tempo) à esquerda, o resultado e a busca à direita. */}
           <section
-            className="px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap sticky top-0 z-10"
+            className="px-4 md:px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap sticky top-0 z-10"
             style={{ background: "var(--surface)" }}
           >
             <div className="flex flex-wrap gap-1.5">
@@ -250,7 +250,7 @@ function EscrowRow({
       onClick={onOpen}
       // `hover:bg-hover` e não `--surface-2` com fallback claro fixo: o
       // `#FAFBFC` clareava a linha no modo escuro.
-      className="w-full text-left px-8 py-3.5 flex items-center gap-4 border-b border-border-soft hover:bg-hover transition-colors cursor-pointer z-rise"
+      className="w-full text-left px-4 md:px-8 py-3.5 flex items-center gap-4 border-b border-border-soft hover:bg-hover transition-colors cursor-pointer z-rise"
       style={stagger(Math.min(index, 12))}
     >
       <span

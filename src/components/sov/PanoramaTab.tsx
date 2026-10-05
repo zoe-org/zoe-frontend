@@ -49,7 +49,7 @@ function PositionSection({ ranked, periodLabel, hasPreviousPeriod, onCompare }: 
 
   if (!you) {
     return (
-      <section className="px-8 py-7 border-b border-border-soft">
+      <section className="px-4 md:px-8 py-7 border-b border-border-soft">
         <div className="eyebrow mb-2">Sua posição</div>
         <p className="text-[13px] text-ink-muted max-w-160 leading-relaxed">
           Nenhuma marca própria neste recorte. Marque uma das suas marcas como própria em
@@ -64,7 +64,7 @@ function PositionSection({ ranked, periodLabel, hasPreviousPeriod, onCompare }: 
 
   return (
     <section
-      className="grid grid-cols-1 lg:grid-cols-[1.25fr_1fr] gap-x-10 gap-y-6 px-8 py-7 border-b border-border-soft z-rise"
+      className="grid grid-cols-1 lg:grid-cols-[1.25fr_1fr] gap-x-10 gap-y-6 px-4 md:px-8 py-7 border-b border-border-soft z-rise"
       style={stagger(0)}
     >
       <div>
@@ -173,13 +173,13 @@ function RankingSection({ ranked, hasPreviousPeriod, ppHint }: {
   // Só vira link o que o tenant assina: marca fora da lista não pode ser a ativa.
   const assinadas = new Set(brands.map((x) => x.brandId))
   return (
-    <section className="px-8 py-7 border-b border-border-soft z-rise" style={stagger(1)}>
+    <section className="px-4 md:px-8 py-7 border-b border-border-soft z-rise" style={stagger(1)}>
       <SectionHead
         title="Ranking do conjunto"
         sub="Share e sentimento lado a lado: share alto com sentimento baixo é exposição, não vantagem. Clique num concorrente para abrir o Dashboard dele."
       />
-      <div className="overflow-x-auto overflow-y-clip">
-        <table className="w-full text-[13px] min-w-160">
+      <div className="@container overflow-x-auto overflow-y-clip">
+        <table className="w-full text-[13px] @2xl:min-w-160 table-cards">
           <thead>
             <tr className="text-ink-muted text-[12px]">
               <th className="text-left font-medium pb-2 w-8">#</th>
@@ -207,8 +207,8 @@ function RankingSection({ ranked, hasPreviousPeriod, ppHint }: {
                   className="border-t border-border-soft z-rise"
                   style={{ ...stagger(Math.min(i, 12)), ...(b.isYou ? { background: "var(--teal-bg)" } : {}) }}
                 >
-                  <td className="py-3 pl-1 font-mono-zoe text-[11.5px] text-ink-muted-2">{b.rank}</td>
-                  <td className="py-3 pr-3">
+                  <td className="@max-2xl:hidden! py-3 pl-1 font-mono-zoe text-[11.5px] text-ink-muted-2">{b.rank}</td>
+                  <td data-wide className="py-3 pr-3">
                     <span className="flex items-center gap-2 min-w-0">
                       <BrandSwatch color={c} />
                       {/* ADR-063: o concorrente se lê no Dashboard, com ele como marca
@@ -230,7 +230,7 @@ function RankingSection({ ranked, hasPreviousPeriod, ppHint }: {
                       {b.isYou && <span className="chip chip-primary text-[9.5px] px-1.5 py-px">VOCÊ</span>}
                     </span>
                   </td>
-                  <td className="py-3 pr-4">
+                  <td data-wide data-label="Share" className="py-3 pr-4">
                     {/* Barra na escala absoluta: 34% ocupa 34% do trilho. Relativa ao
                         líder, o primeiro sempre pareceria dono de tudo. */}
                     <div className="flex items-center gap-2.5">
@@ -245,11 +245,11 @@ function RankingSection({ ranked, hasPreviousPeriod, ppHint }: {
                       <span className="font-mono-zoe w-10 text-right" style={{ color: "var(--ink)" }}>{b.sharePct}%</span>
                     </div>
                   </td>
-                  <td className="py-3 text-right">
+                  <td data-label="Variação" className="py-3 text-right">
                     {hasPreviousPeriod ? <DeltaPp value={b.deltaPp} /> : <span className="text-ink-muted-2">—</span>}
                   </td>
-                  <td className="py-3 text-right"><SentimentChip score={b.avgScore} /></td>
-                  <td className="py-3 pr-1 text-right font-mono-zoe text-ink-muted">{b.mentions.toLocaleString("pt-BR")}</td>
+                  <td data-label="Sentimento" className="py-3 text-right"><SentimentChip score={b.avgScore} /></td>
+                  <td data-label="Menções" className="py-3 pr-1 text-right font-mono-zoe text-ink-muted">{b.mentions.toLocaleString("pt-BR")}</td>
                 </tr>
               )
             })}
@@ -292,7 +292,7 @@ function TrendSection({ trend, loading }: { trend: SovTrend | undefined; loading
   const emptyColumn = (i: number) => series.every((s) => (s.data[i] ?? 0) === 0)
 
   return (
-    <section className="px-8 py-7 z-rise" style={stagger(2)}>
+    <section className="px-4 md:px-8 py-7 z-rise" style={stagger(2)}>
       <SectionHead
         title="Evolução do share"
         hint={GLOSSARY.trend}

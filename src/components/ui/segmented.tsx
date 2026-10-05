@@ -20,11 +20,13 @@ export function Segmented<T extends string>({
 }) {
   // p-0.5 + h-7 = 32px, a mesma altura dos outros controles da barra. O raio
   // interno também fecha: 8px do trilho menos 2px de folga = 6px (rounded-md).
+  // No celular o trilho não cabe com cinco itens: ele rola de lado em vez de
+  // empurrar a página.
   return (
     <div
       role="group"
       aria-label={ariaLabel}
-      className="flex items-center gap-0.5 p-0.5 rounded-lg border border-border-soft bg-inset"
+      className="flex items-center gap-0.5 p-0.5 rounded-lg border border-border-soft bg-inset max-w-full overflow-x-auto overflow-y-clip no-scrollbar"
     >
       {items.map((item) => {
         const active = value === item.key
@@ -34,7 +36,7 @@ export function Segmented<T extends string>({
             type="button"
             onClick={() => onChange(item.key)}
             aria-pressed={active}
-            className={`inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-[12.5px] font-medium transition-colors ${
+            className={`shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 h-7 px-3 rounded-md text-[12.5px] font-medium transition-colors ${
               active ? "text-white" : "text-ink-muted hover:text-ink"
             }`}
             style={active ? { background: item.color ?? "var(--color-teal-500)" } : undefined}

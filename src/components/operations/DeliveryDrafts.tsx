@@ -127,7 +127,7 @@ export function DeliveryDrafts() {
 
   return (
     <>
-      <section className="px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap">
+      <section className="px-4 md:px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap">
         <div className="flex gap-1.5 flex-wrap">
           {([["AwaitingReview", "Aguardando"], ["", "Todos"]] as const).map(([id, label]) => (
             <button
@@ -179,7 +179,7 @@ export function DeliveryDrafts() {
       </section>
 
       {/* O que esta fila decide — a frase saiu do `<h1>` que trocava. */}
-      <p className="px-8 pt-4 pb-0 m-0 text-[12.5px] text-ink-muted max-w-160">
+      <p className="px-4 md:px-8 pt-4 pb-0 m-0 text-[12.5px] text-ink-muted max-w-160">
         O vídeo antes de ir ao ar. Aprovar libera a publicação — o pagamento só sai depois,
         sobre o vídeo publicado.
       </p>

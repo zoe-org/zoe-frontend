@@ -28,38 +28,53 @@ const TONE_COLOR: Record<NonNullable<Stat["tone"]>, string> = {
 
 /**
  * Valor longo encolhe. "R$ 1.746.205,00" em 40px passava da coluna e encostava
- * no vizinho — visto na Custódia com a barra lateral aberta, em 15/09.
+ * no vizinho — visto na Custódia com a barra lateral aberta, em 15/09. No celular
+ * a coluna tem ~150px, então o corte é mais cedo.
  */
-function valueSize(value: string | number): number {
-  return String(value).length > 13 ? 24 : 40
+function valueClass(value: string | number): string {
+  const n = String(value).length
+  const desktop = n > 13 ? "md:text-[24px]" : "md:text-[40px]"
+  const mobile = n > 10 ? "text-[18px]" : n > 7 ? "text-[22px]" : "text-[30px]"
+  return `${mobile} ${desktop}`
 }
 
+/**
+ * Celular: duas colunas (a última ocupa a linha quando sobra uma). md+: uma
+ * coluna por métrica. As réguas são borda direita + inferior em toda célula,
+ * e a grade sai 1px para fora do `overflow-hidden` — assim a última coluna e a
+ * última linha perdem a régua sem precisar saber quantas colunas há em cada largura.
+ */
 export function StatBand({ items }: { items: Stat[] }) {
+  const odd = items.length % 2 === 1
   return (
-    <section
-      className="grid border-b border-border-soft"
-      style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}
-    >
-      {items.map((k, i) => (
-        <div key={k.label} className={`px-6 py-5 min-w-0 ${i < items.length - 1 ? "border-r border-border-soft" : ""}`}>
-          <div className="eyebrow">{k.label}</div>
-          <div className="flex items-baseline gap-1.5 mt-2">
-            <span
-              className="font-display"
-              style={{
-                fontSize: valueSize(k.value),
-                lineHeight: 1.1,
-                color: k.tone ? TONE_COLOR[k.tone] : "var(--ink)",
-                overflowWrap: "anywhere",
-              }}
-            >
-              {k.value}
-            </span>
-            {k.suffix && <span className="text-[14px] text-ink-muted">{k.suffix}</span>}
+    <section className="border-b border-border-soft overflow-hidden">
+      <div
+        className="grid grid-cols-2 md:grid-cols-[repeat(var(--n),minmax(0,1fr))] -mr-px -mb-px"
+        style={{ "--n": items.length } as React.CSSProperties}
+      >
+        {items.map((k, i) => (
+          <div
+            key={k.label}
+            className={`px-4 py-4 md:px-6 md:py-5 min-w-0 border-r border-b border-border-soft ${odd && i === items.length - 1 ? "col-span-2 md:col-span-1" : ""}`}
+          >
+            <div className="eyebrow">{k.label}</div>
+            <div className="flex items-baseline gap-1.5 mt-2">
+              <span
+                className={`font-display ${valueClass(k.value)}`}
+                style={{
+                  lineHeight: 1.1,
+                  color: k.tone ? TONE_COLOR[k.tone] : "var(--ink)",
+                  overflowWrap: "anywhere",
+                }}
+              >
+                {k.value}
+              </span>
+              {k.suffix && <span className="text-[14px] text-ink-muted">{k.suffix}</span>}
+            </div>
+            {k.hint && <div className="text-[11.5px] text-ink-muted mt-2">{k.hint}</div>}
           </div>
-          {k.hint && <div className="text-[11.5px] text-ink-muted mt-2">{k.hint}</div>}
-        </div>
-      ))}
+        ))}
+      </div>
     </section>
   )
 }

@@ -157,8 +157,8 @@ export default function OperationsContractsPage() {
   }, [allContracts, campaignFilter])
 
   return (
-    <div className="-m-6" style={{ color: "var(--ink)" }}>
-      <section className="px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
+    <div className="-m-4 md:-m-6" style={{ color: "var(--ink)" }}>
+      <section className="px-4 md:px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
         <div className="flex items-end justify-between gap-6 flex-wrap">
           <div className="flex-1 max-w-200 min-w-70">
             <div className="eyebrow mb-3">Operations · Documentos</div>
@@ -184,7 +184,7 @@ export default function OperationsContractsPage() {
 
       {/* Barra de trabalho: o recorte vigente e a busca, coladas na tabela. */}
       <section
-        className="px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap sticky top-0 z-10"
+        className="px-4 md:px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap sticky top-0 z-10"
         style={{ background: "var(--surface)" }}
       >
         <div className="flex items-center gap-2 flex-wrap">
@@ -229,7 +229,7 @@ export default function OperationsContractsPage() {
           não existe, e o Painel conta o que está lá. Aqui é onde ela aparece. */}
       {pendentes.length > 0 && (
         <section
-          className="px-8 py-3 border-b border-border-soft flex items-center gap-3 flex-wrap"
+          className="px-4 md:px-8 py-3 border-b border-border-soft flex items-center gap-3 flex-wrap"
           style={{ background: "var(--warn-bg)" }}
         >
           <ShieldAlert className="w-4 h-4 shrink-0" style={{ color: "var(--color-warn)" }} />
@@ -274,17 +274,17 @@ export default function OperationsContractsPage() {
             hint="Um contrato começa como rascunho a partir de uma modalidade. Só depois de assinado é que a custódia pode ser aberta."
           />
         ) : (
-          <div className="overflow-x-auto overflow-y-clip">
-            <table className="w-full text-[13px]">
+          <div className="@container overflow-x-auto overflow-y-clip">
+            <table className="w-full text-[13px] table-cards">
               <thead>
                 <tr className="border-b border-border-soft">
-                  <th className="text-left px-8 py-3 eyebrow font-semibold">Criador</th>
+                  <th className="text-left px-4 md:px-8 py-3 eyebrow font-semibold">Criador</th>
                   <th className="text-left py-3 eyebrow font-semibold">Campanha</th>
                   <th className="text-left py-3 eyebrow font-semibold">Modalidade</th>
                   <th className="text-left py-3 eyebrow font-semibold">Status</th>
                   <th className="text-left py-3 eyebrow font-semibold">Custódia</th>
                   <th className="text-left py-3 eyebrow font-semibold">Quando</th>
-                  <th className="px-8 py-3"><span className="sr-only">Ações</span></th>
+                  <th className="px-4 md:px-8 py-3"><span className="sr-only">Ações</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -294,7 +294,7 @@ export default function OperationsContractsPage() {
                     className="border-b border-border-soft hover:bg-hover transition-colors z-rise"
                     style={stagger(Math.min(i, 12))}
                   >
-                    <td className="px-8 py-3.5">
+                    <td className="px-4 md:px-8 py-3.5">
                       <Link to={`/operations/contracts/${it.contractId}`} className="block">
                         <div className="font-medium hover:underline" style={{ color: "var(--ink)" }}>
                           {it.influencerName}
@@ -305,7 +305,7 @@ export default function OperationsContractsPage() {
                         </div>
                       </Link>
                     </td>
-                    <td className="py-3.5">
+                    <td data-label="Campanha" className="py-3.5">
                       {it.campaignId ? (
                         <Link
                           to={`/operations/campaigns?c=${it.campaignId}`}
@@ -320,8 +320,8 @@ export default function OperationsContractsPage() {
                         <span className="text-ink-muted">Sem campanha</span>
                       )}
                     </td>
-                    <td className="py-3.5">{tEnum("contractModality", it.modality)}</td>
-                    <td className="py-3.5">
+                    <td data-label="Modalidade" className="py-3.5">{tEnum("contractModality", it.modality)}</td>
+                    <td data-label="Status" className="py-3.5">
                       <div className="flex items-center gap-2">
                         <StatusChip status={it.status} kind="contractStatus" colors={STATUS_COLOR} />
                         {it.status === "Draft" && !it.templateLegalReviewed && (
@@ -334,9 +334,9 @@ export default function OperationsContractsPage() {
                         )}
                       </div>
                     </td>
-                    <td className="py-3.5"><EscrowCell item={it} /></td>
-                    <td className="py-3.5 text-[12.5px]"><WhenCell item={it} /></td>
-                    <td className="px-8 py-3.5 text-right">
+                    <td data-label="Custódia" className="py-3.5"><EscrowCell item={it} /></td>
+                    <td data-label="Quando" className="py-3.5 text-[12.5px]"><WhenCell item={it} /></td>
+                    <td data-wide className="px-4 md:px-8 py-3.5 text-right">
                       <RoleGate allow={["Owner", "Admin"]}>
                         {/* Só rascunho: a partir do envio existe envelope no provedor e
                             talvez quem ja' assinou, e apagar aqui nao desfaz nada disso. */}
@@ -745,7 +745,7 @@ function CreateContractModal({
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Field label="Prazo de revisão" hint="Dias para revisar a entrega.">
                   <Input
                     type="number"

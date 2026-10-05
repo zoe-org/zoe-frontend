@@ -88,7 +88,7 @@ export default function DashboardPage() {
  */
 function FullPlatformDashboard() {
   return (
-    <div className="-m-6">
+    <div className="-m-4 md:-m-6">
       <IntelligenceDashboard embedded afterHero={<NeedsYouBand />} />
       <OperationsSummary />
     </div>
@@ -203,7 +203,7 @@ function NeedsYouBand() {
   return (
     // Rótulo na mesma linha das pastilhas: a faixa inteira mede 56px com um
     // item, contra os ~150px que a grade gastava.
-    <section className="px-8 py-3 border-b border-border-soft flex items-center gap-x-3 gap-y-2 flex-wrap">
+    <section className="px-4 md:px-8 py-3 border-b border-border-soft flex items-center gap-x-3 gap-y-2 flex-wrap">
       <span className="eyebrow shrink-0">Precisa de você</span>
       {itens.map((i) => <NeedsYouChip key={i.plural} {...i} />)}
     </section>
@@ -223,7 +223,7 @@ function OperationsSummary() {
 
   return (
     <>
-      <section className="px-8 py-3 border-y border-border-soft flex items-center justify-between gap-4 flex-wrap">
+      <section className="px-4 md:px-8 py-3 border-y border-border-soft flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="eyebrow">Operations</span>
           <span className="chip text-[10.5px]">workspace inteiro</span>
@@ -274,10 +274,10 @@ function OperationsSummary() {
           />
 
           <section className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] border-b border-border-soft">
-            <div className="p-7 lg:border-r border-b lg:border-b-0 border-border-soft">
+            <div className="p-4 md:p-7 lg:border-r border-b lg:border-b-0 border-border-soft">
               <EscrowByState rows={d.escrowByState} />
             </div>
-            <div className="p-7">
+            <div className="p-4 md:p-7">
               <OpsRisks risks={d.risks} />
             </div>
           </section>
@@ -350,11 +350,11 @@ function IntelligenceDashboard({ embedded = false, afterHero }: {
   const brandName = brand.active?.displayName ?? brand.active?.brandName ?? ""
 
   return (
-    <div className={embedded ? "" : "-m-6"}>
+    <div className={embedded ? "" : "-m-4 md:-m-6"}>
       {/* Abertura: o resumo do período escrito em frase, com os números reais.
           Ela vale nos dois modos — no full platform ela era trocada por um
           slogan, e slogan não diz o que mudou desde ontem. */}
-      <section className="px-8 pt-7 pb-7 border-b border-border-soft">
+      <section className="px-4 md:px-8 pt-7 pb-7 border-b border-border-soft">
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div className="flex-1 min-w-70">
             <div className="eyebrow mb-3">
@@ -393,7 +393,7 @@ function IntelligenceDashboard({ embedded = false, afterHero }: {
 
       {afterHero}
 
-      <CoverageNotice tenantBrandIds={[brand.active?.tenantBrandId]} className="mx-8 mt-4" />
+      <CoverageNotice tenantBrandIds={[brand.active?.tenantBrandId]} className="mx-4 md:mx-8 mt-4" />
 
       {/* Faixa de números */}
       <section className="grid grid-cols-2 xl:grid-cols-4 border-b border-border-soft">
@@ -405,7 +405,7 @@ function IntelligenceDashboard({ embedded = false, afterHero }: {
               {ritmo == null ? "—" : <CountUp value={ritmo.media} format={(n) => nf1.format(n)} />}
             </BigNumber>
             {sparkVolume.length > 1 && (
-              <div className="w-28 shrink-0"><Sparkline data={sparkVolume} height={30} color="#00A799" /></div>
+              <div className="w-16 sm:w-28 min-w-0"><Sparkline data={sparkVolume} height={30} color="#00A799" /></div>
             )}
           </div>
           <div className="text-[11.5px] text-ink-muted mt-3">
@@ -473,7 +473,7 @@ function IntelligenceDashboard({ embedded = false, afterHero }: {
 
       {/* Sentimento no tempo + o que pede ação */}
       <section className="grid grid-cols-1 lg:grid-cols-[1.65fr_1fr] border-b border-border-soft">
-        <div className="lg:border-r border-b lg:border-b-0 border-border-soft p-7 z-rise" style={stagger(4)}>
+        <div className="lg:border-r border-b lg:border-b-0 border-border-soft p-4 md:p-7 z-rise" style={stagger(4)}>
           <div className="flex items-start justify-between gap-4 flex-wrap mb-5">
             <div>
               <div className="eyebrow">Sentimento · 30 dias</div>
@@ -502,7 +502,7 @@ function IntelligenceDashboard({ embedded = false, afterHero }: {
           )}
         </div>
 
-        <div className="p-7 flex flex-col z-rise" style={stagger(5)}>
+        <div className="p-4 md:p-7 flex flex-col z-rise" style={stagger(5)}>
           <PendingAlerts
             items={pendingAlerts}
             total={unreadCount}
@@ -514,7 +514,7 @@ function IntelligenceDashboard({ embedded = false, afterHero }: {
 
       {/* Menções recentes */}
       <section>
-        <div className="flex items-center justify-between px-8 pt-6 pb-3">
+        <div className="flex items-center justify-between px-4 md:px-8 pt-6 pb-3">
           <div className="eyebrow">Menções recentes</div>
           <Link
             to="/intelligence/monitoring"
@@ -536,7 +536,7 @@ function IntelligenceDashboard({ embedded = false, afterHero }: {
         ) : (
           /* Cartões com a miniatura, e não uma tabela: a lista em colunas é o que o
              Monitoramento já faz melhor — aqui a pergunta é "o que saiu agora". */
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 px-8 pb-7">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 px-4 md:px-8 pb-7">
             {recent.map((m, i) => (
               <button
                 key={m.analysisId}
@@ -582,10 +582,10 @@ function IntelligenceDashboard({ embedded = false, afterHero }: {
           operacional por ângulos diferentes — quando estar de plantão e com quem
           falar —, então dividem a linha. */}
       <section className="grid grid-cols-1 lg:grid-cols-[1.3fr_1fr] border-t border-border-soft">
-        <div className="lg:border-r border-b lg:border-b-0 border-border-soft p-7">
+        <div className="lg:border-r border-b lg:border-b-0 border-border-soft p-4 md:p-7">
           <ActivityHeatmap data={activity.data} loading={activity.isLoading} />
         </div>
-        <div className="p-7">
+        <div className="p-4 md:p-7">
           <TopInfluencers rows={influencers.data?.items ?? []} loading={influencers.isLoading} />
         </div>
       </section>
@@ -688,7 +688,7 @@ function KpiCell({ i, label, loading, className, children }: {
   children: React.ReactNode
 }) {
   return (
-    <div className={`px-6 pt-6 pb-6 min-h-[150px] border-border-soft z-rise ${className ?? ""}`} style={stagger(i)}>
+    <div className={`px-4 py-5 md:px-6 md:py-6 min-w-0 min-h-[150px] border-border-soft z-rise ${className ?? ""}`} style={stagger(i)}>
       <div className="eyebrow mb-3">{label}</div>
       {loading ? <div className="h-10 w-24 rounded z-skeleton" /> : children}
     </div>
@@ -697,7 +697,7 @@ function KpiCell({ i, label, loading, className, children }: {
 
 function BigNumber({ color, children }: { color: string; children: React.ReactNode }) {
   return (
-    <span className="font-display leading-none" style={{ fontSize: 40, color }}>
+    <span className="font-display leading-none text-[32px] md:text-[40px]" style={{ color }}>
       {children}
     </span>
   )
@@ -972,22 +972,22 @@ function compact(n: number): string {
 
 function PageSkeleton() {
   return (
-    <div className="-m-6">
-      <div className="px-8 pt-7 pb-7 border-b border-border-soft">
+    <div className="-m-4 md:-m-6">
+      <div className="px-4 md:px-8 pt-7 pb-7 border-b border-border-soft">
         <div className="h-3 w-56 rounded z-skeleton mb-4" />
         <div className="h-10 w-96 max-w-full rounded z-skeleton" />
       </div>
       <div className="grid grid-cols-2 xl:grid-cols-4 border-b border-border-soft">
         {[0, 1, 2, 3].map((i) => <div key={i} className="p-6 border-r border-border-soft"><div className="h-10 w-24 rounded z-skeleton" /></div>)}
       </div>
-      <div className="p-7"><div className="h-50 rounded z-skeleton" /></div>
+      <div className="p-4 md:p-7"><div className="h-50 rounded z-skeleton" /></div>
     </div>
   )
 }
 
 function RecentSkeleton() {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 px-8 pb-7">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 px-4 md:px-8 pb-7">
       {Array.from({ length: 6 }).map((_, i) => (
         <div key={i} className="rounded-lg border border-border-soft p-3 flex gap-3">
           <div className="w-28 h-16 rounded-md z-skeleton shrink-0" />

@@ -192,9 +192,9 @@ export default function InfluencersPage() {
   const restantes = filtered.length - mostrados.length
 
   return (
-    <div className="-m-6" style={{ color: "var(--ink)" }}>
+    <div className="-m-4 md:-m-6" style={{ color: "var(--ink)" }}>
       {/* Abertura */}
-      <section className="px-8 pt-7 pb-6 border-b border-border-soft">
+      <section className="px-4 md:px-8 pt-7 pb-6 border-b border-border-soft">
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div className="flex-1 max-w-190 min-w-70">
             <div className="eyebrow mb-3">Intelligence · Pessoas</div>
@@ -217,7 +217,7 @@ export default function InfluencersPage() {
           {/* A busca não mora aqui: ela recorta a tabela, que começa dois
               rolamentos abaixo. Junto do título, o controle ficava longe do
               efeito — agora ela vive na barra de trabalho, colada na lista. */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={handleExport}
               disabled={filtered.length === 0}
@@ -229,7 +229,7 @@ export default function InfluencersPage() {
         </div>
       </section>
 
-      <CoverageNotice tenantBrandIds={[brand.active?.tenantBrandId]} className="mx-8 mt-4" />
+      <CoverageNotice tenantBrandIds={[brand.active?.tenantBrandId]} className="mx-4 md:mx-8 mt-4" />
 
       {inf.isError ? (
         <ErrorState onRetry={() => inf.refetch()} />
@@ -247,7 +247,7 @@ export default function InfluencersPage() {
           {/* Uma faixa só: os dois grupos que pedem ação e, encostados neles, os
               números do período. Em duas faixas empilhadas os números empurravam
               a tabela pra baixo da dobra — e a tabela é o que a tela promete. */}
-          <section className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-[1fr_1fr_21rem] border-b border-border-soft">
+          <section className="grid grid-cols-1 lg:grid-cols-[repeat(2,minmax(0,1fr))] xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_21rem] border-b border-border-soft">
             <div className="p-6 border-b xl:border-b-0 lg:border-r border-border-soft z-rise" style={stagger(0)}>
               <div className="eyebrow">Falam bem da marca</div>
               <div className="text-[12px] text-ink-muted mt-1 mb-3">
@@ -322,7 +322,7 @@ export default function InfluencersPage() {
               contador do resultado. Gruda no topo porque a lista é longa e o
               controle precisa seguir ao alcance enquanto se rola. */}
           <section
-            className="px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap sticky top-0 z-10"
+            className="px-4 md:px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap sticky top-0 z-10"
             style={{ background: "var(--surface)" }}
           >
             {hasSubs ? (
@@ -373,11 +373,11 @@ export default function InfluencersPage() {
               sentidos. As linhas entram com `z-rise`, que as desloca 10px
               pra baixo — transbordo que conta pra área rolável e abria uma
               barra vertical fantasma até a última animação terminar. */}
-          <section className="overflow-x-auto overflow-y-clip">
-            <table className="w-full text-[13px]">
+          <section className="@container overflow-x-auto overflow-y-clip">
+            <table className="w-full text-[13px] table-cards">
               <thead>
                 <tr className="border-b border-border-soft">
-                  <th className="text-left px-8 py-3 eyebrow font-semibold">#</th>
+                  <th className="text-left px-4 md:px-8 py-3 eyebrow font-semibold">#</th>
                   <th className="text-left py-3 eyebrow font-semibold">Canal</th>
                   <SortableHeader label="Inscritos" sortKey="subscribers" currentKey={sortKey} asc={sortAsc} onToggle={toggleSort} />
                   <SortableHeader label="Views somadas" sortKey="reach" currentKey={sortKey} asc={sortAsc} onToggle={toggleSort} />
@@ -405,12 +405,12 @@ export default function InfluencersPage() {
                       className="border-b border-border-soft hover:bg-hover transition-colors z-rise"
                       style={stagger(Math.min(idx, 12))}
                     >
-                      <td className="px-8 py-3.5">
+                      <td className="@max-2xl:hidden! px-4 md:px-8 py-3.5">
                         <span className="font-mono-zoe text-[11.5px] text-ink-muted-2">
                           {String(idx + 1).padStart(2, "0")}
                         </span>
                       </td>
-                      <td className="py-3.5">
+                      <td data-wide className="py-3.5">
                         <div className="flex items-center gap-3">
                           <div
                             className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center font-display text-white text-[13px]"
@@ -426,23 +426,23 @@ export default function InfluencersPage() {
                           </div>
                         </div>
                       </td>
-                      <td className="py-3.5 font-mono-zoe text-ink-2">
+                      <td data-label="Inscritos" className="py-3.5 font-mono-zoe text-ink-2">
                         {c.subscribers == null ? (
                           <span className="text-ink-muted-2" title="Inscritos ainda não capturados para este canal">—</span>
                         ) : (
                           fmtLargeNumber(c.subscribers)
                         )}
                       </td>
-                      <td className="py-3.5 font-mono-zoe text-ink-2">{fmtLargeNumber(c.reach)}</td>
-                      <td className="py-3.5">
+                      <td data-label="Views somadas" className="py-3.5 font-mono-zoe text-ink-2">{fmtLargeNumber(c.reach)}</td>
+                      <td data-label="Menções" className="py-3.5">
                         <span className="font-mono-zoe text-[13px] text-ink">{c.mentions}</span>
                       </td>
-                      <td className="py-3.5">
+                      <td data-label="Sentimento" className="py-3.5">
                         <span className={`chip text-[11px] ${scoreChipClass(c.avgScore)}`}>
                           {formatScore(c.avgScore)}
                         </span>
                       </td>
-                      <td className="px-4 py-3.5">
+                      <td data-label="Tendência" className="px-4 py-3.5">
                         <span className="inline-flex items-center gap-1.5 text-[12px]" style={{ color: trendColor }}>
                           <TrendIcon className="w-3.5 h-3.5" />
                           {trendLabel[c.trend]}
@@ -453,7 +453,7 @@ export default function InfluencersPage() {
                 })}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-8 py-16 text-center">
+                    <td colSpan={7} className="px-4 md:px-8 py-16 text-center">
                       <p className="text-ink-muted text-sm">
                         {busca.trim() ? (
                           <>
@@ -480,7 +480,7 @@ export default function InfluencersPage() {
           {/* Paginação local: a lista inteira já veio na resposta, então o botão
               só revela mais linhas — e por isso ele diz quantas faltam. */}
           {filtered.length > 0 && (
-            <section className="px-8 py-6 flex flex-col items-center gap-2.5">
+            <section className="px-4 md:px-8 py-6 flex flex-col items-center gap-2.5">
               {restantes > 0 ? (
                 <>
                   <button
@@ -577,8 +577,8 @@ function SortableHeader({
 
 function PageSkeleton() {
   return (
-    <div className="-m-6">
-      <div className="px-8 pt-7 pb-6 border-b border-border-soft">
+    <div className="-m-4 md:-m-6">
+      <div className="px-4 md:px-8 pt-7 pb-6 border-b border-border-soft">
         <div className="h-3 w-44 rounded z-skeleton mb-4" />
         <div className="h-9 w-80 max-w-full rounded z-skeleton" />
       </div>
@@ -598,7 +598,7 @@ function PageSkeleton() {
 
 function TableSkeleton() {
   return (
-    <div className="px-8 py-6 space-y-3">
+    <div className="px-4 md:px-8 py-6 space-y-3">
       {[0, 1, 2, 3, 4].map((i) => (
         <div key={i} className="h-10 rounded z-skeleton" />
       ))}

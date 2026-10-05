@@ -69,7 +69,7 @@ export default function InfluencerInvitePage() {
   return (
     <div className="min-h-dvh flex items-center justify-center p-6" style={{ background: "var(--bg, #FAFBFC)" }}>
       <div
-        className="w-full max-w-md rounded-xl border border-border-soft p-7"
+        className="w-full max-w-md rounded-xl border border-border-soft p-4 md:p-7"
         style={{ background: "var(--surface)" }}
       >
         {preview.isLoading || authLoading ? (

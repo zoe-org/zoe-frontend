@@ -129,7 +129,7 @@ export default function CreatorPayoutPage() {
   return (
     <div className="min-h-dvh" style={{ background: "var(--bg, #FAFBFC)" }}>
       <header className="border-b border-border-soft" style={{ background: "var(--surface)" }}>
-        <div className="max-w-[880px] mx-auto px-6 py-4 flex items-center justify-between gap-4">
+        <div className="max-w-[880px] mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
             <ZoeLogo className="h-6 w-auto" />
             <span className="chip text-[10.5px]">Criador</span>
@@ -153,7 +153,7 @@ export default function CreatorPayoutPage() {
         </div>
       </header>
 
-      <main className="max-w-[880px] mx-auto px-6 py-8">
+      <main className="max-w-[880px] mx-auto px-4 sm:px-6 py-8">
         <Link
           to="/creator"
           className="inline-flex items-center gap-1.5 text-[13px] text-ink-muted hover:opacity-70 mb-5"

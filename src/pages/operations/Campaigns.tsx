@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react"
+import { MasterDetail } from "@/components/ui/master-detail"
+import { scrollContentToTopOnMobile } from "@/lib/useScrollToTop"
 import { Plus, Megaphone } from "lucide-react"
 import { EmptyBlock } from "@/components/ui/empty-block"
 import { RoleGate } from "@/features/auth/RoleGate"
@@ -32,8 +34,8 @@ export default function OperationsCampaignsPage() {
   const effectiveId = selectedId ?? items[0]?.campaignId ?? null
 
   return (
-    <div className="-m-6" style={{ color: "var(--ink)" }}>
-      <section className="px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
+    <div className="-m-4 md:-m-6" style={{ color: "var(--ink)" }}>
+      <section className="px-4 md:px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
         <div className="flex items-end justify-between gap-6 flex-wrap">
           <div className="flex-1 max-w-200 min-w-70">
             <div className="eyebrow mb-3">Operations · Gestão de campanhas</div>
@@ -75,9 +77,14 @@ export default function OperationsCampaignsPage() {
           />
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] min-h-[calc(100vh-220px)]">
-          {/* Lista */}
-          <div className="border-r border-border-soft" style={{ background: "var(--surface)" }}>
+        <MasterDetail
+          listWidth={360}
+          className="min-h-[calc(100vh-220px)]"
+          listStyle={{ background: "var(--surface)" }}
+          showDetail={selectedId != null}
+          onBack={() => setSelectedId(null)}
+          backLabel="Todas as campanhas"
+          list={<>
             {/* Barra da coluna: gruda no topo porque a lista rola sozinha. */}
             <div
               className="px-4 py-3 border-b border-border-soft sticky top-0 z-10"
@@ -105,7 +112,7 @@ export default function OperationsCampaignsPage() {
             {items.map((c, i) => (
               <button
                 key={c.campaignId}
-                onClick={() => setSelectedId(c.campaignId)}
+                onClick={() => { setSelectedId(c.campaignId); scrollContentToTopOnMobile() }}
                 className="block w-full text-left px-4 py-4 border-b border-border-soft transition-colors hover:bg-hover cursor-pointer z-rise"
                 style={{
                   // `--teal-bg` e não `#F0FDFB`: o hex fixo era claro e ficava
@@ -129,15 +136,15 @@ export default function OperationsCampaignsPage() {
                 </div>
               </button>
             ))}
-          </div>
-
-          {/* Detalhe */}
-          <div className="p-8">
-            {effectiveId
-              ? <CampaignDetailPanel campaignId={effectiveId} />
-              : <EmptyBlock message="Selecione uma campanha" />}
-          </div>
-        </div>
+          </>}
+          detail={
+            <div className="p-4 md:p-8">
+              {effectiveId
+                ? <CampaignDetailPanel campaignId={effectiveId} />
+                : <EmptyBlock message="Selecione uma campanha" />}
+            </div>
+          }
+        />
       )}
 
       {createOpen && <CreateCampaignModal onClose={() => setCreateOpen(false)} />}

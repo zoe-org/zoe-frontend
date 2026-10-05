@@ -74,7 +74,7 @@ export function CampaignDetailPanel({ campaignId }: { campaignId: string }) {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <div className="flex items-center gap-2 mb-1.5">
-            <h2 className="font-display m-0" style={{ fontSize: 26, color: "var(--ink)" }}>{d.name}</h2>
+            <h2 className="font-display m-0 text-[22px] sm:text-[26px]" style={{ color: "var(--ink)" }}>{d.name}</h2>
             <CampaignChip status={d.status} />
             {isPastEndDate(d) && (
               <span
@@ -127,11 +127,14 @@ export function CampaignDetailPanel({ campaignId }: { campaignId: string }) {
           {kpis.map((k, i) => (
             <div
               key={k.label}
-              className="px-5 py-4"
-              style={{ borderRight: i < 3 ? "1px solid var(--border-soft)" : undefined }}
+              className={`px-4 sm:px-5 py-4 min-w-0 border-border-soft ${i % 2 === 0 ? "border-r" : ""} ${i < 2 ? "border-b sm:border-b-0" : ""} ${i < 3 ? "sm:border-r" : ""}`}
             >
               <div className="eyebrow">{k.label}</div>
-              <div className="font-display mt-1.5" style={{ fontSize: 26, lineHeight: 1, color: "var(--ink)" }}>
+              {/* Valor em reais não cabe a 26px na meia coluna do celular. */}
+              <div
+                className={`font-display mt-1.5 ${k.value.length > 8 ? "text-[19px] sm:text-[26px]" : "text-[26px]"}`}
+                style={{ lineHeight: 1, color: "var(--ink)", overflowWrap: "anywhere" }}
+              >
                 {k.value}
               </div>
             </div>

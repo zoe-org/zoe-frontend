@@ -255,7 +255,8 @@ export default function LoginPage() {
             <div className="relative flex justify-center"><span className="bg-white px-3 text-xs text-ink-muted">ou</span></div>
           </div>
 
-          <div className="flex gap-5 justify-center items-center" >
+          {/* Lado a lado só cabe a partir de sm: no celular os dois somavam ~384px. */}
+          <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-5 justify-center sm:items-center">
             <Button variant="outline" disabled={!socialLoginEnabled || redirecting !== null} onClick={() => onSocial("Google")}>
               <Google className="w-4 h-4 mr-2"/> {redirecting === "Google" ? "Redirecionando..." : "Entrar com Google"}
             </Button>

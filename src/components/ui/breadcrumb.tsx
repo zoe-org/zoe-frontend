@@ -1,4 +1,5 @@
 import { Link, useLocation } from "react-router-dom"
+import { ChevronLeft } from "lucide-react"
 
 const routeLabels: Record<string, string> = {
   "/dashboard": "Dashboard",
@@ -67,7 +68,20 @@ export function Breadcrumb() {
   const group = parentGroups[currentLabel ? pathname : parentPath!]
 
   return (
-    <nav className="flex items-center gap-1.5 font-mono-zoe text-xs" aria-label="Você está em">
+    <>
+    {/* Celular: o caminho inteiro não cabe e repete o eyebrow da tela. Fica só
+        o que é navegação de verdade — o "voltar" das telas de detalhe. */}
+    {parentPath && (
+      <Link
+        to={parentPath}
+        className="md:hidden inline-flex items-center gap-0.5 shrink-0 font-mono-zoe text-xs hover:underline"
+        style={{ color: "var(--ink)" }}
+      >
+        <ChevronLeft className="w-3.5 h-3.5 shrink-0" />
+        <span>{routeLabels[parentPath]}</span>
+      </Link>
+    )}
+    <nav className="hidden md:flex items-center gap-1.5 font-mono-zoe text-xs" aria-label="Você está em">
       {group && (
         <>
           <span style={{ color: "var(--ink-muted)" }}>{group}</span>
@@ -88,5 +102,6 @@ export function Breadcrumb() {
         </Link>
       )}
     </nav>
+    </>
   )
 }

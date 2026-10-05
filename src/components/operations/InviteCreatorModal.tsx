@@ -297,7 +297,7 @@ export function InviteCreatorModal({
                 </>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Field label="Campanha" hint="Em branco convida só para o elenco.">
                   <SelectField
                     value={campaignId}
@@ -326,7 +326,7 @@ export function InviteCreatorModal({
                            placeholder="1 vídeo dedicado, 12-18min" />
                   </Field>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <Field
                       label="Cachê"
                       hint={isBarter ? "Permuta não move dinheiro." : "Valor bruto proposto, em reais."}

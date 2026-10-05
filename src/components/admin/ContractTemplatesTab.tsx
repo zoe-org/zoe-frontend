@@ -23,7 +23,7 @@ export function ContractTemplatesTab() {
   const list = useContractTemplates(true)
   const items = list.data?.items ?? []
 
-  if (list.isLoading) return <div className="px-8 py-10"><PanelSkeleton /></div>
+  if (list.isLoading) return <div className="px-4 md:px-8 py-10"><PanelSkeleton /></div>
 
   if (list.isError) {
     return (
@@ -48,7 +48,7 @@ export function ContractTemplatesTab() {
 
   return (
     <>
-      <div className="px-8 pt-5 pb-2">
+      <div className="px-4 md:px-8 pt-5 pb-2">
         <p className="text-[13.5px] text-ink-muted max-w-160 m-0 leading-relaxed">
           O texto que veio do documento de referência é estrutura, não parecer. Até a revisão ser registrada aqui,
           nenhum contrato daquela modalidade sai para assinatura — e quem contrata vê só o bloqueio, sem poder
@@ -57,7 +57,7 @@ export function ContractTemplatesTab() {
       </div>
 
       {items.length > 0 && (
-        <div className="px-8 pb-5 pt-3">
+        <div className="px-4 md:px-8 pb-5 pt-3">
           <div className="rounded-lg border border-border-soft grid grid-cols-3">
             {[
               {
@@ -93,7 +93,7 @@ export function ContractTemplatesTab() {
         </div>
       )}
 
-      <div className="px-8 pb-8">
+      <div className="px-4 md:px-8 pb-8">
         <div className="rounded-lg border border-border-soft overflow-hidden">
           {items.length === 0 ? (
             <div className="py-14 text-center text-[13.5px] text-ink-muted max-w-140 mx-auto leading-relaxed">

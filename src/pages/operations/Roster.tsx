@@ -132,10 +132,10 @@ export default function OperationsRosterPage() {
   const limparRecorte = () => { setSearch(""); setArea(""); setAudience(""); setRel("") }
 
   return (
-    <div className="-m-6" style={{ color: "var(--ink)" }}>
+    <div className="-m-4 md:-m-6" style={{ color: "var(--ink)" }}>
       {/* Abertura: só o enquadramento. A contagem foi pra barra, ao lado do
           recorte que a muda — repetida aqui ela envelhecia a cada filtro. */}
-      <section className="px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
+      <section className="px-4 md:px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
         <div className="flex items-end justify-between gap-6 flex-wrap">
           <div className="flex-1 max-w-200 min-w-70">
             <div className="eyebrow mb-3">Operations · Elenco</div>
@@ -163,7 +163,7 @@ export default function OperationsRosterPage() {
       {/* Barra de trabalho: o recorte à esquerda, o resultado e os filtros à
           direita. Gruda no topo porque o elenco cresce e rola. */}
       <section
-        className="px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap sticky top-0 z-10"
+        className="px-4 md:px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap sticky top-0 z-10"
         style={{ background: "var(--surface)" }}
       >
         <RelationshipTabs items={all} value={rel} onChange={setRel} />
@@ -237,18 +237,18 @@ export default function OperationsRosterPage() {
         ) : (
           // `overflow-y-clip`: com só `overflow-x-auto` a spec promove o eixo Y
           // a `auto`, e o `z-rise` das linhas abriria uma barra fantasma.
-          <div className="overflow-x-auto overflow-y-clip">
-            <table className="w-full text-[13px]">
+          <div className="@container overflow-x-auto overflow-y-clip">
+            <table className="w-full text-[13px] table-cards">
               <thead>
                 <tr className="border-b border-border-soft">
                   {/* `px-3` nas colunas do meio: sem padding lateral os rótulos
                       encostavam um no outro — "RECEBIMENTOCONTRATOS". */}
-                  <th className="text-left px-8 py-3 eyebrow font-semibold">Criador</th>
+                  <th className="text-left px-4 md:px-8 py-3 eyebrow font-semibold">Criador</th>
                   <th className="text-left px-3 py-3 eyebrow font-semibold">Redes e audiência</th>
                   <th className="text-left px-3 py-3 eyebrow font-semibold">Atuação</th>
                   <th className="text-left px-3 py-3 eyebrow font-semibold">Recebimento</th>
                   <th className="text-right px-3 py-3 eyebrow font-semibold">Contratos</th>
-                  <th className="text-left px-8 py-3 eyebrow font-semibold">Última campanha</th>
+                  <th className="text-left px-4 md:px-8 py-3 eyebrow font-semibold">Última campanha</th>
                 </tr>
               </thead>
               <tbody>
@@ -285,7 +285,7 @@ function RosterRow({ item, index, onOpen }: { item: RosterItem; index: number; o
       className="border-b border-border-soft hover:bg-hover transition-colors cursor-pointer z-rise"
       style={stagger(Math.min(index, 12))}
     >
-      <td className="px-8 py-3.5 align-top">
+      <td className="px-4 md:px-8 py-3.5 align-top">
         <div className="flex items-center gap-3">
           <div
             className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center font-display text-white text-[12px]"
@@ -308,7 +308,7 @@ function RosterRow({ item, index, onOpen }: { item: RosterItem; index: number; o
           </div>
         </div>
       </td>
-      <td className="px-3 py-3.5 text-[12px] text-ink-2 align-top">
+      <td data-label="Redes e audiência" className="px-3 py-3.5 text-[12px] text-ink-2 align-top">
         {networks.length === 0
           ? <span className="text-ink-muted">—</span>
           : networks.map(([network, handle]) => (
@@ -322,7 +322,7 @@ function RosterRow({ item, index, onOpen }: { item: RosterItem; index: number; o
           <div className="text-[11.5px] text-ink-muted mt-0.5">{audiencia}</div>
         )}
       </td>
-      <td className="px-3 py-3.5 text-[12.5px] text-ink-2 align-top">
+      <td data-label="Atuação" className="px-3 py-3.5 text-[12.5px] text-ink-2 align-top">
         {item.primaryArea ?? <span className="text-ink-muted">—</span>}
         {/* Tópicos são o que se procura ao montar uma campanha. Três, porque a
             coluna é estreita e o resto vive na gaveta. */}
@@ -339,7 +339,7 @@ function RosterRow({ item, index, onOpen }: { item: RosterItem; index: number; o
           </div>
         )}
       </td>
-      <td className="px-3 py-3.5 text-[12.5px] align-top">
+      <td data-label="Recebimento" className="px-3 py-3.5 text-[12.5px] align-top">
         <span style={{ color: rec.color }}>{rec.label}</span>
         {isPaymentStuck(item) && (
           <div className="text-[11px] font-medium" style={{ color: "var(--color-neg)" }}>
@@ -347,8 +347,8 @@ function RosterRow({ item, index, onOpen }: { item: RosterItem; index: number; o
           </div>
         )}
       </td>
-      <td className="px-3 py-3.5 font-mono-zoe text-ink-2 text-right align-top">{item.contractCount}</td>
-      <td className="px-8 py-3.5 text-[12.5px] text-ink-2 align-top">
+      <td data-label="Contratos" className="px-3 py-3.5 font-mono-zoe text-ink-2 text-right align-top">{item.contractCount}</td>
+      <td data-label="Última campanha" className="px-4 md:px-8 py-3.5 text-[12.5px] text-ink-2 align-top">
         {item.lastContractAt
           ? <>{campaignLabel(item.lastCampaignName)} <span className="text-ink-muted">· {fmtDate(item.lastContractAt)}</span></>
           : <span className="text-ink-muted">—</span>}

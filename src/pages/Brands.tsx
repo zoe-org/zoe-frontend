@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { MasterDetail } from "@/components/ui/master-detail"
+import { scrollContentToTopOnMobile } from "@/lib/useScrollToTop"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import {
   Plus, X, Check, AlertCircle, ExternalLink, ShieldCheck, Clock, Loader2, ChevronDown, Archive, RotateCcw,
@@ -182,10 +184,10 @@ export default function BrandsPage() {
   }
 
   return (
-    <div className="-m-6" style={{ color: "var(--ink)" }}>
+    <div className="-m-4 md:-m-6" style={{ color: "var(--ink)" }}>
       {/* Hero */}
-      <section className="px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
-        <div className="flex items-end justify-between gap-6">
+      <section className="px-4 md:px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
+        <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
           <div>
             <div className="eyebrow mb-3">Gestão · Workspace</div>
             <h1 className="font-display m-0" style={{ fontSize: 34, lineHeight: 1.1, color: "var(--ink)" }}>Marcas</h1>
@@ -206,9 +208,13 @@ export default function BrandsPage() {
       </section>
 
       {/* Master–detail */}
-      <div className="grid" style={{ gridTemplateColumns: "340px 1fr", minHeight: "calc(100vh - 200px)" }}>
-        {/* Lista */}
-        <div className="border-r border-border-soft" style={{ background: "var(--surface)" }}>
+      <MasterDetail
+        style={{ minHeight: "calc(100vh - 200px)" }}
+        listStyle={{ background: "var(--surface)" }}
+        showDetail={selectedId != null}
+        onBack={() => setSelectedId(null)}
+        backLabel="Todas as marcas"
+        list={<>
           <div className="px-4 py-3 border-b border-border-soft sticky top-0 z-5" style={{ background: "var(--surface)" }}>
             <SearchBox value={query} onChange={setQuery} placeholder="Buscar marca…" className="w-full" />
             <div className="flex items-center gap-1.5 mt-2 text-[11.5px] text-ink-muted">
@@ -230,7 +236,7 @@ export default function BrandsPage() {
                   brand={b}
                   index={i}
                   active={selected?.tenantBrandId === b.tenantBrandId}
-                  onSelect={() => setSelectedId(b.tenantBrandId)}
+                  onSelect={() => { setSelectedId(b.tenantBrandId); scrollContentToTopOnMobile() }}
                 />
               ))}
               {monitored.length === 0 && (
@@ -256,17 +262,16 @@ export default function BrandsPage() {
                       key={b.tenantBrandId}
                       brand={b}
                       active={selected?.tenantBrandId === b.tenantBrandId}
-                      onSelect={() => setSelectedId(b.tenantBrandId)}
+                      onSelect={() => { setSelectedId(b.tenantBrandId); scrollContentToTopOnMobile() }}
                     />
                   ))}
                 </>
               )}
             </>
           )}
-        </div>
+        </>}
 
-        {/* Detalhe */}
-        {selected && (selectedArchived ? (
+        detail={selected && (selectedArchived ? (
           <ArchivedBrandDetail key={selected.tenantBrandId} brand={selected} canManage={canManage} />
         ) : (
           <BrandDetail
@@ -285,7 +290,7 @@ export default function BrandsPage() {
             onUnsubscribed={() => { setSelectedId(selected.tenantBrandId); setShowArchived(true) }}
           />
         ))}
-      </div>
+      />
 
       <BrandModal open={newOpen} onClose={() => setNewOpen(false)} />
     </div>
@@ -356,7 +361,7 @@ function ArchivedBrandDetail({ brand, canManage }: { brand: TenantBrandSummary; 
     )
 
   return (
-    <div className="p-8 overflow-y-auto">
+    <div className="p-4 md:p-8 overflow-y-auto">
       <div className="flex items-center gap-4 mb-7">
         <div className="opacity-60">
           <Avatar name={brand.brandName} slug={brand.brandSlug} color={brand.color} size={64} radius={14} font={26} />
@@ -455,9 +460,9 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
     // conjunto competitivo —, todos com o mesmo peso e moldura.
     <div className="overflow-y-auto">
       {/* Cabeçalho */}
-      <div className="flex items-center gap-4 px-8 pt-7 pb-6 border-b border-border-soft">
+      <div className="flex flex-wrap items-center gap-4 px-4 md:px-8 pt-7 pb-6 border-b border-border-soft">
         <Avatar name={brand.brandName} slug={brand.brandSlug} color={brand.color} size={64} radius={14} font={26} />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1 sm:flex-none">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <h2 className="font-display m-0" style={{ fontSize: 28, lineHeight: 1, color: "var(--ink)" }}>
               {brand.displayName ?? brand.brandName}
@@ -476,7 +481,7 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
             Assinada em {new Date(brand.subscribedAt).toLocaleDateString("pt-BR")} · {brand.brandSlug}
           </div>
         </div>
-        <div className="flex-1" />
+        <div className="hidden sm:block flex-1" />
         <button
           onClick={onOpenDashboard}
           className="inline-flex items-center gap-1.5 h-9 px-3.5 text-[13px] rounded-md border border-border-soft hover:bg-hover transition-colors shrink-0 cursor-pointer"
@@ -503,7 +508,7 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
       {/* Keywords + Assinatura */}
       <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] border-b border-border-soft">
         {/* Palavras-chave */}
-        <div className="px-8 py-7 border-b lg:border-b-0 lg:border-r border-border-soft">
+        <div className="px-4 md:px-8 py-7 border-b lg:border-b-0 lg:border-r border-border-soft">
           <div className="eyebrow mb-3.5">Palavras-chave monitoradas</div>
           {keywords.isLoading ? (
             <div className="h-8 rounded z-skeleton" />
@@ -559,7 +564,7 @@ function BrandDetail({ brand, canManage, onOpenDashboard, onUnsubscribed }: {
         </div>
 
         {/* Assinatura */}
-        <div className="px-8 py-7">
+        <div className="px-4 md:px-8 py-7">
           <div className="eyebrow mb-3.5">Assinatura</div>
           <div className="flex flex-col gap-3.5">
             <Field label="Relacionamento">
@@ -680,7 +685,7 @@ function CompetitiveSetCard({ brand, canManage }: {
   }
 
   return (
-    <div className="px-8 py-7 border-b border-border-soft">
+    <div className="px-4 md:px-8 py-7 border-b border-border-soft">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <div className="eyebrow mb-1.5">Conjunto competitivo</div>
@@ -950,7 +955,7 @@ function BrandModal({ open, onClose }: { open: boolean; onClose: () => void }) {
           style={{ background: "var(--surface)" }}
         >
           {/* Header */}
-          <div className="px-7 pt-6">
+          <div className="px-4 md:px-7 pt-6">
             <div className="flex items-start justify-between mb-4">
               <div>
                 <div className="eyebrow mb-1.5">Nova marca</div>
@@ -992,7 +997,7 @@ function BrandModal({ open, onClose }: { open: boolean; onClose: () => void }) {
           </div>
 
           {/* Corpo */}
-          <div className="px-7 pb-7 pt-1 overflow-y-auto flex-1">
+          <div className="px-4 md:px-7 pb-7 pt-1 overflow-y-auto flex-1">
             {forbidden ? (
               <div className="border border-border-soft rounded-lg p-4">
                 <div className="eyebrow mb-1.5">Sem permissão</div>
@@ -1255,7 +1260,7 @@ function BrandModal({ open, onClose }: { open: boolean; onClose: () => void }) {
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between px-7 py-4 border-t border-border-soft">
+          <div className="flex items-center justify-between px-4 md:px-7 py-4 border-t border-border-soft">
             {step > 0 ? (
               <button
                 onClick={() => setStep(step - 1)}
@@ -1397,13 +1402,13 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function PageSkeleton() {
   return (
-    <div className="-m-6">
-      <div className="px-8 pt-7 pb-5 border-b border-border-soft"><div className="h-9 w-48 rounded z-skeleton" /></div>
-      <div className="grid" style={{ gridTemplateColumns: "340px 1fr" }}>
-        <div className="border-r border-border-soft p-4 space-y-3">
+    <div className="-m-4 md:-m-6">
+      <div className="px-4 md:px-8 pt-7 pb-5 border-b border-border-soft"><div className="h-9 w-48 rounded z-skeleton" /></div>
+      <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr]">
+        <div className="lg:border-r border-border-soft p-4 space-y-3">
           {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-12 rounded z-skeleton" />)}
         </div>
-        <div className="p-8"><div className="h-24 rounded z-skeleton" /></div>
+        <div className="hidden lg:block p-4 md:p-8"><div className="h-24 rounded z-skeleton" /></div>
       </div>
     </div>
   )

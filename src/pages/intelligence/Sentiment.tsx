@@ -139,9 +139,9 @@ export default function SentimentPage() {
   const carregando = evolution.isLoading
 
   return (
-    <div className="-m-6" style={{ color: "var(--ink)" }}>
+    <div className="-m-4 md:-m-6" style={{ color: "var(--ink)" }}>
       {/* Abertura: a leitura do saldo em uma frase, antes de qualquer gráfico. */}
-      <section className="px-8 pt-7 pb-6 border-b border-border-soft">
+      <section className="px-4 md:px-8 pt-7 pb-6 border-b border-border-soft">
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div className="flex-1 max-w-200 min-w-70">
             <div className="eyebrow mb-3">Intelligence · Análise</div>
@@ -174,7 +174,7 @@ export default function SentimentPage() {
             <EarnedOnlyNote />
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2">
             <SelectFilterChip
               value={period}
               onChange={setPeriod}
@@ -185,7 +185,7 @@ export default function SentimentPage() {
         </div>
       </section>
 
-      <CoverageNotice tenantBrandIds={[brand.active?.tenantBrandId]} className="mx-8 mt-4" />
+      <CoverageNotice tenantBrandIds={[brand.active?.tenantBrandId]} className="mx-4 md:mx-8 mt-4" />
 
       {evolution.isError ? (
         <ErrorState onRetry={() => evolution.refetch()} />
@@ -288,7 +288,7 @@ export default function SentimentPage() {
 
           {/* Saldo no tempo + o que mexeu nele */}
           <section className="grid grid-cols-1 lg:grid-cols-[1.45fr_1fr] border-b border-border-soft">
-            <div className="p-7 border-b lg:border-b-0 lg:border-r border-border-soft z-rise" style={stagger(4)}>
+            <div className="p-4 md:p-7 border-b lg:border-b-0 lg:border-r border-border-soft z-rise" style={stagger(4)}>
               <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
                 <div>
                   <div className="eyebrow">Saldo ao longo do tempo</div>
@@ -320,7 +320,7 @@ export default function SentimentPage() {
               )}
             </div>
 
-            <div className="p-7 z-rise" style={stagger(5)}>
+            <div className="p-4 md:p-7 z-rise" style={stagger(5)}>
               <div className="mb-4">
                 <div className="eyebrow">O que mais mexeu no saldo</div>
                 <div className="text-[12px] text-ink-muted mt-1">
@@ -360,7 +360,7 @@ export default function SentimentPage() {
           </section>
 
           {/* Tópicos: em linhas, para comparar de cima a baixo. */}
-          <section className="px-8 py-7 border-b border-border-soft">
+          <section className="px-4 md:px-8 py-7 border-b border-border-soft">
             <div className="flex items-start justify-between gap-4 flex-wrap mb-5">
               <div>
                 <div className="eyebrow">Sobre o que estão falando</div>
@@ -387,8 +387,10 @@ export default function SentimentPage() {
                 {topicos.map((t, i) => (
                   <div
                     key={t.label}
-                    className={`z-rise grid items-center gap-4 py-3 ${i > 0 ? "border-t border-border-soft" : ""}`}
-                    style={{ gridTemplateColumns: "minmax(0,1fr) 92px minmax(0,2fr) 150px", ...stagger(6 + i) }}
+                    // Celular: duas linhas — tópico e volume em cima, barra e
+                    // percentuais embaixo. Em quatro colunas o rótulo sumia.
+                    className={`z-rise grid items-center gap-x-4 gap-y-2 py-3 grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(0,1fr)_92px_minmax(0,2fr)_150px] ${i > 0 ? "border-t border-border-soft" : ""}`}
+                    style={stagger(6 + i)}
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-[13.5px] font-medium truncate text-ink">{t.label}</span>
@@ -416,7 +418,7 @@ export default function SentimentPage() {
           </section>
 
           {/* Termos: lista ordenada, não nuvem — nuvem não deixa comparar volume. */}
-          <section className="px-8 py-7">
+          <section className="px-4 md:px-8 py-7">
             <div className="mb-5">
               <div className="eyebrow">Termos mais citados</div>
               <div className="text-[12px] text-ink-muted mt-1">
@@ -510,8 +512,8 @@ function NetRuler({ value }: { value: number }) {
 
 function PageSkeleton() {
   return (
-    <div className="-m-6">
-      <div className="px-8 pt-7 pb-6 border-b border-border-soft">
+    <div className="-m-4 md:-m-6">
+      <div className="px-4 md:px-8 pt-7 pb-6 border-b border-border-soft">
         <div className="h-3 w-44 rounded z-skeleton mb-4" />
         <div className="h-9 w-80 max-w-full rounded z-skeleton" />
       </div>
@@ -522,7 +524,7 @@ function PageSkeleton() {
           </div>
         ))}
       </div>
-      <div className="p-7"><div className="h-55 rounded z-skeleton" /></div>
+      <div className="p-4 md:p-7"><div className="h-55 rounded z-skeleton" /></div>
     </div>
   )
 }

@@ -126,10 +126,10 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="-m-6 min-h-[calc(100dvh-3.75rem)] flex flex-col" style={{ color: "var(--ink)" }}>
+    <div className="-m-4 md:-m-6 min-h-[calc(100dvh-3.75rem)] flex flex-col" style={{ color: "var(--ink)" }}>
       {/* Hero */}
       <section
-        className="px-8 pt-7 pb-6 border-b border-border-soft"
+        className="px-4 md:px-8 pt-7 pb-6 border-b border-border-soft"
         style={{ background: "var(--surface)" }}
       >
         <div className="flex items-end justify-between gap-6 flex-wrap">
@@ -156,11 +156,11 @@ export default function ReportsPage() {
       </section>
 
       {/* O relatório sai com o que o tenant pode ver: dizer antes de gerar, não depois. */}
-      <CoverageNotice tenantBrandIds={[brand.active?.tenantBrandId]} className="mx-8 mt-4" />
+      <CoverageNotice tenantBrandIds={[brand.active?.tenantBrandId]} className="mx-4 md:mx-8 mt-4" />
 
       {/* Templates */}
       <section
-        className="px-8 py-6 border-b border-border-soft"
+        className="px-4 md:px-8 py-6 border-b border-border-soft"
         style={{ background: "var(--surface)" }}
       >
         <div className="eyebrow mb-3.5">Começar a partir de um template</div>
@@ -223,7 +223,7 @@ export default function ReportsPage() {
       {/* Barra de trabalho: calha de 8 como o resto da página, e grudada —
           a biblioteca rola e a busca precisa acompanhar. */}
       <section
-        className="px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap sticky top-0 z-10"
+        className="px-4 md:px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap sticky top-0 z-10"
         style={{ background: "var(--surface)" }}
       >
         <div className="flex items-center gap-1.5">
@@ -255,7 +255,7 @@ export default function ReportsPage() {
       </section>
 
       {/* Biblioteca */}
-      <section className="flex-1 p-7 bg-inset">
+      <section className="flex-1 p-4 md:p-7 bg-inset">
         {list.isError && !forbidden ? (
           <ErrorState onRetry={() => list.refetch()} />
         ) : list.isLoading ? (
@@ -428,7 +428,7 @@ function ReportCard({
 
 function UpsellScreen() {
   return (
-    <div className="-m-6" style={{ background: "var(--surface)", color: "var(--ink)" }}>
+    <div className="-m-4 md:-m-6" style={{ background: "var(--surface)", color: "var(--ink)" }}>
       <div className="flex flex-col items-center justify-center text-center px-6 py-24 max-w-lg mx-auto">
         <div
           className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5"

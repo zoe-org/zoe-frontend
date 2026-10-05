@@ -23,7 +23,7 @@ export function Field({
 
 export function TableSkeleton({ rows = 4 }: { rows?: number }) {
   return (
-    <div className="px-8 py-6 space-y-3">
+    <div className="px-4 md:px-8 py-6 space-y-3">
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="h-11 rounded z-skeleton" />
       ))}

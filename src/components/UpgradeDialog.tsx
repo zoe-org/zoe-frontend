@@ -29,7 +29,7 @@ export function UpgradeDialog() {
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/45 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
         <Dialog.Content
-          className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[min(460px,calc(100vw-2rem))] rounded-[18px] border border-border-soft px-7 py-7 shadow-2xl outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95"
+          className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[min(460px,calc(100vw-2rem))] rounded-[18px] border border-border-soft px-4 md:px-7 py-7 shadow-2xl outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95"
           style={{ background: "var(--surface)", color: "var(--ink)" }}
         >
           <Dialog.Close

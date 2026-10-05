@@ -33,7 +33,7 @@ export function CompetitorChannelCard({ brandId, brandName }: { brandId: string;
   const reaction = useOwnedReaction(brandId, { from: windowFrom(30, anchor) }, hasSov)
 
   return (
-    <section className="border-t border-border-soft px-8 py-7">
+    <section className="border-t border-border-soft px-4 md:px-8 py-7">
       <div className="mb-5">
         <div className="flex items-center gap-2">
           <MessageSquareOff className="w-4 h-4 text-ink-muted" aria-hidden />

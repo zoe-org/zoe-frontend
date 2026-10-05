@@ -33,7 +33,7 @@ export function CompareTab({ ranked, topics, topicsLoading, hasPreviousPeriod }:
 
   if (!you) {
     return (
-      <section className="px-8 py-7">
+      <section className="px-4 md:px-8 py-7">
         <EmptyBlock
           message="Comparar exige uma marca própria no recorte"
           hint="Marque uma das suas marcas como própria em Gestão · Marcas."
@@ -48,7 +48,7 @@ export function CompareTab({ ranked, topics, topicsLoading, hasPreviousPeriod }:
 
   return (
     <>
-      <section className="px-8 py-7 border-b border-border-soft">
+      <section className="px-4 md:px-8 py-7 border-b border-border-soft">
         <div className="flex items-center gap-3 flex-wrap mb-6">
           <span className="text-[13px] text-ink-muted">Comparar {you.brandName} com</span>
           <Select value={rival.brandId} onValueChange={setChoice}>
@@ -78,7 +78,7 @@ export function CompareTab({ ranked, topics, topicsLoading, hasPreviousPeriod }:
         <HeadToHead you={you} rival={rival} youColor={youColor} rivalColor={rivalColor} hasPreviousPeriod={hasPreviousPeriod} />
       </section>
 
-      <section className="px-8 py-7">
+      <section className="px-4 md:px-8 py-7">
         {topicsLoading ? (
           <BlockSkeleton rows={4} h="h-12" />
         ) : topics.length === 0 ? (
