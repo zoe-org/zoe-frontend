@@ -20,6 +20,7 @@ import {
 } from "@/lib/api/operations"
 import { AUDIENCE_SIZES } from "@/lib/api/creator"
 import { SelectField } from "@/components/ui/select-field"
+import { FilterSheetButton } from "@/components/ui/filter-sheet"
 import { stagger } from "@/lib/motion"
 
 /** Valor da aba do filtro de pagamento travado — não é um estado de relacionamento. */
@@ -95,6 +96,7 @@ export default function OperationsRosterPage() {
   const all = useMemo(() => roster.data?.items ?? [], [roster.data])
   const [rel, setRel] = useState<string>("")
   const [search, setSearch] = useState("")
+  const [filtrosOpen, setFiltrosOpen] = useState(false)
   const [area, setArea] = useState("")
   const [audience, setAudience] = useState("")
 
@@ -132,10 +134,10 @@ export default function OperationsRosterPage() {
   const limparRecorte = () => { setSearch(""); setArea(""); setAudience(""); setRel("") }
 
   return (
-    <div className="-m-6" style={{ color: "var(--ink)" }}>
+    <div className="-m-4 md:-m-6" style={{ color: "var(--ink)" }}>
       {/* Abertura: só o enquadramento. A contagem foi pra barra, ao lado do
           recorte que a muda — repetida aqui ela envelhecia a cada filtro. */}
-      <section className="px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
+      <section className="px-4 md:px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
         <div className="flex items-end justify-between gap-6 flex-wrap">
           <div className="flex-1 max-w-200 min-w-70">
             <div className="eyebrow mb-3">Operations · Elenco</div>
@@ -163,12 +165,38 @@ export default function OperationsRosterPage() {
       {/* Barra de trabalho: o recorte à esquerda, o resultado e os filtros à
           direita. Gruda no topo porque o elenco cresce e rola. */}
       <section
-        className="px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap sticky top-0 z-10"
+        className="px-4 md:px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap md:sticky top-0 z-10"
         style={{ background: "var(--surface)" }}
       >
         <RelationshipTabs items={all} value={rel} onChange={setRel} />
 
-        <div className="flex items-center gap-2 ml-auto flex-wrap">
+        {/* Celular: busca na largura toda e os filtros de área e audiência numa
+            folha. Lado a lado, o contador, dois selects e a busca quebravam em
+            três linhas e a busca virava "Buscar por nc". */}
+        {all.length > 0 && (
+          <div className="md:hidden flex items-center gap-2 w-full">
+            <SearchBox value={search} onChange={setSearch} placeholder="Buscar criador…" className="flex-1 min-w-0" />
+            {(areas.length > 1 || audienceOptions.length > 1) && (
+              <FilterSheetButton
+                open={filtrosOpen}
+                onOpenChange={setFiltrosOpen}
+                activeCount={[area, audience].filter(Boolean).length}
+                onClear={() => { setArea(""); setAudience("") }}
+                resultLabel={`Ver ${items.length} ${items.length === 1 ? "criador" : "criadores"}`}
+                groups={[
+                  ...(areas.length > 1
+                    ? [{ label: "Área", value: area, onChange: setArea, options: [{ key: "", label: "Todas" }, ...areas.map((a) => ({ key: a, label: a }))] }]
+                    : []),
+                  ...(audienceOptions.length > 1
+                    ? [{ label: "Audiência", value: audience, onChange: setAudience, options: [{ key: "", label: "Qualquer" }, ...audienceOptions.map((a) => ({ key: a.value, label: a.label }))] }]
+                    : []),
+                ]}
+              />
+            )}
+          </div>
+        )}
+
+        <div className="hidden md:flex items-center gap-2 ml-auto flex-wrap">
           <span className="text-[12px] text-ink-muted whitespace-nowrap">
             {items.length === all.length
               ? `${all.length} ${all.length === 1 ? "criador" : "criadores"}`
@@ -237,18 +265,23 @@ export default function OperationsRosterPage() {
         ) : (
           // `overflow-y-clip`: com só `overflow-x-auto` a spec promove o eixo Y
           // a `auto`, e o `z-rise` das linhas abriria uma barra fantasma.
-          <div className="overflow-x-auto overflow-y-clip">
-            <table className="w-full text-[13px]">
+          <div className="@container overflow-x-auto overflow-y-clip">
+            <ul className="@2xl:hidden m-0 p-0 list-none">
+              {items.map((it, i) => (
+                <RosterLine key={it.tenantInfluencerId} item={it} index={i} onOpen={() => openCreator(it)} />
+              ))}
+            </ul>
+            <table className="hidden @2xl:table w-full text-[13px]">
               <thead>
                 <tr className="border-b border-border-soft">
                   {/* `px-3` nas colunas do meio: sem padding lateral os rótulos
                       encostavam um no outro — "RECEBIMENTOCONTRATOS". */}
-                  <th className="text-left px-8 py-3 eyebrow font-semibold">Criador</th>
+                  <th className="text-left px-4 md:px-8 py-3 eyebrow font-semibold">Criador</th>
                   <th className="text-left px-3 py-3 eyebrow font-semibold">Redes e audiência</th>
                   <th className="text-left px-3 py-3 eyebrow font-semibold">Atuação</th>
                   <th className="text-left px-3 py-3 eyebrow font-semibold">Recebimento</th>
                   <th className="text-right px-3 py-3 eyebrow font-semibold">Contratos</th>
-                  <th className="text-left px-8 py-3 eyebrow font-semibold">Última campanha</th>
+                  <th className="text-left px-4 md:px-8 py-3 eyebrow font-semibold">Última campanha</th>
                 </tr>
               </thead>
               <tbody>
@@ -271,6 +304,60 @@ export default function OperationsRosterPage() {
   )
 }
 
+/**
+ * Linha do elenco na tela estreita: quem é, o que faz e onde está, e à direita o
+ * que decide se dá para contratar e pagar. E-mail, tópicos e última campanha
+ * ficam na gaveta, que a linha abre.
+ */
+function RosterLine({ item, index, onOpen }: { item: RosterItem; index: number; onOpen: () => void }) {
+  const name = item.displayName || item.fullName
+  const rec = payoutState(item)
+  const networks = Object.entries(item.handles ?? {})
+  const audiencia = AUDIENCE_SIZES.find((a) => a.value === item.audienceSize)?.label ?? null
+  const sobre = [item.primaryArea, audiencia].filter(Boolean).join(" · ")
+
+  return (
+    <li className="border-b border-border-soft z-rise" style={stagger(Math.min(index, 12))}>
+      <button
+        onClick={onOpen}
+        className="w-full flex items-start gap-3 px-4 md:px-8 py-3.5 text-left hover:bg-hover transition-colors cursor-pointer"
+      >
+        <div
+          className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center font-display text-white text-[12px]"
+          style={{ background: `hsl(${index * 47 + 200}, 45%, 60%)` }}
+        >
+          {initials(item.fullName, item.email)}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-[14px] font-medium truncate" style={{ color: "var(--ink)" }}>{name}</span>
+            {item.status !== "Active" && (
+              <span className="chip text-[10px] shrink-0">{tEnum("rosterStatus", item.status)}</span>
+            )}
+          </div>
+          {sobre && <div className="text-[12px] text-ink-2 mt-0.5 truncate">{sobre}</div>}
+          {networks.length > 0 && (
+            <div className="text-[11.5px] text-ink-muted mt-0.5 truncate">
+              {networks.map(([network, handle]) => `${NETWORKS[network]?.abbreviation ?? network} @${stripAt(handle)}`).join(" · ")}
+            </div>
+          )}
+        </div>
+        <div className="flex flex-col items-end gap-0.5 shrink-0 text-right">
+          <span className="text-[12px]" style={{ color: rec.color }}>{rec.label}</span>
+          {isPaymentStuck(item) && (
+            <span className="text-[11px] font-medium" style={{ color: "var(--color-neg)" }}>
+              {fmtCents(item.releasableCents ?? 0)} esperando
+            </span>
+          )}
+          <span className="text-[11px] text-ink-muted-2">
+            {item.contractCount} {item.contractCount === 1 ? "contrato" : "contratos"}
+          </span>
+        </div>
+      </button>
+    </li>
+  )
+}
+
 function RosterRow({ item, index, onOpen }: { item: RosterItem; index: number; onOpen: () => void }) {
   const name = item.displayName || item.fullName
   const rec = payoutState(item)
@@ -285,7 +372,7 @@ function RosterRow({ item, index, onOpen }: { item: RosterItem; index: number; o
       className="border-b border-border-soft hover:bg-hover transition-colors cursor-pointer z-rise"
       style={stagger(Math.min(index, 12))}
     >
-      <td className="px-8 py-3.5 align-top">
+      <td className="px-4 md:px-8 py-3.5 align-top">
         <div className="flex items-center gap-3">
           <div
             className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center font-display text-white text-[12px]"
@@ -348,7 +435,7 @@ function RosterRow({ item, index, onOpen }: { item: RosterItem; index: number; o
         )}
       </td>
       <td className="px-3 py-3.5 font-mono-zoe text-ink-2 text-right align-top">{item.contractCount}</td>
-      <td className="px-8 py-3.5 text-[12.5px] text-ink-2 align-top">
+      <td className="px-4 md:px-8 py-3.5 text-[12.5px] text-ink-2 align-top">
         {item.lastContractAt
           ? <>{campaignLabel(item.lastCampaignName)} <span className="text-ink-muted">· {fmtDate(item.lastContractAt)}</span></>
           : <span className="text-ink-muted">—</span>}
@@ -399,7 +486,7 @@ function CreatorDrawer({ item, open, onClose }: {
         showCloseButton={false}
         // Inline porque o `SheetContent` embute `sm:max-w-sm`, que vence
         // utilitário por especificidade.
-        style={{ width: 520, maxWidth: "94vw" }}
+        style={{ width: "min(520px, 100vw)" }}
         className="p-0 overflow-y-auto gap-0"
       >
         <SheetHeader className="sr-only">
@@ -407,7 +494,7 @@ function CreatorDrawer({ item, open, onClose }: {
         </SheetHeader>
 
         <div
-          className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b border-border-soft"
+          className="sticky top-0 z-10 flex items-center justify-between px-4 sm:px-6 py-4 border-b border-border-soft"
           style={{ background: "var(--surface)" }}
         >
           <div className="eyebrow">Criador</div>
@@ -420,7 +507,7 @@ function CreatorDrawer({ item, open, onClose }: {
           </button>
         </div>
 
-        <div className="px-6 py-5 flex flex-col gap-6">
+        <div className="px-4 sm:px-6 py-5 flex flex-col gap-6">
           {/* Identidade com a mesma inicial colorida da lista: abrir a gaveta
               não deveria fazer duvidar se é a mesma pessoa da linha clicada. */}
           <div className="flex items-start gap-3.5">
@@ -448,15 +535,17 @@ function CreatorDrawer({ item, open, onClose }: {
               nele. Estava dentro de "Contratos com você", três seções abaixo:
               é a manchete da relação, não um detalhe da lista. */}
           {((item.paidCents ?? 0) > 0 || (item.inEscrowCents ?? 0) > 0 || (item.releasableCents ?? 0) > 0) && (
-            <div className="grid grid-cols-3 gap-2">
+            // Celular: uma caixa com três linhas, rótulo e valor lado a lado. Em três
+            // colunas de ~100px, "R$ 145.200,00" passava por cima do vizinho.
+            <div className="rounded-lg border border-border-soft divide-y divide-border-soft sm:divide-y-0 sm:divide-x sm:grid sm:grid-cols-3">
               {([
                 ["Pago", item.paidCents ?? 0],
                 ["Em custódia", item.inEscrowCents ?? 0],
                 ["Liberável", item.releasableCents ?? 0],
               ] as const).map(([label, value]) => (
-                <div key={label} className="rounded-lg border border-border-soft px-3 py-2.5">
+                <div key={label} className="flex sm:block items-baseline justify-between gap-3 px-3 py-2.5 min-w-0">
                   <div className="text-[10.5px] text-ink-muted">{label}</div>
-                  <div className="font-mono-zoe text-[13px] font-semibold mt-0.5" style={{ color: "var(--ink)" }}>
+                  <div className="font-mono-zoe text-[13px] font-semibold sm:mt-0.5" style={{ color: "var(--ink)", overflowWrap: "anywhere" }}>
                     {fmtCents(value)}
                   </div>
                 </div>
@@ -628,7 +717,7 @@ function CreatorDrawer({ item, open, onClose }: {
             ele escolhido. */}
         <RoleGate minRole="Admin">
           <div
-            className="sticky bottom-0 mt-auto px-6 py-4 border-t border-border-soft"
+            className="sticky bottom-0 mt-auto px-4 sm:px-6 py-4 border-t border-border-soft"
             style={{ background: "var(--surface)" }}
           >
             <Link
@@ -700,7 +789,8 @@ function RelationshipTabs({
   if (present.length <= 1 && stuckCount === 0) return null
 
   return (
-    <div className="flex gap-1.5 flex-wrap">
+    // Celular: uma faixa que rola, em vez de quebrar "Pagamento travado" sozinho na linha de baixo.
+    <div className="flex gap-1.5 max-w-full overflow-x-auto no-scrollbar md:flex-wrap md:overflow-visible">
       <TabButton label="Todos" count={items.length} active={value === ""} onClick={() => onChange("")} />
       {present.map((k) => (
         <TabButton
@@ -733,7 +823,7 @@ function TabButton({
     <button
       onClick={onClick}
       aria-pressed={active}
-      className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12.5px] font-medium transition-colors cursor-pointer"
+      className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12.5px] font-medium transition-colors cursor-pointer shrink-0 whitespace-nowrap"
       style={
         active
           ? { background: color, color: "#fff" }

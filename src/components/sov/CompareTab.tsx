@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { stagger } from "@/lib/motion"
 import type { SovTopic } from "@/lib/api/dashboard"
 import { brandColor,
-  CONTESTED_MARGIN, formatScore, GLOSSARY, matchup, nearestRival, readSentiment,
+  CONTESTED_MARGIN, formatScore, GLOSSARY, matchup, nearestRival, ppGap, readSentiment,
   type RankedBrand, type TopicDuel,
 } from "@/lib/sov"
 import { BlockSkeleton, BrandSwatch, DeltaPp, SectionHead } from "./shared"
@@ -33,7 +33,7 @@ export function CompareTab({ ranked, topics, topicsLoading, hasPreviousPeriod }:
 
   if (!you) {
     return (
-      <section className="px-8 py-7">
+      <section className="px-4 md:px-8 py-7">
         <EmptyBlock
           message="Comparar exige uma marca própria no recorte"
           hint="Marque uma das suas marcas como própria em Gestão · Marcas."
@@ -48,7 +48,7 @@ export function CompareTab({ ranked, topics, topicsLoading, hasPreviousPeriod }:
 
   return (
     <>
-      <section className="px-8 py-7 border-b border-border-soft">
+      <section className="px-4 md:px-8 py-7 border-b border-border-soft">
         <div className="flex items-center gap-3 flex-wrap mb-6">
           <span className="text-[13px] text-ink-muted">Comparar {you.brandName} com</span>
           <Select value={rival.brandId} onValueChange={setChoice}>
@@ -78,7 +78,7 @@ export function CompareTab({ ranked, topics, topicsLoading, hasPreviousPeriod }:
         <HeadToHead you={you} rival={rival} youColor={youColor} rivalColor={rivalColor} hasPreviousPeriod={hasPreviousPeriod} />
       </section>
 
-      <section className="px-8 py-7">
+      <section className="px-4 md:px-8 py-7">
         {topicsLoading ? (
           <BlockSkeleton rows={4} h="h-12" />
         ) : topics.length === 0 ? (
@@ -116,7 +116,7 @@ function HeadToHead({ you, rival, youColor, rivalColor, hasPreviousPeriod }: {
 
   return (
     <div className="overflow-x-auto overflow-y-clip">
-      <table className="w-full text-[13px] min-w-130">
+      <table className="w-full text-[13px] sm:min-w-130">
         <thead>
           <tr className="text-[12px] text-ink-muted">
             <th className="text-left font-medium pb-3 w-[28%]" />
@@ -138,7 +138,7 @@ function HeadToHead({ you, rival, youColor, rivalColor, hasPreviousPeriod }: {
             you={`#${you.rank}`} rival={`#${rival.rank}`} />
           <Row label="Share" hint={GLOSSARY.sov} win={winner(you.sharePct, rival.sharePct)}
             you={`${you.sharePct}%`} rival={`${rival.sharePct}%`}
-            sub={`${Math.abs(you.sharePct - rival.sharePct)}pp de diferença`} />
+            sub={`${Math.abs(ppGap(you.sharePct, rival.sharePct))}pp de diferença`} />
           {hasPreviousPeriod && (
             <Row label="Variação" hint={GLOSSARY.pp} win={winner(you.deltaPp, rival.deltaPp)}
               you={<DeltaPp value={you.deltaPp} />} rival={<DeltaPp value={rival.deltaPp} />} />
@@ -164,7 +164,7 @@ function Row({ label, hint, you, rival, win, sub }: {
 }) {
   // Quem está à frente em cada linha ganha peso — a tabela se lê de relance.
   const cell = (side: "you" | "rival", content: ReactNode) => (
-    <td className="py-3 text-right font-mono-zoe" style={{ color: "var(--ink)", fontWeight: win === side ? 700 : 400, opacity: win && win !== side ? 0.7 : 1 }}>
+    <td className="py-3 pl-3 text-right font-mono-zoe" style={{ color: "var(--ink)", fontWeight: win === side ? 700 : 400, opacity: win && win !== side ? 0.7 : 1 }}>
       {content}
     </td>
   )

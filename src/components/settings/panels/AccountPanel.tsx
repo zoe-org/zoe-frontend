@@ -67,7 +67,7 @@ export function Section({
 export function ReadOnlyValue({ value, mono }: { value: string; mono?: boolean }) {
   return (
     <div
-      className={`h-9 px-3 inline-flex items-center rounded-lg border border-border-soft text-[13px] w-full @xl:min-w-56 justify-end @xl:justify-start ${
+      className={`h-9 px-3 inline-flex items-center rounded-lg border border-border-soft text-[13px] w-full @xl:min-w-56 justify-start ${
         mono ? "font-mono-zoe" : ""
       }`}
       style={{ background: "var(--surface)", color: "var(--ink)" }}

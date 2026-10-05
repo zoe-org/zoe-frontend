@@ -62,19 +62,19 @@ export function BrandEditModal({ brand, onClose }: { brand: AdminBrand; onClose:
 
   return (
     <div
-      className="fixed inset-0 z-90 flex items-center justify-center p-4"
+      className="fixed inset-0 z-90 flex items-end sm:items-center justify-center sm:p-4"
       style={{ background: "rgba(7,9,26,0.32)", backdropFilter: "blur(2px)" }}
       onClick={onClose}
     >
       <div
-        className="w-full max-w-2xl rounded-xl border border-border-soft shadow-2xl overflow-hidden flex flex-col max-h-[88vh]"
+        className="w-full max-w-2xl rounded-xl border border-border-soft shadow-2xl overflow-hidden flex flex-col max-h-[88vh] max-sm:rounded-b-none max-sm:border-b-0 max-sm:max-h-[92dvh] z-sheet"
         style={{ background: "var(--surface)" }}
         role="dialog"
         aria-modal="true"
         aria-label={`Editar marca verificada ${brand.name}`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-7 pt-6 shrink-0">
+        <div className="px-4 md:px-7 pt-6 shrink-0">
           <div className="flex items-start justify-between mb-4">
             <div className="min-w-0">
               <div className="eyebrow mb-2">Editar marca verificada</div>
@@ -117,7 +117,7 @@ export function BrandEditModal({ brand, onClose }: { brand: AdminBrand; onClose:
           </div>
         </div>
 
-        <div className="px-7 pb-6 overflow-y-auto flex-1">
+        <div className="px-4 md:px-7 pb-6 overflow-y-auto flex-1">
           {step === 0 && (
             <IdentityStep brand={brand} category={category} onCategory={setCategory} draft={draft} />
           )}
@@ -139,7 +139,7 @@ export function BrandEditModal({ brand, onClose }: { brand: AdminBrand; onClose:
           )}
         </div>
 
-        <div className="flex items-center justify-between gap-3 px-7 py-3.5 border-t border-border-soft shrink-0">
+        <div className="flex items-center justify-between gap-3 px-4 md:px-7 py-3.5 border-t border-border-soft shrink-0">
           {step > 0 ? (
             <button
               onClick={() => setStep(step - 1)}
@@ -202,7 +202,7 @@ function IdentityStep({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 mb-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-2">
         <ReadOnlyField label="Nome canônico" value={brand.name} />
         <ReadOnlyField label="Slug" value={brand.slug} mono />
       </div>

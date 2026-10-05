@@ -41,7 +41,7 @@ export function AlertEventDrawer({
       <SheetContent
         side="right"
         showCloseButton={false}
-        style={{ width: 520, maxWidth: "94vw" }}
+        style={{ width: "min(520px, 100vw)" }}
         className="p-0 overflow-y-auto gap-0"
       >
         <SheetHeader className="sr-only">
@@ -49,7 +49,7 @@ export function AlertEventDrawer({
         </SheetHeader>
 
         <div
-          className="sticky top-0 z-10 flex items-center gap-3 px-6 py-4 border-b border-border-soft"
+          className="sticky top-0 z-10 flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-border-soft"
           style={{ background: "var(--surface)" }}
         >
           <span className="eyebrow">Detalhe do disparo</span>

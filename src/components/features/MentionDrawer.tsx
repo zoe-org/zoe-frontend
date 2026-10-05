@@ -83,7 +83,9 @@ export function MentionDrawer({
         // Largura via style inline: o SheetContent do shadcn embute
         // `data-[side=right]:sm:max-w-sm`, que tem especificidade maior que
         // classes utilitárias e vencia o `max-w-*`. Inline sempre ganha.
-        style={{ width: 580, maxWidth: "94vw" }}
+        // No celular ocupa a tela toda: a faixa de 6% da lista que sobrava ao
+        // lado não servia para nada além de ser tocada por engano.
+        style={{ width: "min(580px, 100vw)" }}
         className="p-0 overflow-y-auto gap-0"
       >
         {/* Título acessível (leitor de tela) — o cabeçalho visual é custom. */}
@@ -93,7 +95,7 @@ export function MentionDrawer({
 
         {/* Cabeçalho fixo */}
         <div
-          className="sticky top-0 z-10 flex items-center gap-2.5 px-6 py-3 border-b border-border-soft"
+          className="sticky top-0 z-10 flex items-center gap-2.5 px-4 sm:px-6 py-3 border-b border-border-soft"
           style={{ background: "var(--surface)" }}
         >
           <span className="eyebrow">Menção</span>
@@ -144,31 +146,35 @@ export function MentionDrawer({
         {/* O corpo inteiro num container só: as divisórias ficaram na moldura
             (cabeçalho e rodapé). No miolo elas picotavam a leitura — o respiro e
             os rótulos já marcam onde cada seção começa. */}
-        <div className="px-6 py-5 flex flex-col gap-6">
+        <div className="px-4 sm:px-6 py-5 flex flex-col gap-6">
 
         {/* Identidade: quem falou, sobre o quê e quando. A thumbnail encolheu de
             propósito — em largura cheia ela comia 330px do topo e empurrava o
-            veredito, que é a resposta que traz a pessoa aqui, pra baixo da dobra. */}
-        <div className="flex gap-4">
+            veredito, que é a resposta que traz a pessoa aqui, pra baixo da dobra.
+
+            Celular: o título sobe para a largura toda e a miniatura fica ao lado
+            de quem falou. Ao lado da miniatura, o título tinha 150px e quebrava
+            palavra por palavra. A grade troca a ordem sem duplicar nada. */}
+        <div className="grid gap-x-4 gap-y-3 grid-cols-[8.5rem_minmax(0,1fr)] sm:grid-cols-[11rem_minmax(0,1fr)] sm:grid-rows-[auto_1fr] [grid-template-areas:'title_title'_'thumb_meta'] sm:[grid-template-areas:'thumb_title'_'thumb_meta']">
           <a
             href={youtubeUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="shrink-0"
+            className="[grid-area:thumb] self-start"
             aria-label="Abrir vídeo no YouTube"
           >
             <VideoThumb
               youtubeVideoId={item.youtubeVideoId}
               durationSeconds={item.durationSeconds}
-              className="w-44 aspect-video rounded-[10px]"
+              className="w-full aspect-video rounded-[10px]"
               playSize={28}
             />
           </a>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-[15.5px] font-semibold leading-snug line-clamp-3" style={{ color: "var(--ink)" }}>
-              {item.title}
-            </h2>
-            <div className="flex items-center gap-2 mt-2.5">
+          <h2 className="[grid-area:title] text-[16px] sm:text-[15.5px] font-semibold leading-snug line-clamp-3 m-0" style={{ color: "var(--ink)" }}>
+            {item.title}
+          </h2>
+          <div className="[grid-area:meta] min-w-0 self-center sm:self-start">
+            <div className="flex items-center gap-2">
               <PersonAvatar name={item.channelName} size={22} />
               <span className="text-[12.5px] font-medium truncate" style={{ color: "var(--ink-2)" }}>
                 {item.channelName}

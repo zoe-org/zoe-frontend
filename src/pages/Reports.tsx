@@ -126,10 +126,10 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="-m-6 min-h-[calc(100dvh-3.75rem)] flex flex-col" style={{ color: "var(--ink)" }}>
+    <div className="-m-4 md:-m-6 min-h-[calc(100dvh-3.75rem)] flex flex-col" style={{ color: "var(--ink)" }}>
       {/* Hero */}
       <section
-        className="px-8 pt-7 pb-6 border-b border-border-soft"
+        className="px-4 md:px-8 pt-7 pb-6 border-b border-border-soft"
         style={{ background: "var(--surface)" }}
       >
         <div className="flex items-end justify-between gap-6 flex-wrap">
@@ -156,11 +156,11 @@ export default function ReportsPage() {
       </section>
 
       {/* O relatório sai com o que o tenant pode ver: dizer antes de gerar, não depois. */}
-      <CoverageNotice tenantBrandIds={[brand.active?.tenantBrandId]} className="mx-8 mt-4" />
+      <CoverageNotice tenantBrandIds={[brand.active?.tenantBrandId]} className="mx-4 md:mx-8 mt-4" />
 
       {/* Templates */}
       <section
-        className="px-8 py-6 border-b border-border-soft"
+        className="px-4 md:px-8 py-6 border-b border-border-soft"
         style={{ background: "var(--surface)" }}
       >
         <div className="eyebrow mb-3.5">Começar a partir de um template</div>
@@ -185,15 +185,18 @@ export default function ReportsPage() {
                   onClick={() => generate(t)}
                   disabled={create.isPending || !brand.brandId}
                   title={!brand.brandId ? "Assine uma marca para gerar relatórios" : undefined}
-                  className="text-left p-4.5 rounded-[14px] border border-border-soft hover:border-teal-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-border-soft cursor-pointer z-rise"
+                  // Celular: o ícone vai ao lado do texto. Empilhado, cada template
+                  // ocupava 165px e os três empurravam a biblioteca para longe.
+                  className="flex gap-3 sm:block text-left p-4 sm:p-4.5 rounded-[14px] border border-border-soft hover:border-teal-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-border-soft cursor-pointer z-rise"
                   style={{ background: "var(--surface)", ...stagger(i) }}
                 >
                   <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center mb-3"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 sm:mb-3"
                     style={{ background: "var(--teal-bg)" }}
                   >
                     <Icon className="w-4 h-4" style={{ color: "var(--color-teal-500)" }} />
                   </div>
+                  <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-[14px] font-semibold">{t.name}</span>
                     {/* De qual módulo o template é. Só aparece em workspace com
@@ -205,12 +208,13 @@ export default function ReportsPage() {
                       <span className="chip text-[10px]">{MODULE_LABEL[t.requiresFeature]}</span>
                     )}
                   </div>
-                  <div className="text-[12px] text-ink-muted leading-[1.4] mb-2.5">{t.description}</div>
+                  <div className="text-[12px] text-ink-muted leading-[1.4] mb-1.5 sm:mb-2.5">{t.description}</div>
                   <div className="flex items-center justify-between">
                     <span className="font-mono-zoe text-[10.5px] text-ink-muted-2">
                       {busy ? "gerando…" : windowLabel(t.code)}
                     </span>
                     <ArrowRight className="w-3.5 h-3.5 text-ink-muted" />
+                  </div>
                   </div>
                 </button>
               )
@@ -223,7 +227,7 @@ export default function ReportsPage() {
       {/* Barra de trabalho: calha de 8 como o resto da página, e grudada —
           a biblioteca rola e a busca precisa acompanhar. */}
       <section
-        className="px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap sticky top-0 z-10"
+        className="px-4 md:px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap md:sticky top-0 z-10"
         style={{ background: "var(--surface)" }}
       >
         <div className="flex items-center gap-1.5">
@@ -251,11 +255,11 @@ export default function ReportsPage() {
           ))}
         </div>
 
-        <SearchBox value={search} onChange={setSearch} placeholder="Buscar relatório…" className="w-48 sm:w-60" />
+        <SearchBox value={search} onChange={setSearch} placeholder="Buscar relatório…" className="w-full sm:w-60" />
       </section>
 
       {/* Biblioteca */}
-      <section className="flex-1 p-7 bg-inset">
+      <section className="flex-1 p-4 md:p-7 bg-inset">
         {list.isError && !forbidden ? (
           <ErrorState onRetry={() => list.refetch()} />
         ) : list.isLoading ? (
@@ -277,7 +281,7 @@ export default function ReportsPage() {
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-5">
             {filtered.map((r, i) => (
               <ReportCard
                 key={r.id}
@@ -296,6 +300,14 @@ export default function ReportsPage() {
       </section>
     </div>
   )
+}
+
+/**
+ * "2026-09-04" → "04/09". Era `slice(5)`, que deixava "09-04": mês antes do dia,
+ * lido como 9 de abril em pt-BR.
+ */
+function dayMonth(isoDate: string): string {
+  return `${isoDate.slice(8, 10)}/${isoDate.slice(5, 7)}`
 }
 
 /** Título derivado: o backend guarda template + período, não um título livre. */
@@ -396,7 +408,7 @@ function ReportCard({
       <div className="flex items-center justify-between gap-3 text-[11.5px] text-ink-muted mt-3 pt-3 border-t border-border-soft">
         <span className="truncate">{fmtDate(report.createdAt)} · {report.requestedByName || "—"}</span>
         <span className="font-mono-zoe shrink-0">
-          {report.periodStart.slice(5)} → {report.periodEnd.slice(5)}
+          {dayMonth(report.periodStart)} → {dayMonth(report.periodEnd)}
         </span>
       </div>
 
@@ -428,7 +440,7 @@ function ReportCard({
 
 function UpsellScreen() {
   return (
-    <div className="-m-6" style={{ background: "var(--surface)", color: "var(--ink)" }}>
+    <div className="-m-4 md:-m-6" style={{ background: "var(--surface)", color: "var(--ink)" }}>
       <div className="flex flex-col items-center justify-center text-center px-6 py-24 max-w-lg mx-auto">
         <div
           className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5"

@@ -39,7 +39,7 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-90 flex items-center justify-center p-4"
+      className="fixed inset-0 z-90 flex items-end sm:items-center justify-center sm:p-4"
       style={{ background: "rgba(7,9,26,0.32)", backdropFilter: "blur(2px)" }}
       onClick={onClose}
     >
@@ -48,11 +48,11 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`w-full ${WIDTH[size]} rounded-[20px] border border-border-soft shadow-2xl overflow-hidden flex flex-col max-h-[90vh]`}
+        className={`w-full ${WIDTH[size]} rounded-[20px] border border-border-soft shadow-2xl overflow-hidden flex flex-col max-h-[90vh] max-sm:rounded-b-none max-sm:border-b-0 max-sm:max-h-[92dvh] z-sheet`}
         style={{ background: "var(--surface)" }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start gap-4 px-6 pt-5 pb-4 border-b border-border-soft shrink-0">
+        <div className="flex items-start gap-4 px-5 sm:px-6 pt-5 pb-4 border-b border-border-soft shrink-0">
           <div className="flex-1 min-w-0">
             {eyebrow && <div className="eyebrow inline-flex items-center gap-1.5 mb-2">{eyebrow}</div>}
             <h2 className="font-display m-0" style={{ fontSize: 23, lineHeight: 1.1, color: "var(--ink)" }}>
@@ -70,12 +70,12 @@ export function Modal({
           </button>
         </div>
 
-        <div className="px-6 py-5 overflow-y-auto flex flex-col gap-4">
+        <div className="px-5 sm:px-6 py-5 overflow-y-auto flex flex-col gap-4">
           {children}
         </div>
 
         {footer && (
-          <div className="flex items-center gap-2.5 px-6 py-4 border-t border-border-soft shrink-0 bg-inset">
+          <div className="flex flex-wrap items-center gap-2.5 px-5 sm:px-6 py-4 border-t border-border-soft shrink-0 bg-inset">
             {footer}
           </div>
         )}
@@ -103,11 +103,11 @@ export function ModalFooter({
 }) {
   return (
     <>
-      {hint && <span className="flex-1 text-[11.5px] text-ink-muted">{hint}</span>}
+      {hint && <span className="basis-full sm:basis-auto sm:flex-1 text-[11.5px] text-ink-muted">{hint}</span>}
       <button
         type="button"
         onClick={onCancel}
-        className={`h-9 px-4 rounded-lg border border-border-soft text-[13px] font-medium text-ink-muted hover:text-ink hover:bg-hover transition-colors cursor-pointer ${hint ? "" : "ml-auto"}`}
+        className={`h-9 px-4 rounded-lg border border-border-soft text-[13px] font-medium text-ink-muted hover:text-ink hover:bg-hover transition-colors cursor-pointer ${hint ? "ml-auto sm:ml-0" : "ml-auto"}`}
       >
         {cancelLabel}
       </button>

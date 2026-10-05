@@ -17,7 +17,7 @@ export function TabPill({
   return (
     <button
       onClick={onClick}
-      className="px-4 py-2 rounded-lg text-[13.5px] font-semibold transition-colors cursor-pointer inline-flex items-center gap-1.5"
+      className="px-3 sm:px-4 py-2 rounded-lg text-[13.5px] font-semibold transition-colors cursor-pointer inline-flex items-center gap-1.5 shrink-0 whitespace-nowrap"
       style={{
         background: active ? "var(--color-teal-500)" : "transparent",
         color: active ? "#fff" : "var(--ink-muted)",

@@ -165,7 +165,7 @@ export default function ContractDetailPage() {
   }
 
   return (
-    <div className="-m-6" style={{ color: "var(--ink)" }}>
+    <div className="-m-4 md:-m-6" style={{ color: "var(--ink)" }}>
       <Header
         data={data}
         progress={progress}
@@ -177,7 +177,7 @@ export default function ContractDetailPage() {
         sending={sendForSignature.isPending}
       />
 
-      <div className="px-8 py-6 grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-8" style={{ background: "var(--surface)" }}>
+      <div className="px-4 md:px-8 py-6 grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-8" style={{ background: "var(--surface)" }}>
         {/* Campos */}
         <div>
           {/* Salvar e Enviar subiram para o cabeçalho da página: são ações do
@@ -395,7 +395,7 @@ function Header({
   const completo = progress.filled >= progress.required
   return (
     <>
-      <section className="px-8 pt-6 pb-5 border-b border-border-soft" style={{ background: "var(--surface)" }}>
+      <section className="px-4 md:px-8 pt-6 pb-5 border-b border-border-soft" style={{ background: "var(--surface)" }}>
         <div className="flex items-start justify-between gap-6 flex-wrap">
           <div className="min-w-0">
             <div className="eyebrow mb-2">
@@ -467,7 +467,7 @@ function Header({
       {/* As regras do contrato, cada uma com rótulo. Eram seis fatos numa frase
           só separada por "·", onde o SLA de revisão lia igual ao estado. */}
       <section
-        className="px-8 py-3.5 border-b border-border-soft flex items-start gap-x-10 gap-y-3 flex-wrap"
+        className="px-4 md:px-8 py-3.5 border-b border-border-soft flex items-start gap-x-10 gap-y-3 flex-wrap"
         style={{ background: "var(--surface)" }}
       >
         <Fact label="Custódia">{data.usesEscrow ? "Prevista no contrato" : "Sem custódia"}</Fact>

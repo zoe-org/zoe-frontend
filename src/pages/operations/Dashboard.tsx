@@ -33,8 +33,8 @@ export default function OperationsDashboardPage({ embedded = false }: { embedded
     // Abertura full-bleed como o resto da plataforma; os painéis seguem em
     // cartões dentro de um container com respiro — num painel os cartões são o
     // agrupamento certo, diferente das listas, que sangram até a borda.
-    <div className={embedded ? "" : "-m-6"} style={{ color: "var(--ink)" }}>
-      {!embedded && <section className="px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
+    <div className={embedded ? "" : "-m-4 md:-m-6"} style={{ color: "var(--ink)" }}>
+      {!embedded && <section className="px-4 md:px-8 pt-7 pb-6 border-b border-border-soft" style={{ background: "var(--surface)" }}>
         <div className="flex-1 max-w-220 min-w-70">
           <div className="eyebrow mb-3">Operations · Workspace inteiro</div>
           <h1 className="font-display m-0" style={{ fontSize: 34, lineHeight: 1.1, color: "var(--ink)" }}>
@@ -85,7 +85,7 @@ export default function OperationsDashboardPage({ embedded = false }: { embedded
       {/* O trabalho primeiro e junto. Fila é o que espera a sua vez; risco é
           o que não anda sozinho — as duas coisas que pedem ação. */}
       <section
-        className={`px-8 py-7 border-b border-border-soft z-rise ${riskTotal > 0
+        className={`px-4 md:px-8 py-7 border-b border-border-soft z-rise ${riskTotal > 0
           ? "grid grid-cols-1 lg:grid-cols-[1.35fr_1fr] gap-8 items-start"
           : ""}`}
         style={stagger(0)}
@@ -94,12 +94,12 @@ export default function OperationsDashboardPage({ embedded = false }: { embedded
         {riskTotal > 0 && <RisksPanel risks={d.risks} />}
       </section>
 
-      <section className="px-8 py-7 border-b border-border-soft z-rise" style={stagger(1)}>
+      <section className="px-4 md:px-8 py-7 border-b border-border-soft z-rise" style={stagger(1)}>
         <MoneyPanel money={d.money} byState={d.escrowByState} />
       </section>
 
       {/* Contexto, não trabalho. */}
-      <section className="px-8 py-5 z-rise" style={stagger(2)}>
+      <section className="px-4 md:px-8 py-5 z-rise" style={stagger(2)}>
         <VolumeStrip volume={d.volume} />
       </section>
     </div>
@@ -149,19 +149,19 @@ function OperationsOverview({ data: d }: { data: OperationsDashboard }) {
       </section>
 
       <section className="grid grid-cols-1 lg:grid-cols-[1.45fr_1fr] border-b border-border-soft">
-        <div className="p-7 lg:border-r border-b lg:border-b-0 border-border-soft">
+        <div className="p-4 md:p-7 lg:border-r border-b lg:border-b-0 border-border-soft">
           <OperationalFlow pending={d.pending} />
         </div>
-        <div className="p-7">
+        <div className="p-4 md:p-7">
           <OperationsHealth data={d} riskTotal={riskTotal} />
         </div>
       </section>
 
       <section className="grid grid-cols-1 lg:grid-cols-[1.45fr_1fr]">
-        <div className="p-7 lg:border-r border-b lg:border-b-0 border-border-soft">
+        <div className="p-4 md:p-7 lg:border-r border-b lg:border-b-0 border-border-soft">
           <EscrowFlow money={d.money} byState={d.escrowByState} />
         </div>
-        <div className="p-7">
+        <div className="p-4 md:p-7">
           <OperationReach volume={d.volume} />
         </div>
       </section>

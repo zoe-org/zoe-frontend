@@ -92,7 +92,7 @@ export default function AuthCallbackPage() {
 
   return (
     <div className="min-h-screen grid place-items-center bg-inset p-6">
-      <div className="w-full max-w-md bg-white rounded-2xl border border-border p-8 shadow-sm text-center">
+      <div className="w-full max-w-md bg-white rounded-2xl border border-border p-4 md:p-8 shadow-sm text-center">
         <ZoeLogo className="w-12 h-auto text-teal-500 mb-6 mx-auto" />
 
         {message ? (

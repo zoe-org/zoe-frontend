@@ -2,7 +2,7 @@ import { EmptyBlock } from "@/components/ui/empty-block"
 import { stagger } from "@/lib/motion"
 import type { SovTopic, SovTopicShare } from "@/lib/api/dashboard"
 import {
-  brandColor, findTopicGaps, GLOSSARY, isLowVolume, leaderOf, MIN_TOPIC_VOLUME, type RankedBrand,
+  brandColor, findTopicGaps, GLOSSARY, isLowVolume, leaderOf, MIN_TOPIC_VOLUME, ppGap, type RankedBrand,
 } from "@/lib/sov"
 import { BlockSkeleton, BrandSwatch, SectionHead } from "./shared"
 
@@ -16,7 +16,7 @@ export function TopicsTab({ topics, loading, ranked }: {
 }) {
   if (loading) {
     return (
-      <section className="px-8 py-7">
+      <section className="px-4 md:px-8 py-7">
         <BlockSkeleton rows={6} h="h-10" />
       </section>
     )
@@ -24,7 +24,7 @@ export function TopicsTab({ topics, loading, ranked }: {
 
   if (topics.length === 0) {
     return (
-      <section className="px-8 py-7">
+      <section className="px-4 md:px-8 py-7">
         <EmptyBlock
           message="Nenhum tópico no período"
           hint="Os tópicos vêm da análise de IA das menções e aparecem quando houver vídeos processados no recorte."
@@ -38,7 +38,7 @@ export function TopicsTab({ topics, loading, ranked }: {
   // Tabela à esquerda, espaços não ocupados num painel ao lado. Empilhados, o painel
   // vem primeiro: é a leitura que pede ação, e a tabela é o detalhe.
   return (
-    <section className="px-8 py-7">
+    <section className="px-4 md:px-8 py-7">
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-x-10 gap-y-8 items-start">
         {you && (
           // 72px = os 56 da barra de trabalho + respiro. Com `top-4` o painel
@@ -110,7 +110,7 @@ function GapsPanel({ topics, you }: { topics: SovTopic[]; you: RankedBrand }) {
                   <span>você <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>{mine}%</span></span>
                   <span className="truncate">
                     {leader.brandName} <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>{leader.sharePct}%</span>
-                    {" · "}<span className="font-mono-zoe">{leader.sharePct - mine}pp</span> à frente
+                    {" · "}<span className="font-mono-zoe">{ppGap(leader.sharePct, mine)}pp</span> à frente
                   </span>
                 </div>
               </div>

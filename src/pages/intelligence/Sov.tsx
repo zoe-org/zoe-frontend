@@ -112,9 +112,9 @@ export default function SovPage() {
   const ready = !sov.isError && !sov.isLoading && !precisaEscolher && competitors > 0
 
   return (
-    <div className="-m-6" style={{ background: "var(--surface)", color: "var(--ink)" }}>
+    <div className="-m-4 md:-m-6" style={{ background: "var(--surface)", color: "var(--ink)" }}>
       {/* Abertura */}
-      <section className="px-8 pt-7 pb-6 border-b border-border-soft">
+      <section className="px-4 md:px-8 pt-7 pb-6 border-b border-border-soft">
         <div className="flex items-end justify-between gap-6 flex-wrap">
           <div className="flex-1 max-w-200 min-w-70">
             <div className="eyebrow mb-3">Intelligence · Competitivo</div>
@@ -155,12 +155,14 @@ export default function SovPage() {
           topo porque as três leituras são longas e trocar de aba no meio da
           rolagem era subir a página inteira pra encontrar o controle. */}
       <section
-        className="px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap sticky top-0 z-10"
+        className="px-4 md:px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap md:sticky top-0 z-10"
         style={{ background: "var(--surface)" }}
       >
         <Segmented items={TABS} value={tab} onChange={setTab} ariaLabel="Leitura do share of voice" />
 
-        <div className="flex items-center gap-2 ml-auto">
+        {/* Celular: a contagem à esquerda e o período à direita, na linha de baixo —
+            alinhados à direita, os dois pareciam soltos sob as abas. */}
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end sm:ml-auto">
           {!precisaEscolher && competitors > 0 && (
             <span className="text-[12px] text-ink-muted whitespace-nowrap">
               {competitors} {competitors === 1 ? "concorrente" : "concorrentes"}
@@ -197,7 +199,7 @@ export default function SovPage() {
       <CoverageNotice
         tenantBrandIds={setTenantBrandIds}
         scopeLabel={setTenantBrandIds.length > 1 ? "deste conjunto competitivo" : "desta marca"}
-        className="mx-8 mt-4"
+        className="mx-4 md:mx-8 mt-4"
       />
 
       {sov.isError && !forbidden ? (
@@ -251,7 +253,7 @@ export default function SovPage() {
 
 function UpsellScreen() {
   return (
-    <div className="-m-6" style={{ background: "var(--surface)", color: "var(--ink)" }}>
+    <div className="-m-4 md:-m-6" style={{ background: "var(--surface)", color: "var(--ink)" }}>
       <div className="flex flex-col items-center justify-center text-center px-6 py-24 max-w-lg mx-auto">
         <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5" style={{ background: "var(--teal-bg)" }}>
           <Lock className="w-6 h-6" style={{ color: "var(--color-teal-500)" }} />
@@ -278,7 +280,7 @@ function UpsellScreen() {
 
 function BarsSkeleton() {
   return (
-    <section className="px-8 py-7">
+    <section className="px-4 md:px-8 py-7">
       <div className="flex flex-col gap-4 max-w-3xl">
         {Array.from({ length: 5 }).map((_, i) => (
           <div key={i} className="space-y-2">

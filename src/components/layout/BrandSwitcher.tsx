@@ -55,7 +55,7 @@ export function BrandSwitcher({ allowAll = false }: {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className="h-8 pl-1 pr-2.5 border border-border rounded-full flex items-center gap-2 text-[12.5px] text-ink hover:bg-hover transition-colors cursor-pointer"
+          className="h-8 pl-1 pr-2 sm:pr-2.5 border border-border rounded-full flex items-center gap-1.5 sm:gap-2 min-w-0 text-[12.5px] text-ink hover:bg-hover transition-colors cursor-pointer"
           aria-label="Trocar marca ativa"
         >
           {todas ? (
@@ -70,15 +70,15 @@ export function BrandSwitcher({ allowAll = false }: {
               {label.charAt(0).toUpperCase()}
             </span>
           )}
-          <span className="max-w-40 truncate font-medium">{label}</span>
+          <span className="max-w-24 sm:max-w-40 truncate font-medium">{label}</span>
           {/* O selo diz de quem é o dado ANTES de alguém ler os números da tela.
               No recorte agregado não há "de quem": o selo sai em vez de mentir. */}
           {!todas && (
-            <span className={`chip h-4.5 text-[10px] ${concorrente ? "chip-warn" : "chip-primary"}`}>
+            <span className={`chip h-4.5 text-[10px] shrink-0 ${concorrente ? "chip-warn" : "chip-primary"}`}>
               {concorrente ? "Concorrente" : "Própria"}
             </span>
           )}
-          <ChevronDown className="w-3.5 h-3.5 text-ink-muted" />
+          <ChevronDown className="w-3.5 h-3.5 text-ink-muted shrink-0" />
         </button>
       </DropdownMenuTrigger>
 

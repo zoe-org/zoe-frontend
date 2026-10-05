@@ -356,7 +356,8 @@ export function MultiLine({
           fontSize="10"
           fill="currentColor"
           opacity="0.55"
-          textAnchor="middle"
+          // O último ancora pelo fim: centrado, "agora" passava da borda direita.
+          textAnchor={i === labels.length - 1 ? "end" : "middle"}
           fontFamily="var(--font-mono)"
         >
           {lb}
@@ -497,7 +498,9 @@ export function Heatmap({ data, counts, width = 560 }: HeatmapProps) {
           style={{
             position: "absolute",
             left: `${((labelW + hover.ci * (cellW + cellGap) + cellW / 2) / width) * 100}%`,
-            top: hover.ri * (cellH + cellGap) - 12,
+            // Em %, como o `left`: o SVG escala com a largura, e em px do desenho
+            // (560) o balão descolava da célula quando o mapa encolhia no celular.
+            top: `${((hover.ri * (cellH + cellGap) - 4) / (rows * (cellH + cellGap) + 24)) * 100}%`,
             transform: "translate(-50%, -100%)",
             pointerEvents: "none",
             background: "var(--ink)",
@@ -526,6 +529,17 @@ type StackedSeries = { name: string; color: string; data: number[] }
  * pontos, e não curva: com curva, uma faixa podia passar por cima da vizinha entre
  * dois dias e desenhar um volume que não existiu.
  */
+/**
+ * Rótulo do eixo X: a cada `tickEvery` pontos, mais o último sempre. O regular
+ * que cai a menos de ~44px do último sai — no celular "30/09" e "04/10" se
+ * sobrepunham. A distância é em pixels porque o mesmo número de pontos ocupa
+ * 300px no telefone e 1000px no desktop.
+ */
+function showTick(i: number, len: number, tickEvery: number, xOf: (i: number) => number): boolean {
+  if (i === len - 1) return true
+  return i % tickEvery === 0 && xOf(len - 1) - xOf(i) >= 44
+}
+
 export function StackedArea({
   series,
   labels,
@@ -620,7 +634,7 @@ export function StackedArea({
           </g>
         )}
         {labels.map((lb, i) =>
-          i % tickEvery === 0 || i === len - 1 ? (
+          showTick(i, len, tickEvery, xOf) ? (
             <text
               key={i}
               x={xOf(i)}
@@ -793,7 +807,7 @@ export function NetLine({
         )}
 
         {data.map((d, i) =>
-          i % tickEvery === 0 || i === len - 1 ? (
+          showTick(i, len, tickEvery, xOf) ? (
             <text
               key={i} x={xOf(i)} y={height - 5} fontSize="10" fill="currentColor" opacity="0.5"
               textAnchor={i === 0 ? "start" : i === len - 1 ? "end" : "middle"}

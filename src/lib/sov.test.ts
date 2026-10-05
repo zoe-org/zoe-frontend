@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import type { SovBrand, SovTopic } from "@/lib/api/dashboard"
 import {
   CONTESTED_MARGIN, findTopicGaps, formatScore, isLowVolume, leaderOf, matchup, MIN_TOPIC_VOLUME,
-  nearestRival, positionSummary, rankBrands, readSentiment,
+  nearestRival, positionSummary, ppGap, rankBrands, readSentiment,
 } from "@/lib/sov"
 
 const brand = (brandName: string, sharePct: number, over: Partial<SovBrand> = {}): SovBrand => ({
@@ -229,5 +229,13 @@ describe("nearestRival", () => {
   it("sem marca própria, ou sozinha no conjunto, não há com quem comparar", () => {
     expect(nearestRival(rankBrands([brand("Itaú", 60), brand("Inter", 40)]))).toBeNull()
     expect(nearestRival(rankBrands([brand("Nubank", 100, { isYou: true })]))).toBeNull()
+  })
+})
+
+describe("ppGap", () => {
+  it("arredonda a diferença na casa decimal do share", () => {
+    expect(ppGap(38.2, 35.3)).toBe(2.9)
+    expect(ppGap(35.3, 38.2)).toBe(-2.9)
+    expect(ppGap(10, 10)).toBe(0)
   })
 })

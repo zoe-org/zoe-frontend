@@ -104,7 +104,7 @@ export function ChangePlanDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center sm:p-4"
       style={{ background: "rgba(7,9,26,0.32)", backdropFilter: "blur(2px)" }}
       onClick={onClose}
     >
@@ -113,7 +113,7 @@ export function ChangePlanDialog({
         role="dialog"
         aria-modal="true"
         aria-label="Confirmar troca de plano"
-        className="relative w-full max-w-[540px] rounded-[14px] border border-border-soft px-6 py-6 shadow-xl max-h-[90vh] overflow-y-auto"
+        className="relative w-full max-w-[540px] rounded-[14px] border border-border-soft px-4 sm:px-6 py-6 shadow-xl max-h-[90vh] overflow-y-auto max-sm:rounded-b-none max-sm:border-b-0 max-sm:max-h-[92dvh] z-sheet"
         style={{ background: "var(--surface)" }}
         onClick={(e) => e.stopPropagation()}
       >

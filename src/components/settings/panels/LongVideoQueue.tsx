@@ -132,7 +132,7 @@ export function LongVideoQueue() {
 
   return (
     <section className="rounded-[14px] border border-border-soft overflow-hidden" style={{ background: "var(--surface)" }}>
-      <div className="px-6 pt-5 pb-4">
+      <div className="px-4 sm:px-6 pt-5 pb-4">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <div className="eyebrow">Vídeos longos</div>
@@ -212,7 +212,7 @@ export function LongVideoQueue() {
       )}
 
       {tab === "Pending" && canDecide && totals.count > 0 && (
-        <div className="flex items-center gap-x-4 gap-y-2 flex-wrap px-6 py-3.5 border-t border-border-soft bg-inset">
+        <div className="flex items-center gap-x-4 gap-y-2 flex-wrap px-4 sm:px-6 py-3.5 border-t border-border-soft bg-inset">
           <div className="text-[13px]" style={{ color: "var(--ink)" }}>
             <strong>{plural(totals.count, "selecionado", "selecionados")}</strong> ·{" "}
             <span className="font-mono-zoe">{int(totals.minutes)} min</span>
@@ -246,7 +246,7 @@ export function LongVideoQueue() {
       )}
 
       {tab === "Pending" && !canDecide && items.length > 0 && (
-        <div className="px-6 py-3.5 border-t border-border-soft text-[12.5px] text-ink-muted">
+        <div className="px-4 sm:px-6 py-3.5 border-t border-border-soft text-[12.5px] text-ink-muted">
           Só Owner ou Admin do workspace aprovam ou descartam: aprovar é autorizar gasto.
         </div>
       )}
@@ -268,7 +268,7 @@ function Pagination({ page, pageCount, total, shown, from, onChange, selectAll }
     "hover:bg-tint transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
 
   return (
-    <div className="flex items-center gap-x-4 gap-y-2 flex-wrap px-6 py-2.5 border-t border-border-soft">
+    <div className="flex items-center gap-x-4 gap-y-2 flex-wrap px-4 sm:px-6 py-2.5 border-t border-border-soft">
       <div className="text-[12.5px] text-ink-muted">
         <span className="font-mono-zoe">{from}–{from + shown - 1}</span> de{" "}
         <span className="font-mono-zoe">{total}</span>
@@ -373,7 +373,7 @@ function QueueBody({
 }) {
   if (loading) {
     return (
-      <div className="px-6 pb-6 space-y-2 animate-pulse">
+      <div className="px-4 sm:px-6 pb-6 space-y-2 animate-pulse">
         {[0, 1, 2].map((i) => <div key={i} className="h-11 rounded bg-tint" />)}
       </div>
     )
@@ -381,7 +381,7 @@ function QueueBody({
 
   if (error) {
     return (
-      <div className="px-6 pb-6">
+      <div className="px-4 sm:px-6 pb-6">
         <EmptyBlock message={apiMessage(error, "Não foi possível carregar a fila de vídeos longos.")} />
       </div>
     )
@@ -389,15 +389,77 @@ function QueueBody({
 
   if (items.length === 0) {
     return (
-      <div className="px-6 pb-6">
+      <div className="px-4 sm:px-6 pb-6">
         <EmptyBlock message={EMPTY[tab].message} hint={EMPTY[tab].hint} />
       </div>
     )
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-[13px]">
+    <div className="@container overflow-x-auto">
+      {/* Estreita: uma linha por vídeo — título, de onde veio, e o tamanho numa frase
+          só. Em cartões rotulados, cada vídeo tomava meia tela. */}
+      <div className="@2xl:hidden border-t border-border-soft">
+        {selectable && (
+          <label className="flex items-center gap-2.5 px-4 py-2.5 border-b border-border-soft text-[12.5px] text-ink-muted cursor-pointer">
+            <input type="checkbox" checked={allSelected} onChange={onToggleAll} className="accent-teal-500" />
+            Selecionar todos
+          </label>
+        )}
+        <ul className="m-0 p-0 list-none">
+          {items.map((v) => (
+            <li
+              key={v.id}
+              className="flex items-start gap-2.5 px-4 py-3 border-b border-border-soft last:border-b-0"
+              style={selected.has(v.id) ? { background: "var(--teal-bg)" } : undefined}
+            >
+              {selectable && (
+                <input
+                  type="checkbox"
+                  checked={selected.has(v.id)}
+                  onChange={() => onToggle(v.id)}
+                  aria-label={`Selecionar ${v.title}`}
+                  className="accent-teal-500 mt-1 shrink-0"
+                />
+              )}
+              <div className="flex-1 min-w-0">
+                <a
+                  href={`https://www.youtube.com/watch?v=${v.youtubeVideoId}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-start gap-1.5 text-[13px] font-semibold hover:underline max-w-full"
+                  style={{ color: "var(--ink)" }}
+                >
+                  <span className="line-clamp-2">{v.title}</span>
+                  <ExternalLink className="w-3 h-3 shrink-0 mt-1 text-ink-muted-2" />
+                </a>
+                <div className="text-[11.5px] text-ink-muted mt-0.5 truncate">
+                  {v.channelName} · {v.brandName}
+                </div>
+                <div className="flex items-center justify-between gap-3 mt-1.5 text-[11.5px] text-ink-muted">
+                  <span className="min-w-0">
+                    <span className="font-mono-zoe" style={{ color: "var(--ink)" }}>{formatDuration(v.durationSeconds)}</span>
+                    {" · "}
+                    <span className="font-mono-zoe">{int(v.estimatedMinutes)}</span> min
+                    {" · "}teto {int(v.maxVideoMinutes)}
+                  </span>
+                  <span className="shrink-0">
+                    {tab === "Pending" && (!v.collected
+                      ? <span className="chip text-[10px]">não coletado</span>
+                      : shortDate(v.createdAt))}
+                    {tab === "Approved" && (v.collected
+                      ? <span className="chip chip-pos text-[10.5px]">cobrado</span>
+                      : <span className="chip chip-warn text-[10.5px]">aguardando coleta</span>)}
+                    {tab === "Dismissed" && (v.decidedAt ? shortDate(v.decidedAt) : "—")}
+                  </span>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <table className="hidden @2xl:table w-full text-[13px]">
         <thead>
           <tr className="border-y border-border-soft">
             {selectable && (
@@ -411,11 +473,11 @@ function QueueBody({
                 />
               </th>
             )}
-            <th className={`text-left font-medium text-ink-muted py-2.5 ${selectable ? "px-3" : "px-6"}`}>Vídeo</th>
+            <th className={`text-left font-medium text-ink-muted py-2.5 ${selectable ? "px-3" : "px-4 sm:px-6"}`}>Vídeo</th>
             <th className="text-left font-medium text-ink-muted px-3 py-2.5">Marca</th>
             <th className="text-right font-medium text-ink-muted px-3 py-2.5">Duração</th>
             <th className="text-right font-medium text-ink-muted px-3 py-2.5">Minutos</th>
-            <th className="text-right font-medium text-ink-muted px-6 py-2.5">
+            <th className="text-right font-medium text-ink-muted px-4 sm:px-6 py-2.5">
               {tab === "Pending" ? "Chegou" : tab === "Approved" ? "Situação" : "Descartado"}
             </th>
           </tr>
@@ -438,7 +500,7 @@ function QueueBody({
                   />
                 </td>
               )}
-              <td className={`py-3 align-top ${selectable ? "px-3" : "px-6"}`}>
+              <td className={`py-3 align-top ${selectable ? "px-3" : "px-4 sm:px-6"}`}>
                 <a
                   href={`https://www.youtube.com/watch?v=${v.youtubeVideoId}`}
                   target="_blank"
@@ -468,7 +530,7 @@ function QueueBody({
                 <div className="text-[11px] text-ink-muted-2 mt-0.5">teto {int(v.maxVideoMinutes)} min</div>
               </td>
               <td className="text-right px-3 py-3 align-top font-mono-zoe">{int(v.estimatedMinutes)}</td>
-              <td className="text-right px-6 py-3 align-top text-[12.5px] text-ink-muted whitespace-nowrap">
+              <td className="text-right px-4 sm:px-6 py-3 align-top text-[12.5px] text-ink-muted whitespace-nowrap">
                 {tab === "Pending" && shortDate(v.createdAt)}
                 {tab === "Approved" && (v.collected
                   ? <span className="chip chip-pos text-[10.5px]">cobrado</span>

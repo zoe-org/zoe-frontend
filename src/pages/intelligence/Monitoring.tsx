@@ -10,6 +10,7 @@ import { ConfidenceBadge } from "@/components/ui/confidence-badge"
 import { coverageSaysOwnedContent } from "@/components/ui/coverage-labels"
 import { VideoThumb } from "@/components/ui/video-thumb"
 import { SelectFilterChip } from "@/components/ui/select-filter-chip"
+import { FilterSheetButton } from "@/components/ui/filter-sheet"
 import { Segmented } from "@/components/ui/segmented"
 import { useActiveBrand } from "@/features/brands/context"
 import { toCsv, downloadCsv } from "@/lib/csv"
@@ -189,6 +190,12 @@ export default function MonitoringPage() {
     }, { replace: true })
   }
 
+  const [filtrosOpen, setFiltrosOpen] = useState(false)
+  // No botão do celular só conta o que recorta a lista e mora na folha: o
+  // sentimento tem a própria barra e a busca, o próprio campo.
+  const filtrosNaFolha = [period, min, rel].filter(Boolean).length
+  const totalAtual = tabCount(sent)
+
   const [selected, setSelected] = useState<VideoListItem | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const openDrawer = (item: VideoListItem) => { setSelected(item); setDrawerOpen(true) }
@@ -248,16 +255,16 @@ export default function MonitoringPage() {
   }
 
   return (
-    <div className="-m-6" style={{ color: "var(--ink)" }}>
+    <div className="-m-4 md:-m-6" style={{ color: "var(--ink)" }}>
       {/* Abertura */}
-      <section className="px-8 pt-7 pb-6 border-b border-border-soft">
+      <section className="px-4 md:px-8 pt-7 pb-6 border-b border-border-soft">
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div className="flex-1 max-w-200 min-w-70">
             <div className="eyebrow mb-3">Intelligence · Feed</div>
             <h1 className="font-display m-0 text-ink" style={{ fontSize: 34, lineHeight: 1.1 }}>
               Monitoramento
             </h1>
-            <div className="flex items-center mt-2 gap-1 text-[14px]">
+            <div className="flex flex-wrap items-baseline mt-2 gap-x-1 text-[14px]">
               <p className=" text-ink-muted">
                 Tudo o que foi dito sobre {brand.active?.displayName ?? brand.active?.brandName ?? "a marca"} em
                 vídeo, áudio e comentários.
@@ -273,9 +280,9 @@ export default function MonitoringPage() {
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             {/* Seletor de marca vive no header agora (BrandSwitcher). */}
-            <label className="relative">
+            <label className="relative flex-1 sm:flex-none">
               <span className="sr-only">Buscar por título</span>
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-ink-muted-2" />
               <input
@@ -283,7 +290,7 @@ export default function MonitoringPage() {
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 placeholder="Buscar título..."
-                className="w-60 h-9 pl-9 pr-3 text-[13px] rounded-md border border-border-soft bg-transparent outline-none transition-colors focus:border-teal-500"
+                className="w-full sm:w-60 h-9 pl-9 pr-3 text-[13px] rounded-md border border-border-soft bg-transparent outline-none transition-colors focus:border-teal-500"
               />
             </label>
             <button
@@ -291,28 +298,56 @@ export default function MonitoringPage() {
               onClick={exportCsv}
               disabled={items.length === 0}
               title="Exporta as menções já carregadas, com os filtros atuais"
-              className="inline-flex items-center gap-1.5 h-9 px-3.5 text-[13px] rounded-md border border-border-soft hover:bg-hover transition-colors disabled:opacity-50"
+              aria-label="Exportar CSV"
+              className="inline-flex items-center justify-center gap-1.5 h-9 w-9 sm:w-auto sm:px-3.5 text-[13px] rounded-md border border-border-soft hover:bg-hover transition-colors disabled:opacity-50 shrink-0"
             >
-              <Download className="w-3.5 h-3.5" /> Exportar
+              <Download className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Exportar</span>
             </button>
           </div>
         </div>
       </section>
 
       {/* Barra de trabalho: o que estou vendo (abas) e como (ordem e formato).
-          Gruda no topo porque o feed é longo e a régua precisa acompanhar. */}
+          Gruda no topo porque o feed é longo e a régua precisa acompanhar — a
+          partir de md. No celular ela quebra em três linhas e, presa, comia um
+          quinto da tela. */}
       <section
-        className="px-8 py-3 border-b border-border-soft flex items-center justify-between gap-4 flex-wrap sticky top-0 z-10"
+        className="px-4 md:px-8 py-3 border-b border-border-soft flex items-center justify-between gap-4 flex-wrap md:sticky top-0 z-10"
         style={{ background: "var(--surface)" }}
       >
-        <Segmented
-          items={SENT_TABS.map((tab) => ({ ...tab, count: tabCount(tab.key) }))}
-          value={sent}
-          onChange={(key) => setParam("sent", key)}
-          ariaLabel="Recorte por sentimento"
+        <div className="min-w-0 flex-1 md:flex-none">
+          <Segmented
+            items={SENT_TABS.map((tab) => ({ ...tab, count: tabCount(tab.key) }))}
+            value={sent}
+            onChange={(key) => setParam("sent", key)}
+            ariaLabel="Recorte por sentimento"
+          />
+        </div>
+
+        <FilterSheetButton
+          className="md:hidden"
+          open={filtrosOpen}
+          onOpenChange={setFiltrosOpen}
+          activeCount={filtrosNaFolha}
+          onClear={limparFiltros}
+          resultLabel={totalAtual === undefined
+            ? "Ver menções"
+            : `Ver ${totalAtual} ${totalAtual === 1 ? "menção" : "menções"}`}
+          groups={[
+            { label: "Período", value: period, options: PERIODS, onChange: (v) => setParam("period", v) },
+            { label: "Score mínimo", value: min, options: MIN_SCORES, onChange: (v) => setParam("min", v) },
+            { label: "Origem do canal", value: rel, options: CHANNEL_RELATIONS, onChange: (v) => setParam("rel", v) },
+            { label: "Ordem", value: sort, options: SORT_OPTIONS, onChange: (v) => setParam("sort", v) },
+            {
+              label: "Exibição",
+              value: view === "grid" ? "grid" : "",
+              options: [{ key: "", label: "Lista" }, { key: "grid", label: "Grade" }],
+              onChange: (v) => setParam("view", v),
+            },
+          ]}
         />
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="hidden md:flex items-center gap-2 flex-wrap">
           {temFiltro && (
             <button
               onClick={limparFiltros}
@@ -366,9 +401,10 @@ export default function MonitoringPage() {
 
       {/* Recorte: período, score e origem do canal, com o resultado ao lado. */}
       {view !== "grid" ? (
-      <section 
-        className="px-8 py-2.5 border-b border-border-soft grid items-center gap-4 text-ink-muted eyebrow font-semibold"
-        style={{ gridTemplateColumns: "1fr 150px 100px 60px 80px" }}
+      // Cabeçalho só existe com as colunas: na lista compacta (< lg) cada linha
+      // traz os próprios rótulos.
+      <section
+        className="hidden lg:grid px-4 md:px-8 py-2.5 border-b border-border-soft items-center gap-4 text-ink-muted eyebrow font-semibold grid-cols-[1fr_150px_100px_60px_80px]"
       >
         <p>
           VÍDEO
@@ -410,7 +446,7 @@ export default function MonitoringPage() {
       ) : (
         <section>
           {view === "grid" ? (
-            <div className="grid gap-4 px-8 py-6" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))" }}>
+            <div className="grid gap-4 px-4 md:px-8 py-6" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(min(260px, 100%), 1fr))" }}>
               {items.map((m, i) => (
                 <button
                   key={m.analysisId}
@@ -477,18 +513,19 @@ export default function MonitoringPage() {
               <button
                 key={m.analysisId}
                 onClick={() => openDrawer(m)}
-                className="z-row z-rise grid items-center gap-4 px-8 py-3.5 border-b border-border-soft w-full text-left cursor-pointer"
+                className="z-row z-rise grid items-center gap-3 lg:gap-4 px-4 md:px-8 py-3.5 border-b border-border-soft w-full text-left cursor-pointer grid-cols-[96px_minmax(0,1fr)] lg:grid-cols-[110px_1fr_150px_100px_60px_80px]"
                 // O escalonamento para na 12ª linha: mais do que isso e a última
                 // demoraria quase um segundo para aparecer.
-                style={{ gridTemplateColumns: "110px 1fr 150px 100px 60px 80px", ...stagger(Math.min(i, 12)) }}
+                style={stagger(Math.min(i, 12))}
               >
                 <VideoThumb
                   youtubeVideoId={m.youtubeVideoId}
                   durationSeconds={m.durationSeconds}
-                  className="w-27.5 h-15.5"
+                  className="w-24 h-13.5 lg:w-27.5 lg:h-15.5"
                 />
                 <div className="min-w-0">
-                  <div className="text-[14px] font-medium truncate mb-0.5" style={{ color: "var(--ink)" }}>
+                  {/* Duas linhas no celular: numa só, o título virava "Compre Só o Br…" */}
+                  <div className="text-[14px] font-medium leading-snug line-clamp-2 lg:line-clamp-1 mb-0.5" style={{ color: "var(--ink)" }}>
                     {m.title}
                   </div>
                   <div className="flex items-center gap-2 text-[11.5px] text-ink-muted flex-wrap">
@@ -496,8 +533,23 @@ export default function MonitoringPage() {
                     <span>·</span>
                     <span>{formatDistanceToNow(new Date(m.publishedAt), { addSuffix: true, locale: ptBR })}</span>
                   </div>
+                  {/* Lista compacta: score, tom e views descem para debaixo do título. */}
+                  <div className="lg:hidden flex items-center gap-2 mt-1.5 text-[11.5px] text-ink-muted">
+                    <span
+                      className="font-mono-zoe text-[12.5px]"
+                      style={{ color: hasSelfMeasuredScore(m) || m.score == null ? "var(--ink-muted-2)" : scoreColor(m.score) }}
+                    >
+                      {scoreLabel(m)}
+                    </span>
+                    {m.classificacao && (
+                      <span className={`${classificationChip(m.classificacao)} h-4.5 text-[10.5px]`}>
+                        {tEnum("classification", m.classificacao)}
+                      </span>
+                    )}
+                    {m.views != null && <span className="font-mono-zoe truncate">{compactNumber(m.views)} views</span>}
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5 flex-wrap">
+                <div className="hidden lg:flex items-center gap-1.5 flex-wrap">
                   <ConfidenceBadge
                     pipelinePath={m.pipelinePath}
                     confidence={m.confidence}
@@ -512,7 +564,7 @@ export default function MonitoringPage() {
                     && <OwnedTag />}
                 </div>
                 
-                <p className="text-[12px] text-ink-muted flex flex-col">
+                <p className="hidden lg:flex text-[12px] text-ink-muted flex-col">
                 {m.views != null && (
                       <>
                         <span className="font-mono-zoe">{compactNumber(m.views)} views</span>
@@ -528,13 +580,13 @@ export default function MonitoringPage() {
                 </p>
 
                 <span
-                  className="font-mono-zoe text-[13px] shrink-0"
+                  className="hidden lg:inline font-mono-zoe text-[13px] shrink-0"
                   style={{ color: hasSelfMeasuredScore(m) || m.score == null ? "var(--ink-muted-2)" : scoreColor(m.score) }}
                 >
                   {scoreLabel(m)}
                 </span>
 
-                <div>
+                <div className="hidden lg:block">
                   {m.classificacao && (
                     <span className={classificationChip(m.classificacao)}>
                       {tEnum("classification", m.classificacao)}
@@ -546,7 +598,7 @@ export default function MonitoringPage() {
           )}
 
           {feed.hasNextPage && (
-            <div className="px-8 py-6 text-center">
+            <div className="px-4 md:px-8 py-6 text-center">
               <button
                 onClick={() => feed.fetchNextPage()}
                 disabled={feed.isFetchingNextPage}
@@ -576,8 +628,8 @@ export default function MonitoringPage() {
 
 function PageSkeleton() {
   return (
-    <div className="-m-6">
-      <div className="px-8 pt-7 pb-6 border-b border-border-soft">
+    <div className="-m-4 md:-m-6">
+      <div className="px-4 md:px-8 pt-7 pb-6 border-b border-border-soft">
         <div className="h-3 w-40 rounded z-skeleton mb-4" />
         <div className="h-9 w-96 max-w-full rounded z-skeleton" />
       </div>
@@ -590,7 +642,7 @@ function FeedSkeleton() {
   return (
     <section>
       {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="flex items-center gap-4 px-8 py-3.5 border-b border-border-soft">
+        <div key={i} className="flex items-center gap-4 px-4 md:px-8 py-3.5 border-b border-border-soft">
           {/* Mesma caixa 110×62 da thumbnail real — sem isso a linha "pula" ao carregar. */}
           <div className="w-27.5 h-15.5 shrink-0 rounded-md z-skeleton" />
           <div className="flex-1 space-y-2">

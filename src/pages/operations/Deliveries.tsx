@@ -82,8 +82,8 @@ export default function OperationsDeliveriesPage() {
     // Full-bleed, como o resto da plataforma. Antes era uma pilha de blocos
     // dentro do padding padrão, e cada uma das duas filas trazia o PRÓPRIO
     // `<h1>` — o título da página trocava ao alternar de fila.
-    <div className="-m-6" style={{ color: "var(--ink)" }}>
-      <section className="px-8 pt-7 pb-6 border-b border-border-soft flex items-end justify-between" style={{ background: "var(--surface)" }}>
+    <div className="-m-4 md:-m-6" style={{ color: "var(--ink)" }}>
+      <section className="px-4 md:px-8 pt-7 pb-6 border-b border-border-soft flex flex-wrap items-end justify-between gap-x-6 gap-y-4" style={{ background: "var(--surface)" }}>
         <div className="flex-1 max-w-200 min-w-70">
           <div className="eyebrow mb-3">Operations · Qualidade</div>
           <h1 className="font-display m-0" style={{ fontSize: 34, lineHeight: 1.1, color: "var(--ink)" }}>
@@ -240,7 +240,7 @@ function PublishedQueue({
 
   return (
     <>
-      <section className="px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap">
+      <section className="px-4 md:px-8 py-3 border-b border-border-soft flex items-center justify-between gap-x-4 gap-y-2.5 flex-wrap">
         <div className="flex gap-1.5 flex-wrap">
           {TABS.map(([k, label]) => (
             <button
@@ -286,7 +286,7 @@ function PublishedQueue({
       </section>
 
       {/* O que esta fila decide — a frase saiu do `<h1>` que trocava. */}
-      <p className="px-8 pt-4 pb-0 m-0 text-[12.5px] text-ink-muted max-w-160">
+      <p className="px-4 md:px-8 pt-4 pb-0 m-0 text-[12.5px] text-ink-muted max-w-160">
         A entrega é o link do vídeo já publicado — é sobre o conteúdo público que a
         conformidade se verifica. Aprovar libera a custódia para pagamento.
       </p>

@@ -8,7 +8,7 @@ import { InfoHint } from "@/components/ui/info-hint"
 import type { SovTrend } from "@/lib/api/dashboard"
 import { Stat } from "@/components/ui/stat"
 import {
-  brandColor, formatScore, GLOSSARY, nearestRival, positionSummary, readSentiment,
+  brandColor, formatScore, GLOSSARY, nearestRival, positionSummary, ppGap, readSentiment,
   type RankedBrand,
 } from "@/lib/sov"
 import { stagger } from "@/lib/motion"
@@ -49,7 +49,7 @@ function PositionSection({ ranked, periodLabel, hasPreviousPeriod, onCompare }: 
 
   if (!you) {
     return (
-      <section className="px-8 py-7 border-b border-border-soft">
+      <section className="px-4 md:px-8 py-7 border-b border-border-soft">
         <div className="eyebrow mb-2">Sua posição</div>
         <p className="text-[13px] text-ink-muted max-w-160 leading-relaxed">
           Nenhuma marca própria neste recorte. Marque uma das suas marcas como própria em
@@ -64,7 +64,7 @@ function PositionSection({ ranked, periodLabel, hasPreviousPeriod, onCompare }: 
 
   return (
     <section
-      className="grid grid-cols-1 lg:grid-cols-[1.25fr_1fr] gap-x-10 gap-y-6 px-8 py-7 border-b border-border-soft z-rise"
+      className="grid grid-cols-1 lg:grid-cols-[1.25fr_1fr] gap-x-10 gap-y-6 px-4 md:px-8 py-7 border-b border-border-soft z-rise"
       style={stagger(0)}
     >
       <div>
@@ -121,7 +121,7 @@ function RivalTarget({ ranked, onCompare }: { ranked: RankedBrand[]; onCompare?:
   if (!you || !alvo) return null
 
   const lidera = you.rank === 1
-  const gap = Math.abs(you.sharePct - alvo.sharePct)
+  const gap = Math.abs(ppGap(you.sharePct, alvo.sharePct))
 
   return (
     <div className="flex items-center gap-4 flex-wrap mt-5 rounded-[14px] border border-border-soft bg-inset px-4 py-3">
@@ -173,13 +173,56 @@ function RankingSection({ ranked, hasPreviousPeriod, ppHint }: {
   // Só vira link o que o tenant assina: marca fora da lista não pode ser a ativa.
   const assinadas = new Set(brands.map((x) => x.brandId))
   return (
-    <section className="px-8 py-7 border-b border-border-soft z-rise" style={stagger(1)}>
+    <section className="px-4 md:px-8 py-7 border-b border-border-soft z-rise" style={stagger(1)}>
       <SectionHead
         title="Ranking do conjunto"
         sub="Share e sentimento lado a lado: share alto com sentimento baixo é exposição, não vantagem. Clique num concorrente para abrir o Dashboard dele."
       />
-      <div className="overflow-x-auto overflow-y-clip">
-        <table className="w-full text-[13px] min-w-160">
+      <div className="@container overflow-x-auto overflow-y-clip">
+        {/* Estreita: uma linha por marca — nome e share em cima, a barra, e
+            sentimento, menções e variação numa linha só. */}
+        <ul className="@2xl:hidden m-0 p-0 list-none">
+          {ranked.map((b, i) => {
+            const c = brandColor(b.brandId, b.color)
+            return (
+              <li
+                key={b.brandId}
+                className="py-3 px-2.5 border-t border-border-soft z-rise"
+                style={{ ...stagger(Math.min(i, 12)), ...(b.isYou ? { background: "var(--teal-bg)" } : {}) }}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="font-mono-zoe text-[11px] text-ink-muted-2 w-4 shrink-0">{b.rank}</span>
+                  <BrandSwatch color={c} />
+                  {b.isYou || !assinadas.has(b.brandId) ? (
+                    <span className="truncate text-[13.5px]" style={{ color: "var(--ink)", fontWeight: b.isYou ? 700 : 500 }}>{b.brandName}</span>
+                  ) : (
+                    <Link
+                      to="/dashboard"
+                      onClick={() => setBrand(b.brandId)}
+                      className="truncate text-[13.5px] font-medium hover:underline inline-flex items-center gap-1"
+                      style={{ color: "var(--ink)" }}
+                    >
+                      {b.brandName}
+                      <ChevronRight className="w-3 h-3 opacity-60 shrink-0" aria-hidden />
+                    </Link>
+                  )}
+                  {b.isYou && <span className="chip chip-primary text-[9.5px] px-1.5 py-px shrink-0">VOCÊ</span>}
+                  <span className="ml-auto font-mono-zoe text-[13px] shrink-0" style={{ color: "var(--ink)" }}>{b.sharePct}%</span>
+                </div>
+                <div className="h-1.5 rounded-full overflow-hidden bg-tint mt-2 ml-6">
+                  <div className="h-full rounded-full z-grow-x" style={{ width: `${b.sharePct}%`, background: c, ...stagger(Math.min(i, 12)) }} />
+                </div>
+                <div className="flex items-center gap-2.5 mt-2 ml-6 text-[11.5px] text-ink-muted flex-wrap">
+                  <SentimentChip score={b.avgScore} />
+                  <span><span className="font-mono-zoe">{b.mentions.toLocaleString("pt-BR")}</span> menções</span>
+                  {hasPreviousPeriod && <DeltaPp value={b.deltaPp} />}
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+
+        <table className="hidden @2xl:table w-full text-[13px] min-w-160">
           <thead>
             <tr className="text-ink-muted text-[12px]">
               <th className="text-left font-medium pb-2 w-8">#</th>
@@ -292,7 +335,7 @@ function TrendSection({ trend, loading }: { trend: SovTrend | undefined; loading
   const emptyColumn = (i: number) => series.every((s) => (s.data[i] ?? 0) === 0)
 
   return (
-    <section className="px-8 py-7 z-rise" style={stagger(2)}>
+    <section className="px-4 md:px-8 py-7 z-rise" style={stagger(2)}>
       <SectionHead
         title="Evolução do share"
         hint={GLOSSARY.trend}

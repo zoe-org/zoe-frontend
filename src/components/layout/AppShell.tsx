@@ -4,11 +4,12 @@ import {
   LayoutDashboard, Activity, Smile, ChartPie, Users, Bell, Gauge, Megaphone, UsersRound,
   FileText, Package, Vault, Tag, FileChartColumn, Settings, UserCog,
   PanelLeftClose, PanelLeftOpen, ChevronsUpDown, UserRound, Palette, CreditCard,
-  Sun, Moon, LogOut, Check, Plus, ShieldCheck, AlertCircle,
+  Sun, Moon, LogOut, Check, Plus, ShieldCheck, AlertCircle, Menu, X,
   type LucideIcon,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { useAuth } from "@/features/auth/context"
 import { useFeature } from "@/features/auth/useFeature"
 import { useSwitchWorkspace } from "@/features/auth/useSwitchWorkspace"
@@ -125,7 +126,7 @@ function tenantColor(id: string) {
  * inteiro (marcas, features, cobrança), então ele fica visível — e não escondido
  * dentro do menu do usuário, onde ninguém procurava por ele.
  */
-function WorkspaceSwitcher({ collapsed }: { collapsed: boolean }) {
+function WorkspaceSwitcher({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
   const { activeTenantId, memberships, role } = useAuth()
   const switchWorkspace = useSwitchWorkspace()
   const openSettings = useOpenSettings()
@@ -172,7 +173,7 @@ function WorkspaceSwitcher({ collapsed }: { collapsed: boolean }) {
             return (
               <DropdownMenuItem
                 key={m.tenantId}
-                onSelect={() => { if (!isActive) switchWorkspace(m.tenantId) }}
+                onSelect={() => { onNavigate?.(); if (!isActive) switchWorkspace(m.tenantId) }}
                 className="flex items-center gap-2.5 cursor-pointer"
               >
                 <span
@@ -193,12 +194,12 @@ function WorkspaceSwitcher({ collapsed }: { collapsed: boolean }) {
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="flex items-center gap-2 text-sm cursor-pointer"
-            onSelect={() => openSettings("workspace")}
+            onSelect={() => { onNavigate?.(); openSettings("workspace") }}
           >
             <Settings className="w-4 h-4 text-ink-muted" /> Gerenciar workspace
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <Link to="/onboarding/tenant" className="flex items-center gap-2 text-sm cursor-pointer">
+            <Link to="/onboarding/tenant" onClick={onNavigate} className="flex items-center gap-2 text-sm cursor-pointer">
               <Plus className="w-4 h-4 text-ink-muted" /> Criar novo workspace
             </Link>
           </DropdownMenuItem>
@@ -208,11 +209,19 @@ function WorkspaceSwitcher({ collapsed }: { collapsed: boolean }) {
   )
 }
 
-export function AppShell() {
+/**
+ * Conteúdo da sidebar. O mesmo corpo serve à coluna fixa (md+) e à gaveta do
+ * celular — duas cópias do menu divergiriam no primeiro item novo.
+ *
+ * `onNavigate` fecha a gaveta ao escolher um destino; na coluna fixa não vem.
+ */
+function SidebarBody({ collapsed, onToggle, onNavigate }: {
+  collapsed: boolean
+  /** Coluna fixa: recolhe/expande. Gaveta: fecha. */
+  onToggle: () => void
+  onNavigate?: () => void
+}) {
   const { user, role, signOut, isZoeAdmin } = useAuth()
-  // WS-F3 — mantém a conexão de tempo real viva pro app inteiro logado (não só
-  // Alertas: é daqui que o badge da sidebar recebe o "novo" sem precisar navegar).
-  useRealtimeConnection()
   const hasIntelligence = useFeature("intelligence")
   const hasOperations = useFeature("operations")
   const hasSov = useFeature("sov")
@@ -223,50 +232,40 @@ export function AppShell() {
   const planLabel = [hasIntelligence && "Intelligence", hasOperations && "Operations"]
     .filter(Boolean).join(" + ") || null
   const userContext = [planLabel, role].filter(Boolean).join(" · ")
-  const location = useLocation()
   const navigate = useNavigate()
-  const openSettings = useOpenSettings()
-  const { resolvedTheme, setTheme } = useTheme()
-  const isDark = resolvedTheme === "dark"
-
-  const mainRef = useRef<HTMLElement>(null)
-  useScrollToTop(mainRef)
-
-  const [sidebarOpen, setSidebarOpen] = useState(() => getInitialOpenState(STORAGE_SIDEBAR_KEY))
-  const collapsed = !sidebarOpen
-
-  useEffect(() => {
-    try { localStorage.setItem(STORAGE_SIDEBAR_KEY, String(sidebarOpen)) } catch { /* storage indisponível */ }
-  }, [sidebarOpen])
+  const openSettingsRaw = useOpenSettings()
+  // Na gaveta, abrir as configurações fecha o menu antes: dois diálogos modais
+  // empilhados disputam o foco e o de baixo ficava capturando o toque.
+  const openSettings: typeof openSettingsRaw = (section) => { onNavigate?.(); openSettingsRaw(section) }
+  const sidebarOpen = !collapsed
 
   return (
-    // Altura travada na viewport: quem rola é o <main>, e só ele. Com
-    // `min-h-screen` o documento também rolava, e qualquer transbordo
-    // dentro do <main> (as animações de entrada empurram o conteúdo 10px
-    // pra baixo) abria uma segunda barra de rolagem por alguns segundos.
-    <div className="h-screen overflow-hidden flex text-ink bg-surface">
-      {/* Sidebar */}
-      <aside className={`${sidebarOpen ? "w-60" : "w-14"} transition-[width] duration-300 ease-[cubic-bezier(0.2,0.7,0.1,1)] h-dvh border-r sticky top-0 bg-canvas text-ink-muted border-border-soft flex flex-col overflow-hidden shrink-0`}>
+    <>
         {/* Logo */}
         <div className={`h-fit flex items-center my-4 ${sidebarOpen ? "px-4 justify-between" : "justify-center"}`}>
           {sidebarOpen && <ZoeLogo className="w-12 h-full text-teal-500" />}
           <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            aria-label={sidebarOpen ? "Recolher menu" : "Expandir menu"}
+            onClick={onToggle}
+            aria-label={onNavigate ? "Fechar menu" : sidebarOpen ? "Recolher menu" : "Expandir menu"}
             className="cursor-pointer text-ink-muted-2 hover:text-ink transition-colors"
           >
-            {sidebarOpen ? <PanelLeftClose className="h-5" /> : <PanelLeftOpen className="h-5" />}
+            {onNavigate ? <X className="h-5" /> : sidebarOpen ? <PanelLeftClose className="h-5" /> : <PanelLeftOpen className="h-5" />}
           </button>
         </div>
 
         {/* Workspace: quem você é dentro da conta. Fica ACIMA da navegação porque
             troca o conteúdo de todas as telas abaixo dele. */}
-        <WorkspaceSwitcher collapsed={collapsed} />
+        <WorkspaceSwitcher collapsed={collapsed} onNavigate={onNavigate} />
 
-        {sidebarOpen && <TrialBadge />}
+        {sidebarOpen && <TrialBadge onNavigate={onNavigate} />}
 
-        {/* Navegação: seções planas, sempre abertas. */}
-        <nav className={`flex-1 pb-3 overflow-y-auto ${sidebarOpen ? "px-3" : "px-2"}`}>
+        {/* Navegação: seções planas, sempre abertas. O clique em qualquer link
+            fecha a gaveta — delegado aqui em vez de repetido em cada item. */}
+        <nav
+          // Na gaveta os itens crescem para alvo de dedo (40px); 32px é alvo de mouse.
+          className={`flex-1 pb-3 overflow-y-auto ${sidebarOpen ? "px-3" : "px-2"} ${onNavigate ? "[&_a]:h-10 [&_a]:text-[14.5px]" : ""}`}
+          onClick={(e) => { if ((e.target as HTMLElement).closest("a")) onNavigate?.() }}
+        >
           <NavItem to="/dashboard" icon={LayoutDashboard} collapsed={collapsed}>Dashboard</NavItem>
 
           {hasIntelligence && (
@@ -383,23 +382,83 @@ export function AppShell() {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+    </>
+  )
+}
 
+export function AppShell() {
+  // WS-F3 — mantém a conexão de tempo real viva pro app inteiro logado (não só
+  // Alertas: é daqui que o badge da sidebar recebe o "novo" sem precisar navegar).
+  useRealtimeConnection()
+  const location = useLocation()
+  const { resolvedTheme, setTheme } = useTheme()
+  const isDark = resolvedTheme === "dark"
+
+  const mainRef = useRef<HTMLElement>(null)
+  useScrollToTop(mainRef)
+
+  const [sidebarOpen, setSidebarOpen] = useState(() => getInitialOpenState(STORAGE_SIDEBAR_KEY))
+  // Gaveta do celular: estado próprio, separado do recolher da coluna fixa —
+  // abrir o menu no telefone não pode gravar preferência do desktop.
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_SIDEBAR_KEY, String(sidebarOpen)) } catch { /* storage indisponível */ }
+  }, [sidebarOpen])
+
+  return (
+    // Altura travada na viewport: quem rola é o <main>, e só ele. Com
+    // `min-h-screen` o documento também rolava, e qualquer transbordo
+    // dentro do <main> (as animações de entrada empurram o conteúdo 10px
+    // pra baixo) abria uma segunda barra de rolagem por alguns segundos.
+    // `dvh` e não `vh`: no celular a barra de endereço entra e sai, e com `vh`
+    // o rodapé da sidebar e o fim do conteúdo ficavam escondidos atrás dela.
+    <div className="h-dvh overflow-hidden flex text-ink bg-surface">
+      {/* Sidebar fixa: só a partir de md. Abaixo disso ela come a tela. */}
+      <aside className={`${sidebarOpen ? "w-60" : "w-14"} hidden md:flex transition-[width] duration-300 ease-[cubic-bezier(0.2,0.7,0.1,1)] h-dvh border-r sticky top-0 bg-canvas text-ink-muted border-border-soft flex-col overflow-hidden shrink-0`}>
+        <SidebarBody collapsed={!sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
       </aside>
+
+      {/* Celular: a mesma sidebar, em gaveta sobre o conteúdo. */}
+      <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+        <SheetContent
+          side="left"
+          showCloseButton={false}
+          aria-describedby={undefined}
+          className="md:hidden p-0 gap-0 data-[side=left]:w-70 data-[side=left]:max-w-[85vw] bg-canvas text-ink-muted border-border-soft"
+        >
+          <SheetTitle className="sr-only">Menu</SheetTitle>
+          <SidebarBody
+            collapsed={false}
+            onToggle={() => setMobileNavOpen(false)}
+            onNavigate={() => setMobileNavOpen(false)}
+          />
+        </SheetContent>
+      </Sheet>
 
       {/* Main area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Topbar */}
-        <header className="h-15 sticky top-0 bg-surface border-b border-border-soft px-6 flex items-center gap-2 shrink-0 z-20">
+        <header className="h-15 sticky top-0 bg-surface border-b border-border-soft px-3 md:px-6 flex items-center gap-2 shrink-0 z-20">
+          <button
+            type="button"
+            onClick={() => setMobileNavOpen(true)}
+            aria-label="Abrir menu"
+            className="md:hidden w-9 h-9 -ml-1 flex items-center justify-center rounded-md text-ink-muted hover:text-ink hover:bg-tint transition-colors cursor-pointer shrink-0"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
           <Breadcrumb />
           <div className="flex-1" />
           {/* A busca saiu daqui: o campo não fazia nada. Volta quando existir busca de verdade. */}
           {/* Só Alertas lê várias marcas de uma vez (a API de disparos
               aceita `brandId` nulo). Ver `allBrands` no BrandContext. */}
           <BrandSwitcher allowAll={location.pathname.startsWith("/alerts")} />
+          {/* No celular o tema fica em Aparência: o espaço do topo é da marca ativa. */}
           <button
             type="button"
             aria-label={isDark ? "Ativar modo claro" : "Ativar modo escuro"}
-            className="w-8 h-8 flex items-center justify-center rounded-full text-ink-muted hover:text-ink hover:bg-tint transition-colors cursor-pointer"
+            className="hidden sm:flex w-8 h-8 items-center justify-center rounded-full text-ink-muted hover:text-ink hover:bg-tint transition-colors cursor-pointer"
             onClick={() => setTheme(isDark ? "light" : "dark")}
           >
             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
@@ -412,7 +471,8 @@ export function AppShell() {
             `p-6` aqui, a caixa de conteúdo começava 24px abaixo da borda e as
             barras `sticky top-0` das telas grudavam nesse recuo em vez de
             encostar no header. O respiro mudou pro wrapper de rota, então as 14
-            telas full-bleed seguem cancelando com o mesmo `-m-6`.
+            telas full-bleed seguem cancelando com o mesmo `-m-4 md:-m-6` — o par
+            precisa andar junto, ou a tela ganha uma faixa ou corta a borda.
 
             `scrollbar-gutter: stable` reserva a calha desde o primeiro quadro:
             sem isso o conteúdo pula alguns pixels na horizontal quando a barra
@@ -424,12 +484,12 @@ export function AppShell() {
         >
           {/* `empty:hidden`: os dois avisos somem na maior parte do tempo, e sem
               isso o padding deles deixava uma faixa morta no topo. */}
-          <div className="px-6 pt-6 empty:hidden">
+          <div className="px-4 pt-4 md:px-6 md:pt-6 empty:hidden">
             <BillingStateBanner />
             <TrialBanner />
           </div>
           {/* Remonta por rota: cada tela entra com o mesmo movimento curto. */}
-          <div key={location.pathname} className="z-rise p-6">
+          <div key={location.pathname} className="z-rise p-4 md:p-6">
             <Outlet />
           </div>
         </main>
@@ -460,14 +520,14 @@ function useTrialDaysLeft(): number | null {
   return Math.max(0, Math.ceil(ms / 86_400_000))
 }
 
-function TrialBadge() {
+function TrialBadge({ onNavigate }: { onNavigate?: () => void }) {
   const days = useTrialDaysLeft()
   const openSettings = useOpenSettings()
   if (days === null) return null
 
   return (
     <button
-      onClick={() => openSettings("plano")}
+      onClick={() => { onNavigate?.(); openSettings("plano") }}
       className="mx-3 mb-1 flex w-[calc(100%-1.5rem)] items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-[12px] transition-colors hover:opacity-80"
       style={{ background: "var(--teal-bg)", color: "var(--teal-fg)" }}
     >
@@ -502,11 +562,11 @@ function BillingStateBanner() {
 
   return (
     <div
-      className="mb-5 flex items-start gap-3 rounded-[14px] border px-4 py-3.5"
+      className="mb-5 flex flex-wrap sm:flex-nowrap items-start gap-3 rounded-[14px] border px-4 py-3.5"
       style={{ background: tom.bg, borderColor: tom.border }}
     >
       <AlertCircle className="w-[17px] h-[17px] shrink-0 mt-0.5" style={{ color: tom.color }} />
-      <div className="flex-1">
+      <div className="flex-1 min-w-0 basis-[calc(100%-2rem)] sm:basis-auto">
         <div className="text-[14px] font-semibold" style={{ color: tom.color }}>
           {pendente
             ? "Pagamento pendente"
@@ -531,7 +591,7 @@ function BillingStateBanner() {
       </div>
       <button
         onClick={() => openSettings("plano")}
-        className="shrink-0 h-8 px-3 inline-flex items-center rounded-lg text-[12.5px] font-medium text-white"
+        className="shrink-0 h-8 px-3 ml-7.5 sm:ml-0 inline-flex items-center rounded-lg text-[12.5px] font-medium text-white"
         style={{ background: "var(--color-teal-500)" }}
       >
         {pendente ? "Revisar cobrança" : "Reativar assinatura"}
@@ -548,11 +608,11 @@ function TrialBanner() {
 
   return (
     <div
-      className="mb-5 flex items-start gap-3 rounded-[14px] border px-4 py-3.5"
+      className="mb-5 flex flex-wrap sm:flex-nowrap items-start gap-3 rounded-[14px] border px-4 py-3.5"
       style={{ background: "#FFFBEB", borderColor: "rgba(217,119,6,.32)" }}
     >
       <AlertCircle className="w-[17px] h-[17px] shrink-0 mt-0.5" style={{ color: "var(--color-warn)" }} />
-      <div className="flex-1">
+      <div className="flex-1 min-w-0 basis-[calc(100%-2rem)] sm:basis-auto">
         <div className="text-[14px] font-semibold" style={{ color: "var(--color-warn)" }}>
           {days === 0
             ? "Seu período de teste termina hoje"
@@ -565,7 +625,7 @@ function TrialBanner() {
       </div>
       <button
         onClick={() => openSettings("plano")}
-        className="shrink-0 h-8 px-3 inline-flex items-center rounded-lg text-[12.5px] font-medium text-white"
+        className="shrink-0 h-8 px-3 ml-7.5 sm:ml-0 inline-flex items-center rounded-lg text-[12.5px] font-medium text-white"
         style={{ background: "var(--color-teal-500)" }}
       >
         Escolher plano

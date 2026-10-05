@@ -122,7 +122,7 @@ export default function CreatorHomePage() {
         className="border-b border-border-soft"
         style={{ background: "var(--surface)" }}
       >
-        <div className="max-w-[880px] mx-auto px-6 py-4 flex items-center justify-between gap-4">
+        <div className="max-w-[880px] mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
             <ZoeLogo className="h-6 w-auto" />
             <span className="chip text-[10.5px]">Criador</span>
@@ -152,7 +152,7 @@ export default function CreatorHomePage() {
         </div>
       </header>
 
-      <main className="max-w-[880px] mx-auto px-6 py-8">
+      <main className="max-w-[880px] mx-auto px-4 sm:px-6 py-8">
         {workspace.isLoading ? (
           <div className="flex items-center gap-2 text-ink-muted text-[13px]">
             <Loader2 className="w-4 h-4 animate-spin" /> Carregando…

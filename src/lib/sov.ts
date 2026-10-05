@@ -52,6 +52,14 @@ export type RankedBrand = SovBrand & { rank: number }
  * 25% arredondado não estão necessariamente empatadas, e mostrar a de menor volume à
  * frente seria um artefato do arredondamento.
  */
+/**
+ * Diferença de share em pontos percentuais. O share chega com uma casa decimal, e a
+ * subtração crua em ponto flutuante dava "2.9000000000000057pp" na tela.
+ */
+export function ppGap(a: number, b: number): number {
+  return Math.round((a - b) * 10) / 10
+}
+
 export function rankBrands(brands: SovBrand[]): RankedBrand[] {
   const sorted = [...brands].sort((a, b) => b.sharePct - a.sharePct || b.mentions - a.mentions)
   // Posição de competição (1, 1, 3): mesmo share E mesmas menções é empate de
@@ -97,14 +105,14 @@ export function positionSummary(ranked: RankedBrand[]): string | null {
   if (you.rank === 1) {
     const proximo = ranked.find((b) => b.rank > 1)
     if (proximo) {
-      const gap = you.sharePct - proximo.sharePct
+      const gap = ppGap(you.sharePct, proximo.sharePct)
       distancia = gap === 0
         ? `, com o mesmo share de ${proximo.brandName} e mais menções`
         : `, ${gap}pp à frente de ${proximo.brandName}`
     }
   } else {
     const lider = ranked[0]
-    const gap = lider.sharePct - you.sharePct
+    const gap = ppGap(lider.sharePct, you.sharePct)
     distancia = gap === 0
       ? `, com o mesmo share de ${lider.brandName} e menos menções`
       : `, ${gap}pp atrás de ${lider.brandName}`
@@ -216,7 +224,7 @@ export function matchup(topics: SovTopic[], rivalBrandId: string): Matchup {
     .map((t) => {
       const yours = t.shares.find((s) => s.isYou)?.sharePct ?? 0
       const theirs = t.shares.find((s) => s.brandId === rivalBrandId)?.sharePct ?? 0
-      return { topic: t.topic, volume: t.volume, yours, theirs, gap: yours - theirs }
+      return { topic: t.topic, volume: t.volume, yours, theirs, gap: ppGap(yours, theirs) }
     })
     .filter((d) => d.yours > 0 || d.theirs > 0)
 

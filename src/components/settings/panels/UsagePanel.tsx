@@ -267,7 +267,7 @@ function MeterCard(p: MeterProps) {
 
   return (
     <div className="rounded-[14px] border border-border-soft overflow-hidden" style={{ background: "var(--surface)" }}>
-      <div className="px-6 pt-6 pb-5">
+      <div className="px-4 sm:px-6 pt-6 pb-5">
         <div className="flex items-end justify-between gap-3 flex-wrap mb-3">
           <div className="flex items-baseline gap-2.5">
             <span className="font-display" style={{ fontSize: 38, lineHeight: 1, color: t.color }}>
@@ -387,7 +387,7 @@ function TwoQuantities({
 }) {
   return (
     <div className="grid @md:grid-cols-2 border-t border-border-soft">
-      <div className="px-6 py-5 sm:border-r border-border-soft">
+      <div className="px-4 sm:px-6 py-5 sm:border-r border-border-soft">
         <div className="eyebrow">Minutos cobrados</div>
         <div className="font-display mt-1.5" style={{ fontSize: 26, color: "var(--ink)" }}>
           {int(billed)}
@@ -396,7 +396,7 @@ function TwoQuantities({
           A unidade de cobrança do período. Um vídeo de 40 minutos consome 40 minutos de cota.
         </div>
       </div>
-      <div className="px-6 py-5">
+      <div className="px-4 sm:px-6 py-5">
         <div className="eyebrow">Vídeos analisados</div>
         <div className="font-display mt-1.5" style={{ fontSize: 26, color: "var(--ink)" }}>
           {int(analyzed)}
@@ -434,18 +434,20 @@ function Projection({
   const text = projectionText(projection, hasQuota)
 
   return (
+    // Celular: rótulo e selo na primeira linha, o texto na largura toda embaixo.
+    // Em três colunas, a frase ficava numa faixa de 80px, uma palavra por linha.
     <div
-      className="flex items-start gap-3 rounded-[14px] border border-border-soft px-4 py-3.5"
+      className="flex flex-wrap sm:flex-nowrap items-start gap-x-3 gap-y-1.5 rounded-[14px] border border-border-soft px-4 py-3.5"
       style={{ background: "var(--surface)" }}
     >
       <span className="eyebrow shrink-0 mt-0.5">estimativa</span>
-      <div className="flex-1">
+      <div className="basis-full sm:basis-0 sm:flex-1 min-w-0 order-last sm:order-none">
         <div className="text-[13.5px] leading-relaxed" style={{ color: "var(--ink-2)" }}>
           {text.headline}
         </div>
         <div className="text-[12.5px] text-ink-muted mt-1">{text.caveat}</div>
       </div>
-      {projection.confidence === "Low" && <span className="chip chip-warn text-[10.5px]">confiança baixa</span>}
+      {projection.confidence === "Low" && <span className="chip chip-warn text-[10.5px] ml-auto sm:ml-0 shrink-0">confiança baixa</span>}
     </div>
   )
 }
@@ -533,7 +535,7 @@ function BlockedBrandsBanner({ rows }: { rows: BrandUsage[] }) {
 function BrandTable({ rows, billedMinutes }: { rows: BrandUsage[]; billedMinutes: number }) {
   return (
     <div className="rounded-[14px] border border-border-soft overflow-hidden" style={{ background: "var(--surface)" }}>
-      <div className="px-6 pt-5 pb-3">
+      <div className="px-4 sm:px-6 pt-5 pb-3">
         <div className="eyebrow">Causa do consumo, por marca</div>
         <div className="text-[13px] text-ink-muted mt-2 max-w-165 leading-relaxed">
           Os quatro números juntos, porque 50 vídeos de 2 minutos e 2 vídeos de 50 minutos dão o
@@ -542,21 +544,54 @@ function BrandTable({ rows, billedMinutes }: { rows: BrandUsage[]; billedMinutes
       </div>
 
       {rows.length === 0 ? (
-        <div className="px-6 pb-6">
+        <div className="px-4 sm:px-6 pb-6">
           <EmptyBlock message="Nenhum minuto cobrado neste período." />
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-[13px]">
+        <div className="@container overflow-x-auto">
+          {/* Estreita: uma linha por marca — minutos e fatia em cima, a régua, e os
+              outros números numa frase. Em cartões com rótulo, três marcas davam
+              quase uma tela inteira. */}
+          <ul className="@2xl:hidden m-0 p-0 list-none border-t border-border-soft">
+            {rows.map((b) => {
+              const share = billedMinutes > 0 ? (b.billedMinutes / billedMinutes) * 100 : 0
+              const color = brandColor(b.brandId)
+              return (
+                <li key={b.brandId} className="px-4 py-3.5 border-b border-border-soft last:border-b-0">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: color }} />
+                    <span className="font-semibold text-[13.5px] truncate flex-1">{b.brandName}</span>
+                    <span className="font-mono-zoe text-[13px] shrink-0">{int(b.billedMinutes)} min</span>
+                    <span className="font-mono-zoe text-[11.5px] text-ink-muted shrink-0 w-10 text-right">{Math.round(share)}%</span>
+                  </div>
+                  <div className="h-1.5 rounded-full overflow-hidden mt-2" style={{ background: "var(--border-soft)" }}>
+                    <div className="h-full rounded-full" style={{ width: `${share}%`, background: color }} />
+                  </div>
+                  <div className="flex items-center justify-between gap-3 mt-2 text-[11.5px] text-ink-muted">
+                    {/* Cada trecho inteiro numa linha: a quebra cai entre eles, nunca no meio. */}
+                    <span className="min-w-0 flex flex-wrap gap-x-1">
+                      <span className="whitespace-nowrap"><span className="font-mono-zoe">{int(b.videoCount)}</span> vídeos ·</span>
+                      <span className="whitespace-nowrap">média <span className="font-mono-zoe">{dec(b.averageMinutes)}</span> min ·</span>
+                      <span className="whitespace-nowrap">mais longo <span className="font-mono-zoe">{duration(b.longestVideoMinutes)}</span></span>
+                    </span>
+                    <span className="shrink-0 inline-flex items-center gap-1.5">
+                      teto <BrandBudgetCell row={b} />
+                    </span>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+          <table className="hidden @2xl:table w-full text-[13px]">
             <thead>
               <tr className="border-y border-border-soft">
-                <th className="text-left font-medium text-ink-muted px-6 py-2.5">Marca</th>
+                <th className="text-left font-medium text-ink-muted px-4 sm:px-6 py-2.5">Marca</th>
                 <th className="text-right font-medium text-ink-muted px-3 py-2.5">Minutos</th>
                 <th className="text-right font-medium text-ink-muted px-3 py-2.5">Vídeos</th>
                 <th className="text-right font-medium text-ink-muted px-3 py-2.5">Duração média</th>
                 <th className="text-right font-medium text-ink-muted px-3 py-2.5">Vídeo mais longo</th>
                 <th className="text-right font-medium text-ink-muted px-3 py-2.5">Teto mensal</th>
-                <th className="text-left font-medium text-ink-muted px-6 py-2.5 w-[150px]">Participação</th>
+                <th className="text-left font-medium text-ink-muted px-4 sm:px-6 py-2.5 w-[150px]">Participação</th>
               </tr>
             </thead>
             <tbody>
@@ -565,7 +600,7 @@ function BrandTable({ rows, billedMinutes }: { rows: BrandUsage[]; billedMinutes
                 const color = brandColor(b.brandId)
                 return (
                   <tr key={b.brandId} className="border-b border-border-soft last:border-b-0">
-                    <td className="px-6 py-3">
+                    <td className="px-4 sm:px-6 py-3">
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: color }} />
                         <span className="font-semibold">{b.brandName}</span>
@@ -578,7 +613,7 @@ function BrandTable({ rows, billedMinutes }: { rows: BrandUsage[]; billedMinutes
                     <td className="text-right px-3 py-3">
                       <BrandBudgetCell row={b} />
                     </td>
-                    <td className="px-6 py-3">
+                    <td className="px-4 sm:px-6 py-3">
                       <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--border-soft)" }}>
                         <div className="h-full rounded-full" style={{ width: `${share}%`, background: color }} />
                       </div>
@@ -745,8 +780,8 @@ function SpendCapCard({
   }
 
   return (
-    <div className="rounded-[14px] border border-border-soft px-6 py-6" style={{ background: "var(--surface)" }}>
-      <div className="grid @3xl:grid-cols-[1fr_300px] gap-8 items-start">
+    <div className="rounded-[14px] border border-border-soft px-4 sm:px-6 py-6" style={{ background: "var(--surface)" }}>
+      <div className="grid grid-cols-[minmax(0,1fr)] @3xl:grid-cols-[minmax(0,1fr)_300px] gap-6 sm:gap-8 items-start">
         <div>
           <div className="eyebrow">Teto de gasto</div>
           <h2 className="font-display mt-2 mb-0" style={{ fontSize: 18, color: "var(--ink)" }}>

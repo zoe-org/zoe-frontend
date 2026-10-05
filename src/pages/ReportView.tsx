@@ -32,7 +32,7 @@ export default function ReportViewPage() {
 
   if (query.isLoading) {
     return (
-      <div className="max-w-[860px] mx-auto p-10 animate-pulse">
+      <div className="max-w-[860px] mx-auto p-4 sm:p-10 animate-pulse">
         <div className="h-10 w-2/3 rounded bg-tint mb-4" />
         <div className="h-40 rounded bg-tint" />
       </div>
@@ -69,7 +69,7 @@ export default function ReportViewPage() {
     <div style={{ background: "var(--surface)", color: "var(--ink)", minHeight: "100vh" }}>
       {/* Barra de ações — some na impressão */}
       <div className="print:hidden sticky top-0 z-10 border-b border-border-soft" style={{ background: "var(--surface)" }}>
-        <div className="max-w-[860px] mx-auto px-10 py-3 flex items-center justify-between">
+        <div className="max-w-[860px] mx-auto px-4 sm:px-10 py-3 flex items-center justify-between">
           <button
             onClick={() => navigate("/reports")}
             className="inline-flex items-center gap-1.5 text-[13px] text-ink-muted hover:text-ink transition-colors"
@@ -86,7 +86,7 @@ export default function ReportViewPage() {
         </div>
       </div>
 
-      <article className="max-w-[860px] mx-auto px-10 py-10">
+      <article className="max-w-[860px] mx-auto px-4 sm:px-10 py-10">
         {/* Cabeçalho do documento */}
         <header className="pb-6 mb-8 border-b border-border-soft">
           <div className="eyebrow mb-2.5">Zoe · Relatório de Inteligência</div>
