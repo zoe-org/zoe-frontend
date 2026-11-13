@@ -29,6 +29,7 @@ import OperationsDashboardPage from "@/pages/operations/Dashboard"
 import OperationsDeliveriesPage from "@/pages/operations/Deliveries"
 import OperationsEscrowPage from "@/pages/operations/Escrow"
 import OperationsRosterPage from "@/pages/operations/Roster"
+import { OPERATIONS_ENABLED } from "@/lib/modules"
 import UsersPage from "@/pages/Users"
 import AdminBrandsPage from "@/pages/admin/AdminBrands"
 import TermsPage from "@/pages/legal/Terms"
@@ -92,15 +93,20 @@ export const router = createBrowserRouter([
       // Tela de canal próprio removida: link antigo cai no monitoramento já filtrado.
       { path: "/intelligence/owned", element: <Navigate to="/intelligence/monitoring?rel=owned" replace /> },
       { path: "/mentions", element: <Navigate to="/intelligence/monitoring" replace /> },
-      // Operations: rota sempre montada. O gate real é o [RequiresFeature] do
-      // backend (403); o item no menu é que some sem a feature.
-      { path: "/operations", element: <OperationsDashboardPage /> },
-      { path: "/operations/campaigns", element: <OperationsCampaignsPage /> },
-      { path: "/operations/influencers", element: <OperationsRosterPage /> },
-      { path: "/operations/contracts", element: <OperationsContractsPage /> },
-      { path: "/operations/deliveries", element: <OperationsDeliveriesPage /> },
-      { path: "/operations/escrow", element: <OperationsEscrowPage /> },
-      { path: "/operations/contracts/:contractId", element: <OperationsContractDetailPage /> },
+      // Operations: rota sempre montada quando o módulo está ligado. O gate real é o
+      // [RequiresFeature] do backend (403); o item no menu é que some sem a feature.
+      // Desligado (lib/modules.ts), qualquer link antigo cai no dashboard.
+      ...(OPERATIONS_ENABLED
+        ? [
+            { path: "/operations", element: <OperationsDashboardPage /> },
+            { path: "/operations/campaigns", element: <OperationsCampaignsPage /> },
+            { path: "/operations/influencers", element: <OperationsRosterPage /> },
+            { path: "/operations/contracts", element: <OperationsContractsPage /> },
+            { path: "/operations/deliveries", element: <OperationsDeliveriesPage /> },
+            { path: "/operations/escrow", element: <OperationsEscrowPage /> },
+            { path: "/operations/contracts/:contractId", element: <OperationsContractDetailPage /> },
+          ]
+        : [{ path: "/operations/*", element: <Navigate to="/dashboard" replace /> }]),
       { path: "/brands", element: <BrandsPage /> },
       { path: "/alerts", element: <AlertsPage /> },
       { path: "/reports", element: <ReportsPage /> },

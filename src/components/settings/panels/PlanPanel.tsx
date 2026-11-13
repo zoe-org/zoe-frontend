@@ -34,6 +34,7 @@ import {
 import { ChangePlanDialog } from "./plan/ChangePlanDialog"
 import { BundleGrid, IntelligenceGrid, OperationsGrid, type CardContext } from "./plan/PlanCards"
 import { day, int, money, shortDay } from "./plan/format"
+import { OPERATIONS_ENABLED } from "@/lib/modules"
 
 // Plano e faturamento (WS-F1). Nenhum valor em reais mora aqui: preço vem de
 // /api/billing/plans, que o lê do Stripe. Cravar número nesta tela criaria uma
@@ -128,8 +129,12 @@ export function PlanPanel() {
         {/* Uma linha só: quebrada, "Full Platform" descia sozinho e parecia outro grupo. */}
         <div className="flex items-center gap-1 overflow-x-auto no-scrollbar -mx-1 px-1">
           <TabPill active={tab === "intelligence"} onClick={() => setTab("intelligence")} label="Intelligence" />
-          <TabPill active={tab === "operations"} onClick={() => setTab("operations")} label="Operations" />
-          <TabPill active={tab === "pacote"} onClick={() => setTab("pacote")} label="Full Platform" />
+          {OPERATIONS_ENABLED && (
+            <>
+              <TabPill active={tab === "operations"} onClick={() => setTab("operations")} label="Operations" />
+              <TabPill active={tab === "pacote"} onClick={() => setTab("pacote")} label="Full Platform" />
+            </>
+          )}
         </div>
 
         {tab === "intelligence" && (
@@ -191,7 +196,10 @@ function useModuleTab(): [ModuleTab, (t: ModuleTab) => void] {
   const { hasFeature } = useAuth()
   const raw = params.get(PLAN_TAB_PARAM)
   const fallback: ModuleTab = hasFeature("intelligence") || !hasFeature("operations") ? "intelligence" : "operations"
-  const tab: ModuleTab = raw === "intelligence" || raw === "operations" || raw === "pacote" ? raw : fallback
+  // Sem Operations (lib/modules.ts) só existe a aba do Intelligence; `?tab=` antigo é ignorado.
+  const tab: ModuleTab = !OPERATIONS_ENABLED
+    ? "intelligence"
+    : raw === "intelligence" || raw === "operations" || raw === "pacote" ? raw : fallback
 
   const setTab = (t: ModuleTab) => {
     const next = new URLSearchParams(params)

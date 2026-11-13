@@ -24,6 +24,7 @@ import { useCurationDraft } from "@/components/admin/curation-draft"
 import { CurationCard, CurationEditor } from "@/components/admin/CurationEditor"
 import { BrandEditModal } from "@/components/admin/BrandEditModal"
 import { formatScore } from "@/lib/score"
+import { OPERATIONS_ENABLED } from "@/lib/modules"
 
 /**
  * Curadoria admin de brands (ADR-021). É o **mecanismo de cura** do modelo de
@@ -45,7 +46,7 @@ export default function AdminBrandsPage() {
   // Fora da aba de propósito, como o summary: o número de modalidades sem parecer
   // é urgência que precisa aparecer na pastilha, não só depois de clicar nela.
   // Mesma query key da aba — o cache serve as duas, sem request repetido.
-  const templates = useContractTemplates(isZoeAdmin)
+  const templates = useContractTemplates(isZoeAdmin && OPERATIONS_ENABLED)
 
   if (!isZoeAdmin) {
     return (
@@ -84,16 +85,18 @@ export default function AdminBrandsPage() {
           badge={summary.data?.breached}
         />
         <TabPill active={tab === "global"} onClick={() => setTab("global")} label="Marcas globais" />
-        <TabPill
-          active={tab === "templates"}
-          onClick={() => setTab("templates")}
-          label="Templates de contrato"
-          badge={templates.data?.pendingLegalReview}
-        />
+        {OPERATIONS_ENABLED && (
+          <TabPill
+            active={tab === "templates"}
+            onClick={() => setTab("templates")}
+            label="Templates de contrato"
+            badge={templates.data?.pendingLegalReview}
+          />
+        )}
       </section>
 
       {tab === "queue" ? <VerificationQueueTab />
-        : tab === "global" ? <GlobalBrandsTab />
+        : tab === "global" || !OPERATIONS_ENABLED ? <GlobalBrandsTab />
         : <ContractTemplatesTab />}
     </div>
   )

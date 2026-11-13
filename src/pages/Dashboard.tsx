@@ -34,6 +34,7 @@ import { StatBand } from "@/components/ui/stat-band"
 import { useOperationsDashboard, fmtCents, type OperationsDashboard } from "@/lib/api/operations"
 import { ESCROW_STATE_COLOR } from "@/lib/status-colors"
 import OperationsDashboardPage from "@/pages/operations/Dashboard"
+import { OPERATIONS_ENABLED } from "@/lib/modules"
 
 function getGreeting(): string {
   const h = new Date().getHours()
@@ -69,7 +70,9 @@ export default function DashboardPage() {
   return (
     <EmptyState
       title="Nenhum módulo ativo"
-      description="Este workspace ainda não tem acesso ao Intelligence ou ao Operations."
+      description={OPERATIONS_ENABLED
+        ? "Este workspace ainda não tem acesso ao Intelligence ou ao Operations."
+        : "Este workspace ainda não tem acesso ao Intelligence."}
     />
   )
 }

@@ -20,6 +20,7 @@ import {
 } from "@/features/auth/pendingInvite"
 import { invitesApi } from "@/lib/api/invites"
 import { operationsApi } from "@/lib/api/operations"
+import { OPERATIONS_ENABLED } from "@/lib/modules"
 import { ApiError, setActiveTenantId } from "@/lib/api"
 import { useNavigate, useLocation, Link } from "react-router-dom"
 import { Check, ArrowLeft, Eye, EyeOff, BriefcaseBusiness, Blocks } from "lucide-react"
@@ -646,16 +647,19 @@ export default function RegisterPage() {
     || getPendingInviteToken() != null
     || getPendingInfluencerInviteToken() != null
 
-  const [step, setStep] = useState(initial?.step ?? (inviteMode ? 2 : 1))
+  // Sem Operations (lib/modules.ts) não há o que escolher: o passo "Objetivo" também é pulado.
+  const pulaObjetivo = inviteMode || !OPERATIONS_ENABLED
+
+  const [step, setStep] = useState(initial?.step ?? (pulaObjetivo ? 2 : 1))
   const [intent, setIntent] = useState("")
   // Em modo convite o campo é travado, então o valor TEM de vir de algum lugar: do
   // estado de navegação (convite de membro) ou do que a tela de convite guardou.
   const [email, setEmail] = useState(initial?.email ?? getPendingInviteEmail() ?? "")
   const [password, setPassword] = useState<string | null>(null)
 
-  const minStep = inviteMode ? 2 : 1
-  const steps = inviteMode ? ["Criar conta", "Verificação"] : stepsData
-  const activeIndex = inviteMode ? step - 2 : step - 1
+  const minStep = pulaObjetivo ? 2 : 1
+  const steps = pulaObjetivo ? ["Criar conta", "Verificação"] : stepsData
+  const activeIndex = pulaObjetivo ? step - 2 : step - 1
 
   return (
     <div className="min-h-screen bg-inset flex flex-col lg:flex-row">
