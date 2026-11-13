@@ -14,6 +14,7 @@ import {
   featuresForIntent,
   getOnboardingIntent,
 } from "@/features/auth/onboardingIntent"
+import { OPERATIONS_ENABLED } from "@/lib/modules"
 import { tenantsApi } from "@/lib/api/tenants"
 import { ApiError } from "@/lib/api"
 import ZoeLogo from "@/assets/zoe-logo.svg?react"
@@ -21,7 +22,7 @@ import ZoeLogo from "@/assets/zoe-logo.svg?react"
 const MODULES = [
   { code: "intelligence", name: "Intelligence", hint: "Monitorar marcas em vídeo" },
   { code: "operations", name: "Operations", hint: "Gerir campanhas e contratos" },
-]
+].filter((m) => m.code !== "operations" || OPERATIONS_ENABLED)
 
 const SLUG_PREFIX = "zoe.ai/"
 

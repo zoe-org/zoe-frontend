@@ -3,6 +3,8 @@
  * Persistido em localStorage pra sobreviver à confirmação de email (auto-login) e
  * ser consumido no OnboardingTenant.
  */
+import { OPERATIONS_ENABLED } from "@/lib/modules"
+
 export type OnboardingIntent = "monitor" | "campaigns" | "both"
 
 const STORAGE_KEY = "zoe_onboarding_intent"
@@ -30,5 +32,10 @@ export function clearOnboardingIntent() {
 
 /** Códigos de feature a ativar pro intent. Default = ambos quando intent ausente. */
 export function featuresForIntent(intent: OnboardingIntent | null): string[] {
-  return intent ? FEATURES_BY_INTENT[intent] : FEATURES_BY_INTENT.both
+  const features = intent ? FEATURES_BY_INTENT[intent] : FEATURES_BY_INTENT.both
+  if (OPERATIONS_ENABLED) return features
+  // Operations desligado: intent antigo "campaigns" (guardado no localStorage) não pode
+  // criar um workspace sem módulo nenhum.
+  const semOperations = features.filter((f) => f !== "operations")
+  return semOperations.length > 0 ? semOperations : ["intelligence"]
 }

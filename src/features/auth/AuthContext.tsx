@@ -6,6 +6,7 @@ import { ApiError, getActiveTenantId, setActiveTenantId } from "@/lib/api"
 import { clearPendingInviteToken } from "@/features/auth/pendingInvite"
 import { AuthContext } from "@/features/auth/context"
 import { useCognitoAuth } from "@/features/auth/constants"
+import { OPERATIONS_ENABLED } from "@/lib/modules"
 import type { AuthState, AuthActions } from "@/features/auth/types"
 
 const DEV_MOCK: { me: Me; tenant: MeTenant } = {
@@ -203,7 +204,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
   }, [])
 
-  const hasFeature = useCallback((code: string) => state.features.includes(code), [state.features])
+  // Operations desligado (lib/modules.ts): a feature some para toda a UI, mesmo que o
+  // tenant a tenha no backend.
+  const hasFeature = useCallback(
+    (code: string) => (code === "operations" && !OPERATIONS_ENABLED) ? false : state.features.includes(code),
+    [state.features],
+  )
 
   useEffect(() => { void Promise.resolve().then(refresh) }, [refresh])
 
